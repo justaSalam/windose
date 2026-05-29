@@ -1,12 +1,11 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Graphics.Fonts;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 public class Taskbar : Process
 {
     private Canvas canvas;
     private int height = 20;
+
     public Taskbar(Canvas canvas)
     {
         this.canvas = canvas;
@@ -15,6 +14,8 @@ public class Taskbar : Process
     public override void Start()
     {
         base.Start();
+        Name = "Taskbar";
+        Description = "Shell explorer taskbar process";
     }
 
     public override void Tick()

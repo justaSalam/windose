@@ -6,18 +6,14 @@ using Windose;
 
 public class ShellExplorer : Process
 {
-
-    public string Name = "Shell Explorer";
-    public string Description = "shell explorer";
-    public bool Running = true;
-
-
     private Canvas canvas;
     private Taskbar taskbar;
 
     public override void Start()
     {
         base.Start();
+        Name = "Shell Explorer";
+        Description = "shell explorer";
         canvas = Kernel.Instance.canvas;
 
 
@@ -29,7 +25,7 @@ public class ShellExplorer : Process
         canvas.Clear(Color.FromArgb(0, 80, 128));
         for (int i = 0; i < childIds.Count; i++)
         {
-            canvas.DrawString($"Shell Child[{i}] | {childIds[i].Name}", PCScreenFont.DefaultFont, Color.White, 10, 10 + (i * 30));
+            canvas.DrawString($"Shell Child[{i}] | {childIds[i].Name}", PCScreenFont.DefaultFont, Color.White, 10, 35 + (i * 35));
 
         }
         base.Tick();
