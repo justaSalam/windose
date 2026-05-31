@@ -13,15 +13,14 @@ public class Taskbar : Process
 
     public override void Start()
     {
-        base.Start();
         Name = "Taskbar";
-        Description = "Shell explorer taskbar process";
+        Description = "taskbar";
+        base.Start();
     }
 
-    public override void Tick()
+    public override void Update()
     {
-        base.Tick();
-        canvas.DrawFilledRectangle(Color.Gray, 0, Global.screenHeight - height, Global.screenWidth, height);
+        //canvas.DrawFilledRectangle(Color.Gray, 0, Global.screenHeight - height, Global.screenWidth, height);
 
     }
 

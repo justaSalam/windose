@@ -8,13 +8,18 @@ public static class ProcessManger
 
     public static Process Start(Process process)
     {
-        process.id = processId;
-        process.startTime = DateTime.Now.ToString("HH:mm:ss");
+        try
+        {
+            process.Start();
+            //processes.Add(processId, process);
+            return process;
 
-        process.Start();
-        processes.Add(processId, process);
-        processId++;
-        return process;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+            return null;
+        }
     }
 
     public static List<Process> GetChildren(int parentPid)
@@ -30,17 +35,15 @@ public static class ProcessManger
         return children;
     }
 
-
-
-    public static void Tick()
+    public static T? GetProcess<T>() where T : Process
     {
-        foreach (KeyValuePair<int, Process> _process in processes)
+        foreach (Process process in processes.Values)
         {
-            Process process = _process.Value;
-
-            process.Tick();
-
+            if (process is T typed)
+                return typed;
         }
+
+        return null;
     }
 
 
