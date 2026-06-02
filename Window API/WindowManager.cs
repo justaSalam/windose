@@ -16,23 +16,30 @@ public class WindowManager : Process
 
     public override void Update()
     {
+        return;
         mx = MouseManager.X;
         my = MouseManager.Y;
 
-
-        foreach (Window window in windows.OrderBy(w => w.zIndex))//Draw window
+        lock (windows)
         {
-            if (window == null) continue;
+            foreach (Window window in windows.OrderBy(w => w.zIndex))//Draw window
+            {
+                if (window == null) continue;
 
-            window.Update();
-            if (MouseEventHandler.mouseLeft == MouseLeftEvent.Press && window.HitTest(mx, my)) BringToFront(window);
-        }
-        foreach (Window window in windows.OrderBy(w => w.zIndex))//Pass input
-        {
-            if (window == null) continue;
+                //window.DrawToBuffer();
+                //window.Compose();
 
-            window.HandleInput(mx, my, MouseEventHandler.mouseLeft, MouseEventHandler.mouseRight, MouseEventHandler.mouseMiddle);
-            break;
+
+                if (MouseEventHandler.mouseLeft == MouseLeftEvent.Press && window.HitTest(mx, my)) BringToFront(window);
+            }
+            foreach (Window window in windows.OrderBy(w => w.zIndex))//Pass input
+            {
+                if (window == null) continue;
+
+                window.HandleInput(mx, my, MouseEventHandler.mouseLeft, MouseEventHandler.mouseRight, MouseEventHandler.mouseMiddle);
+                break;
+            }
+
         }
 
     }

@@ -7,7 +7,6 @@ using Windose;
 
 public class ShellExplorer : Process
 {
-    private Canvas canvas;
     private Taskbar taskbar;
 
     public override void Start()
@@ -15,13 +14,17 @@ public class ShellExplorer : Process
         Name = "Shell Explorer";
         Description = "shell explorer";
         base.Start();
-        canvas = Kernel.Instance.canvas;
 
     }
 
+
     public override void Update()
     {
-        //canvas.Clear(Color.FromArgb(0, 80, 128));
+
+        Compositor.Instance.Enqueue(canvas =>
+        {
+            canvas.DrawFilledRectangle(Color.FromArgb(0, 80, 128), 0, 0, Global.screenWidth, Global.screenHeight);
+        });
     }
 
     public override void Stop()

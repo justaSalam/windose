@@ -20,10 +20,14 @@ public class Taskbar : Process
 
     public override void Update()
     {
-        //canvas.DrawFilledRectangle(Color.Gray, 0, Global.screenHeight - height, Global.screenWidth, height);
+
 
     }
 
+    public void Draw()
+    {
+        //canvas.DrawFilledRectangle(Color.Gray, 0, Global.screenHeight - height, Global.screenWidth, height);
+    }
     public override void Stop()
     {
 

@@ -20,6 +20,7 @@ public class Kernel : Sys.Kernel
     public ShellExplorer shellExplorer;
     public WindowManager windowManager;
     public Taskbar taskbar;
+    private Compositor compositor;
 
     protected override void BeforeRun()
     {
@@ -27,6 +28,7 @@ public class Kernel : Sys.Kernel
         Console.WriteLine("Cosmos booted successfully!");
 
         canvas = Canvas.GetFullScreen();
+        compositor = new Compositor(canvas);
 
         MouseManager.Initialize();
         MouseManager.SetScreenSize(canvas.Width, canvas.Height);
@@ -52,27 +54,15 @@ public class Kernel : Sys.Kernel
         {
             canvas.Clear(Color.Black);
             MouseEventHandler.Update();
-            KernelTime.SystemTicks++;
-            TimerManager.Update();
+
+            //shellExplorer.Draw();
+            //taskbar.Draw();
 
 
 
-
+            compositor.Flush();
 
             canvas.DrawString($"Windose NativeAOT {VersionString}", PCScreenFont.DefaultFont, Color.White, 10, 10);
-            //canvas.DrawString($"left state {MouseEventHandler.mouseLeft}", PCScreenFont.DefaultFont, Color.White, 10, 80);
-            //canvas.DrawString($"middle state {MouseEventHandler.mouseMiddle}", PCScreenFont.DefaultFont, Color.White, 10, 120);
-            //canvas.DrawString($"right state {MouseEventHandler.mouseRight}", PCScreenFont.DefaultFont, Color.White, 10, 160);
-
-            int ctr = 0;
-            foreach (KeyValuePair<int, Process> pair in ProcessManger.processes)
-            {
-                Process process = pair.Value;
-                canvas.DrawString($"{process.Name} | {process.thread.ThreadState}", PCScreenFont.DefaultFont, Color.White, 10, 45 + (ctr * 35));
-
-
-                ctr++;
-            }
 
             canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);
 

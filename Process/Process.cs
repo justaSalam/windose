@@ -15,35 +15,38 @@ public abstract class Process
     {
         try
         {
-            Console.WriteLine($"Starting Thread({Name}):");
+            Console.Write($"Starting {Name}: ");
+
             Running = true;
+            thread = new Thread(Main)
+            {
 
-            Console.WriteLine($"Creating a thread");
-            thread = new Thread(Main);
-
-            Console.WriteLine($"Running thread.Start()");
+                Priority = ThreadPriority.Highest
+            };
             thread.Start();
-            Console.WriteLine("Done");
+
+            Console.Write("done");
+            Console.WriteLine();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Thread({Name}) failed to start");
+            Console.WriteLine($"Thread : {Name} | failed to start");
             Console.WriteLine(ex.Message);
         }
     }
     private void Main()
     {
-        try
+        while (Running)
         {
-            while (thread.ThreadState == ThreadState.Running || thread.ThreadState == ThreadState.Background)
+            try
             {
-                //Update();
+                Update();
             }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Thread({Name}) Main failed");
-            Console.WriteLine(ex.Message);
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Thread : {Name} | An exception occurred");
+                Console.WriteLine(ex.Message);
+            }
         }
     }
 

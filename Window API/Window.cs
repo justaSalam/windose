@@ -1,13 +1,16 @@
 using System.Drawing;
+using System.Runtime.CompilerServices;
+using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 
 public class Window : Process
 {
     private WindowManager windowManager;
-    private Canvas canvas;
-    public Rectangle bounds;
-    private Canvas buffer;
+    private Canvas canvas; //Fullscreen buffer
+    public Rectangle bounds; //Window viewport, relative to the screen
+    public Rectangle content; //Content rect, relative to the window
+    private Canvas buffer; //Window Draw Buffer
     public int zIndex;
     public int resizeMargin = 10;
 
@@ -83,7 +86,7 @@ public class Window : Process
 
             if (newWidth > 200 && newHeight > 100) //TODO: each window should have its own clamp size
             {
-                bounds = new Rectangle(bounds.X, bounds.Y, newWidth, newHeight);
+                Resize(bounds.X, bounds.Y, newWidth, newHeight);
             }
         }
     }
@@ -103,29 +106,54 @@ public class Window : Process
     }
 
 
+    private void Resize(int x, int y, int width, int height)
+    {
+        bounds = new Rectangle(x, y, width, height);
+        buffer = new Canvas(width, height);
+    }
 
     public override void Start()
     {
         windowManager = ProcessManger.GetProcess<WindowManager>();
-        if (windowManager == null)
-        {
-            //throw;
-        }
+        if (windowManager == null) return;
+
         Name = "WND";
+        buffer = new Canvas(bounds.Width, bounds.Height);
+
+
+
         base.Start();
     }
 
-    public override void Update()
+    public override void Update() //Window Logic
     {
-        DrawWindow();
+
     }
-    private void DrawWindow()
+    public void DrawToBuffer()
     {
-        canvas.DrawFilledRectangle(Color.LightGray, bounds.X, bounds.Y, bounds.Width, bounds.Height);
-        canvas.DrawString("WINDOW", PCScreenFont.DefaultFont, Color.Black, bounds.X, bounds.Y);
+        try
+        {
+            buffer.DrawFilledRectangle(Color.LightGray, content.X, content.Y, content.Width, content.Height);
+            buffer.DrawString("WINDOW", PCScreenFont.DefaultFont, Color.Black, content.X, content.Y);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
+    }
+    public void Compose()
+    {
+        try
+        {
+            canvas.DrawCanvas(buffer, bounds.X, bounds.Y);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
     }
 
-    public override void Stop() ///TODO Dispose
+    public override void Stop() //TODO Dispose, GC wont collect it without proper disposal first
     {
         Running = false;
     }
