@@ -7,39 +7,33 @@ public class WindowManager : Process
     private int nextZIndex = 1;
 
     private int mx, my;
-    public override void Start()
+    public override void Start(int processId)
     {
         Name = "Desktop Window Manager";
         Description = "Window behavior manager";
-        base.Start();
+        base.Start(processId);
     }
 
     public override void Update()
     {
-        return;
         mx = MouseManager.X;
         my = MouseManager.Y;
 
-        lock (windows)
+        foreach (Window window in windows.OrderBy(w => w.zIndex))//Draw window
         {
-            foreach (Window window in windows.OrderBy(w => w.zIndex))//Draw window
-            {
-                if (window == null) continue;
+            if (window == null) continue;
 
-                //window.DrawToBuffer();
-                //window.Compose();
+            window.Update();
 
 
-                if (MouseEventHandler.mouseLeft == MouseLeftEvent.Press && window.HitTest(mx, my)) BringToFront(window);
-            }
-            foreach (Window window in windows.OrderBy(w => w.zIndex))//Pass input
-            {
-                if (window == null) continue;
+            if (MouseEventHandler.mouseLeft == MouseLeftEvent.Press && window.HitTest(mx, my)) BringToFront(window);
+        }
+        foreach (Window window in windows.OrderBy(w => w.zIndex))//Pass input
+        {
+            if (window == null) continue;
 
-                window.HandleInput(mx, my, MouseEventHandler.mouseLeft, MouseEventHandler.mouseRight, MouseEventHandler.mouseMiddle);
-                break;
-            }
-
+            window.HandleInput(mx, my, MouseEventHandler.mouseLeft, MouseEventHandler.mouseRight, MouseEventHandler.mouseMiddle);
+            break;
         }
 
     }

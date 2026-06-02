@@ -6,24 +6,15 @@ public abstract class Process
     public int id;
     public string startTime;
     public bool Running;
-    public Thread thread { get; private set; }
 
 
-
-
-    public virtual void Start()
+    public virtual void Start(int processId)
     {
         try
         {
             Console.Write($"Starting {Name}: ");
-
+            id = processId;
             Running = true;
-            thread = new Thread(Main)
-            {
-
-                Priority = ThreadPriority.Highest
-            };
-            thread.Start();
 
             Console.Write("done");
             Console.WriteLine();
@@ -34,20 +25,19 @@ public abstract class Process
             Console.WriteLine(ex.Message);
         }
     }
-    private void Main()
+    public void Main()
     {
-        while (Running)
+
+        try
         {
-            try
-            {
-                Update();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Thread : {Name} | An exception occurred");
-                Console.WriteLine(ex.Message);
-            }
+            Update();
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Thread : {Name} | An exception occurred");
+            Console.WriteLine(ex.Message);
+        }
+
     }
 
     public abstract void Update();

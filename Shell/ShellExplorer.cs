@@ -8,23 +8,21 @@ using Windose;
 public class ShellExplorer : Process
 {
     private Taskbar taskbar;
+    private Canvas canvas;
 
-    public override void Start()
+    public override void Start(int processId)
     {
         Name = "Shell Explorer";
         Description = "shell explorer";
-        base.Start();
+        canvas = FullScreenCanvas.GetCurrentFullScreenCanvas();
+        base.Start(processId);
 
     }
 
 
     public override void Update()
     {
-
-        Compositor.Instance.Enqueue(canvas =>
-        {
-            canvas.DrawFilledRectangle(Color.FromArgb(0, 80, 128), 0, 0, Global.screenWidth, Global.screenHeight);
-        });
+        canvas.DrawFilledRectangle(Color.FromArgb(0, 80, 128), 0, 0, canvas.Width, canvas.Height);
     }
 
     public override void Stop()

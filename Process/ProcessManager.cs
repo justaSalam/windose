@@ -10,8 +10,9 @@ public static class ProcessManger
     {
         try
         {
-            process.Start();
-            //processes.Add(processId, process);
+            process.Start(processId);
+            processes.Add(processId, process);
+            processId++;
             return process;
 
         }
@@ -19,6 +20,14 @@ public static class ProcessManger
         {
             Console.WriteLine(ex.Message);
             return null;
+        }
+    }
+
+    public static void Update()
+    {
+        foreach (KeyValuePair<int, Process> process in processes)
+        {
+            process.Value.Main();
         }
     }
 

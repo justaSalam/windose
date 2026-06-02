@@ -32,6 +32,7 @@ public class Window : Process
         {
             inFocus = HitTest(mouseX, mouseY);
         }
+
         DragWindow(mouseLeft, mouseX, mouseY);
         ResizeWindow(mouseLeft, mouseX, mouseY);
 
@@ -39,7 +40,9 @@ public class Window : Process
 
         if (mouseRight == MouseRightEvent.Release)
         {
-            windowManager.Close(this);
+
+            //Stop();
+            //windowManager.Close(this);
         }
     }
 
@@ -112,35 +115,36 @@ public class Window : Process
         buffer = new Canvas(width, height);
     }
 
-    public override void Start()
+    public override void Start(int processId)
     {
-        windowManager = ProcessManger.GetProcess<WindowManager>();
-        if (windowManager == null) return;
+        try
+        {
 
-        Name = "WND";
-        buffer = new Canvas(bounds.Width, bounds.Height);
+            windowManager = ProcessManger.GetProcess<WindowManager>();
+            if (windowManager == null) return;
+
+            Name = "WND";
+            bounds = new Rectangle(100, 100, 320, 240);
+            buffer = new Canvas(bounds.Width, bounds.Height);
 
 
 
-        base.Start();
+            base.Start(processId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
     }
 
     public override void Update() //Window Logic
     {
+        buffer.DrawFilledRectangle(Color.LightGray, content.X, content.Y, content.Width, content.Height);
+        buffer.DrawString("WINDOW", PCScreenFont.DefaultFont, Color.Black, content.X, content.Y);
 
+        //Compose();
     }
-    public void DrawToBuffer()
-    {
-        try
-        {
-            buffer.DrawFilledRectangle(Color.LightGray, content.X, content.Y, content.Width, content.Height);
-            buffer.DrawString("WINDOW", PCScreenFont.DefaultFont, Color.Black, content.X, content.Y);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
-    }
+
     public void Compose()
     {
         try

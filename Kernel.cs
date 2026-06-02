@@ -55,12 +55,8 @@ public class Kernel : Sys.Kernel
             canvas.Clear(Color.Black);
             MouseEventHandler.Update();
 
-            //shellExplorer.Draw();
-            //taskbar.Draw();
+            ProcessManger.Update();
 
-
-
-            compositor.Flush();
 
             canvas.DrawString($"Windose NativeAOT {VersionString}", PCScreenFont.DefaultFont, Color.White, 10, 10);
 

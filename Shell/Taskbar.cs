@@ -11,22 +11,16 @@ public class Taskbar : Process
         this.canvas = canvas;
     }
 
-    public override void Start()
+    public override void Start(int processId)
     {
         Name = "Taskbar";
         Description = "taskbar";
-        base.Start();
+        base.Start(processId);
     }
 
     public override void Update()
     {
-
-
-    }
-
-    public void Draw()
-    {
-        //canvas.DrawFilledRectangle(Color.Gray, 0, Global.screenHeight - height, Global.screenWidth, height);
+        canvas.DrawFilledRectangle(Color.Gray, 0, canvas.Height - height, canvas.Width, height);
     }
     public override void Stop()
     {
