@@ -127,7 +127,8 @@ public class Window : Process
 
     public override void Update() //Window Logic
     {
-
+        DrawToBuffer();
+        Compose();
     }
     public void DrawToBuffer()
     {
@@ -145,7 +146,6 @@ public class Window : Process
     {
         try
         {
-            canvas.DrawCanvas(buffer, bounds.X, bounds.Y);
         }
         catch (Exception ex)
         {

@@ -1,4 +1,8 @@
 
+using System.Runtime.InteropServices;
+using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.System.Graphics;
+
 public abstract class Process
 {
     public string Name;
@@ -8,6 +12,10 @@ public abstract class Process
     public bool Running;
     public Thread thread { get; private set; }
 
+    public Action<Canvas> drawCall;
+
+    private GCHandle gCHandle;
+
 
 
 
@@ -15,14 +23,16 @@ public abstract class Process
     {
         try
         {
+            gCHandle = GCHandle.Alloc(this);
             Console.Write($"Starting {Name}: ");
-
+            drawCall = DrawCall;
             Running = true;
             thread = new Thread(Main)
             {
+                Name = Name,
 
-                Priority = ThreadPriority.Highest
             };
+
             thread.Start();
 
             Console.Write("done");
@@ -30,24 +40,29 @@ public abstract class Process
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Thread : {Name} | failed to start");
-            Console.WriteLine(ex.Message);
+            Serial.WriteString($"Thread : {Name} | failed to start");
+            Serial.WriteString(ex.Message);
         }
     }
     private void Main()
     {
         while (Running)
         {
+
             try
             {
                 Update();
+                Compositor.Instance.SetDrawCall(thread.ManagedThreadId, drawCall);
+                Thread.Sleep(16);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Thread : {Name} | An exception occurred");
-                Console.WriteLine(ex.Message);
+                Serial.WriteString($"Thread : {Name} | An exception occurred");
+                Serial.WriteString(ex.Message);
             }
         }
+
+
     }
 
     public abstract void Update();
@@ -56,6 +71,8 @@ public abstract class Process
     {
         Running = false;
     }
+
+    protected virtual void DrawCall(Canvas canvas) { }
 
 }
 

@@ -3,7 +3,7 @@ using Windose;
 
 public static class ProcessManger
 {
-    public static Dictionary<int, Process> processes = new Dictionary<int, Process>();
+    public static List<Process> processes = new();
     private static int processId;
 
     public static Process Start(Process process)
@@ -11,7 +11,7 @@ public static class ProcessManger
         try
         {
             process.Start();
-            //processes.Add(processId, process);
+            processes.Add(process);
             return process;
 
         }
@@ -22,22 +22,9 @@ public static class ProcessManger
         }
     }
 
-    public static List<Process> GetChildren(int parentPid)
-    {
-        List<Process> children = new();
-
-        foreach (var process in processes)
-        {
-            if (process.Key == parentPid)
-                children.Add(process.Value);
-        }
-
-        return children;
-    }
-
     public static T? GetProcess<T>() where T : Process
     {
-        foreach (Process process in processes.Values)
+        foreach (Process process in processes)
         {
             if (process is T typed)
                 return typed;

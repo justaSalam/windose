@@ -1,6 +1,10 @@
 using System;
 using System.Drawing;
 using System.Runtime.InteropServices;
+using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.Core.Memory.GarbageCollector;
+using Cosmos.Kernel.Core.Memory.Heap;
+using Cosmos.Kernel.Core.Runtime;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Mouse;
@@ -22,9 +26,12 @@ public class Kernel : Sys.Kernel
     public Taskbar taskbar;
     private Compositor compositor;
 
+    int tick;
+
     protected override void BeforeRun()
     {
         Instance = this;
+        GarbageCollector.Initialize();
         Console.WriteLine("Cosmos booted successfully!");
 
         canvas = Canvas.GetFullScreen();
@@ -40,11 +47,11 @@ public class Kernel : Sys.Kernel
         windowManager = new WindowManager();
 
         ProcessManger.Start(shellExplorer);
-        ProcessManger.Start(taskbar);
+        //ProcessManger.Start(taskbar);
 
-        ProcessManger.Start(windowManager);
+        //ProcessManger.Start(windowManager);
 
-        windowManager.Register(new Window(canvas) { bounds = new Rectangle(100, 100, 320, 240) });
+        //windowManager.Register(new Window(canvas) { bounds = new Rectangle(100, 100, 320, 240) });
 
     }
 
@@ -55,19 +62,27 @@ public class Kernel : Sys.Kernel
             canvas.Clear(Color.Black);
             MouseEventHandler.Update();
 
-            //shellExplorer.Draw();
-            //taskbar.Draw();
-
-
-
+            tick++;
             compositor.Flush();
-
             canvas.DrawString($"Windose NativeAOT {VersionString}", PCScreenFont.DefaultFont, Color.White, 10, 10);
+
+
+            canvas.DrawString(tick.ToString(), PCScreenFont.DefaultFont, Color.White, 10, 80);
 
             canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);
 
-
             canvas.Display();
+
+            GarbageCollector.GetStats(out int collections, out int freed);
+            ulong heap = GarbageCollector.GetHeapSizeBytes();
+            int timeInGC = GarbageCollector.GetLastGCPercentTimeInGC();
+
+            Serial.WriteString($"[KERNEL GC] GC collections: {collections}\n");
+            Serial.WriteString($"[KERNEL GC] GC freed: {freed} objects\n");
+            Serial.WriteString($"[KERNEL GC] Heap: {heap} bytes\n");
+            Serial.WriteString($"[KERNEL GC] Time in GC: {timeInGC}%\n");
+
+
         }
         catch (Exception ex)
         {
