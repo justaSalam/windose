@@ -5,6 +5,7 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.Core.Memory.Heap;
 using Cosmos.Kernel.Core.Runtime;
+using Cosmos.Kernel.HAL;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Mouse;
@@ -18,14 +19,13 @@ namespace Windose;
 /// </summary>
 public class Kernel : Sys.Kernel
 {
-    public static Kernel Instance;
-    public Canvas canvas;
+    private const int gcrate = 150;
+    public static Kernel Instance = null!;
+    public static DirectBitmap mainBuffer;
+    public static Canvas canvas = null!;
 
-    public ShellExplorer shellExplorer;
-    public WindowManager windowManager;
-    public Taskbar taskbar;
-    private Compositor compositor;
-
+    private WindowManager windowManager = null!;
+    private const string versionString = $"Windose NativeAOT {VersionString}";
     int tick;
 
     protected override void BeforeRun()
@@ -35,53 +35,46 @@ public class Kernel : Sys.Kernel
         Console.WriteLine("Cosmos booted successfully!");
 
         canvas = Canvas.GetFullScreen();
-        compositor = new Compositor(canvas);
+        mainBuffer = new DirectBitmap(canvas.Width, canvas.Height);
 
         MouseManager.Initialize();
         MouseManager.SetScreenSize(canvas.Width, canvas.Height);
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
 
-        shellExplorer = new ShellExplorer();
-        taskbar = new Taskbar(canvas);
-        windowManager = new WindowManager();
+        Explorer explorer = new Explorer(canvas);
 
-        ProcessManger.Start(shellExplorer);
-        //ProcessManger.Start(taskbar);
 
-        //ProcessManger.Start(windowManager);
 
-        //windowManager.Register(new Window(canvas) { bounds = new Rectangle(100, 100, 320, 240) });
 
+        ProcessManger.Start(new WindowManager());
+        ProcessManger.Start(explorer);
     }
 
     protected override void Run()
     {
         try
         {
-            canvas.Clear(Color.Black);
-            MouseEventHandler.Update();
-
-            tick++;
-            compositor.Flush();
-            canvas.DrawString($"Windose NativeAOT {VersionString}", PCScreenFont.DefaultFont, Color.White, 10, 10);
+            Mouse.Update();
+            //canvas.Clear(Color.Black);
 
 
-            canvas.DrawString(tick.ToString(), PCScreenFont.DefaultFont, Color.White, 10, 80);
+            ProcessManger.Update();
+
+
+
+            mainBuffer.DrawString(versionString, PCScreenFont.DefaultFont, Color.White, 10, 10);
+            canvas.DrawArray(mainBuffer.GetBuffer(), 0, 0, canvas.Width, canvas.Height);
 
             canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);
-
             canvas.Display();
 
-            GarbageCollector.GetStats(out int collections, out int freed);
-            ulong heap = GarbageCollector.GetHeapSizeBytes();
-            int timeInGC = GarbageCollector.GetLastGCPercentTimeInGC();
+            tick++;
 
-            Serial.WriteString($"[KERNEL GC] GC collections: {collections}\n");
-            Serial.WriteString($"[KERNEL GC] GC freed: {freed} objects\n");
-            Serial.WriteString($"[KERNEL GC] Heap: {heap} bytes\n");
-            Serial.WriteString($"[KERNEL GC] Time in GC: {timeInGC}%\n");
-
+            if (tick % gcrate == 0)
+            {
+                GarbageCollector.Collect();
+            }
 
         }
         catch (Exception ex)
@@ -90,5 +83,15 @@ public class Kernel : Sys.Kernel
             Console.WriteLine(ex.Message);
         }
 
+    }
+
+
+    private int collections, freed, timeInGC;
+    private ulong heap;
+    private void GCINFO()
+    {
+        GarbageCollector.GetStats(out collections, out freed);
+        heap = GarbageCollector.GetHeapSizeBytes();
+        timeInGC = GarbageCollector.GetLastGCPercentTimeInGC();
     }
 }
