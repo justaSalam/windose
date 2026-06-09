@@ -5,6 +5,10 @@ using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
 
+
+/// <summary>
+/// A base for every GUI object
+/// </summary>
 public class Component : IDisposable
 {
 
@@ -86,7 +90,7 @@ public class Component : IDisposable
     public State state;
 
     protected bool dirty;
-    public bool forceDirty { get; protected set; }
+    public bool forceDirty { get; private set; }
     protected bool visible;
     public bool isRoot;
 
@@ -99,7 +103,23 @@ public class Component : IDisposable
     protected int _absoluteY;
     protected int zIndex;
 
-    public Component(int x, int y, int width, int height)
+    protected Thickness Margin = new Thickness(5);
+    protected Thickness Padding = new Thickness(5);
+
+    public HorizontalAlignment horizontalAlignment = HorizontalAlignment.Left;
+    public VerticalAlignment verticalAlignment = VerticalAlignment.Top;
+
+    public Component(int x, int y, int width, int height, Thickness margin = new Thickness(), Thickness padding = new Thickness(), HorizontalAlignment horizontal = HorizontalAlignment.Left, VerticalAlignment vertical = VerticalAlignment.Top)
+    {
+        Margin = margin;
+        Padding = padding;
+        horizontalAlignment = horizontal;
+        verticalAlignment = vertical;
+
+        Init(x, y, width, height);
+    }
+
+    private void Init(int x, int y, int width, int height)
     {
         rectangle = new Rectangle(x, y, width, height);
         buffer = new DirectBitmap(rectangle.Width, rectangle.Height);
@@ -115,13 +135,14 @@ public class Component : IDisposable
 
         state = State.Normal;
 
-
         MarkDirty();
         components.Add(this);
+
+        ComputeAbsoluteCoordinates();
     }
     public virtual void Update()
     {
-        bool isInside = IsInside(MouseManager.X, MouseManager.Y);
+        bool isInside = IsInsideAbsolute(MouseManager.X, MouseManager.Y);
         State prevState = state;
 
         if (isInside && state != State.Highlighted)
@@ -156,7 +177,10 @@ public class Component : IDisposable
                 break;
         }
     }
-
+    /// <summary>
+    /// -- Call last --
+    /// Copies the component buffer into the main screen buffer
+    /// </summary>
     public virtual void Draw()
     {
         Kernel.mainBuffer.DrawArray(buffer.GetBuffer(), X, Y, Width, Height);
@@ -187,9 +211,14 @@ public class Component : IDisposable
         buffer.DrawImage(cacheBuffer.GetBufferBitmap, 0, 0);
     }
 
-    public bool IsInside(int x, int y)
+    public bool IsInsideAbsolute(int x, int y)
     {
         return x >= AbsoluteX && x <= AbsoluteX + Width && y >= AbsoluteY && y <= AbsoluteY + Height;
+    }
+
+    public bool IsInsideLocal(int x, int y)
+    {
+        return x >= X && x <= X + Width && y >= Y && y <= Y + Height;
     }
 
     public virtual void Resize(int width, int height)

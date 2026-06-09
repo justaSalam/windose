@@ -1,10 +1,10 @@
 
 public static class ProcessManger
 {
-    public static List<Process> processes = new();
+    public static List<SingleThreadedProcess> processes = new();
     private static int processId;
 
-    public static Process Start(Process process)
+    public static SingleThreadedProcess Start(SingleThreadedProcess process)
     {
         process.id = processId;
         process.Start();
@@ -16,15 +16,15 @@ public static class ProcessManger
 
     public static void Update()
     {
-        foreach (Process process in processes)
+        foreach (SingleThreadedProcess process in processes)
         {
             process.Main();
         }
     }
 
-    public static T? GetProcess<T>() where T : Process
+    public static T? GetProcess<T>() where T : SingleThreadedProcess
     {
-        foreach (Process process in processes)
+        foreach (SingleThreadedProcess process in processes)
         {
             if (process is T typed)
                 return typed;

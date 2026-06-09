@@ -17,7 +17,6 @@ public class Taskbar : Component
 
         useGradient = false;
 
-        MarkDirty();
     }
 
     public Taskbar(Color color1, Color color2, int x, int y, int width, int height) : base(x, y, width, height)
@@ -35,17 +34,16 @@ public class Taskbar : Component
     }
     public override void Draw()
     {
-        base.Draw();
-
-
         if (useGradient) DrawGradient(color1, color2, X, Y, Width, Height);
-        else DrawFilledRectangle(color1, X, Y, Width, Height);
+        else DrawFilledRectangle(color1, 0, 0, Width, Height);
 
-        Serial.WriteString($"[DRAW CALL] Use Gradient: {useGradient} for: {GetName()}\n");
+        Serial.WriteString($"[DRAW CALL] Color: {color1} for: {GetName()}\n");
 
 
         if (useBorders) DrawRectangle(borderColor, X, Y, Width, Height);
         if (text != "") DrawString(text, X, Y);
+
+        base.Draw();
     }
 
     public override string GetName() => "Taskbar";

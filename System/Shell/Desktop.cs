@@ -6,7 +6,7 @@ public class Desktop : Component
 {
     public Desktop(int x, int y, int width, int height) : base(x, y, width, height)
     {
-        MarkDirty();
+
     }
 
 
@@ -17,8 +17,8 @@ public class Desktop : Component
     }
     public override void Draw()
     {
+        DrawFilledRectangle(Color.FromArgb(0, 128, 128), X, Y, Width, Height);
         base.Draw();
-        DrawFilledRectangle(Color.Blue, X, Y, Width, Height);
     }
 
 }

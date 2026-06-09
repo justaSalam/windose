@@ -23,29 +23,18 @@ public class Window : Component
 
     public Window(int x, int y, int width, int height) : base(x, y, width, height)
     {
-
     }
 
     public void Start()
     {
-        content = new Rectangle(0, 0, bounds.Width, bounds.Height);
     }
 
-    public void Update() //Window Logic
+    public override void Draw() //Window Logic
     {
-        Compose();
+        DrawFilledRectangle(Color.White, X, Y, Width, Height);
+        base.Draw();
     }
-    private void Compose()
-    {
-        try
-        {
 
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine(ex.Message);
-        }
-    }
 
 
     public void Stop() //TODO Dispose, GC wont collect it without proper disposal first

@@ -1,8 +1,9 @@
 using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
 
-public class WindowManager : Process
+public class WindowManager : SingleThreadedProcess
 {
     public List<Window> windows = new List<Window>();
     private Window? focused;
@@ -23,6 +24,8 @@ public class WindowManager : Process
         my = MouseManager.Y;
         mouseState = Mouse.state;
 
+
+        //Draw Screen
         foreach (Component component in Component.components)
         {
             if (component.IsDirty() || component.forceDirty)
@@ -31,6 +34,18 @@ public class WindowManager : Process
 
                 component.Draw();
                 component.MarkCleaned();
+            }
+        }
+
+        //Draw Applications
+        foreach (Window window in windows)
+        {
+            if (window.IsDirty() || window.forceDirty)
+            {
+                if (!window.Visible) return;
+
+                window.Draw();
+                window.MarkCleaned();
             }
         }
 
@@ -93,8 +108,9 @@ public class WindowManager : Process
     {
         window.zIndex = nextZIndex++;
     }
-    public override void Stop()
+    public override void Dispose()
     {
-
+        windows = null;
+        base.Dispose();
     }
 }

@@ -43,12 +43,14 @@ public class Kernel : Sys.Kernel
         Global.screenWidth = canvas.Width;
 
         Explorer explorer = new Explorer(canvas);
+        windowManager = new WindowManager();
 
 
 
-
-        ProcessManger.Start(new WindowManager());
+        ProcessManger.Start(windowManager);
         ProcessManger.Start(explorer);
+
+        windowManager.Register(new Window(100, 100, 400, 250));
     }
 
     protected override void Run()
