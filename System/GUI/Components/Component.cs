@@ -86,7 +86,7 @@ public class Component : IDisposable
 
     protected DirectBitmap buffer;
     private DirectBitmap cacheBuffer;
-    protected Rectangle rectangle;
+    public Rectangle rectangle;
     public State state;
 
     protected bool dirty;
@@ -101,7 +101,10 @@ public class Component : IDisposable
 
     protected int _absoluteX;
     protected int _absoluteY;
-    protected int zIndex;
+
+    public static int currentZIndex = 0;
+    public int zIndex;
+    public DrawLayer zLayer;
 
     protected Thickness Margin = new Thickness(5);
     protected Thickness Padding = new Thickness(5);
@@ -131,12 +134,13 @@ public class Component : IDisposable
         visible = true;
         isRoot = true;
 
-        zIndex = 0;
+        zIndex = currentZIndex;
 
         state = State.Normal;
 
-        MarkDirty();
         components.Add(this);
+        MarkDirty();
+        currentZIndex++;
 
         ComputeAbsoluteCoordinates();
     }
@@ -184,6 +188,7 @@ public class Component : IDisposable
     public virtual void Draw()
     {
         Kernel.mainBuffer.DrawArray(buffer.GetBuffer(), X, Y, Width, Height);
+        //SaveCacheBuffer();
     }
 
     public virtual void Draw(Component component)
@@ -241,7 +246,7 @@ public class Component : IDisposable
             }
         }
 
-        rectangle = new Rectangle(Y, X, Y + height, X + width);
+        rectangle = new Rectangle(X, Y, Width, Height);
         buffer = new DirectBitmap(width, height);
         cacheBuffer = new DirectBitmap(width, height);
 
@@ -387,14 +392,13 @@ public class Component : IDisposable
         }
     }
 
-    public virtual bool IsDirty()
-    {
-        return dirty;
-    }
+    public virtual bool IsDirty() => dirty;
 
     public virtual void MarkDirty()
     {
+        if (dirty) return;
         dirty = true;
+        WindowManager.Invalidate(this);
     }
     public virtual void ForceDirty()
     {

@@ -16,6 +16,7 @@ public class Taskbar : Component
         color1 = color;
 
         useGradient = false;
+        zLayer = DrawLayer.Taskbar;
 
     }
 

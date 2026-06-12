@@ -21,8 +21,8 @@ public class Explorer : SingleThreadedProcess
     public override void Start()
     {
         base.Start();
-        taskbar = new Taskbar(Color.Gray, 0, Kernel.canvas.Height - 35, canvas.Width, 35);
         desktop = new Desktop(0, 0, Kernel.canvas.Width, Kernel.canvas.Height);
+        taskbar = new Taskbar(Color.Gray, 0, Kernel.canvas.Height - 35, canvas.Width, 35);
 
     }
 

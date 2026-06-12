@@ -23,15 +23,26 @@ public class Window : Component
 
     public Window(int x, int y, int width, int height) : base(x, y, width, height)
     {
+        bounds = new Rectangle(x, y, width, height);
+        zLayer = DrawLayer.Window;
     }
 
     public void Start()
     {
     }
 
+    public override void Update()
+    {
+        base.Update();
+    }
+
     public override void Draw() //Window Logic
     {
-        DrawFilledRectangle(Color.White, X, Y, Width, Height);
+        DrawFilledRectangle(Color.Gray, 0, 0, Width, Height);
+        DrawString(X.ToString(), Color.Black, 0, 0);
+        DrawString(Y.ToString(), Color.Black, 0, 35);
+        DrawString(Width.ToString(), Color.Black, 0, 70);
+        DrawString(Height.ToString(), Color.Black, 0, 105);
         base.Draw();
     }
 
@@ -75,15 +86,15 @@ public class Window : Component
         else if (mouse.left == MouseEvents.None && dragging)
         {
             dragging = false;
+
         }
 
         if (dragging)
         {
-            bounds = new Rectangle(
-                mouseX - offset.X,
-                mouseY - offset.Y,
-                bounds.Width,
-                bounds.Height);
+            X = mouseX - offset.X;
+            Y = mouseY - offset.Y;
+            bounds = new Rectangle(X, Y, Width, Height);
+            MarkDirty();
         }
     }
 

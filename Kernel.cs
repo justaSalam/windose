@@ -53,12 +53,16 @@ public class Kernel : Sys.Kernel
         windowManager.Register(new Window(100, 100, 400, 250));
     }
 
+    private long lastFrameTicks;
+    public static double DeltaTimeMs;
+    public static double DeltaTimeSeconds;
+    public static int Fps;
     protected override void Run()
     {
         try
         {
             Mouse.Update();
-            //canvas.Clear(Color.Black);
+            canvas.Clear(Color.Black);
 
 
             ProcessManger.Update();
@@ -66,18 +70,20 @@ public class Kernel : Sys.Kernel
 
 
             mainBuffer.DrawString(versionString, PCScreenFont.DefaultFont, Color.White, 10, 10);
+
+
             canvas.DrawArray(mainBuffer.GetBuffer(), 0, 0, canvas.Width, canvas.Height);
+            canvas.DrawString($"Frametime: {DeltaTimeMs}ms | FPS: {Fps}", PCScreenFont.DefaultFont, Color.White, 10, 45);
 
             canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);
             canvas.Display();
 
+
+            Tick();
+            if (tick % gcrate == 0) GarbageCollector.Collect();
+
+
             tick++;
-
-            if (tick % gcrate == 0)
-            {
-                GarbageCollector.Collect();
-            }
-
         }
         catch (Exception ex)
         {
@@ -85,6 +91,24 @@ public class Kernel : Sys.Kernel
             Console.WriteLine(ex.Message);
         }
 
+    }
+
+    private void Tick()
+    {
+        long now = DateTime.UtcNow.Ticks;
+
+        if (lastFrameTicks != 0)
+        {
+            long deltaTicks = now - lastFrameTicks;
+
+            DeltaTimeMs = deltaTicks / 10000.0;
+            DeltaTimeSeconds = deltaTicks / 10_000_000;
+
+            if (DeltaTimeSeconds > 0)
+                Fps = (int)(1.0 / DeltaTimeSeconds);
+        }
+
+        lastFrameTicks = now;
     }
 
 
