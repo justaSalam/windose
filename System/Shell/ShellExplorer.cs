@@ -22,7 +22,7 @@ public class Explorer : SingleThreadedProcess
     {
         base.Start();
         desktop = new Desktop(0, 0, Kernel.canvas.Width, Kernel.canvas.Height);
-        taskbar = new Taskbar(Color.Gray, 0, Kernel.canvas.Height - 35, canvas.Width, 35);
+        taskbar = new Taskbar(Color.Gray, 0, Kernel.canvas.Height - 20, canvas.Width, 20);
 
     }
 

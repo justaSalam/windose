@@ -11,6 +11,8 @@ public class Panel : Component
     private bool useGradient = false;
     public Color borderColor = Color.White;
     public string text = "";
+    public int fontSize = 0;
+    public Color textColor = Color.Black;
 
     public Panel(Color color1, Color color2, int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -18,7 +20,6 @@ public class Panel : Component
         this.color2 = color2;
 
         useGradient = true;
-        Init();
     }
 
     public Panel(Color color, int x, int y, int width, int height) : base(x, y, width, height)
@@ -26,27 +27,35 @@ public class Panel : Component
         color1 = color;
 
         useGradient = false;
-        Init();
+
+
     }
 
-    private void Init()
-    {
-        useBackground = true;
-        useBorders = false;
-        text = "";
-    }
+
 
     public override void Draw()
     {
+        DrawLocal();
         base.Draw();
+    }
+
+    public override void DrawLocal()
+    {
+
         if (useBackground)
         {
-            if (useGradient) DrawGradient(color1, color2, X, Y, Width, Height);
-            else DrawFilledRectangle(color1, X, Y, Width, Height);
+            if (useGradient) DrawGradient(color1, color2, 0, 0, Width, Height);
+            else DrawFilledRectangle(color1, 0, 0, Width, Height);
         }
 
-        if (useBorders) DrawRectangle(borderColor, X, Y, Width, Height);
-        if (text != "") DrawString(text, X, Y);
+        if (useBorders) DrawRectangle(borderColor, 0, 0, Width, Height);
 
+        if (text != "")
+        {
+            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
+            int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
+
+            DrawString(text, textColor, 2, textY, effectiveFontSize);
+        }
     }
 }

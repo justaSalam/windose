@@ -12,24 +12,11 @@ public class Desktop : Component
 
     public override void Update()
     {
-        //base.Update();
-
-
-        if (dirty)
-        {
-            foreach (Component component in components)
-            {
-                if (!component.Visible) continue;
-
-                if (!component.rectangle.IntersectsWith(rectangle)) continue;
-
-                component.MarkDirty();
-            }
-        }
+        // The desktop is a background layer; the compositor handles redraw dependencies.
     }
     public override void Draw()
     {
-        DrawFilledRectangle(Color.FromArgb(0, 128, 128), X, Y, Width, Height);
+        DrawFilledRectangle(Color.FromArgb(0, 128, 128), 0, 0, Width, Height);
         base.Draw();
     }
 

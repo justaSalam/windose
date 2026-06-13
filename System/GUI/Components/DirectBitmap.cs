@@ -259,6 +259,41 @@ public unsafe class DirectBitmap
         }
     }
 
+    public virtual void DrawString(string str, Font font, Color color, int x, int y, int fontSize)
+    {
+        int nativeHeight = font.Height;
+        if (fontSize <= 0) return;
+
+        int scaledWidth = Math.Max(1, font.Width * fontSize / nativeHeight);
+        int cursorX = x;
+
+        for (int i = 0; i < str.Length; i++)
+        {
+            DrawChar(str[i], font, color, cursorX, y, scaledWidth, fontSize);
+            cursorX += scaledWidth;
+        }
+    }
+
+    public virtual void DrawChar(char c, Font font, Color color, int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0) return;
+
+        for (int destY = 0; destY < height; destY++)
+        {
+            int sourceY = destY * font.Height / height;
+
+            for (int destX = 0; destX < width; destX++)
+            {
+                int sourceX = destX * font.Width / width;
+
+                if (FontPixelSet(c, font, sourceX, sourceY))
+                {
+                    DrawPoint(color, x + destX, y + destY);
+                }
+            }
+        }
+    }
+
     public virtual void DrawChar(char c, Font font, Color color, int x, int y)
     {
         byte height = font.Height;
@@ -334,6 +369,57 @@ public unsafe class DirectBitmap
             for (int j = 0; j < height; j++)
             {
                 DrawPoint(colors[j * width + i], x + i, y + j);
+            }
+        }
+    }
+
+    private bool FontPixelSet(char c, Font font, int x, int y)
+    {
+        int bytesPerRow = (font.Width + 7) / 8;
+        int glyphOffset = font.Height * bytesPerRow * (byte)c;
+        byte value = font.Data[glyphOffset + y * bytesPerRow + x / 8];
+
+        return font.ConvertByteToBitAddress(value, x % 8 + 1);
+    }
+
+    public virtual void DrawArrayClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
+    {
+        if (destinationX < 0)
+        {
+            int clipped = -destinationX;
+            sourceX += clipped;
+            width -= clipped;
+            destinationX = 0;
+        }
+
+        if (destinationY < 0)
+        {
+            int clipped = -destinationY;
+            sourceY += clipped;
+            height -= clipped;
+            destinationY = 0;
+        }
+
+        if (destinationX + width > Width)
+        {
+            width = Width - destinationX;
+        }
+
+        if (destinationY + height > Height)
+        {
+            height = Height - destinationY;
+        }
+
+        if (width <= 0 || height <= 0) return;
+
+        for (int j = 0; j < height; j++)
+        {
+            int sourceIndex = (sourceY + j) * sourceWidth + sourceX;
+            int destinationIndex = (destinationY + j) * Width + destinationX;
+
+            for (int i = 0; i < width; i++)
+            {
+                buffer.RawData[destinationIndex + i] = colors[sourceIndex + i];
             }
         }
     }

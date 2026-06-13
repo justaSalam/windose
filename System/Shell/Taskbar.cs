@@ -27,6 +27,8 @@ public class Taskbar : Component
 
         useGradient = true;
 
+        zLayer = DrawLayer.Taskbar;
+
         MarkDirty();
     }
     public override void Update()
@@ -35,14 +37,14 @@ public class Taskbar : Component
     }
     public override void Draw()
     {
-        if (useGradient) DrawGradient(color1, color2, X, Y, Width, Height);
+        if (useGradient) DrawGradient(color1, color2, 0, 0, Width, Height);
         else DrawFilledRectangle(color1, 0, 0, Width, Height);
 
         Serial.WriteString($"[DRAW CALL] Color: {color1} for: {GetName()}\n");
 
 
-        if (useBorders) DrawRectangle(borderColor, X, Y, Width, Height);
-        if (text != "") DrawString(text, X, Y);
+        if (useBorders) DrawRectangle(borderColor, 0, 0, Width, Height);
+        if (text != "") DrawString(text, 0, 0);
 
         base.Draw();
     }

@@ -2,6 +2,7 @@ using System.Drawing;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
+using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
 
@@ -16,10 +17,31 @@ public class Component : IDisposable
     public int[] GetRawBuffer() => buffer.GetBufferBitmap.RawData;
     public virtual string GetName() => "UNASSIGNED COMPONENT";
 
-    public int Width => rectangle.Width;
+    public int Width
+    {
+        get
+        {
+            return rectangle.Width;
+        }
+        set
+        {
+            rectangle.Width = value;
+        }
+
+    }
 
 
-    public int Height => rectangle.Height;
+    public int Height
+    {
+        get
+        {
+            return rectangle.Height;
+        }
+        set
+        {
+            rectangle.Height = value;
+        }
+    }
 
 
     public bool Visible
@@ -84,6 +106,9 @@ public class Component : IDisposable
     public List<Component> children = new List<Component>();
     private Component parent;
 
+    public string text = "";
+
+
     protected DirectBitmap buffer;
     private DirectBitmap cacheBuffer;
     public Rectangle rectangle;
@@ -106,8 +131,8 @@ public class Component : IDisposable
     public int zIndex;
     public DrawLayer zLayer;
 
-    protected Thickness Margin = new Thickness(5);
-    protected Thickness Padding = new Thickness(5);
+    public Thickness Margin = new Thickness(5);
+    public Thickness Padding = new Thickness(5);
 
     public HorizontalAlignment horizontalAlignment = HorizontalAlignment.Left;
     public VerticalAlignment verticalAlignment = VerticalAlignment.Top;
@@ -130,7 +155,7 @@ public class Component : IDisposable
 
         children = new List<Component>();
 
-        dirty = true;
+        dirty = false;
         visible = true;
         isRoot = true;
 
@@ -187,8 +212,129 @@ public class Component : IDisposable
     /// </summary>
     public virtual void Draw()
     {
-        Kernel.mainBuffer.DrawArray(buffer.GetBuffer(), X, Y, Width, Height);
-        //SaveCacheBuffer();
+        DrawLocal();
+        DrawToScreen();
+    }
+
+    public virtual void DrawLocal()
+    {
+    }
+    public virtual bool HandleInput(int mouseX, int mouseY, MouseState mouse)
+    {
+        for (int i = children.Count - 1; i >= 0; i--)
+        {
+            Component child = children[i];
+
+            if (!child.Visible)
+                continue;
+
+            if (!child.IsInsideAbsolute(mouseX, mouseY))
+                continue;
+
+            if (child.HandleInput(mouseX, mouseY, mouse))
+                return true;
+        }
+
+        return false;
+    }
+
+    public virtual void HandleKeyboard(KeyEvent keyEvent)
+    {
+        Serial.WriteString($"[keyevent] | {GetName()} {keyEvent.Key}\n");
+
+    }
+
+    public void ResolveHorizontalAnchor()
+    {
+        if (isRoot || parent == null) return;
+
+        Rectangle oldRectangle = rectangle;
+
+        switch (horizontalAlignment)
+        {
+            case HorizontalAlignment.Left:
+                X = Margin.left;
+                break;
+
+            case HorizontalAlignment.Center:
+                X = (parent.Width - Width) / 2;
+                break;
+
+            case HorizontalAlignment.Right:
+                X = parent.Width - Width - Margin.right;
+
+                break;
+
+            case HorizontalAlignment.Stretch:
+                X = Margin.left;
+                Resize(parent.Width - Margin.left - Margin.right, Height);
+                break;
+        }
+
+        WindowManager.Invalidate(oldRectangle);
+        WindowManager.Invalidate(rectangle);
+    }
+    public void ResolveVerticalAnchor()
+    {
+        if (isRoot || parent == null) return;
+
+        Rectangle oldRectangle = rectangle;
+
+        switch (verticalAlignment)
+        {
+            case VerticalAlignment.Top:
+                Y = Margin.top;
+                break;
+
+            case VerticalAlignment.Center:
+                Y = (parent.Height - Height) / 2;
+
+                break;
+
+            case VerticalAlignment.Bottom:
+                Y = parent.Height - Height - Margin.bottom;
+
+                break;
+
+            case VerticalAlignment.Stretch:
+                Y = Margin.top;
+                Resize(Width, parent.Height - Margin.top - Margin.bottom);
+                break;
+        }
+
+        WindowManager.Invalidate(oldRectangle);
+        WindowManager.Invalidate(rectangle);
+    }
+    public void ResolveChildren()
+    {
+        foreach (Component child in children)
+        {
+            child.ResolveHorizontalAnchor();
+            child.ResolveVerticalAnchor();
+
+            child.MarkDirty();
+        }
+    }
+
+    public void DrawToScreen()
+    {
+        Kernel.mainBuffer.DrawArrayClipped(buffer.GetBuffer(), buffer.Width, 0, 0, X, Y, Width, Height);
+    }
+
+    public void DrawToScreen(Rectangle dirtyRect)
+    {
+        Rectangle clipped = Rectangle.Intersect(rectangle, dirtyRect);
+        if (clipped.Width <= 0 || clipped.Height <= 0) return;
+
+        Kernel.mainBuffer.DrawArrayClipped(
+            buffer.GetBuffer(),
+            buffer.Width,
+            clipped.X - X,
+            clipped.Y - Y,
+            clipped.X,
+            clipped.Y,
+            clipped.Width,
+            clipped.Height);
     }
 
     public virtual void Draw(Component component)
@@ -216,14 +362,54 @@ public class Component : IDisposable
         buffer.DrawImage(cacheBuffer.GetBufferBitmap, 0, 0);
     }
 
+    /// <summary>
+    /// Screen space coordinates
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
     public bool IsInsideAbsolute(int x, int y)
     {
         return x >= AbsoluteX && x <= AbsoluteX + Width && y >= AbsoluteY && y <= AbsoluteY + Height;
     }
 
+    /// <summary>
+    /// Window Space coordinates
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <returns></returns>
     public bool IsInsideLocal(int x, int y)
     {
         return x >= X && x <= X + Width && y >= Y && y <= Y + Height;
+    }
+
+    /// <summary>
+    /// Returns a child component at given absolute coordinates
+    /// </summary>
+    /// <param name="mouseX"></param>
+    /// <param name="mouseY"></param>
+    /// <returns></returns>
+    public Component? GetChildAt(int mouseX, int mouseY)
+    {
+        for (int i = children.Count - 1; i >= 0; i--)
+        {
+            Component child = children[i];
+
+            if (!child.Visible)
+                continue;
+
+            if (!child.IsInsideAbsolute(mouseX, mouseY))
+                continue;
+
+            Component? nested = child.GetChildAt(mouseX, mouseY);
+            if (nested != null)
+                return nested;
+
+            return child;
+        }
+
+        return null;
     }
 
     public virtual void Resize(int width, int height)
@@ -246,19 +432,29 @@ public class Component : IDisposable
             }
         }
 
-        rectangle = new Rectangle(X, Y, Width, Height);
-        buffer = new DirectBitmap(width, height);
-        cacheBuffer = new DirectBitmap(width, height);
+        Rectangle oldRectangle = rectangle;
+        rectangle = new Rectangle(X, Y, width, height);
 
-        Draw();
-        foreach (Component child in children)
+        if (width > buffer.Width || height > buffer.Height)
         {
-            if (child is Button)
-            {
-                child.DrawInParent();
-            }
+            int newBufferWidth = RoundUpToChunk(Math.Max(width, buffer.Width), 64);
+            int newBufferHeight = RoundUpToChunk(Math.Max(height, buffer.Height), 64);
+
+            buffer = new DirectBitmap(newBufferWidth, newBufferHeight);
+            cacheBuffer = new DirectBitmap(newBufferWidth, newBufferHeight);
         }
-        SaveCacheBuffer();
+
+        WindowManager.Invalidate(oldRectangle);
+        WindowManager.Invalidate(rectangle);
+        ResolveChildren();
+        MarkDirty();
+    }
+
+
+
+    private static int RoundUpToChunk(int value, int chunkSize)
+    {
+        return (value + chunkSize - 1) / chunkSize * chunkSize;
     }
 
 
@@ -314,6 +510,18 @@ public class Component : IDisposable
         }
     }
 
+    public void AddChild(Component child)
+    {
+        child.isRoot = false;
+        child.parent = this;
+
+        child.ResolveHorizontalAnchor();
+        child.ResolveVerticalAnchor();
+        components.Remove(child);
+        children.Add(child);
+        MarkDirty();
+    }
+
     public void Clear(Color color)
     {
         buffer.Clear(color);
@@ -327,6 +535,21 @@ public class Component : IDisposable
     public void DrawString(string str, Color color, int x, int y)
     {
         buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
+    }
+
+    public void DrawString(string str, Color color, int x, int y, int fontSize)
+    {
+        buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y, fontSize);
+    }
+
+    public int MeasureStringWidth(string str, int fontSize)
+    {
+        return str.Length * Math.Max(1, PCScreenFont.DefaultFont.Width * fontSize / PCScreenFont.DefaultFont.Height);
+    }
+
+    public int MeasureStringHeight(int fontSize)
+    {
+        return fontSize;
     }
 
     public void DrawString(string str, Font font, Color color, int x, int y)
@@ -392,17 +615,27 @@ public class Component : IDisposable
         }
     }
 
+    public void OverrideLabel(string text)
+    {
+        this.text = text;
+        MarkDirty();
+    }
+
     public virtual bool IsDirty() => dirty;
 
     public virtual void MarkDirty()
     {
         if (dirty) return;
         dirty = true;
-        WindowManager.Invalidate(this);
+
+        if (isRoot) WindowManager.Invalidate(this);
+        else parent.MarkDirty();
+
     }
     public virtual void ForceDirty()
     {
         forceDirty = true;
+        WindowManager.Invalidate(this);
     }
     public virtual void ClearForceDirty()
     {
@@ -412,6 +645,7 @@ public class Component : IDisposable
     public virtual void MarkCleaned()
     {
         dirty = false;
+        forceDirty = false;
     }
 
 

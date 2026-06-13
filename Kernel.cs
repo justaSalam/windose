@@ -47,10 +47,11 @@ public class Kernel : Sys.Kernel
 
 
 
-        ProcessManger.Start(windowManager);
         ProcessManger.Start(explorer);
+        ProcessManger.Start(windowManager);
 
-        windowManager.Register(new Window(100, 100, 400, 250));
+        windowManager.Register(new Window(100, 100, 250, 250, "Test Window Component", true));
+        //windowManager.Register(new Window(350, 200, 200, 200, "Window 2", true));
     }
 
     private long lastFrameTicks;
@@ -62,17 +63,14 @@ public class Kernel : Sys.Kernel
         try
         {
             Mouse.Update();
-            canvas.Clear(Color.Black);
 
 
             ProcessManger.Update();
 
 
 
-            mainBuffer.DrawString(versionString, PCScreenFont.DefaultFont, Color.White, 10, 10);
-
-
             canvas.DrawArray(mainBuffer.GetBuffer(), 0, 0, canvas.Width, canvas.Height);
+            canvas.DrawString(versionString, PCScreenFont.DefaultFont, Color.White, 10, 10);
             canvas.DrawString($"Frametime: {DeltaTimeMs}ms | FPS: {Fps}", PCScreenFont.DefaultFont, Color.White, 10, 45);
 
             canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);
@@ -102,7 +100,7 @@ public class Kernel : Sys.Kernel
             long deltaTicks = now - lastFrameTicks;
 
             DeltaTimeMs = deltaTicks / 10000.0;
-            DeltaTimeSeconds = deltaTicks / 10_000_000;
+            DeltaTimeSeconds = deltaTicks / 10_000_000.0;
 
             if (DeltaTimeSeconds > 0)
                 Fps = (int)(1.0 / DeltaTimeSeconds);

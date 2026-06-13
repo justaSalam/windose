@@ -3,29 +3,57 @@ using System.Runtime.CompilerServices;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
+using Cosmos.Kernel.System.Keyboard;
 
 public class Window : Component
 {
     private Canvas canvas; //Fullscreen buffer
     public Rectangle bounds; //Window viewport, relative to the screen
     public Rectangle content; //Content rect, relative to the window
-    public int zIndex;
-    public int resizeMargin = 10;
+    private bool isCached;
 
     private bool inFocus;
 
     private bool dragging;
     private bool resizing;
-    private bool isCached;
+    public int resizeMargin = 10;
+
     private Point offset;
     private Point resizeStart;
     private Rectangle original;
 
-    public Window(int x, int y, int width, int height) : base(x, y, width, height)
+    private Component? focusedComponent;
+
+    public Window(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height)
     {
         bounds = new Rectangle(x, y, width, height);
         zLayer = DrawLayer.Window;
+
+        if (useTitleBar)
+        {
+            AddChild(new Panel(Color.FromArgb(123, 126, 121), 2, 2, width - 4, 25)
+            {
+                useBorders = false,
+                text = title,
+                fontSize = 16,
+                horizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(2, 2, 2, 2)
+            });
+        }
+
+        AddChild(new Button(Color.Gray, 0, 0, 100, 30)
+        {
+            text = "Button",
+            useBorders = true,
+            horizontalAlignment = HorizontalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Center,
+            leftMouseRelease = () =>
+            {
+                Serial.WriteString("button pressed\n");
+            }
+        });
     }
+
 
     public void Start()
     {
@@ -33,40 +61,64 @@ public class Window : Component
 
     public override void Update()
     {
-        base.Update();
+        // Window movement is handled by the compositor; hover state is for child controls.
     }
 
-    public override void Draw() //Window Logic
+    /// <summary>
+    /// Coordinates relative to the screen
+    /// </summary>
+    public override void Draw()
     {
-        DrawFilledRectangle(Color.Gray, 0, 0, Width, Height);
-        DrawString(X.ToString(), Color.Black, 0, 0);
-        DrawString(Y.ToString(), Color.Black, 0, 35);
-        DrawString(Width.ToString(), Color.Black, 0, 70);
-        DrawString(Height.ToString(), Color.Black, 0, 105);
+        DrawLocal();
         base.Draw();
     }
 
-
-
-    public void Stop() //TODO Dispose, GC wont collect it without proper disposal first
+    /// <summary>
+    /// Component rendering, coordinates relative to the window
+    /// </summary>
+    public override void DrawLocal()
     {
+        DrawFilledRectangle(Color.FromArgb(190, 190, 190), 0, 0, Width, Height);
 
+
+
+        DrawRectangle(Color.White, 0, 0, Width, Height);
+
+        foreach (Component child in children)
+        {
+            if (!child.Visible) continue;
+
+            child.DrawLocal();
+            buffer.DrawImageAlpha(child.GetBuffer(), child.X, child.Y);
+            child.MarkCleaned();
+        }
     }
 
 
-    public void HandleInput(int mouseX, int mouseY, MouseState mouseState)
+
+
+
+
+    public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
     {
         if (mouseState.left == MouseEvents.Press)
         {
             inFocus = HitTest(mouseX, mouseY);
+            focusedComponent = GetChildAt(mouseX, mouseY);
         }
+
+        if (focusedComponent != null && focusedComponent.HandleInput(mouseX, mouseY, mouseState))
+            return true;
+
         DragWindow(mouseState, mouseX, mouseY);
         ResizeWindow(mouseState, mouseX, mouseY);
 
-        if (Mouse.state.right == MouseEvents.Release)
-        {
-            Stop();
-        }
+        return HitTest(mouseX, mouseY);
+    }
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (focusedComponent != null) focusedComponent.HandleKeyboard(keyEvent);
+        else base.HandleKeyboard(keyEvent);
     }
 
     public bool FocusCheck(int mouseX, int mouseY, MouseState mouseState)
@@ -78,12 +130,12 @@ public class Window : Component
     {
         if (resizing) return;
 
-        if (mouse.left == MouseEvents.Hold && !dragging && TitleHitTest(mouseX, mouseY))
+        if (mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY))
         {
             dragging = true;
             offset = new Point(mouseX - bounds.X, mouseY - bounds.Y);
         }
-        else if (mouse.left == MouseEvents.None && dragging)
+        else if ((mouse.left == MouseEvents.Release || mouse.left == MouseEvents.None) && dragging)
         {
             dragging = false;
 
@@ -91,10 +143,14 @@ public class Window : Component
 
         if (dragging)
         {
+            Rectangle oldBounds = bounds;
+
             X = mouseX - offset.X;
             Y = mouseY - offset.Y;
             bounds = new Rectangle(X, Y, Width, Height);
-            MarkDirty();
+
+            WindowManager.Invalidate(oldBounds);
+            WindowManager.Invalidate(bounds);
         }
     }
 
@@ -112,6 +168,7 @@ public class Window : Component
         else if (mouseState.left == MouseEvents.None && resizing)
         {
             resizing = false;
+            ResolveChildren();
         }
 
         if (resizing)
@@ -143,8 +200,22 @@ public class Window : Component
 
     private void Resize(int x, int y, int width, int height)
     {
-        bounds = new Rectangle(x, y, width, height);
+        Rectangle oldBounds = bounds;
+
+        X = x;
+        Y = y;
+        base.Resize(width, height);
+        bounds = new Rectangle(X, Y, Width, Height);
+
+        WindowManager.Invalidate(oldBounds);
+        WindowManager.Invalidate(bounds);
+        MarkDirty();
+    }
+    public void Stop() //TODO Dispose, GC wont collect it without proper disposal first
+    {
+
     }
 
+    public override string GetName() => "Window";
 
 }
