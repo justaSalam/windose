@@ -1,5 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Keyboard;
+using Windose;
 
 public class TextField : Component
 {
@@ -15,7 +16,7 @@ public class TextField : Component
 
     public TextField(Color color, int x, int y, int width, int height) : base(x, y, width, height)
     {
-        color1 = color;
+        color1 = Kernel.Gray;
     }
 
 
@@ -36,10 +37,10 @@ public class TextField : Component
 
         if (useBorders) DrawRectangle(borderColor, 0, 0, Width, Height);
 
+        int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
+        int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
         if (text != "")
         {
-            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
-            int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
 
             if (MeasureStringWidth(text, fontSize) >= Width && truncate)
             {
@@ -47,6 +48,8 @@ public class TextField : Component
             }
             DrawString(text, textColor, 2, textY, effectiveFontSize);
         }
+
+        DrawString("_", MeasureStringWidth(text, fontSize), textY);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)

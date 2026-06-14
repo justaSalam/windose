@@ -33,6 +33,11 @@ public class Window : Component
     private Component? focusedComponent;
 
     private Panel titlebar;
+    private bool hasTitleBar;
+
+    private Color titlebarOutOfFocus = Color.FromArgb(123, 126, 121);
+    private Color titlebarInFocus = Color.FromArgb(0, 0, 128);
+
 
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height)
     {
@@ -41,8 +46,9 @@ public class Window : Component
 
         if (useTitleBar)
         {
-            titlebar = new Panel(Color.FromArgb(123, 126, 121), 2, 2, width - 4, 25)
+            titlebar = new Panel(titlebarOutOfFocus, 2, 2, width - 4, 25)
             {
+                textColor = Color.White,
                 useBorders = false,
                 clampSize = false,
                 text = title,
@@ -51,7 +57,7 @@ public class Window : Component
                 Margin = new Thickness(2, 2, 2, 2)
             };
             AddChild(titlebar);
-
+            hasTitleBar = true;
 
             AddChild(new Button(Color.LightGray, 0, 0, 20, 20)
             {
@@ -63,7 +69,6 @@ public class Window : Component
                 borderColor = Color.White,
                 leftMouseRelease = () =>
                 {
-                    Serial.WriteString("[TITLE] Closing window\n");
                 }
             });
 
@@ -79,7 +84,6 @@ public class Window : Component
                     borderColor = Color.White,
                     leftMouseRelease = () =>
                     {
-                        Serial.WriteString("[TITLE] Maximizing window.\n");
                     }
                 });
 
@@ -96,7 +100,6 @@ public class Window : Component
                     borderColor = Color.White,
                     leftMouseRelease = () =>
                     {
-                        Serial.WriteString("[TITLE] Minimizing window\n");
                     }
                 });
             }
@@ -112,7 +115,6 @@ public class Window : Component
             verticalAlignment = VerticalAlignment.Center,
             leftMouseRelease = () =>
             {
-                Serial.WriteString("button pressed\n");
             }
         });
 
@@ -143,6 +145,7 @@ public class Window : Component
     public override void Update()
     {
         // Window movement is handled by the compositor; hover state is for child controls.
+
     }
 
     /// <summary>
@@ -186,6 +189,8 @@ public class Window : Component
         if (mouseState.left == MouseEvents.Press)
         {
             inFocus = HitTest(mouseX, mouseY);
+
+
             focusedComponent = GetChildAt(mouseX, mouseY);
         }
 
@@ -197,6 +202,18 @@ public class Window : Component
 
         return HitTest(mouseX, mouseY);
     }
+
+    public void SetFocused(bool focused)
+    {
+        if (!hasTitleBar) return;
+
+        Color titlebarColor = focused ? titlebarInFocus : titlebarOutOfFocus;
+        if (titlebar.color1 == titlebarColor) return;
+
+        titlebar.color1 = titlebarColor;
+        titlebar.MarkDirty();
+    }
+
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
         if (focusedComponent != null) focusedComponent.HandleKeyboard(keyEvent);

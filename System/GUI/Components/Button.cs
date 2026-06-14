@@ -1,4 +1,5 @@
 using System.Drawing;
+using Windose;
 
 public class Button : Component
 {
@@ -18,8 +19,8 @@ public class Button : Component
 
     public Button(Color color, int x, int y, int width, int height) : base(x, y, width, height)
     {
-        color1 = color;
-        darkenColor1 = GUIFeatures.Darken(color1, 0.15f);
+        color1 = Kernel.Gray;
+        darkenColor1 = GUIFeatures.Darken(color1, 0.07f);
     }
 
 

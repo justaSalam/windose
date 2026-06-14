@@ -12,7 +12,7 @@ public class WindowManager : SingleThreadedProcess
     private static bool hasPreviewRect;
     private static Rectangle previewRect;
     private Window? capturedWindow;
-    private Window? focusedWindow;
+    public static Window? focusedWindow;
     private MouseState mouseState;
     private int nextZIndex = 1;
 
@@ -74,7 +74,7 @@ public class WindowManager : SingleThreadedProcess
             if (mouseState.left == MouseEvents.Press)
             {
                 BringToFront(win);
-                focusedWindow = win;
+                SetFocusedWindow(win);
                 capturedWindow = win;
             }
             if (win.HandleInput(mx, my, mouseState)) break;
@@ -93,6 +93,17 @@ public class WindowManager : SingleThreadedProcess
 
         if (focusedWindow != null)
             focusedWindow.HandleKeyboard(keyEvent);
+    }
+
+    private void SetFocusedWindow(Window window)
+    {
+        if (focusedWindow == window) return;
+
+        if (focusedWindow != null)
+            focusedWindow.SetFocused(false);
+
+        focusedWindow = window;
+        focusedWindow.SetFocused(true);
     }
 
     private void ComposeDirtyRegions()
@@ -161,6 +172,7 @@ public class WindowManager : SingleThreadedProcess
             window.Start();
             windows.Add(window);
             nextZIndex++;
+            SetFocusedWindow(window);
         }
         catch (Exception ex)
         {
@@ -174,6 +186,9 @@ public class WindowManager : SingleThreadedProcess
     {
         window.Stop();
         windows.Remove(window);
+
+        if (focusedWindow == window)
+            focusedWindow = null;
     }
 
     public static void Invalidate(Component dirty)

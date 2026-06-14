@@ -19,6 +19,10 @@ namespace Windose;
 /// </summary>
 public class Kernel : Sys.Kernel
 {
+
+    public static Color Gray = Color.FromArgb(123, 126, 121);
+    public static Color Blue = Color.FromArgb(0, 0, 128);
+
     private const int gcrate = 150;
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
@@ -51,7 +55,7 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(windowManager);
 
         windowManager.Register(new Window(100, 100, 250, 250, "Test Window Component", true));
-        //windowManager.Register(new Window(200, 200, 175, 175, "Viewport 2", true));
+        windowManager.Register(new Window(200, 200, 175, 175, "Viewport 2", true));
     }
 
     private long lastFrameTicks;

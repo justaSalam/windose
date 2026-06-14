@@ -1,5 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.Core.IO;
+using Windose;
 
 public class Checkbox : Component
 {
@@ -24,7 +25,7 @@ public class Checkbox : Component
     public override void DrawLocal()
     {
 
-        DrawFilledRectangle(Color.Gray, 0, 0, Width, Height);
+        DrawFilledRectangle(Kernel.Gray, 0, 0, Width, Height);
 
         if (isPressed) DrawFilledRectangle(Color.DarkGray, 6, 6, Width - 12, Height - 12);
 
