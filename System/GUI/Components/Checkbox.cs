@@ -18,7 +18,6 @@ public class Checkbox : Component
 
     public override void Draw()
     {
-        DrawLocal();
         base.Draw();
     }
 

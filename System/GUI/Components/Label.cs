@@ -14,7 +14,6 @@ public class Label : Component
 
     public override void Draw()
     {
-        DrawLocal();
         base.Draw();
     }
 
@@ -41,4 +40,6 @@ public class Label : Component
     {
         return true;
     }
+
+    public override bool IsOpaqueForCopy() => useBackground;
 }

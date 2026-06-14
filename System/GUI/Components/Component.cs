@@ -129,6 +129,7 @@ public class Component : IDisposable
     public State state;
 
     protected bool dirty;
+    protected bool childrenDirty;
     private bool disposed;
     public bool clampSize = true;
     public bool forceDirty { get; private set; }
@@ -585,8 +586,9 @@ public class Component : IDisposable
 
     public void RemoveChild(Component child)
     {
-        components.Remove(child);
-        children.Add(child);
+        children.Remove(child);
+        child.isRoot = true;
+        components.Add(child);
         MarkDirty();
     }
 
@@ -720,16 +722,94 @@ public class Component : IDisposable
     }
 
     public virtual bool IsDirty() => dirty;
+    public virtual bool HasDirtyTree() => dirty || childrenDirty || forceDirty;
+    public virtual bool IsOpaqueForCopy() => true;
 
-    public virtual void MarkDirty()
+    public virtual void MarkDirty(bool invalidate = true)
     {
-        if (dirty) return;
+        if (invalidate)
+            WindowManager.Invalidate(this);
+
         dirty = true;
 
-        if (isRoot) WindowManager.Invalidate(this);
-        else parent.MarkDirty();
+        if (!isRoot)
+            parent.MarkChildDirty();
 
     }
+
+    protected virtual void MarkChildDirty()
+    {
+        childrenDirty = true;
+
+        if (!isRoot)
+            parent.MarkChildDirty();
+    }
+
+    public virtual void DrawDirtyLocal(Rectangle dirtyRect)
+    {
+        if (dirty || forceDirty)
+        {
+            DrawLocal();
+            return;
+        }
+
+        if (!childrenDirty)
+            return;
+
+        for (int i = 0; i < children.Count; i++)
+        {
+            Component child = children[i];
+            if (!child.Visible) continue;
+            if (!child.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
+
+            if (child.HasDirtyTree())
+                child.DrawDirtyLocal(dirtyRect);
+
+            DrawChildClipped(child, dirtyRect);
+            child.MarkCleaned();
+        }
+    }
+
+    protected void DrawChildClipped(Component child, Rectangle dirtyRect)
+    {
+        Rectangle clipped = Rectangle.Intersect(child.AbsoluteRectangle, dirtyRect);
+        if (clipped.Width <= 0 || clipped.Height <= 0) return;
+
+        DrawChildArea(child, clipped.X - child.AbsoluteX, clipped.Y - child.AbsoluteY, clipped.X - AbsoluteX, clipped.Y - AbsoluteY, clipped.Width, clipped.Height);
+    }
+
+    protected void DrawChild(Component child)
+    {
+        DrawChildArea(child, 0, 0, child.X, child.Y, child.Width, child.Height);
+    }
+
+    protected void DrawChildArea(Component child, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
+    {
+        if (child.IsOpaqueForCopy())
+        {
+            buffer.DrawArrayClipped(
+                child.GetRawBuffer(),
+                child.buffer.Width,
+                sourceX,
+                sourceY,
+                destinationX,
+                destinationY,
+                width,
+                height);
+            return;
+        }
+
+        buffer.DrawArrayAlphaClipped(
+            child.GetRawBuffer(),
+            child.buffer.Width,
+            sourceX,
+            sourceY,
+            destinationX,
+            destinationY,
+            width,
+            height);
+    }
+
     public virtual void ForceDirty()
     {
         forceDirty = true;
@@ -740,6 +820,7 @@ public class Component : IDisposable
     public virtual void MarkCleaned()
     {
         dirty = false;
+        childrenDirty = false;
         forceDirty = false;
     }
 

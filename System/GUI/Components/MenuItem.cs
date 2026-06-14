@@ -20,7 +20,6 @@ public class MenuItem : Component
 
     public override void Draw()
     {
-        DrawLocal();
         base.Draw();
     }
 

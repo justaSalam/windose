@@ -22,7 +22,6 @@ public class Button : Component
 
     public override void Draw()
     {
-        DrawLocal();
         base.Draw();
     }
 

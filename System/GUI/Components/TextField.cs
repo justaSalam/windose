@@ -18,7 +18,6 @@ public class TextField : Component
 
     public override void Draw()
     {
-        DrawLocal();
         base.Draw();
     }
 
@@ -33,17 +32,21 @@ public class TextField : Component
 
         int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
         int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
-        if (text != "")
+        string visibleText = text;
+        if (visibleText != "")
         {
 
-            if (MeasureStringWidth(text, fontSize) >= Width && truncate)
+            if (MeasureStringWidth(visibleText, effectiveFontSize) >= Width && truncate)
             {
-                text = text.Substring(0, text.Length - 3) + "...";
+                int maxCharacters = Math.Max(0, (Width - MeasureStringWidth("...", effectiveFontSize) - 4) / Math.Max(1, MeasureStringWidth("W", effectiveFontSize)));
+
+                if (visibleText.Length > maxCharacters)
+                    visibleText = visibleText.Substring(0, maxCharacters) + "...";
             }
-            DrawString(text, textColor, 2, textY, effectiveFontSize);
+            DrawString(visibleText, textColor, 2, textY, effectiveFontSize);
         }
 
-        DrawString("_", MeasureStringWidth(text, fontSize), textY);
+        DrawString("_", MeasureStringWidth(visibleText, effectiveFontSize), textY);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
@@ -72,5 +75,5 @@ public class TextField : Component
         MarkDirty();
     }
 
-    public override string GetName() => "Button";
+    public override string GetName() => "TextField";
 }

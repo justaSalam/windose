@@ -417,9 +417,62 @@ public unsafe class DirectBitmap
             int sourceIndex = (sourceY + j) * sourceWidth + sourceX;
             int destinationIndex = (destinationY + j) * Width + destinationX;
 
-            for (int i = 0; i < width; i++)
+            Array.Copy(colors, sourceIndex, buffer.RawData, destinationIndex, width);
+        }
+    }
+
+    public virtual void DrawArrayAlphaClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
+    {
+        if (destinationX < 0)
+        {
+            int clipped = -destinationX;
+            sourceX += clipped;
+            width -= clipped;
+            destinationX = 0;
+        }
+
+        if (destinationY < 0)
+        {
+            int clipped = -destinationY;
+            sourceY += clipped;
+            height -= clipped;
+            destinationY = 0;
+        }
+
+        if (destinationX + width > Width)
+            width = Width - destinationX;
+
+        if (destinationY + height > Height)
+            height = Height - destinationY;
+
+        if (width <= 0 || height <= 0) return;
+
+        for (int y = 0; y < height; y++)
+        {
+            int sourceIndex = (sourceY + y) * sourceWidth + sourceX;
+            int destinationIndex = (destinationY + y) * Width + destinationX;
+
+            for (int x = 0; x < width; x++)
             {
-                buffer.RawData[destinationIndex + i] = colors[sourceIndex + i];
+                int color = colors[sourceIndex + x];
+                int alpha = (color >> 24) & 0xff;
+
+                if (alpha == 0)
+                    continue;
+
+                if (alpha == 0xff)
+                {
+                    buffer.RawData[destinationIndex + x] = color;
+                    continue;
+                }
+
+                int bgColor = buffer.RawData[destinationIndex + x];
+                int invAlpha = 255 - alpha;
+                int red = (((color >> 16) & 0xff) * alpha + ((bgColor >> 16) & 0xff) * invAlpha) >> 8;
+                int green = (((color >> 8) & 0xff) * alpha + ((bgColor >> 8) & 0xff) * invAlpha) >> 8;
+                int blue = ((color & 0xff) * alpha + (bgColor & 0xff) * invAlpha) >> 8;
+
+                buffer.RawData[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
             }
         }
     }

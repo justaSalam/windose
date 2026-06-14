@@ -63,7 +63,6 @@ public class Window : Component
     /// </summary>
     public override void Draw()
     {
-        DrawLocal();
         base.Draw();
     }
 
@@ -84,7 +83,7 @@ public class Window : Component
 
 
             child.DrawLocal();
-            buffer.DrawImageAlpha(child.GetBuffer(), child.X, child.Y);
+            DrawChild(child);
             child.MarkCleaned();
         }
     }

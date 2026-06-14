@@ -176,9 +176,10 @@ public class WindowManager : SingleThreadedProcess
                 if (!component.Visible) continue;
                 if (!component.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
 
-                if (component.IsDirty() || component.forceDirty)
+                if (component.HasDirtyTree())
                 {
-                    component.Draw();
+                    component.DrawDirtyLocal(dirtyRect);
+                    component.DrawToScreen(dirtyRect);
                     component.MarkCleaned();
                 }
                 else

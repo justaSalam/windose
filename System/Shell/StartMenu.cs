@@ -48,6 +48,39 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
+        programs.AddSubmenuItem("Accessories");
+        programs.AddSubmenuItem("File Explorer", () =>
+        {
+            WindowManager.Register(new FileExplorer(100, 100, 600, 400, "Control Panel", true));
+
+        });
+        programs.AddSubmenuItem("System Tools");
+
+        MenuItem documents = new MenuItem(0, 0, width, 24)
+        {
+            text = "Documents",
+            fontSize = 16,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            clampSize = false,
+            Margin = new Thickness(0)
+        };
+
+        MenuItem settings = new MenuItem(0, 0, width, 24)
+        {
+            text = "Settings",
+            fontSize = 16,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            clampSize = false,
+            Margin = new Thickness(0)
+        };
+
+        settings.AddSubmenuItem("Control Panel", () =>
+        {
+        });
+        settings.AddSubmenuItem("Resource Manager");
+
+
+
 
         MenuItem powerOptions = new MenuItem(0, 0, width, 24)
         {
@@ -57,17 +90,6 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
-
-        programs.AddSubmenuItem("Accessories");
-        programs.AddSubmenuItem("System Manager", () =>
-        {
-            WindowManager.Register(new SystemManager(100, 100, 250, 250, "System Manager", true));
-        });
-        programs.AddSubmenuSeparator();
-        programs.AddSubmenuItem("Windose Shell");
-
-
-
         powerOptions.AddSubmenuItem("Log Off");
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {
@@ -89,6 +111,8 @@ public class StartMenu : Window
 });
 
         panel.AddStackChild(programs);
+        panel.AddStackChild(documents);
+        panel.AddStackChild(settings);
         panel.AddStackChild(powerOptions);
         MarkDirty();
     }
@@ -116,7 +140,7 @@ public class StartMenu : Window
             if (!child.Visible) continue;
 
             child.DrawLocal();
-            buffer.DrawImageAlpha(child.GetBuffer(), child.X, child.Y);
+            DrawChild(child);
             child.MarkCleaned();
         }
     }

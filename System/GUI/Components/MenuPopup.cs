@@ -110,7 +110,7 @@ public class MenuPopup : Component
             if (!child.Visible) continue;
 
             child.DrawLocal();
-            buffer.DrawImageAlpha(child.GetBuffer(), child.X, child.Y);
+            DrawChild(child);
             child.MarkCleaned();
         }
     }
