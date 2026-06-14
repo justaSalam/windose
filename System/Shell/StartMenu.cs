@@ -51,7 +51,7 @@ public class StartMenu : Window
         programs.AddSubmenuItem("Accessories");
         programs.AddSubmenuItem("File Explorer", () =>
         {
-            WindowManager.Register(new FileExplorer(100, 100, 600, 400, "Control Panel", true));
+            WindowManager.Register(new FileExplorer(100, 100, 800, 500, "Control Panel", true));
 
         });
         programs.AddSubmenuItem("System Tools");

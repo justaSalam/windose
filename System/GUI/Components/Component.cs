@@ -814,6 +814,9 @@ public class Component : IDisposable
     {
         forceDirty = true;
         WindowManager.Invalidate(this);
+
+        if (!isRoot)
+            parent.MarkChildDirty();
     }
 
 

@@ -79,6 +79,11 @@ public class ScrollView : Component
         DrawScrollbars();
     }
 
+    public override void DrawDirtyLocal(Rectangle dirtyRect)
+    {
+        DrawLocal();
+    }
+
     private void DrawContent()
     {
         int viewportWidth = GetViewportWidth();
@@ -236,6 +241,25 @@ public class ScrollView : Component
         MarkDirty();
     }
 
+    public void RefreshContent(bool resetScroll = false)
+    {
+        RefreshContentSize();
+
+        if (resetScroll)
+        {
+            scrollX = 0;
+            scrollY = 0;
+        }
+
+        ClampScroll();
+        ApplyContentOffset();
+
+        if (content != null)
+            content.MarkDirty(false);
+
+        ForceDirty();
+    }
+
     private void ClampScroll()
     {
         scrollX = Math.Max(0, Math.Min(scrollX, GetMaxScrollX()));
@@ -258,6 +282,18 @@ public class ScrollView : Component
         if (content is TreeView treeView)
         {
             int newHeight = Math.Max(GetViewportHeight(), treeView.GetContentHeight());
+
+            if (newHeight != contentHeight)
+            {
+                contentHeight = newHeight;
+                content.Resize(contentWidth, contentHeight);
+                ClampScroll();
+                ApplyContentOffset();
+            }
+        }
+        else if (content is ListView listView)
+        {
+            int newHeight = Math.Max(GetViewportHeight(), listView.GetContentHeight());
 
             if (newHeight != contentHeight)
             {

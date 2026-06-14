@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ObjectNodes>
-  <Metadata Name="__embedded_metadata" Length="121338" Hash="51146c595f75e7f1c2e0787dea066376730924abeeefa8cba99afd927ba2447a" />
+  <Metadata Name="__embedded_metadata" Length="121936" Hash="c38530424e00a73130434437c233c75cb3b46bd7192ed61a7e2203a5fddce8c2" />
   <ResourceData Name="__embedded_resourcedata" Length="17403" Hash="f588cdf02336ee3f561ab5cfc6a5615422030fbd7bb493a30add4a74377e1207" />
   <ResourceIndex Name="__embedded_resourceindex" Length="138" Hash="0b3cc4c3d6426e5df370da6a953559d9a3a520ca05ac1ee40045b2da27bcb07f" />
-  <TypeMetadataMap Name="__type_to_metadata_map" Length="5483" Hash="6cf7aa4adb2b22fdf3599ee118bf7cb1cf8c868837fb52cf3fd603711230922c" />
-  <ClassConstructorContextMap Name="__type_to_cctorContext_map" Length="241" Hash="8dc82ea9b97ae2be1e2d50921c7705ddeb632e3dc8f769c58d1f95ee8e76403b" />
-  <ReflectionInvokeMap Name="__method_to_entrypoint_map" Length="2404" Hash="8013bdcb3802a87466d47849047a38bf02df912bcb7ba414ef1c92846556908c" />
+  <TypeMetadataMap Name="__type_to_metadata_map" Length="5503" Hash="604663bf80cec68df80ac33a875c0cd98e0e96aed4cb11eb9cbd4214a8bb5ba2" />
+  <ClassConstructorContextMap Name="__type_to_cctorContext_map" Length="241" Hash="8b1b5566e0b172e2fcefee73ffd0614e73c3893cffa5ae6b77b667de2e6efd01" />
+  <ReflectionInvokeMap Name="__method_to_entrypoint_map" Length="2404" Hash="0de4942a8b0a7e2ea599085720a509eda18c27922ce888fc273648b559f2ed13" />
   <DelegateMarshallingStubMap Name="__delegate_marshalling_stub_map" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <StructMarshallingStubMap Name="__struct_marshalling_stub_map" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
-  <ArrayMap Name="__array_type_map" Length="479" Hash="7ab3afcf1c3d73ee734d4eff003b4885e0fd104eed3c742ce8818bf3d0659c16" />
+  <ArrayMap Name="__array_type_map" Length="484" Hash="45d3ce9981cb8f8eaed9caf136a00b6c72e9eff9c8433b9262d7d09fb1ba9bd3" />
   <PointerTypeMap Name="__ptr_type_map" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <ByRefTypeMap Name="__byref_type_map" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <FunctionPointerMap Name="__fnptr_type_map" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
-  <ReflectionFieldMap Name="__field_to_offset_map" Length="741" Hash="35041a8bfcce9bba1856fafb9b79f4250ae541038a976233effa62760b0ef36c" />
+  <ReflectionFieldMap Name="__field_to_offset_map" Length="741" Hash="bca8bb2253dd27a109ac14b359b1b3079832ddbfaadc2bd6e208797586633f67" />
   <NativeLayoutInfo Name="__nativelayoutinfo" Length="27" Hash="0832127bf229102fb804bdc8b2ac0bc17c5927bd358d6f32e1e6d4f853eb332a" />
   <ExactMethodInstantiations Name="__exact_method_instantiations" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
-  <GenericTypesHashtable Name="__generic_types_hashtable" Length="2829" Hash="a079676c735093776adcb71ae3f55685ae81d2bda3a0e14d1189a2f522b67c86" />
+  <GenericTypesHashtable Name="__generic_types_hashtable" Length="2889" Hash="be1b222bebaecb0f32487a250406a0c6c63c7e10e359f70518480305a1b12b63" />
   <GenericMethodsHashtable Name="__generic_methods_hashtable" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <GenericVirtualMethodTable Name="__gvm_table" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <InterfaceGenericVirtualMethodTable Name="__interface_gvm_table" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <GenericMethodsTemplateMap Name="__GenericMethodsTemplateMap" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
-  <GenericTypesTemplateMap Name="__GenericTypesTemplateMap" Length="43" Hash="46d13173ced804153adecc7d0ba7a9082dea751a190192eda33f6bd968a10d47" />
+  <GenericTypesTemplateMap Name="__GenericTypesTemplateMap" Length="43" Hash="401f20c8eee93b3abd6fe16cea87dab24630a023e3f8ae12735a656c3f1816c4" />
   <StaticsInfoHashtable Name="_StaticsInfoHashtableNode" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <ReflectionVirtualInvokeMap Name="__VirtualInvokeMap" Length="3" Hash="65fde13cf1e4ea4206c293082657037684ee456e40041c816509b63e1b89d387" />
   <ArrayOfEmbeddedPointers Name="__EagerCctor" Length="16" Hash="374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb" />
-  <ArrayOfEmbeddedPointers Name="__GCStaticRegion" Length="792" Hash="52f033ec34066343ced3a1bed745100fe4efe6577154125a6d9483c6b482219a" />
-  <ExternalReferencesTable Name="__external_CommonFixupsTable_references" Length="3876" Hash="784fadfa334836103bb0723d6e63671848bd8d26f71b2fa00e4393d856e8a734" />
-  <ExternalReferencesTable Name="__external_NativeReferences_references" Length="2268" Hash="9f7b93fbc025e2b2eb07447db8cbbcda2b25265865de0bb31a1401f480db19c2" />
+  <ArrayOfEmbeddedPointers Name="__GCStaticRegion" Length="808" Hash="33e15ec51f02d31aedb153489237b7938676d30e5a211a4498ae4910930e1a86" />
+  <ExternalReferencesTable Name="__external_CommonFixupsTable_references" Length="3888" Hash="b45c2c840156fdd9cd3a84a707f3d0673c0843db465604a90d44f2a84bc23ce2" />
+  <ExternalReferencesTable Name="__external_NativeReferences_references" Length="2316" Hash="84b3f48c5890bdc4162dc7299bfad23e9b4aae33b74f4077d9cafd70ac29da4f" />
   <ExternalReferencesTable Name="__external_NativeStatics_references" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
-  <StackTraceMethodMapping Name="_stacktrace_methodRVA_to_token_mapping" Length="34427" Hash="29e0c8248c9093103900ea8c62640b8ae67149a1b3e346d9087bcadaa64a3fcf" />
+  <StackTraceMethodMapping Name="_stacktrace_methodRVA_to_token_mapping" Length="34788" Hash="a620f777ef080a59d29a3524c1bd5e64fbb5a711dc1609c7cc6abb94f907f401" />
   <ArrayOfEmbeddedData Name="__ThreadStaticRegion" Length="112" Hash="b5fdab78d8947eacc864bfeecb4d2100780e5afe1cd8efafb124887913ac49fa" />
   <TypeManagerIndirection Name="__typemanager_indirection" Length="16" Hash="374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb" />
   <CanonicalDefinitionEEType Name="_ZTV14System___Canon" Length="32" Hash="3807c296a5a5f280e1c853936e9e4a6a59dbb40e85b1be2d21862970f39496f9" />
@@ -192,7 +192,7 @@
   <UnboxingStub Name="unbox_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Dock&gt;__Dispose" Length="9" Hash="3824fd57e67dd4fd113129165d5440aaf7d249eafb14b464f92f15a29878014f" />
   <UnboxingStub Name="unbox_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Dock&gt;__MoveNext" Length="9" Hash="3824fd57e67dd4fd113129165d5440aaf7d249eafb14b464f92f15a29878014f" />
   <UnboxingStub Name="unbox_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Dock&gt;__get_Current" Length="9" Hash="3824fd57e67dd4fd113129165d5440aaf7d249eafb14b464f92f15a29878014f" />
-  <ArrayOfFrozenObjects Name="__FrozenSegmentStart" Length="162064" Hash="8c584fb39e073eb9e47d81c1b6391b7831a5d5484d7c145307c829299a814adb" />
+  <ArrayOfFrozenObjects Name="__FrozenSegmentStart" Length="165216" Hash="05c79707002b4c6a8114cc066c4bb255eef7726e393b6c98dd2eaf3abc6688cd" />
   <PInvokeMethodFixup Name="__pinvoke_S_P_CoreLib__Module__libSystem_Native_2050__SystemNative_Abort" Length="28" Hash="3addfb141cd7c9c4c6543a82191a3707ac29c7a041217782e61d4d91c691aee8" />
   <PInvokeMethodFixup Name="__pinvoke_S_P_CoreLib__Module__libSystem_Native_2050__SystemNative_CanGetHiddenFlag" Length="28" Hash="3addfb141cd7c9c4c6543a82191a3707ac29c7a041217782e61d4d91c691aee8" />
   <PInvokeMethodFixup Name="__pinvoke_S_P_CoreLib__Module__libSystem_Native_2050__SystemNative_Close" Length="28" Hash="3addfb141cd7c9c4c6543a82191a3707ac29c7a041217782e61d4d91c691aee8" />
@@ -342,6 +342,16 @@
   <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Runtime_CompilerServices_Unsafe__BitCast&lt;Windose_Component__Int16&gt;" Length="16" Hash="3d3fded2624c8bdc4d82c9bfbde48dfe6faf9c9a4cd8aa2271280b7aa7326db6" />
   <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Runtime_CompilerServices_Unsafe__BitCast&lt;Windose_Component__Int32&gt;" Length="16" Hash="551651e32ea5ca205151e283635c0d282c12b72eaab7d4511e9d2877be372977" />
   <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Runtime_CompilerServices_Unsafe__BitCast&lt;Windose_Component__Int64&gt;" Length="16" Hash="c60992525eca05da68383585be263c943adcadc2725812b9b6e6b922ffd2418e" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Buffer__Memmove&lt;Windose_ListViewItem&gt;" Length="8" Hash="88da4ff5f0ee5b61c2f49a686630d4516e78c759cc5aff02b419ea63b2154b9c" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Array__IndexOfImpl&lt;Windose_ListViewItem&gt;" Length="24" Hash="7164ebaf59f77cd71acd5b8dede1f820ccec6f2f856a310304191f160bcd31c1" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Array__Empty&lt;Windose_ListViewItem&gt;" Length="24" Hash="d01d8ec675395c70283d43e3e6ef90eb75d16cddcc3570d2f248d13dd3bd2005" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Array__IndexOf_4&lt;Windose_ListViewItem&gt;" Length="48" Hash="dcc0be78db487ea9a7ec42de348f9a357799cec10f190cddc2f7718dc67d9e02" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_Internal_IntrinsicSupport_EqualityComparerHelpers__GetComparerForReferenceTypesOnly&lt;Windose_ListViewItem&gt;" Length="16" Hash="56f9f59b8972f59ffe606464294c8c97cc63c2e36d8a356bfece1efcbc21ba4c" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_Internal_IntrinsicSupport_EqualityComparerHelpers__StructOnlyEquals&lt;Windose_ListViewItem&gt;" Length="16" Hash="541d7ac6bdaeba39e3dff49464b940131a820920832d0ee38e757c09d156efad" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Runtime_CompilerServices_Unsafe__BitCast&lt;Windose_ListViewItem__UInt8&gt;" Length="16" Hash="1d6691b522e0ecb6d3863f415af9a6f7fc93176439e7c696943789d6d4bd008a" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Runtime_CompilerServices_Unsafe__BitCast&lt;Windose_ListViewItem__Int16&gt;" Length="16" Hash="ebee867fc062e4346318f0bfe50101821188363e7fc0e8ae4a81d9eb16d4fbc1" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Runtime_CompilerServices_Unsafe__BitCast&lt;Windose_ListViewItem__Int32&gt;" Length="16" Hash="190248b500abe76ea20c6a6df1631e08d1e00f828241e28a2039591d9116b280" />
+  <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Runtime_CompilerServices_Unsafe__BitCast&lt;Windose_ListViewItem__Int64&gt;" Length="16" Hash="b7515f335626e7f61c49dba5f91c89fba57324a5c2c4f81c5bfb82016f60ff72" />
   <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Buffer__Memmove&lt;Windose_MenuPopup&gt;" Length="8" Hash="a49fbdaa507f5ba8b2b0b0184795f89ec6909a9e648a555351c52b79c5710eb0" />
   <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Array__IndexOfImpl&lt;Windose_MenuPopup&gt;" Length="24" Hash="124ab0bc1a538402dbdbd41f619db491cf4573da8d3acbb7d3e76cd4829a5fd8" />
   <MethodGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Array__Empty&lt;Windose_MenuPopup&gt;" Length="24" Hash="1f1bfd4cb22941f38d35035c705082c021fa37ce0757d14e031145aa46ca4a62" />
@@ -558,6 +568,10 @@
   <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_Component&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_Component&gt;" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
   <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_Component&gt;" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
+  <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_Array_EmptyArray_1&lt;Windose_ListViewItem&gt;" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
+  <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
+  <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_ListViewItem&gt;" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
   <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_Array_EmptyArray_1&lt;Windose_MenuPopup&gt;" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
   <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_MenuPopup&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <NonGCStatics Name="__NONGCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_MenuPopup&gt;" Length="0" Hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" />
@@ -677,7 +691,13 @@
   <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__S_P_CoreLib_System_IO_Enumeration_FileSystemEnumerableFactory___c__DisplayClass4_0___UserEntries_b__1" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
   <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__S_P_CoreLib_System_Reflection_Runtime_Assemblies_RuntimeAssemblyInfo___c____cctor_b__82_0" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
   <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__S_P_CoreLib_System_Reflection_Runtime_Assemblies_NativeFormat_NativeFormatRuntimeAssembly___c____cctor_b__36_0" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
-  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__8_0" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
+  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__12_0" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
+  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__12_1" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
+  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__12_2" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
+  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__12_3" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
+  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__12_4" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
+  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__12_5" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
+  <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_FileExplorer____ctor_b__12_6" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
   <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_Component___Init_b__60_0" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
   <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_Window___TitlebarSetup_b__23_0" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
   <ReadyToRunHelper Name="__DelegateCtor_S_P_CoreLib_System_Delegate__InitializeClosedInstance__Windose_Window___c___TitlebarSetup_b__23_1" Length="12" Hash="3a67ecae22ea7bd7adaf78d539ac03ef0a3870395ff7ff659690b1c6d0d9bf64" />
@@ -939,6 +959,10 @@
   <GCStatics Name="__GCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_Component&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
   <GCStatics Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_Component&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
   <GCStatics Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_Component&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
+  <GCStatics Name="__GCSTATICSS_P_CoreLib_System_Array_EmptyArray_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
+  <GCStatics Name="__GCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
+  <GCStatics Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
+  <GCStatics Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
   <GCStatics Name="__GCSTATICSS_P_CoreLib_System_Array_EmptyArray_1&lt;Windose_MenuPopup&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
   <GCStatics Name="__GCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_MenuPopup&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
   <GCStatics Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_MenuPopup&gt;" Length="8" Hash="35be322d094f9d154a8aba4733b8497f180353bd7ae7b0a15f90b586b549f28b" />
@@ -1476,14 +1500,16 @@
   <WritableData Name="__writableDataWindose_Component" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_DirectBitmap" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_DockPanel" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
-  <WritableData Name="__writableDataWindose_GridPanel" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_Label" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataWindose_ListView" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataWindose_ListViewItem" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_MenuBar" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_MenuItem" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_MenuPopup" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_Panel" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_ScrollView" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_Separator" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataWindose_Splitter" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_StackPanel" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_StatusBar" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataWindose_TextField" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
@@ -1935,6 +1961,18 @@
   <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_IEqualityComparer_1&lt;Windose_Component&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_Component&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Component&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Action_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_ReadOnlySpan_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Span_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_ArraySortHelper_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_ObjectEqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_IEnumerable_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_IEnumerator_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_IEqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableDataS_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_MenuPopup&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataS_P_CoreLib_System_ReadOnlySpan_1&lt;Windose_MenuPopup&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableDataS_P_CoreLib_System_Span_1&lt;Windose_MenuPopup&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
@@ -2118,6 +2156,7 @@
   <WritableData Name="__writableData__Array&lt;S_P_TypeLoader_Internal_Runtime_TypeLoader_ModuleInfo&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableData__Array&lt;Windose_Button&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableData__Array&lt;Windose_Component&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <WritableData Name="__writableData__Array&lt;Windose_ListViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableData__Array&lt;Windose_MenuPopup&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableData__Array&lt;Windose_TreeViewItem&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <WritableData Name="__writableData__Array&lt;Windose_Dock&gt;" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
@@ -2899,20 +2938,22 @@
   <ConstructedEEType Name="_ZTV53S_P_TypeLoader_Internal_Runtime_TypeLoader_ModuleList" Length="80" Hash="3b30319804208baeed48ff154b5c466827bad4fc0e17d2eed2739293c9f1eab8" />
   <ConstructedEEType Name="_ZTV52S_P_TypeLoader_Internal_Runtime_TypeLoader_Callbacks" Length="64" Hash="c563102b96e4412b1ea39616d800191e9a1cc8f88bfdaa269820a1755c2f0017" />
   <ConstructedEEType Name="_ZTV49S_P_TypeLoader_Internal_NativeFormat_NativeReader" Length="56" Hash="f527ea691e572cfacf9ed0bfc233dc47223f6b1785fb5b0b34aa0edc6bba49e7" />
-  <ConstructedEEType Name="_ZTV20Windose_FileExplorer" Length="192" Hash="ce7412cf1ff1e8bb14e5fab1b2fc39a19d06072b12dfeea5a013e872fde2046c" />
+  <ConstructedEEType Name="_ZTV20Windose_FileExplorer" Length="192" Hash="f67a6a78c9a361f22541e5e9e87f5784040b2799bc29d53e4141f5c39f658ce2" />
   <ConstructedEEType Name="_ZTV18Windose_AddressBar" Length="168" Hash="3a28315cf6f28fb4203f3d30f73d0b730d1bcf6af243687ece7c459db62767e2" />
   <ConstructedEEType Name="_ZTV14Windose_Button" Length="200" Hash="6bee0fabf1e70e8330f6181eefba18211deccbb8085b281c29c1f84957f1a447" />
   <ConstructedEEType Name="_ZTV17Windose_Component" Length="156" Hash="69a1c6b81f2f8c8a0230fbc20f87143758816a1fc09aa43bb6f20adefbb7a939" />
   <ConstructedEEType Name="_ZTV20Windose_DirectBitmap" Length="208" Hash="44a0cd101b3b0398a2ffb8aa8dff9e1469e62c221116c9a773d84c6f4cc4926d" />
   <ConstructedEEType Name="_ZTV17Windose_DockPanel" Length="168" Hash="3f2ce73779ff65e8625b29f69e2a090729c598b34a1925987a7ae6f9788c3660" />
-  <ConstructedEEType Name="_ZTV17Windose_GridPanel" Length="168" Hash="893e709bae2d361b65a46ff94d55f20d274c789aed410d8da0ae75422535efd8" />
   <ConstructedEEType Name="_ZTV13Windose_Label" Length="152" Hash="0e2ce5fa35b7e3153a98339eb0e62f1f4e402490c05c52a6144b913cdbbbb037" />
+  <ConstructedEEType Name="_ZTV16Windose_ListView" Length="200" Hash="0ff4f308e70d73ac4019afdf48dab3b19ffc81af8d996900c1e96b9633ce2dec" />
+  <ConstructedEEType Name="_ZTV20Windose_ListViewItem" Length="80" Hash="ded66bf0bd4702a1322bcc0aca0a15f103ed626922cb331e37fd82651040ed7e" />
   <ConstructedEEType Name="_ZTV15Windose_MenuBar" Length="168" Hash="1d181a814680592f2ef3f7cb3b6bbdf25873ab3efd383586b724803332ec2a50" />
   <ConstructedEEType Name="_ZTV16Windose_MenuItem" Length="200" Hash="d5df1eaf3163a6d2e49b6db04a96ba26d2868913f8596f583e0394f072516bf4" />
   <ConstructedEEType Name="_ZTV17Windose_MenuPopup" Length="168" Hash="54dc10e3e0ee51456ce6b36e951e5a146db67920eb2b23789571adb4e347da2b" />
   <ConstructedEEType Name="_ZTV13Windose_Panel" Length="232" Hash="fbf3ecea651597b9bea9495ad56be15418d0c784a7af27c4e6bf21ae0a35a2d2" />
   <ConstructedEEType Name="_ZTV18Windose_ScrollView" Length="184" Hash="9379f03fc12c6e7909f10b52b610bb110456c7acf29d9277428e78e7631f3c73" />
   <ConstructedEEType Name="_ZTV17Windose_Separator" Length="152" Hash="dbaa109d9dc0b1e3d5cc117216cd069d79764f2a858c0278ff274d88e61fc197" />
+  <ConstructedEEType Name="_ZTV16Windose_Splitter" Length="168" Hash="88536c845f527435ab292f8678554965ffed0783338994ef5a0bead299da226e" />
   <ConstructedEEType Name="_ZTV18Windose_StackPanel" Length="232" Hash="d5e420de111786c012b25e264615eaea5d86fe520bab9e1eb0cbd391f6dafa2f" />
   <ConstructedEEType Name="_ZTV17Windose_StatusBar" Length="168" Hash="c3f39588238aa2c79fa8e0348cd145d63c1aeca5d0fc1b102a3ba2b4eecfce3a" />
   <ConstructedEEType Name="_ZTV17Windose_TextField" Length="168" Hash="4096cba10de85657768ffdd83c13ecdac910e68343a348561a86480ba917e2f7" />
@@ -3365,6 +3406,18 @@
   <ConstructedEEType Name="_ZTV77S_P_CoreLib_System_Collections_Generic_IEqualityComparer_1&lt;Windose_Component&gt;" Length="48" Hash="3039692bc9e2070efcdb1a01deb04624b0eacbd44ab6f1ae97cb8f8c120a7126" />
   <ConstructedEEType Name="_ZTV64S_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_Component&gt;" Length="112" Hash="22c551cd860c649e130671c6077901021b7a62090ecbf4a32d02005f64322bec" />
   <ConstructedEEType Name="_ZTV81Boxed_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Component&gt;" Length="136" Hash="6f05c0cea0feb98c58fb99653075f56876d6ce2262a687a295a93bf4c2419991" />
+  <ConstructedEEType Name="_ZTV49S_P_CoreLib_System_Action_1&lt;Windose_ListViewItem&gt;" Length="112" Hash="f925442d52c3bc6ce6ffecff48aec2056d0176f284fd9531a19630d125ed719f" />
+  <ConstructedEEType Name="_ZTV67S_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_ListViewItem&gt;" Length="128" Hash="eb8939763153a515c28f601756511714a458f2a83be36150a39bcecea74c0b51" />
+  <ConstructedEEType Name="_ZTV61Boxed_S_P_CoreLib_System_ReadOnlySpan_1&lt;Windose_ListViewItem&gt;" Length="80" Hash="613fd552a515a6541e462f27c9ad29d2e6a9db20b07185d646d05a90fa92c8de" />
+  <ConstructedEEType Name="_ZTV53Boxed_S_P_CoreLib_System_Span_1&lt;Windose_ListViewItem&gt;" Length="80" Hash="46f282c6ba6bc266137dc007abc08b3ed5339ea056dc814ccd10ba007e2f47f9" />
+  <ConstructedEEType Name="_ZTV78S_P_CoreLib_System_Collections_Generic_ArraySortHelper_1&lt;Windose_ListViewItem&gt;" Length="72" Hash="016d8b8b1817af8ee9592aa59bab13563cb695c9cf8cbc46fda3c9a1e3de9d5a" />
+  <ConstructedEEType Name="_ZTV79S_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="100" Hash="8bd8ba5d0a78c820d135929d3915c64cbb14507fced7a913df4f7318a8e774bf" />
+  <ConstructedEEType Name="_ZTV85S_P_CoreLib_System_Collections_Generic_ObjectEqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="104" Hash="b28c0652a745195bfccc12c8c75efc1b0fff17a617153d565d54aaf8031dbf21" />
+  <ConstructedEEType Name="_ZTV74S_P_CoreLib_System_Collections_Generic_IEnumerable_1&lt;Windose_ListViewItem&gt;" Length="48" Hash="a79dce77d06279d28abf1f7518c9a5297d6ee43034ca2569f42e2545da55a365" />
+  <ConstructedEEType Name="_ZTV74S_P_CoreLib_System_Collections_Generic_IEnumerator_1&lt;Windose_ListViewItem&gt;" Length="64" Hash="5189191247ee02331ab1a8e01f2ba842e42cd8bab49b731d7da1fad95298b47f" />
+  <ConstructedEEType Name="_ZTV80S_P_CoreLib_System_Collections_Generic_IEqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="48" Hash="1e67c9f625ce569601785ec7d10db42af64ac6c045c5904d7eea5a5a9df5cba5" />
+  <ConstructedEEType Name="_ZTV67S_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_ListViewItem&gt;" Length="112" Hash="9405dadfbb72969c6cd7235469e72f728fa9aedc141155b312e54746151d478c" />
+  <ConstructedEEType Name="_ZTV84Boxed_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_ListViewItem&gt;" Length="136" Hash="c3204370261eb26a6cc0015f10e88d266e552cf071db871954d6dd1d077812b4" />
   <ConstructedEEType Name="_ZTV64S_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_MenuPopup&gt;" Length="128" Hash="4f207068a1eada88985f479ddbfc71e6e08cb238ccbd41d483a70ba68ba033df" />
   <ConstructedEEType Name="_ZTV58Boxed_S_P_CoreLib_System_ReadOnlySpan_1&lt;Windose_MenuPopup&gt;" Length="80" Hash="2cce11ee418d39bbccd37fd14b6e1a5e33aa9da6afaad00a36f6cc691dc75005" />
   <ConstructedEEType Name="_ZTV50Boxed_S_P_CoreLib_System_Span_1&lt;Windose_MenuPopup&gt;" Length="80" Hash="a8ddd9e71988372dcd3c3f1784063158cfe89d91fa5eccd91e630268bcea2ad7" />
@@ -3555,6 +3608,7 @@
   <ConstructedEEType Name="_ZTV62__Array&lt;S_P_TypeLoader_Internal_Runtime_TypeLoader_ModuleInfo&gt;" Length="112" Hash="ecc2556fecc5419809f2035ac79c0149283199e733447b595811e9369f037c95" />
   <ConstructedEEType Name="_ZTV23__Array&lt;Windose_Button&gt;" Length="112" Hash="29a65b2f96ba1ca1fd695cc0e3d2e98768504e4699cdc53967f76a0ffcd6c0a4" />
   <ConstructedEEType Name="_ZTV26__Array&lt;Windose_Component&gt;" Length="112" Hash="36cbaeb3045ce5ab6608fa92f6425e3cd17bc73a4318e6e01cc45d2e9c30e41d" />
+  <ConstructedEEType Name="_ZTV29__Array&lt;Windose_ListViewItem&gt;" Length="112" Hash="726b3a20763ed5f6a1c8521176872083280ea704303e05f6aef8952bc78f49da" />
   <ConstructedEEType Name="_ZTV26__Array&lt;Windose_MenuPopup&gt;" Length="112" Hash="a463f93ce496b1954156ca7a8775710f19fff4428e8e766e5fd8a2bd7a375d11" />
   <ConstructedEEType Name="_ZTV29__Array&lt;Windose_TreeViewItem&gt;" Length="112" Hash="1949953cdb6c7327a7849fdfae17e03ef96c56bfa753a9dd8137cd4eb2035226" />
   <ConstructedEEType Name="_ZTV21__Array&lt;Windose_Dock&gt;" Length="84" Hash="82d815a3be7679967ff0ceb0053501034f345366fea4a3600caba129f03ca16e" />
@@ -3699,6 +3753,7 @@
   <MethodReadOnlyData Name="__readonlydata_S_P_Reflection_Execution_Internal_Reflection_Execution_NativeFormatEnumInfo__GetEnumValuesAndNames" Length="40" Hash="4e81948c0c5f799c72c3706b4f9728f4e05fcaee130383967db01f34ed096810" />
   <MethodReadOnlyData Name="__readonlydata_S_P_StackTraceMetadata_Internal_StackTraceMetadata_MethodNameFormatter__EmitTypeName" Length="36" Hash="5293aa95a54a1814114e88955c4982ef248c246dd101e14c8999f5ba85a6d816" />
   <MethodReadOnlyData Name="__readonlydata_S_P_StackTraceMetadata_Internal_StackTraceMetadata_MethodNameFormatter_SigTypeContext__GetTypeContext" Length="20" Hash="453898bf06b2d53a40812d4dbb6ed0ab34cd7d4a4281be11e4ecf2b2fb6802bc" />
+  <MethodReadOnlyData Name="__readonlydata_Windose_FileExplorer__PopulateFiles" Length="144" Hash="5c85b68b3529c38be12df2485181bd3c76f43f965bd1d0b61d7280ffaaa827f5" />
   <MethodReadOnlyData Name="__readonlydata_Windose_Button__HandleInput" Length="12" Hash="fde13ce2cf6e8490ad663e2e45bba9aa383b78e3fa08adc99be2aa96c676de17" />
   <MethodReadOnlyData Name="__readonlydata_Windose_Component__UpdateFrame" Length="12" Hash="1838358d29858c3efd23a7868ed3d23c11be300e3cbe47582ee7d86dee298125" />
   <MethodReadOnlyData Name="__readonlydata_Windose_Component__HandleKeyboard" Length="16" Hash="0d194a94a055651f318c973f94471da807b6ab53a6158ca2f698d7eb94ef9687" />
@@ -3707,8 +3762,12 @@
   <MethodReadOnlyData Name="__readonlydata_Windose_Component__DrawGradient" Length="4" Hash="4149d67891c7efddad38eb590d537d3f33a25d6454ffba671e1c20cf5824a22c" />
   <MethodReadOnlyData Name="__readonlydata_Windose_DirectBitmap__TrimLine" Length="4" Hash="4149d67891c7efddad38eb590d537d3f33a25d6454ffba671e1c20cf5824a22c" />
   <MethodReadOnlyData Name="__readonlydata_Windose_DockPanel__ResolveDockLayout" Length="20" Hash="490baae70af453bdf68780a4de60ea582b986025a977489df6c39643d48f756d" />
+  <MethodReadOnlyData Name="__readonlydata_Windose_ListView__DrawLocal" Length="16" Hash="a91a0427cd4eef06c5635892bee84e4c412f7de06d2dc8b7af10695e5ec7efb8" />
+  <MethodReadOnlyData Name="__readonlydata_Windose_ListView__GetItemIndexAt" Length="16" Hash="39e40be96fde9209bdcf0c07b97de7948209d5a10b2bae1c0d58e68a270d580e" />
+  <MethodReadOnlyData Name="__readonlydata_Windose_ListView__GetContentHeight" Length="16" Hash="7c84ce1c181e24fa651084708fef822b11a0fbea5baa8331992662bbd622137e" />
   <MethodReadOnlyData Name="__readonlydata_Windose_MenuItem__HandleInput" Length="16" Hash="247f482b38bd16fc6b2b62f07138b723f72f5799a2a2c1a339675fb60bad0f06" />
   <MethodReadOnlyData Name="__readonlydata_Windose_ScrollView__HandleInput" Length="4" Hash="4149d67891c7efddad38eb590d537d3f33a25d6454ffba671e1c20cf5824a22c" />
+  <MethodReadOnlyData Name="__readonlydata_Windose_Splitter__HandleInput" Length="16" Hash="ee046d18b403cd072ff9af0458e6fd06620d099b41d4456c16866e8d3f9fcdb2" />
   <MethodReadOnlyData Name="__readonlydata_Windose_Windose_Kernel__Run" Length="32" Hash="88c12d8e14f5b4e386d3557f1997738a9a60684434aba4a8379e5b71c9b22ab0" />
   <MethodReadOnlyData Name="__readonlydata_Windose_Windose_Kernel__Tick" Length="32" Hash="00f4c24b53db89234cf98bc2702c001272b8d29756a5346e1943881ea88b70ac" />
   <MethodReadOnlyData Name="__readonlydata_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;UInt8&gt;____GetFieldHelper" Length="16" Hash="e45c00fc84cb15f705763b8c81ef04782a498d9c3aef23177404a3559b1faf1a" />
@@ -8913,10 +8972,34 @@
   <GCInfo Name="S_P_TypeLoader_Internal_NativeFormat_NativeHashtable__Lookup" Length="5" Hash="56f03da5a536a06a3ea918b6d84bc2bce2dd0e03077c94bdda431cf04f1a2bce" />
   <MethodCode Name="S_P_TypeLoader_Internal_NativeFormat_NativeHashtable_Enumerator__GetNext" Length="187" Hash="9b0ed2c32d67a3d4cf4fc2e7bb796f80f78815d2ad18c03eed998a514435ba3b" />
   <GCInfo Name="S_P_TypeLoader_Internal_NativeFormat_NativeHashtable_Enumerator__GetNext" Length="10" Hash="3c9d775aeefbf3e68727baedbb0901c1cf172edef9f116790ddb1be164b69bd8" />
-  <MethodCode Name="Windose_FileExplorer___ctor" Length="1500" Hash="f5464ca2a2d3556ee5f68cdbad12a00e34577e8c812de6de05770e51971e1ce6" />
-  <GCInfo Name="Windose_FileExplorer___ctor" Length="142" Hash="1988859f7de884843a7a8410d90ace49b2d3a22b5c8a24dcd09db502044ac8eb" />
-  <MethodCode Name="Windose_FileExplorer____ctor_b__8_0" Length="30" Hash="52f9586de3f68933da9c4bcf7e5ab7794c47d63c65fd72c76d197cf8dbb139b4" />
-  <GCInfo Name="Windose_FileExplorer____ctor_b__8_0" Length="17" Hash="b6d3a24e4f0409786108e6055328c573d5fe975cd8f533c566ef56222fb48ae6" />
+  <MethodCode Name="Windose_FileExplorer___ctor" Length="2278" Hash="c80040b6aa679e74a8c54d5079df4497e00cb2ee8c32a9d73d5552dbe016273d" />
+  <GCInfo Name="Windose_FileExplorer___ctor" Length="229" Hash="b35a3659c3f071a64c67a04eebbfb37b0b50ddb0dfbbe283bd53821f4cf98e5e" />
+  <MethodCode Name="Windose_FileExplorer__BuildTree" Length="364" Hash="f5298d641dad5410256e0c28068f44ecc08e5ebd439fb3aad08fe10765098c75" />
+  <GCInfo Name="Windose_FileExplorer__BuildTree" Length="32" Hash="ec0ec9bf4489d4cf7b6a32979112d3d95fd4e1b510f9d4634c6a4a7078b88749" />
+  <MethodCode Name="Windose_FileExplorer__OpenLocation" Length="186" Hash="1d97bdb258d94c4af5ac2d420d7ccc0ff480fb3d5b713adce3a138a54619a19e" />
+  <GCInfo Name="Windose_FileExplorer__OpenLocation" Length="9" Hash="8be6920f6d0a4500f139988881a4a858df545d268dff7b1faeefcfe7be1c5405" />
+  <MethodCode Name="Windose_FileExplorer__OpenFolderItem" Length="177" Hash="fcbcd83c526d2c91507caf60201fd1f199dc3d9770d60a2ff55c8172e414a8c4" />
+  <GCInfo Name="Windose_FileExplorer__OpenFolderItem" Length="9" Hash="8427c5d65c29b4ee4c9ee6c3495f6e211ddd104393bed991621c191b9b9259df" />
+  <MethodCode Name="Windose_FileExplorer__PopulateFiles" Length="1998" Hash="3d8e74418b156b9efd245cbbfc0344d25f8d92d99a089881bebc8fd8610ed796" />
+  <GCInfo Name="Windose_FileExplorer__PopulateFiles" Length="101" Hash="4c2f84676e652d889d1e2081ff6fefb21fad1385638704b501d68dbe597994b5" />
+  <MethodCode Name="Windose_FileExplorer__AddFolder" Length="36" Hash="1aecd6afa70b45ad5f6a481291f5483d2e5f62206a9022b3c63df0bfd06b0e99" />
+  <GCInfo Name="Windose_FileExplorer__AddFolder" Length="5" Hash="58985713de8d51392595d990d9a5ca2cbb8517367e28e8abe1f0a1acce8ddaab" />
+  <MethodCode Name="Windose_FileExplorer__AddFile" Length="76" Hash="f46d132ad5adfe82afa3d55b831024a1e50fc0d5c12034f9fb4496947adafd7e" />
+  <GCInfo Name="Windose_FileExplorer__AddFile" Length="6" Hash="4075da4ac8a24696dbe2d3930143b2573943c7acb92db349b98913f52a110dd3" />
+  <MethodCode Name="Windose_FileExplorer____ctor_b__12_0" Length="118" Hash="46ba2402dae114b4c4d143418118afc79ed236d73ce330bc00229e33f8268578" />
+  <GCInfo Name="Windose_FileExplorer____ctor_b__12_0" Length="6" Hash="99ca1cab6bcd44b82a23b4b3737a2fb5489422d4a51f717370b515f789dddecf" />
+  <MethodCode Name="Windose_FileExplorer____ctor_b__12_1" Length="120" Hash="0476f4795e136fd31e585b784eb0dd455f0ed96bc30b4bbb021d7c243786c1ab" />
+  <GCInfo Name="Windose_FileExplorer____ctor_b__12_1" Length="6" Hash="6cec9fd2fd66a713c592b5645e15599b08e4f75bb68a0121f5f265d0ecbd272f" />
+  <MethodCode Name="Windose_FileExplorer____ctor_b__12_2" Length="120" Hash="079f1b5f03a7b91ac66a7bffc287f68784ee4de7f3137ace0c49de62e34b67f3" />
+  <GCInfo Name="Windose_FileExplorer____ctor_b__12_2" Length="6" Hash="6cec9fd2fd66a713c592b5645e15599b08e4f75bb68a0121f5f265d0ecbd272f" />
+  <MethodCode Name="Windose_FileExplorer____ctor_b__12_3" Length="5" Hash="e8ebd827d1f36d7cfa5e5220610aa6370284d1589989363f48ac40166362d449" />
+  <GCInfo Name="Windose_FileExplorer____ctor_b__12_3" Length="2" Hash="5aeca385d8b781825b07bbec7c858b7170426c88088935850bc13dd6402368a5" />
+  <MethodCode Name="Windose_FileExplorer____ctor_b__12_4" Length="5" Hash="e8ebd827d1f36d7cfa5e5220610aa6370284d1589989363f48ac40166362d449" />
+  <GCInfo Name="Windose_FileExplorer____ctor_b__12_4" Length="2" Hash="5aeca385d8b781825b07bbec7c858b7170426c88088935850bc13dd6402368a5" />
+  <MethodCode Name="Windose_FileExplorer____ctor_b__12_5" Length="158" Hash="23a6d895b31e40be110f5f2ac4621bfad8373bd17b67880c12cf8f674dffb7aa" />
+  <GCInfo Name="Windose_FileExplorer____ctor_b__12_5" Length="10" Hash="5fdf3603c499542785e2960473e209e1e76bf11eac602b3315c161b451c022ec" />
+  <MethodCode Name="Windose_FileExplorer____ctor_b__12_6" Length="12" Hash="88a068be1860c2ecc37ec796785572b2099b150fde16d3814330873943eb4167" />
+  <GCInfo Name="Windose_FileExplorer____ctor_b__12_6" Length="11" Hash="1dc1012d088790b704299ef6051601c9612ca5cad0755438b28fb6fd3125fc44" />
   <MethodCode Name="Windose_Mouse__Update" Length="129" Hash="190225d0ad1661f062b075f14b137838736c458ab6a0ef3cd42d78f291ac97ed" />
   <GCInfo Name="Windose_Mouse__Update" Length="5" Hash="a99bab13cd693e0e7071fc223a23e30d39ae82cdf5a596a77ebb6f8d42c4b6de" />
   <MethodCode Name="Windose_Mouse__HandleButton" Length="65" Hash="c57d4ec547e94d5c6b735fba3b0811e85fb73340ce668fa0e3b62b804a69a7e9" />
@@ -9009,6 +9092,8 @@
   <GCInfo Name="Windose_DirectBitmap__SetPixelAlpha" Length="3" Hash="d273d27d20bf56d70d15a7e597d96cb5bd5c70b27ddad1aedf371030f6a11a4c" />
   <MethodCode Name="Windose_DirectBitmap__DrawPoint" Length="487" Hash="8b49aa5ddb9b5dd350a550115d58716e082005b1c1ced3df97e6a23b3763e574" />
   <GCInfo Name="Windose_DirectBitmap__DrawPoint" Length="20" Hash="bb2cd9e1cb2dc230066102c67e49ae06b7158890c870b1f011cf68ba06f86088" />
+  <MethodCode Name="Windose_DirectBitmap__DrawImageAlpha" Length="394" Hash="68713f8738e5dfd716a89fc400b5f01f6c382c00bf7349f9906ee9ce955ca5d7" />
+  <GCInfo Name="Windose_DirectBitmap__DrawImageAlpha" Length="54" Hash="b444fe38f77869820ec5fd6edce160843f740d46c8578139bc93623c5a9d31f7" />
   <MethodCode Name="Windose_DirectBitmap__DrawString" Length="140" Hash="cc2541c2a3298500727f2ec0c034750f63b265bdfca19e2865aa6b7b9089a6b1" />
   <GCInfo Name="Windose_DirectBitmap__DrawString" Length="9" Hash="49a60461ae1607e6994cea97c3324fc0509b7487ccfd2345a34af45c64153a94" />
   <MethodCode Name="Windose_DirectBitmap__DrawString_0" Length="194" Hash="c24c77ebb9c08dcfc9d8335df2485f813c404d73125b9ce8779f1e4cbbee4534" />
@@ -9065,24 +9150,58 @@
   <GCInfo Name="Windose_DockPanel__GetName" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
   <MethodCode Name="Windose_DockPanel__IsOpaqueForCopy" Length="8" Hash="bf7c266b66c3d902fb311b7a7eb9037e3b07a7ddd3945539a8c8d0bfcd3f507d" />
   <GCInfo Name="Windose_DockPanel__IsOpaqueForCopy" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
-  <MethodCode Name="Windose_GridPanel___ctor" Length="120" Hash="631dc8d95a7092ab9d25aa85b2512d0be1ad875d89d27db296476845633ba1d4" />
-  <GCInfo Name="Windose_GridPanel___ctor" Length="5" Hash="fbb7e5f65c571a9523cc4a443ad30c9062d3389815e7c49f94b604dd01e19188" />
-  <MethodCode Name="Windose_GridPanel__Resize" Length="21" Hash="e34a85d012c87fd367f68e3afa88bc0248479a64a86ce4423e50b42d62e515ba" />
-  <GCInfo Name="Windose_GridPanel__Resize" Length="4" Hash="dd11fbad636070e2c835d7f72c00e5e58df089987434d6ac01828e8fe6b0b5d7" />
-  <MethodCode Name="Windose_GridPanel__ResolveGridLayout" Length="464" Hash="b553533b9dddbd8dcd17d5ef2793d1bd12c9143ebe41039097d6c5072c89758e" />
-  <GCInfo Name="Windose_GridPanel__ResolveGridLayout" Length="53" Hash="42a9cd402f9c322fadf474fb26b7dd3b0cb27f1689e92a5c3bb33b7e0be97baf" />
-  <MethodCode Name="Windose_GridPanel__DrawLocal" Length="228" Hash="4caf89d35dcb3d95f4d9ac2b54533dd3dd68d1527ea9e23c2a53ac7867ddaf69" />
-  <GCInfo Name="Windose_GridPanel__DrawLocal" Length="14" Hash="08307cdec9ba0692d5cbfc72cdde4859d88a193e322da07c7dbb2900da1fed3e" />
-  <MethodCode Name="Windose_GridPanel__GetName" Length="8" Hash="42bf2fe8994233d2e2eaf9d217f425ee1530fb5e5d6924672ca17f13bdf43411" />
-  <GCInfo Name="Windose_GridPanel__GetName" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
-  <MethodCode Name="Windose_GridPanel__IsOpaqueForCopy" Length="8" Hash="04a571e725bf5bbd5f2ac60da3a6c3658cddeeecaab33f03d6007f9d842ad7d2" />
-  <GCInfo Name="Windose_GridPanel__IsOpaqueForCopy" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
   <MethodCode Name="Windose_Label__DrawLocal" Length="274" Hash="e078693f018237710993896112bbe936661a846b09fece9429fa3464975e2629" />
   <GCInfo Name="Windose_Label__DrawLocal" Length="12" Hash="15d580d8e5a486c046fbc9b0daa6a6ff99e7647a59cd7b21d4407dfaf6b5e4bf" />
   <MethodCode Name="Windose_Label__HandleInput" Length="6" Hash="2db31f4e09597946e56e859813bfdad7046d457c32332c3a882654d1e3ffdf67" />
   <GCInfo Name="Windose_Label__HandleInput" Length="2" Hash="78a23af8da46b1b37e8767921a2d3f528fdc8eca37cea8aea775fd2b283d3776" />
   <MethodCode Name="Windose_Label__IsOpaqueForCopy" Length="8" Hash="f70f973910e394e6709e448ffbf5c16879ecb4db186b1bb7fb7ba773ab5a5b5d" />
   <GCInfo Name="Windose_Label__IsOpaqueForCopy" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
+  <MethodCode Name="Windose_ListView___ctor" Length="265" Hash="8d6e32267bac4c10b88f12dd65c9bbde64abfe230eff3035893661e951b6bd4b" />
+  <GCInfo Name="Windose_ListView___ctor" Length="8" Hash="0e26d5750f71fab436d8cae5a075c3b2b6f69d9336ef4d5c7efe68a3d1c3871b" />
+  <MethodCode Name="Windose_ListView__AddItem" Length="208" Hash="b8885be8aec0fb4e5a70c3a40371c13dbe2367e1df0d4056820cbc846ef3ddf2" />
+  <GCInfo Name="Windose_ListView__AddItem" Length="17" Hash="2b3f597e2fb42ae1bd40e0dfceec525f8c4cf4674ae3578f847e55a597871db4" />
+  <MethodCode Name="Windose_ListView__AddFolder" Length="26" Hash="f6e451f2c96ac60b61256820451d4f2368709bd59a96f50c87f327acf3c6aa06" />
+  <GCInfo Name="Windose_ListView__AddFolder" Length="4" Hash="6acc2ed6d69b552a7bf80a0496e679da6af071f8c16cb809cf6cf68aee098f45" />
+  <MethodCode Name="Windose_ListView__DrawLocal" Length="188" Hash="af6ad35f0ce2f849389ba1bb3e8da261b37d7b442370a3959c17eb649648e701" />
+  <GCInfo Name="Windose_ListView__DrawLocal" Length="43" Hash="b65d237e871b94c09dfc859c7104f876974d6b7f0f8540ca3cd7dc149e866ca6" />
+  <MethodCode Name="Windose_ListView__DrawLargeIcons" Length="195" Hash="a77531c71412345fceee706b2edefe8a049b074ef79bddacc307d04c012b7368" />
+  <GCInfo Name="Windose_ListView__DrawLargeIcons" Length="27" Hash="85ce69c601c992a4fb187d7a089f8a92622a963f6dc7991700ff70553c18f60a" />
+  <MethodCode Name="Windose_ListView__DrawItemLarge" Length="526" Hash="785bbab7dde992f2de7caea5566bf25db2cca24084c31ee250184e9d6f914f91" />
+  <GCInfo Name="Windose_ListView__DrawItemLarge" Length="22" Hash="80ace3208f91ccf2a24d48ee015a7fadbe7fcffb0eb35c708fbb60bc9df66aad" />
+  <MethodCode Name="Windose_ListView__DrawSmallIcons" Length="207" Hash="d987f90b340f36bdd0ecc2d63eefa08332033da25d4b6784f20f4f9b793d15ee" />
+  <GCInfo Name="Windose_ListView__DrawSmallIcons" Length="7" Hash="0edab87c464f036e917d2a67925af1bed3b93c14aecadfcfe34373b9a005ff5e" />
+  <MethodCode Name="Windose_ListView__DrawList" Length="142" Hash="fe34d319a7799d1c071e90fc0e557ad23e1402810e48b85440a2a6eed478767d" />
+  <GCInfo Name="Windose_ListView__DrawList" Length="7" Hash="359205ad905eef02a0b5034ae730eeb2267f49a1cd80165938a80c6999293188" />
+  <MethodCode Name="Windose_ListView__DrawDetails" Length="131" Hash="8ae26164188ace14c8e0ca307827b6fc319e9685d83a85a822f9fc5c08976c39" />
+  <GCInfo Name="Windose_ListView__DrawDetails" Length="27" Hash="72721d8b24fe114b7d57a5f23746d8e453f4422ce66ecbfacb80ea0d1c420ead" />
+  <MethodCode Name="Windose_ListView__DrawDetailsHeader" Length="669" Hash="1fcedeec5962b19aedfe05c545a901d9be7bf07bb459afe5b0f50f54296fc043" />
+  <GCInfo Name="Windose_ListView__DrawDetailsHeader" Length="33" Hash="078b73926a0b6f93db2a30cad54475a6a5e04ded09b1102f4487cfda6e25840d" />
+  <MethodCode Name="Windose_ListView__DrawDetailsRow" Length="565" Hash="da80a45aca51898b83e95b52c376da7099746592038e6fc34de57cd4f176997c" />
+  <GCInfo Name="Windose_ListView__DrawDetailsRow" Length="33" Hash="3e75ec8183c19d5d0b49d76f3b0f86f66f7eed8cf07e9d2b3082f86b8b6b0fda" />
+  <MethodCode Name="Windose_ListView__DrawItemRow" Length="344" Hash="2f9316f00dd62e0047b9509279185c0037b7359d8d098bc0236458b68894fe13" />
+  <GCInfo Name="Windose_ListView__DrawItemRow" Length="14" Hash="bad7520aa95e42c976daac16728c18d4008f4eb5ef9a41d460297dfe123d485b" />
+  <MethodCode Name="Windose_ListView__DrawItemIcon" Length="67" Hash="2e1ebed903aeccd270c2bfa935cd87594ae2010d0db9e4224506132602e988f3" />
+  <GCInfo Name="Windose_ListView__DrawItemIcon" Length="20" Hash="a41656755c41042662384d5a11aac3a7b68bb049441044707f451a0c25133ad6" />
+  <MethodCode Name="Windose_ListView__DrawFolderIcon" Length="417" Hash="6443d2063ed2d4ba577a0409201e191f8b70470f0ee0f400ce6f8afe7aba428c" />
+  <GCInfo Name="Windose_ListView__DrawFolderIcon" Length="16" Hash="fef9eb22328ad8527c30f83745c155ca0753d79a9c635c31146f1f0b05d975f5" />
+  <MethodCode Name="Windose_ListView__DrawFileIcon" Length="398" Hash="25532d108b6d480d08964067d0e9a2e806cd855e583cd4c7cb8a02f714b825b0" />
+  <GCInfo Name="Windose_ListView__DrawFileIcon" Length="13" Hash="d6f9bd288a5b0278acafd0ade6918e5a9117fcdcaa656799532702e3638bb06a" />
+  <MethodCode Name="Windose_ListView__HandleInput" Length="152" Hash="0a8a1b26ee29493f64c5bb464e167e7e68a4f782c6b8f0019e7d687ccd01d078" />
+  <GCInfo Name="Windose_ListView__HandleInput" Length="7" Hash="1af3be248fe3469bfca87326ff4777c3b23974205ade7a4f63f847b5f57e2470" />
+  <MethodCode Name="Windose_ListView__ActivateItem" Length="186" Hash="eb3213b7518476d388cc96993f7598dd5a5faa4376a3b260c374126205fbd7e9" />
+  <GCInfo Name="Windose_ListView__ActivateItem" Length="10" Hash="c5222fee8a75006f5a4e787e05b29a8db86579a8e255857907dec74ede8b49da" />
+  <MethodCode Name="Windose_ListView__SelectItem" Length="160" Hash="f3696c6573750a3bf70107cfd1ef800d318fcc62b940e7fb9f7928d9dc4aee07" />
+  <GCInfo Name="Windose_ListView__SelectItem" Length="7" Hash="5e4a072d6e011e81b898c798511f5c6e6238cf29027f5b0af8fb601f5a09b447" />
+  <MethodCode Name="Windose_ListView__GetItemIndexAt" Length="325" Hash="bd39171262abff3cf5cff1b276a90af6564d23b4cef11cf71401e8b24f7559e8" />
+  <GCInfo Name="Windose_ListView__GetItemIndexAt" Length="4" Hash="5172b257c8c3abaa83275b36b5791da4201ffe95ad3399edd811092504838ab9" />
+  <MethodCode Name="Windose_ListView__GetContentHeight" Length="269" Hash="0be307837c7d6c13b2834b090c5acb8ba9b874d3cda7f591e00958df241dac00" />
+  <GCInfo Name="Windose_ListView__GetContentHeight" Length="4" Hash="07166ff3647d5481dd487b3dae195c2715689a540914325b8a68958a61050640" />
+  <MethodCode Name="Windose_ListView__IsOpaqueForCopy" Length="8" Hash="c35f328d53e9e180bf058814e837d0d73e52336c515ca81b0eae3ff0aa65bdb5" />
+  <GCInfo Name="Windose_ListView__IsOpaqueForCopy" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
+  <MethodCode Name="Windose_ListView__GetName" Length="8" Hash="42bf2fe8994233d2e2eaf9d217f425ee1530fb5e5d6924672ca17f13bdf43411" />
+  <GCInfo Name="Windose_ListView__GetName" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
+  <MethodCode Name="Windose_ListViewItem___ctor" Length="73" Hash="a49c66319fbc3a4d997ff270a268943e126009243ad37c19a825ef8bd38c337f" />
+  <GCInfo Name="Windose_ListViewItem___ctor" Length="2" Hash="20bd5ef69e629c299cebb132138caeffe1a216683957dc8dcbc8330b5c8bb4d3" />
   <MethodCode Name="Windose_MenuBar___ctor" Length="321" Hash="fef43a23f7a70653bd9a26cf325af2c6f20d63da069d87b01d8ca9a801dcddf8" />
   <GCInfo Name="Windose_MenuBar___ctor" Length="12" Hash="16aa64f7941eeef14e4ab0e498b486f08b1134d6543e797b5c37205ae0274aab" />
   <MethodCode Name="Windose_MenuBar__AddMenu" Length="304" Hash="00db37a4b4f1d5d328fcad20153f4370ba4003d51f6683410562ce20f5159128" />
@@ -9157,8 +9276,8 @@
   <GCInfo Name="Windose_ScrollView__ClampScroll" Length="6" Hash="afd080fc4ae70192c6b4f19337663975feaa7cea1c3039a34e0b559c1a2bb8b8" />
   <MethodCode Name="Windose_ScrollView__ApplyContentOffset" Length="70" Hash="48b0705567634d8d7404883a26d4b4cec2167a66382fe75605945649a811de4a" />
   <GCInfo Name="Windose_ScrollView__ApplyContentOffset" Length="5" Hash="43d3e179cbd145e5879a40ba803f821e63f65d877ad20a2d9697d72c33c5c094" />
-  <MethodCode Name="Windose_ScrollView__RefreshContentSize" Length="143" Hash="0cd5b7e4dcf0f712fc5869cd28ce4f0f54ffa2d0038223bd9eb213a2603aa146" />
-  <GCInfo Name="Windose_ScrollView__RefreshContentSize" Length="10" Hash="c9c30fd8c15b8991069b1eec9dc3e28d7446a780bb8350b8cc26cce53a346a75" />
+  <MethodCode Name="Windose_ScrollView__RefreshContentSize" Length="235" Hash="2abf5707ca9c422d16fcc894ae12afc42a26ba03714b67b219153322223eda86" />
+  <GCInfo Name="Windose_ScrollView__RefreshContentSize" Length="15" Hash="5d2021bce6be2013b6a3f575896acd659f9dba75b5d3ed34c28c9e11b35ff679" />
   <MethodCode Name="Windose_ScrollView__GetViewportWidth" Length="47" Hash="a2366063eac4415e9e9eb418186b5fc1eb6c3cab84e42e8ad5097a738396ee28" />
   <GCInfo Name="Windose_ScrollView__GetViewportWidth" Length="2" Hash="2980b96166234d9747e952fc0902911bf8739860d8afcc804258dde3b7d7437d" />
   <MethodCode Name="Windose_ScrollView__GetViewportHeight" Length="47" Hash="97b7008b7c2e9c8a615461c0da08778ca209d255a5988b816f369975519647c0" />
@@ -9195,6 +9314,14 @@
   <GCInfo Name="Windose_Separator__HandleInput" Length="2" Hash="5aeca385d8b781825b07bbec7c858b7170426c88088935850bc13dd6402368a5" />
   <MethodCode Name="Windose_Separator__GetName" Length="8" Hash="42bf2fe8994233d2e2eaf9d217f425ee1530fb5e5d6924672ca17f13bdf43411" />
   <GCInfo Name="Windose_Separator__GetName" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
+  <MethodCode Name="Windose_Splitter___ctor" Length="64" Hash="b18225e50cb0a319cb45bc9ce5fb857a2c7a8c764b878c373016fe9ddd04e612" />
+  <GCInfo Name="Windose_Splitter___ctor" Length="5" Hash="84791cc0fba1e68ae87cbd14a8e60353742c686fddd2adab4c9fb557bccfd356" />
+  <MethodCode Name="Windose_Splitter__DrawLocal" Length="1022" Hash="4134ac596e867af615988bfa30cbe361d6bb3cb1dac607507f4635e4c7d1886b" />
+  <GCInfo Name="Windose_Splitter__DrawLocal" Length="26" Hash="c65a06dd234b87d240b7ffa47d8d899b98144ba18a7b40600bc0c4667e2b5beb" />
+  <MethodCode Name="Windose_Splitter__HandleInput" Length="362" Hash="66fc75cc214160b7bedb0e07c2d7e398e16fbe1645d9b35ea6387ee0d189c629" />
+  <GCInfo Name="Windose_Splitter__HandleInput" Length="47" Hash="7693671869bee02de2535276a1a9f14e053c501b647aaea9d5b964bddeed3322" />
+  <MethodCode Name="Windose_Splitter__GetName" Length="8" Hash="42bf2fe8994233d2e2eaf9d217f425ee1530fb5e5d6924672ca17f13bdf43411" />
+  <GCInfo Name="Windose_Splitter__GetName" Length="2" Hash="869f1dfb999a452f497a4cf7f44db2d6ee661f74a9e7e05251bc1420e50672d4" />
   <MethodCode Name="Windose_StackPanel__Resize" Length="21" Hash="e34a85d012c87fd367f68e3afa88bc0248479a64a86ce4423e50b42d62e515ba" />
   <GCInfo Name="Windose_StackPanel__Resize" Length="4" Hash="dd11fbad636070e2c835d7f72c00e5e58df089987434d6ac01828e8fe6b0b5d7" />
   <MethodCode Name="Windose_StackPanel__ResolveStackLayout" Length="797" Hash="21ed5b333098a8685db8c1dcf70ece5084ca0a645bf1063010c34e153845f899" />
@@ -11240,6 +11367,13 @@
   <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Collections_Generic_ArraySortHelper_1&lt;Windose_Component&gt;" Length="16" Hash="374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb" />
   <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_Component&gt;" Length="16" Hash="374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb" />
   <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_Component&gt;" Length="72" Hash="834a709ba2534ebe3ee1397fd4f7bd288b2acc1d20a08d6c862dcd99b6f04400" />
+  <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Array_1&lt;Windose_ListViewItem&gt;" Length="24" Hash="9d908ecfb6b256def8b49a7c504e6c889c4b0e41fe6ce3e01863dd7b61a20aa0" />
+  <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_ListViewItem&gt;" Length="24" Hash="9d908ecfb6b256def8b49a7c504e6c889c4b0e41fe6ce3e01863dd7b61a20aa0" />
+  <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_ReadOnlySpan_1&lt;Windose_ListViewItem&gt;" Length="40" Hash="2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb" />
+  <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Span_1&lt;Windose_ListViewItem&gt;" Length="32" Hash="66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925" />
+  <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Collections_Generic_ArraySortHelper_1&lt;Windose_ListViewItem&gt;" Length="16" Hash="374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb" />
+  <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_ListViewItem&gt;" Length="16" Hash="374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb" />
+  <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_ListViewItem&gt;" Length="72" Hash="834a709ba2534ebe3ee1397fd4f7bd288b2acc1d20a08d6c862dcd99b6f04400" />
   <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_Array_1&lt;Windose_MenuPopup&gt;" Length="24" Hash="9d908ecfb6b256def8b49a7c504e6c889c4b0e41fe6ce3e01863dd7b61a20aa0" />
   <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_MenuPopup&gt;" Length="24" Hash="9d908ecfb6b256def8b49a7c504e6c889c4b0e41fe6ce3e01863dd7b61a20aa0" />
   <TypeGenericDictionary Name="__GenericDict_S_P_CoreLib_System_ReadOnlySpan_1&lt;Windose_MenuPopup&gt;" Length="40" Hash="2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb" />
@@ -11517,6 +11651,10 @@
   <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_Component&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_Component&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_Component&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_Array_EmptyArray_1&lt;Windose_ListViewItem&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_ListViewItem&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_ListViewItem&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
+  <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_List_1&lt;Windose_ListViewItem&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_Array_EmptyArray_1&lt;Windose_MenuPopup&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_SZGenericArrayEnumerator_1&lt;Windose_MenuPopup&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
   <GCStaticsPreInitData Name="__GCSTATICSS_P_CoreLib_System_Collections_Generic_EqualityComparer_1&lt;Windose_MenuPopup&gt;__PreInitData" Length="8" Hash="af5570f5a1810b7af78caf4bc70a660f0df51e42baf91d4de5b2328de0e83dfc" />
@@ -11623,5 +11761,5 @@
   <SealedVTable Name="__SealedVTable__ZTV100Boxed_S_P_CoreLib_System_Collections_Generic_Dictionary_2_Enumerator&lt;System___Canon__System___Canon&gt;" Length="12" Hash="15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b" />
   <SealedVTable Name="__SealedVTable__ZTV109S_P_CoreLib_System_Runtime_CompilerServices_ConditionalWeakTable_2_Enumerator&lt;System___Canon__System___Canon&gt;" Length="12" Hash="15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b" />
   <SealedVTable Name="__SealedVTable__ZTV23__Array&lt;System___Canon&gt;" Length="4" Hash="df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119" />
-  <ReadyToRunHeader Name="__ReadyToRunHeader" Length="808" Hash="1867970e751904322d39f969a3d7961e0fbb71a87fce2fa7e62872c26177ca86" />
+  <ReadyToRunHeader Name="__ReadyToRunHeader" Length="808" Hash="7c53545cffea2ddc47fd545bfacf21d0f36ce820f87c0b4f4f169bd947866725" />
 </ObjectNodes>

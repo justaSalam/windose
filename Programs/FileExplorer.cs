@@ -6,14 +6,18 @@ using Windose;
 public class FileExplorer : Window
 {
     private DockPanel root;
+    private DockPanel explorerBody;
     private MenuBar menuBar;
     private Toolbar toolbar;
     private AddressBar addressBar;
     private StatusBar statusBar;
-    private GridPanel content;
-
-    private ScrollView contentScroll;
+    private Panel objectCountPanel;
+    private Panel selectedPanel;
+    private ScrollView treeScroll;
     private ScrollView fileScroll;
+    private TreeView tree;
+    private ListView files;
+
     public FileExplorer(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height, title, useTitleBar)
     {
         root = new DockPanel(0, 0, Width, Height)
@@ -25,32 +29,68 @@ public class FileExplorer : Window
             useBackground = true,
         };
 
-
-
-
         menuBar = new MenuBar(0, 0, Width);
         toolbar = new Toolbar(0, 0, Width);
         addressBar = new AddressBar(0, 0, Width);
         statusBar = new StatusBar(0, 0, Width);
+        explorerBody = new DockPanel(0, 0, Width, Height)
+        {
+            clampSize = false,
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+            Padding = new Thickness(0),
+        };
 
-        contentScroll = new ScrollView(0, 0, Width, Height);
-        content = new GridPanel(0, 0, Width, Height)
+        treeScroll = new ScrollView(0, 0, 180, Height)
+        {
+            showHorizontalScrollbar = false,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+
+        tree = new TreeView(0, 0, 180, Height)
         {
             useBackground = true,
-            backgroundColor = Palette.ControlWhite
+            backgroundColor = Palette.ControlWhite,
         };
-        contentScroll.SetContent(content, Width - 16, 1200);
-        root.AddDockChild(contentScroll, Dock.Fill);
+
+        Splitter splitter = new Splitter(0, 0, 4, Height)
+        {
+            orientation = LayoutOrientation.Vertical,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+
+        fileScroll = new ScrollView(0, 0, Width, Height)
+        {
+            showHorizontalScrollbar = true,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+
+        files = new ListView(0, 0, Width, Height)
+        {
+            viewMode = ListViewMode.LargeIcon,
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+        };
 
         root.AddDockChild(menuBar, Dock.Top);
         root.AddDockChild(toolbar, Dock.Top);
         root.AddDockChild(addressBar, Dock.Top);
         root.AddDockChild(statusBar, Dock.Bottom);
-        //root.AddDockChild(content, Dock.Fill);
+        root.AddDockChild(explorerBody, Dock.Fill);
+
+        treeScroll.SetContent(tree, 180, tree.GetContentHeight());
+        fileScroll.SetContent(files, Width, files.GetContentHeight());
+
+        explorerBody.AddDockChild(treeScroll, Dock.Left);
+        explorerBody.AddDockChild(splitter, Dock.Left);
+        explorerBody.AddDockChild(fileScroll, Dock.Fill);
 
         menuBar.AddMenu("File");
         menuBar.AddMenu("Edit");
-        menuBar.AddMenu("View");
+        MenuItem viewMenu = menuBar.AddMenu("View");
         menuBar.AddMenu("Go");
         menuBar.AddMenu("Help");
 
@@ -68,37 +108,183 @@ public class FileExplorer : Window
 
         toolbar.AddSeparator();
         toolbar.AddButton("Delete");
-        toolbar.AddButton("Properties");
-
-        statusBar.AddPanel("Objects");
-        statusBar.AddPanel("Selected");
-
-        TreeView tree = new TreeView(0, 0, 180, Height)
+        toolbar.AddButton("Properties", () =>
         {
-            horizontalAlignment = HorizontalAlignment.Left,
-            verticalAlignment = VerticalAlignment.Stretch,
-            Margin = new Thickness(0),
-        };
 
-        TreeViewItem computer = tree.AddRoot("My Computer");
-        TreeViewItem documents = tree.AddRoot("Documents");
-        TreeViewItem cDrive = computer.AddChild("Windose (C:)");
-        TreeViewItem floppyDrive = computer.AddChild("3.5 Floppy (A:)");
+        });//
 
-        TreeViewItem system = cDrive.AddChild("System");
+        toolbar.AddSeparator();
+        toolbar.AddButton("Icons", () => files.SetViewMode(ListViewMode.LargeIcon), 48);
+        toolbar.AddButton("List", () => files.SetViewMode(ListViewMode.List), 48);
+        toolbar.AddButton("Details", () => files.SetViewMode(ListViewMode.Details), 64);
 
-        system.AddChild("Config");
-        documents.AddChild("Docx");
+        objectCountPanel = statusBar.AddPanel("0 object(s)", 120);
+        selectedPanel = statusBar.AddPanel("", 180);
 
+        BuildTree();
 
         tree.selectedChanged = item =>
         {
-            addressBar.text = item.text;
-            addressBar.DrawLocal();
+            OpenLocation(item);
         };
 
-        root.AddDockChild(tree, Dock.Left);
+        tree.itemDoubleClick = item =>
+        {
+            OpenLocation(item);
+        };
+
+
+
+        files.selectedChanged = item =>
+        {
+            selectedPanel.text = item.text + " selected";
+            statusBar.MarkDirty();
+        };
+
+        files.itemDoubleClick = item =>
+        {
+            if (item.isFolder)
+                OpenFolderItem(item);
+        };
+
+        OpenLocation(tree.roots[0]);
 
         AddChild(root);
+        files.SetViewMode(ListViewMode.Details);
+    }
+
+    private void BuildTree()
+    {
+        TreeViewItem desktop = tree.AddRoot("Desktop", "desktop");
+        TreeViewItem computer = desktop.AddChild("My Computer", "computer");
+        TreeViewItem documents = desktop.AddChild("My Documents", "documents");
+        TreeViewItem cDrive = computer.AddChild("Windose (C:)", "c");
+        TreeViewItem floppyDrive = computer.AddChild("3.5 Floppy (A:)", "a");
+        TreeViewItem controlPanel = computer.AddChild("Control Panel", "control");
+
+        TreeViewItem system = cDrive.AddChild("System", "c/system");
+        system.AddChild("Config", "c/system/config");
+        system.AddChild("Drivers", "c/system/drivers");
+        cDrive.AddChild("Programs", "c/programs");
+        cDrive.AddChild("Users", "c/users");
+
+        documents.AddChild("Letters", "documents/letters");
+        documents.AddChild("Pictures", "documents/pictures");
+
+        floppyDrive.expanded = false;
+        controlPanel.expanded = false;
+    }
+
+    private void OpenLocation(TreeViewItem item)
+    {
+        if (item == null) return;
+
+        addressBar.Address = item.text;
+        PopulateFiles(item.tag as string);
+    }
+
+    private void OpenFolderItem(ListViewItem item)
+    {
+        string path = item.tag as string;
+        if (path == null) return;
+
+        addressBar.Address = item.text;
+        PopulateFiles(path);
+    }
+
+    private void PopulateFiles(string location)
+    {
+        files.ClearItems();
+        selectedPanel.text = "";
+
+        switch (location)
+        {
+            case "desktop":
+                AddFolder("My Computer", "computer");
+                AddFolder("My Documents", "documents");
+                AddFolder("Recycle Bin", "recycle");
+                break;
+
+            case "computer":
+                AddFolder("Windose (C:)", "c");
+                AddFolder("3.5 Floppy (A:)", "a");
+                AddFolder("Control Panel", "control");
+                break;
+
+            case "c":
+                AddFolder("System", "c/system");
+                AddFolder("Programs", "c/programs");
+                AddFolder("Users", "c/users");
+                AddFile("AUTOEXEC.BAT", "1 KB", "Batch File");
+                AddFile("CONFIG.SYS", "1 KB", "System File");
+                break;
+
+            case "c/system":
+                AddFolder("Config", "c/system/config");
+                AddFolder("Drivers", "c/system/drivers");
+                AddFile("kernel.sys", "80 KB", "System File");
+                AddFile("shell.dll", "32 KB", "Application Extension");
+                break;
+
+            case "c/system/config":
+                AddFile("display.ini", "2 KB", "Configuration Settings");
+                AddFile("mouse.ini", "1 KB", "Configuration Settings");
+                AddFile("keyboard.ini", "1 KB", "Configuration Settings");
+                break;
+
+            case "c/system/drivers":
+                AddFile("vga.drv", "18 KB", "Device Driver");
+                AddFile("mouse.drv", "12 KB", "Device Driver");
+                AddFile("keyboard.drv", "10 KB", "Device Driver");
+                break;
+
+            case "documents":
+                AddFolder("Letters", "documents/letters");
+                AddFolder("Pictures", "documents/pictures");
+                AddFile("notes.txt", "4 KB", "Text Document");
+                break;
+
+            case "documents/letters":
+                AddFile("hello.txt", "2 KB", "Text Document");
+                AddFile("todo.txt", "1 KB", "Text Document");
+                break;
+
+            case "documents/pictures":
+                AddFile("clouds.bmp", "42 KB", "Bitmap Image");
+                AddFile("setup.bmp", "64 KB", "Bitmap Image");
+                break;
+
+            case "control":
+                AddFolder("Display", "control/display");
+                AddFolder("Keyboard", "control/keyboard");
+                AddFolder("Mouse", "control/mouse");
+                AddFolder("System", "control/system");
+                break;
+
+            default:
+                AddFile("Empty Folder", "", "Folder");
+                break;
+        }
+
+        objectCountPanel.text = files.items.Count + " object(s)";
+        statusBar.MarkDirty();
+        fileScroll.RefreshContent(true);
+        MarkDirty();
+    }
+
+    private ListViewItem AddFolder(string name, string path)
+    {
+        ListViewItem item = files.AddFolder(name, null, path);
+        item.modified = "Today";
+        return item;
+    }
+
+    private ListViewItem AddFile(string name, string size, string type)
+    {
+        ListViewItem item = files.AddItem(name);
+        item.size = size;
+        item.type = type;
+        item.modified = "Today";
+        return item;
     }
 }
