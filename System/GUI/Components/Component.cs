@@ -56,11 +56,15 @@ public class Component : IDisposable
             if (visible != value)
             {
                 visible = value;
+                dirty = true;
+                WindowManager.Invalidate(this);
+
                 foreach (Component component in children)
                 {
                     component.Visible = value;
                 }
             }
+
         }
     }
     public int AbsoluteX
@@ -75,6 +79,14 @@ public class Component : IDisposable
         get
         {
             return _absoluteY;
+        }
+    }
+
+    public Rectangle AbsoluteRectangle
+    {
+        get
+        {
+            return new Rectangle(AbsoluteX, AbsoluteY, Width, Height);
         }
     }
 
@@ -117,6 +129,7 @@ public class Component : IDisposable
     public State state;
 
     protected bool dirty;
+    private bool disposed;
     public bool clampSize = true;
     public bool forceDirty { get; private set; }
     protected bool visible;
@@ -172,11 +185,11 @@ public class Component : IDisposable
 
         state = State.Normal;
 
+        ComputeAbsoluteCoordinates();
+
         components.Add(this);
         MarkDirty();
         currentZIndex++;
-
-        ComputeAbsoluteCoordinates();
 
 
         if (useRightClick)
@@ -270,7 +283,7 @@ public class Component : IDisposable
     {
         if (isRoot || parent == null) return;
 
-        Rectangle oldRectangle = rectangle;
+        Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
 
         switch (horizontalAlignment)
         {
@@ -294,13 +307,13 @@ public class Component : IDisposable
         }
 
         WindowManager.Invalidate(oldRectangle);
-        WindowManager.Invalidate(rectangle);
+        WindowManager.Invalidate(this);
     }
     public void ResolveVerticalAnchor()
     {
         if (isRoot || parent == null) return;
 
-        Rectangle oldRectangle = rectangle;
+        Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
 
         switch (verticalAlignment)
         {
@@ -325,7 +338,7 @@ public class Component : IDisposable
         }
 
         WindowManager.Invalidate(oldRectangle);
-        WindowManager.Invalidate(rectangle);
+        WindowManager.Invalidate(this);
     }
     public void ResolveChildren()
     {
@@ -340,19 +353,19 @@ public class Component : IDisposable
 
     public void DrawToScreen()
     {
-        Kernel.mainBuffer.DrawArrayClipped(buffer.GetBuffer(), buffer.Width, 0, 0, X, Y, Width, Height);
+        Kernel.mainBuffer.DrawArrayClipped(buffer.GetBuffer(), buffer.Width, 0, 0, AbsoluteX, AbsoluteY, Width, Height);
     }
 
     public void DrawToScreen(Rectangle dirtyRect)
     {
-        Rectangle clipped = Rectangle.Intersect(rectangle, dirtyRect);
+        Rectangle clipped = Rectangle.Intersect(AbsoluteRectangle, dirtyRect);
         if (clipped.Width <= 0 || clipped.Height <= 0) return;
 
         Kernel.mainBuffer.DrawArrayClipped(
             buffer.GetBuffer(),
             buffer.Width,
-            clipped.X - X,
-            clipped.Y - Y,
+            clipped.X - AbsoluteX,
+            clipped.Y - AbsoluteY,
             clipped.X,
             clipped.Y,
             clipped.Width,
@@ -470,7 +483,7 @@ public class Component : IDisposable
             }
         }*/
 
-        Rectangle oldRectangle = rectangle;
+        Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
         rectangle = new Rectangle(X, Y, width, height);
 
         if (width > buffer.Width || height > buffer.Height)
@@ -483,9 +496,18 @@ public class Component : IDisposable
         }
 
         WindowManager.Invalidate(oldRectangle);
-        WindowManager.Invalidate(rectangle);
+        WindowManager.Invalidate(this);
         ResolveChildren();
         MarkDirty();
+    }
+
+    public Rectangle ToAbsoluteRectangle(Rectangle localRectangle)
+    {
+        return new Rectangle(
+            AbsoluteX - X + localRectangle.X,
+            AbsoluteY - Y + localRectangle.Y,
+            localRectangle.Width,
+            localRectangle.Height);
     }
 
 
@@ -561,6 +583,13 @@ public class Component : IDisposable
         MarkDirty();
     }
 
+    public void RemoveChild(Component child)
+    {
+        components.Remove(child);
+        children.Add(child);
+        MarkDirty();
+    }
+
     public void Clear(Color color)
     {
         buffer.Clear(color);
@@ -613,6 +642,36 @@ public class Component : IDisposable
     public void DrawRectangle(Color color, int x, int y, int width, int height)
     {
         buffer.DrawRectangle(color, x, y, width, height);
+    }
+
+    public void DrawRaisedRectangle(int x, int y, int width, int height)
+    {
+        buffer.DrawRaisedRect(x, y, width, height);
+    }
+
+    public void DrawRaisedRectangle(int x, int y, int width, int height, Color face, Color highlight, Color shadow, Color darkShadow)
+    {
+        buffer.DrawRaisedRect(x, y, width, height, face, highlight, shadow, darkShadow);
+    }
+
+    public void DrawSunkenRectangle(int x, int y, int width, int height)
+    {
+        buffer.DrawSunkenRect(x, y, width, height);
+    }
+
+    public void DrawSunkenRectangle(int x, int y, int width, int height, Color face, Color darkShadow, Color shadow, Color highlight)
+    {
+        buffer.DrawSunkenRect(x, y, width, height, face, darkShadow, shadow, highlight);
+    }
+
+    public void DrawEtchedRectangle(int x, int y, int width, int height)
+    {
+        buffer.DrawEtchedRect(x, y, width, height);
+    }
+
+    public void DrawEtchedRectangle(int x, int y, int width, int height, Color shadow, Color highlight)
+    {
+        buffer.DrawEtchedRect(x, y, width, height, shadow, highlight);
     }
 
 
@@ -686,12 +745,15 @@ public class Component : IDisposable
 
 
 
-    public void Dispose()
+    public virtual void Dispose()
     {
-        foreach (Component child in children)
-        {
-            child.Dispose();
-        }
+        if (disposed) return;
+        disposed = true;
+
+        for (int i = children.Count - 1; i >= 0; i--)
+            children[i].Dispose();
+
+        children.Clear();
 
         components.Remove(this);
     }

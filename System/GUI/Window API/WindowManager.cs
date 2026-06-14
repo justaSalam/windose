@@ -7,14 +7,15 @@ using Windose;
 
 public class WindowManager : SingleThreadedProcess
 {
-    public List<Window> windows = new List<Window>();
+    public static List<Window> windows = new List<Window>();
     private static List<Rectangle> dirtyRects = new List<Rectangle>();
     private static bool hasPreviewRect;
     private static Rectangle previewRect;
     private Window? capturedWindow;
+    private Component? capturedComponent;
     public static Window? focusedWindow;
     private MouseState mouseState;
-    private int nextZIndex = 1;
+    private static int nextZIndex = 1;
 
     private static readonly Comparison<Window> zIndexCompare = (a, b) => a.zIndex.CompareTo(b.zIndex);
     private int mx, my;
@@ -31,6 +32,8 @@ public class WindowManager : SingleThreadedProcess
         mx = MouseManager.X;
         my = MouseManager.Y;
         mouseState = Mouse.state;
+
+
 
         //Sort Components based on zLayer
         components.Sort((component1, component2) =>
@@ -62,7 +65,23 @@ public class WindowManager : SingleThreadedProcess
             return;
         }
 
+        if (capturedComponent != null)
+        {
+            capturedComponent.HandleInput(mx, my, mouseState);
+
+            if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
+                capturedComponent = null;
+
+            HandleKeyboardInput();
+            ComposeDirtyRegions();
+            DrawPreviewRect();
+            return;
+        }
+
         HandleKeyboardInput();
+
+        bool hitWindow = false;
+        bool hitComponent = false;
 
         for (int i = windows.Count - 1; i >= 0; i--)//Window Capturing
         {
@@ -70,6 +89,8 @@ public class WindowManager : SingleThreadedProcess
 
             if (win == null || !win.Visible) continue;
             if (!win.HitTest(mx, my)) continue;
+
+            hitWindow = true;
 
             if (mouseState.left == MouseEvents.Press)
             {
@@ -81,6 +102,12 @@ public class WindowManager : SingleThreadedProcess
 
         }
 
+        if (!hitWindow)
+            hitComponent = HandleRootComponentInput();
+
+        if (!hitWindow && !hitComponent && mouseState.left == MouseEvents.Press)
+            ClearFocusedWindow();
+
         ComposeDirtyRegions();
         DrawPreviewRect();
     }
@@ -91,19 +118,49 @@ public class WindowManager : SingleThreadedProcess
 
         KeyEvent keyEvent = KeyboardManager.ReadKey();
 
-        if (focusedWindow != null)
-            focusedWindow.HandleKeyboard(keyEvent);
+        if (focusedWindow != null) focusedWindow.HandleKeyboard(keyEvent);
+
     }
 
-    private void SetFocusedWindow(Window window)
+    private bool HandleRootComponentInput()
+    {
+        for (int i = components.Count - 1; i >= 0; i--)
+        {
+            Component component = components[i];
+
+            if (component == null || !component.Visible) continue;
+            if (component is Window) continue;
+            if (!component.isRoot) continue;
+            if (!component.IsInsideAbsolute(mx, my)) continue;
+
+            bool handled = component.HandleInput(mx, my, mouseState);
+
+            if (handled && mouseState.left == MouseEvents.Press)
+                capturedComponent = component;
+
+            return handled;
+        }
+
+        return false;
+    }
+
+    private static void SetFocusedWindow(Window window)
     {
         if (focusedWindow == window) return;
 
-        if (focusedWindow != null)
-            focusedWindow.SetFocused(false);
+        if (focusedWindow != null) focusedWindow.SetFocused(false);
+
 
         focusedWindow = window;
         focusedWindow.SetFocused(true);
+    }
+
+    private void ClearFocusedWindow()
+    {
+        if (focusedWindow == null) return;
+
+        focusedWindow.SetFocused(false);
+        focusedWindow = null;
     }
 
     private void ComposeDirtyRegions()
@@ -117,7 +174,7 @@ public class WindowManager : SingleThreadedProcess
             foreach (Component component in components)
             {
                 if (!component.Visible) continue;
-                if (!component.rectangle.IntersectsWith(dirtyRect)) continue;
+                if (!component.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
 
                 if (component.IsDirty() || component.forceDirty)
                 {
@@ -164,7 +221,7 @@ public class WindowManager : SingleThreadedProcess
         Kernel.mainBuffer.DrawDottedRectangle(Color.White, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
     }
 
-    public void Register(Window window)
+    public static void Register(Window window)
     {
         try
         {
@@ -173,27 +230,46 @@ public class WindowManager : SingleThreadedProcess
             windows.Add(window);
             nextZIndex++;
             SetFocusedWindow(window);
+
+            Explorer.taskbar.bar.AddStackChild(new Button(0, 0, 75, 25)
+            {
+                text = window.text,
+                fontSize = 14,
+                verticalAlignment = VerticalAlignment.Center,
+                useBorders = true,
+
+                leftMouseRelease = () =>
+                {
+                    //window.Visible = !window.Visible;
+                    //window.MarkDirty();
+                }
+            });
         }
         catch (Exception ex)
         {
             Serial.WriteString(ex.Message);
-        }
+        }//
 
 
     }
 
-    public void Close(Window window)
+    public static void Close(Window window)
     {
-        window.Stop();
-        windows.Remove(window);
+        Invalidate(window.bounds);
+        ClearPreviewRect();
 
         if (focusedWindow == window)
             focusedWindow = null;
+
+        window.Stop();
+        windows.Remove(window);
+
+        Explorer.taskbar.bar.RemoveStackChild(window);
     }
 
     public static void Invalidate(Component dirty)
     {
-        Invalidate(dirty.rectangle);
+        Invalidate(dirty.AbsoluteRectangle);
     }
 
     public static void Invalidate(Rectangle dirtyRect)

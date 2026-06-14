@@ -29,7 +29,6 @@ public class Kernel : Sys.Kernel
     public static Canvas canvas = null!;
 
     private WindowManager windowManager = null!;
-    private const string versionString = $"Windose NativeAOT {VersionString}";
     int tick;
 
     protected override void BeforeRun()
@@ -54,8 +53,7 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(explorer);
         ProcessManger.Start(windowManager);
 
-        windowManager.Register(new Window(100, 100, 250, 250, "Test Window Component", true));
-        windowManager.Register(new Window(200, 200, 175, 175, "Viewport 2", true));
+
     }
 
     private long lastFrameTicks;
@@ -74,7 +72,6 @@ public class Kernel : Sys.Kernel
 
 
             canvas.DrawArray(mainBuffer.GetBuffer(), 0, 0, canvas.Width, canvas.Height);
-            canvas.DrawString(versionString, PCScreenFont.DefaultFont, Color.White, 10, 10);
             canvas.DrawString($"Frametime: {DeltaTimeMs}ms | FPS: {Fps}", PCScreenFont.DefaultFont, Color.White, 10, 45);
 
             canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);

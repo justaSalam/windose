@@ -19,6 +19,12 @@ public class StackPanel : Panel
         ResolveStackLayout();
     }
 
+    public void RemoveStackChild(Component child)
+    {
+        RemoveChild(child);
+        ResolveStackLayout();
+    }
+
     public override void Resize(int width, int height)
     {
         base.Resize(width, height);

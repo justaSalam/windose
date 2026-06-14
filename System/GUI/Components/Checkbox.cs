@@ -25,12 +25,9 @@ public class Checkbox : Component
     public override void DrawLocal()
     {
 
-        DrawFilledRectangle(Kernel.Gray, 0, 0, Width, Height);
 
-        if (isPressed) DrawFilledRectangle(Color.DarkGray, 6, 6, Width - 12, Height - 12);
-
-
-        if (useBorders) DrawRectangle(borderColor, 0, 0, Width, Height);
+        if (isPressed) DrawRaisedRectangle(0, 0, Width, Height);
+        else DrawSunkenRectangle(0, 0, Width, Height);
 
         if (text != "")
         {

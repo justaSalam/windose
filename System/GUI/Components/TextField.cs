@@ -4,19 +4,14 @@ using Windose;
 
 public class TextField : Component
 {
-    public Color color1;
-
     public bool useBackground = true;
-    public bool useBorders = false;
     public bool truncate = true;
 
-    public Color borderColor = Color.White;
     public int fontSize = 0;
     public Color textColor = Color.Black;
 
-    public TextField(Color color, int x, int y, int width, int height) : base(x, y, width, height)
+    public TextField(int x, int y, int width, int height) : base(x, y, width, height)
     {
-        color1 = Kernel.Gray;
     }
 
 
@@ -32,10 +27,9 @@ public class TextField : Component
 
         if (useBackground)
         {
-            DrawFilledRectangle(color1, 0, 0, Width, Height);
+            DrawSunkenRectangle(0, 0, Width, Height);
         }
 
-        if (useBorders) DrawRectangle(borderColor, 0, 0, Width, Height);
 
         int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
         int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);

@@ -16,9 +16,10 @@ public class Window : Component
     private bool dragging;
     private bool resizing;
 
-    private bool canMaximize = true;
-    private bool canMinimize = true;
-    private bool canResize = true;
+    public bool canMaximize = true;
+    public bool canMinimize = true;
+    public bool canResize = true;
+    public bool canMove = true;
 
 
 
@@ -35,111 +36,20 @@ public class Window : Component
     private Panel titlebar;
     private bool hasTitleBar;
 
-    private Color titlebarOutOfFocus = Color.FromArgb(123, 126, 121);
-    private Color titlebarInFocus = Color.FromArgb(0, 0, 128);
-
 
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height)
     {
+        text = title;
         bounds = new Rectangle(x, y, width, height);
         zLayer = DrawLayer.Window;
 
-        if (useTitleBar)
-        {
-            titlebar = new Panel(titlebarOutOfFocus, 2, 2, width - 4, 25)
-            {
-                textColor = Color.White,
-                useBorders = false,
-                clampSize = false,
-                text = title,
-                fontSize = 16,
-                horizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(2, 2, 2, 2)
-            };
-            AddChild(titlebar);
-            hasTitleBar = true;
-
-            AddChild(new Button(Color.LightGray, 0, 0, 20, 20)
-            {
-                text = "X",
-                verticalAlignment = VerticalAlignment.Top,
-                horizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(3, 3, 3, 3),
-                useBorders = true,
-                borderColor = Color.White,
-                leftMouseRelease = () =>
-                {
-                }
-            });
-
-            if (canMaximize)
-            {
-                AddChild(new Button(Color.LightGray, 25, 0, 20, 20)
-                {
-                    text = "O",
-                    verticalAlignment = VerticalAlignment.Top,
-                    horizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(3, 3, 23, 3),
-                    useBorders = true,
-                    borderColor = Color.White,
-                    leftMouseRelease = () =>
-                    {
-                    }
-                });
-
-            }
-            if (canMinimize)
-            {
-                AddChild(new Button(Color.LightGray, 50, 0, 20, 20)
-                {
-                    text = "_",
-                    verticalAlignment = VerticalAlignment.Top,
-                    horizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(3, 3, 46, 3),
-                    useBorders = true,
-                    borderColor = Color.White,
-                    leftMouseRelease = () =>
-                    {
-                    }
-                });
-            }
-        }
-
-
-
-        AddChild(new Button(Color.Gray, 0, 0, 100, 30)
-        {
-            text = "Button",
-            useBorders = true,
-            horizontalAlignment = HorizontalAlignment.Center,
-            verticalAlignment = VerticalAlignment.Center,
-            leftMouseRelease = () =>
-            {
-            }
-        });
-
-        AddChild(new TextField(Color.Gray, 0, 0, 250, 30)
-        {
-            useBorders = true,
-            fontSize = 16,
-            Margin = new Thickness(35, 0, 0, 0),
-            horizontalAlignment = HorizontalAlignment.Center,
-            verticalAlignment = VerticalAlignment.Center,
-        });
-
-        AddChild(new Checkbox(0, 0)
-        {
-            text = "Checkbox",
-            fontSize = 16,
-            Margin = new Thickness(70, 0, 0, 0),
-            horizontalAlignment = HorizontalAlignment.Center,
-            verticalAlignment = VerticalAlignment.Center,
-        });
+        TitlebarSetup(useTitleBar, title);
     }
 
 
     public void Start()
     {
+
     }
 
     public override void Update()
@@ -162,11 +72,11 @@ public class Window : Component
     /// </summary>
     public override void DrawLocal()
     {
-        DrawFilledRectangle(Color.FromArgb(190, 190, 190), 0, 0, Width, Height);
+        DrawRaisedRectangle(0, 0, Width, Height);
 
 
 
-        DrawRectangle(Color.White, 0, 0, Width, Height);
+        //DrawRectangle(Palette.ControlHighlight, 0, 0, Width, Height);
 
         foreach (Component child in children)
         {
@@ -180,7 +90,73 @@ public class Window : Component
     }
 
 
+    private void TitlebarSetup(bool useTitleBar, string title)
+    {
+        if (useTitleBar)
+        {
+            titlebar = new Panel(Palette.InactiveTitle, 2, 2, Width - 4, 25)
+            {
+                useBackground = true,
+                textColor = Color.White,
+                clampSize = false,
+                text = title,
+                fontSize = 16,
+                horizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(2, 2, 2, 2)
+            };
+            AddChild(titlebar);
+            hasTitleBar = true;
 
+            AddChild(new Button(0, 0, 20, 20)
+            {
+                text = "X",
+                verticalAlignment = VerticalAlignment.Top,
+                horizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(3, 3, 3, 3),
+                useBorders = true,
+                borderColor = Color.White,
+                leftMouseRelease = () =>
+                {
+                    WindowManager.Close(this);
+                }
+            });
+
+            if (canMaximize)
+            {
+                AddChild(new Button(25, 0, 20, 20)
+                {
+                    text = "O",
+                    verticalAlignment = VerticalAlignment.Top,
+                    horizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(3, 3, 23, 3),
+                    useBorders = true,
+                    borderColor = Color.White,
+                    leftMouseRelease = () =>
+                    {
+                    }
+                });
+
+            }
+            if (canMinimize)
+            {
+                AddChild(new Button(50, 0, 20, 20)
+                {
+                    text = "_",
+                    verticalAlignment = VerticalAlignment.Top,
+                    horizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(3, 3, 46, 3),
+                    useBorders = true,
+                    borderColor = Color.White,
+                    leftMouseRelease = () =>
+                    {
+                        //Visible = !Visible;
+                        //MarkDirty();
+                    }
+                });
+            }
+        }
+
+    }
 
 
 
@@ -205,13 +181,21 @@ public class Window : Component
 
     public void SetFocused(bool focused)
     {
+        if (!focused) OnLoseFocus();
+
         if (!hasTitleBar) return;
 
-        Color titlebarColor = focused ? titlebarInFocus : titlebarOutOfFocus;
+        Color titlebarColor = focused ? Palette.ActiveTitle : Palette.InactiveTitle;
         if (titlebar.color1 == titlebarColor) return;
 
         titlebar.color1 = titlebarColor;
         titlebar.MarkDirty();
+
+    }
+
+    public virtual void OnLoseFocus()
+    {
+
     }
 
     public override void HandleKeyboard(KeyEvent keyEvent)
@@ -227,7 +211,7 @@ public class Window : Component
 
     private void DragWindow(MouseState mouse, int mouseX, int mouseY)
     {
-        if (resizing) return;
+        if (resizing || !canMove) return;
 
         if (mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY))
         {
@@ -335,7 +319,13 @@ public class Window : Component
     }
     public void Stop() //TODO Dispose, GC wont collect it without proper disposal first
     {
+        Visible = false;
+        Dispose();
+    }
 
+    public override void Dispose()
+    {
+        base.Dispose();
     }
 
     public override string GetName() => "Window";

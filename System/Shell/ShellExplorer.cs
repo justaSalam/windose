@@ -9,8 +9,9 @@ using Windose;
 
 public class Explorer : SingleThreadedProcess
 {
-    private static Taskbar taskbar;
-    private static Desktop desktop;
+    public static Taskbar taskbar;
+    public static Desktop desktop;
+    public static StartMenu startMenu;
     private Canvas canvas;
 
     public Explorer(Canvas canvas) : base("Explorer", ProcessType.Program)
@@ -22,8 +23,9 @@ public class Explorer : SingleThreadedProcess
     {
         base.Start();
         desktop = new Desktop(0, 0, Kernel.canvas.Width, Kernel.canvas.Height);
-        taskbar = new Taskbar(Color.Gray, 0, Kernel.canvas.Height - 20, canvas.Width, 20);
-
+        taskbar = new Taskbar(0, Kernel.canvas.Height - 20, canvas.Width, 20);
+        startMenu = new StartMenu(taskbar.X, taskbar.Y - 500, 300, 500, "Start Menu", false);
+        WindowManager.Register(startMenu);
     }
 
     public override void Update()

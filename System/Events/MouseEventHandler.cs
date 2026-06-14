@@ -3,6 +3,7 @@ using Cosmos.Kernel.System.Mouse;
 public static class Mouse
 {
     public static MouseState state;
+    public static float scroll;
 
 
     public static void Update()
@@ -10,6 +11,7 @@ public static class Mouse
         state.left = HandleButton(MouseManager.LeftButton, state.left);
         state.right = HandleButton(MouseManager.RightButton, state.right);
         state.middle = HandleButton(MouseManager.MiddleButton, state.middle);
+        scroll = MouseManager.ScrollDelta;
     }
 
     private static MouseEvents HandleButton(bool down, MouseEvents current)

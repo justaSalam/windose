@@ -692,6 +692,78 @@ public unsafe class DirectBitmap
         DrawLine(color, x + width - 1, y, x + width - 1, y + height);
     }
 
+    public virtual void DrawRaisedRect(int x, int y, int width, int height)
+    {
+        DrawRaisedRect(x, y, width, height, Palette.ControlFace, Palette.ControlWhite, Palette.ControlShadow, Palette.ControlBlack);
+    }
+
+    public virtual void DrawRaisedRect(int x, int y, int width, int height, Color face, Color highlight, Color shadow, Color darkShadow)
+    {
+        if (width <= 0 || height <= 0) return;
+
+        DrawFilledRectangle(face, x, y, width, height);
+
+        int right = x + width - 1;
+        int bottom = y + height - 1;
+
+        DrawLine(highlight, x, y, right, y);
+        DrawLine(highlight, x, y, x, bottom);
+        DrawLine(darkShadow, x, bottom, right, bottom);
+        DrawLine(darkShadow, right, y, right, bottom);
+
+        if (width < 3 || height < 3) return;
+
+        DrawLine(face, x + 1, y + 1, right - 1, y + 1);
+        DrawLine(face, x + 1, y + 1, x + 1, bottom - 1);
+        DrawLine(shadow, x + 1, bottom - 1, right - 1, bottom - 1);
+        DrawLine(shadow, right - 1, y + 1, right - 1, bottom - 1);
+    }
+
+    public virtual void DrawSunkenRect(int x, int y, int width, int height)
+    {
+        DrawSunkenRect(x, y, width, height, Palette.ControlFace, Palette.ControlBlack, Palette.ControlShadow, Palette.ControlHighlight);
+    }
+
+    public virtual void DrawSunkenRect(int x, int y, int width, int height, Color face, Color darkShadow, Color shadow, Color highlight)
+    {
+        if (width <= 0 || height <= 0) return;
+
+        DrawFilledRectangle(face, x, y, width, height);
+
+        int right = x + width - 1;
+        int bottom = y + height - 1;
+
+        DrawLine(darkShadow, x, y, right, y);
+        DrawLine(darkShadow, x, y, x, bottom);
+        DrawLine(highlight, x, bottom, right, bottom);
+        DrawLine(highlight, right, y, right, bottom);
+
+        if (width < 3 || height < 3) return;
+
+        DrawLine(shadow, x + 1, y + 1, right - 1, y + 1);
+        DrawLine(shadow, x + 1, y + 1, x + 1, bottom - 1);
+        DrawLine(face, x + 1, bottom - 1, right - 1, bottom - 1);
+        DrawLine(face, right - 1, y + 1, right - 1, bottom - 1);
+    }
+
+    public virtual void DrawEtchedRect(int x, int y, int width, int height)
+    {
+        DrawEtchedRect(x, y, width, height, Palette.ControlShadow, Palette.ControlWhite);
+    }
+
+    public virtual void DrawEtchedRect(int x, int y, int width, int height, Color shadow, Color highlight)
+    {
+        if (width <= 1 || height <= 1) return;
+
+        int right = x + width - 1;
+        int bottom = y + height - 1;
+
+        DrawLine(shadow, x, y, right - 1, y);
+        DrawLine(shadow, x, y, x, bottom - 1);
+        DrawLine(highlight, x + 1, bottom, right, bottom);
+        DrawLine(highlight, right, y + 1, right, bottom);
+    }
+
     public virtual void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
     {
         if (height == -1)

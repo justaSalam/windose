@@ -6,7 +6,7 @@ public class Panel : Component
     public Color color1;
     public Color color2;
 
-    public bool useBackground = true;
+    public bool useBackground = false;
     public bool useBorders = false;
     private bool useGradient = false;
     public Color borderColor = Color.White;
@@ -56,6 +56,15 @@ public class Panel : Component
             int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
 
             DrawString(text, textColor, 2, textY, effectiveFontSize);
+        }
+
+        foreach (Component child in children)
+        {
+            if (!child.Visible) continue;
+
+            child.DrawLocal();
+            buffer.DrawImageAlpha(child.GetBuffer(), child.X, child.Y);
+            child.MarkCleaned();
         }
     }
 }
