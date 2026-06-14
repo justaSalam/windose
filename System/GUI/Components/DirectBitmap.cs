@@ -499,6 +499,35 @@ public unsafe class DirectBitmap
             DrawDiagonalLine(color, num, num2, x1, y1);
         }
     }
+    public void DrawDottedRectangle(Color color, int x, int y, int width, int height, int dotLength = 2, int gapLength = 2)
+    {
+        DrawDottedHorizontalLine(color, x, y, width, dotLength, gapLength);
+        DrawDottedHorizontalLine(color, x, y + height - 1, width, dotLength, gapLength);
+
+        DrawDottedVerticalLine(color, x, y, height, dotLength, gapLength);
+        DrawDottedVerticalLine(color, x + width - 1, y, height, dotLength, gapLength);
+    }
+
+    public void DrawDottedHorizontalLine(Color color, int x, int y, int length, int dotLength = 2, int gapLength = 2)
+    {
+        int step = dotLength + gapLength;
+
+        for (int i = 0; i < length; i += step)
+        {
+            int currentDotLength = Math.Min(dotLength, length - i);
+            DrawLine(color, x + i, y, x + i + currentDotLength, y);
+        }
+    }
+    public void DrawDottedVerticalLine(Color color, int x, int y, int length, int dotLength = 2, int gapLength = 2)
+    {
+        int step = dotLength + gapLength;
+
+        for (int i = 0; i < length; i += step)
+        {
+            int currentDotLength = Math.Min(dotLength, length - i);
+            DrawLine(color, x, y + i, x, y + i + currentDotLength);
+        }
+    }
 
     public virtual void DrawCircle(Color color, int xCenter, int yCenter, int radius)
     {
@@ -659,8 +688,8 @@ public unsafe class DirectBitmap
     {
         DrawLine(color, x, y, x + width, y);
         DrawLine(color, x, y, x, y + height);
-        DrawLine(color, x, y + height, x + width, y + height);
-        DrawLine(color, x + width, y, x + width, y + height);
+        DrawLine(color, x, y + height - 1, x + width, y + height - 1);
+        DrawLine(color, x + width - 1, y, x + width - 1, y + height);
     }
 
     public virtual void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)

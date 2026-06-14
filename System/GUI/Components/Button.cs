@@ -9,7 +9,6 @@ public class Button : Component
     public bool useBorders = false;
     private bool isPressed = false;
     public Color borderColor = Color.White;
-    public string text = "";
     public int fontSize = 0;
     public Color textColor = Color.Black;
 

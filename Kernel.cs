@@ -51,7 +51,7 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(windowManager);
 
         windowManager.Register(new Window(100, 100, 250, 250, "Test Window Component", true));
-        //windowManager.Register(new Window(350, 200, 200, 200, "Window 2", true));
+        //windowManager.Register(new Window(200, 200, 175, 175, "Viewport 2", true));
     }
 
     private long lastFrameTicks;

@@ -11,6 +11,8 @@ public class Taskbar : Component
     public Color borderColor = Color.White;
     public string text = "";
 
+    public List<Button> windows = new List<Button>();
+
     public Taskbar(Color color, int x, int y, int width, int height) : base(x, y, width, height)
     {
         color1 = color;

@@ -1,5 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.Core.Runtime;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
@@ -112,9 +113,11 @@ public class Component : IDisposable
     protected DirectBitmap buffer;
     private DirectBitmap cacheBuffer;
     public Rectangle rectangle;
+    public Rectangle clampedBounds = new Rectangle(0, 0, 50, 50);
     public State state;
 
     protected bool dirty;
+    public bool clampSize = true;
     public bool forceDirty { get; private set; }
     protected bool visible;
     public bool isRoot;
@@ -136,6 +139,12 @@ public class Component : IDisposable
 
     public HorizontalAlignment horizontalAlignment = HorizontalAlignment.Left;
     public VerticalAlignment verticalAlignment = VerticalAlignment.Top;
+
+
+    public Action rightClickAction;
+    public bool useRightClick = false;
+
+    public Window contextWindow;
 
     public Component(int x, int y, int width, int height, Thickness margin = new Thickness(), Thickness padding = new Thickness(), HorizontalAlignment horizontal = HorizontalAlignment.Left, VerticalAlignment vertical = VerticalAlignment.Top)
     {
@@ -168,6 +177,17 @@ public class Component : IDisposable
         currentZIndex++;
 
         ComputeAbsoluteCoordinates();
+
+
+        if (useRightClick)
+        {
+            contextWindow = new Window(X + Width, Y + Width, 100, 100, "Component Context");
+            rightClickAction = () =>
+            {
+                contextWindow.Visible = !contextWindow.Visible;
+            };
+        }
+
     }
     public virtual void Update()
     {
@@ -235,12 +255,14 @@ public class Component : IDisposable
                 return true;
         }
 
+        if (IsInsideAbsolute(mouseX, mouseY) && mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
+
         return false;
     }
 
     public virtual void HandleKeyboard(KeyEvent keyEvent)
     {
-        Serial.WriteString($"[keyevent] | {GetName()} {keyEvent.Key}\n");
+        Serial.WriteString($"[KEY EVENT] | {GetName()} {keyEvent.Key}\n");
 
     }
 
@@ -287,7 +309,7 @@ public class Component : IDisposable
                 break;
 
             case VerticalAlignment.Center:
-                Y = (parent.Height - Height) / 2;
+                Y = ((parent.Height - Height) / 2) + Margin.top;
 
                 break;
 
@@ -385,11 +407,23 @@ public class Component : IDisposable
     }
 
     /// <summary>
+    /// Checks for a point within reference
+    /// </summary>
+    /// <param name="x"></param>
+    /// <param name="y"></param>
+    /// <param name="reference"></param>
+    /// <returns>If a point in space is within reference</returns>
+    public bool Contains(int x, int y, Rectangle reference)
+    {
+        return x >= reference.X && x <= reference.X + reference.Width && y >= reference.Y && y <= rectangle.Y + reference.Height;
+    }
+
+    /// <summary>
     /// Returns a child component at given absolute coordinates
     /// </summary>
     /// <param name="mouseX"></param>
     /// <param name="mouseY"></param>
-    /// <returns></returns>
+    /// <returns>A child at a given point on screen</returns>
     public Component? GetChildAt(int mouseX, int mouseY)
     {
         for (int i = children.Count - 1; i >= 0; i--)
@@ -414,9 +448,13 @@ public class Component : IDisposable
 
     public virtual void Resize(int width, int height)
     {
-        if (width <= 0 || width >= 1000 || height <= 0 || height >= 1000)
+        if (clampSize)
         {
-            return;
+
+            if (width <= clampedBounds.Width || width >= 2000 || height <= clampedBounds.Height || height >= 2000)
+            {
+                return;
+            }
         }
 
         if (width % 2 != 0)
@@ -424,13 +462,13 @@ public class Component : IDisposable
             width++;
         }
 
-        foreach (Component child in children)
+        /*foreach (Component child in children)
         {
             if (child is Button)
             {
                 child.X += width - Width;
             }
-        }
+        }*/
 
         Rectangle oldRectangle = rectangle;
         rectangle = new Rectangle(X, Y, width, height);
@@ -514,6 +552,7 @@ public class Component : IDisposable
     {
         child.isRoot = false;
         child.parent = this;
+        zIndex++;
 
         child.ResolveHorizontalAnchor();
         child.ResolveVerticalAnchor();
@@ -637,10 +676,7 @@ public class Component : IDisposable
         forceDirty = true;
         WindowManager.Invalidate(this);
     }
-    public virtual void ClearForceDirty()
-    {
-        forceDirty = false;
-    }
+
 
     public virtual void MarkCleaned()
     {

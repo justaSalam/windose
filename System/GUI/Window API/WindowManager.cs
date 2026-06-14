@@ -9,7 +9,10 @@ public class WindowManager : SingleThreadedProcess
 {
     public List<Window> windows = new List<Window>();
     private static List<Rectangle> dirtyRects = new List<Rectangle>();
+    private static bool hasPreviewRect;
+    private static Rectangle previewRect;
     private Window? capturedWindow;
+    private Window? focusedWindow;
     private MouseState mouseState;
     private int nextZIndex = 1;
 
@@ -49,32 +52,47 @@ public class WindowManager : SingleThreadedProcess
         if (capturedWindow != null) //Handling a captured window
         {
             capturedWindow.HandleInput(mx, my, mouseState);
-            if (KeyboardManager.KeyAvailable) capturedWindow.HandleKeyboard(KeyboardManager.ReadKey());
+
+            if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
+                capturedWindow = null;
+
+            HandleKeyboardInput();
+            ComposeDirtyRegions();
+            DrawPreviewRect();
+            return;
         }
+
+        HandleKeyboardInput();
 
         for (int i = windows.Count - 1; i >= 0; i--)//Window Capturing
         {
             Window win = windows[i];
 
             if (win == null || !win.Visible) continue;
-            if (!win.HitTest(mx, my) && win == capturedWindow)
-            {
-                capturedWindow = null;
-                continue;
-            }
-
-            win.HandleInput(mx, my, mouseState);
+            if (!win.HitTest(mx, my)) continue;
 
             if (mouseState.left == MouseEvents.Press)
             {
                 BringToFront(win);
+                focusedWindow = win;
                 capturedWindow = win;
             }
+            if (win.HandleInput(mx, my, mouseState)) break;
 
-            break;
         }
 
         ComposeDirtyRegions();
+        DrawPreviewRect();
+    }
+
+    private void HandleKeyboardInput()
+    {
+        if (!KeyboardManager.KeyAvailable) return;
+
+        KeyEvent keyEvent = KeyboardManager.ReadKey();
+
+        if (focusedWindow != null)
+            focusedWindow.HandleKeyboard(keyEvent);
     }
 
     private void ComposeDirtyRegions()
@@ -104,6 +122,37 @@ public class WindowManager : SingleThreadedProcess
 
         dirtyRects.Clear();
     }
+
+    public static void ShowPreviewRect(Rectangle rect)
+    {
+        if (hasPreviewRect)
+            InvalidatePreviewRect(previewRect);
+
+        previewRect = rect;
+        hasPreviewRect = true;
+        InvalidatePreviewRect(previewRect);
+    }
+
+    public static void ClearPreviewRect()
+    {
+        if (!hasPreviewRect) return;
+
+        InvalidatePreviewRect(previewRect);
+        hasPreviewRect = false;
+    }
+
+    private static void InvalidatePreviewRect(Rectangle rect)
+    {
+        Invalidate(new Rectangle(rect.X - 1, rect.Y - 1, rect.Width + 2, rect.Height + 2));
+    }
+
+    private static void DrawPreviewRect()
+    {
+        if (!hasPreviewRect) return;
+
+        Kernel.mainBuffer.DrawDottedRectangle(Color.White, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
+    }
+
     public void Register(Window window)
     {
         try
