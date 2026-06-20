@@ -88,6 +88,23 @@ public class MenuPopup : Component
         openMenus.Clear();
     }
 
+    public static bool HandleOpenMenuInput(int mouseX, int mouseY, MouseState mouse)
+    {
+        for (int i = openMenus.Count - 1; i >= 0; i--)
+        {
+            MenuPopup menu = openMenus[i];
+            if (!menu.Visible || !menu.IsInsideAbsolute(mouseX, mouseY)) continue;
+
+            menu.HandleInput(mouseX, mouseY, mouse);
+            return true;
+        }
+
+        if (mouse.left == MouseEvents.Press)
+            HideAll();
+
+        return false;
+    }
+
     public override void Resize(int width, int height)
     {
         base.Resize(width, height);

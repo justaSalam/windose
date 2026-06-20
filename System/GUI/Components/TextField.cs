@@ -56,23 +56,58 @@ public class TextField : Component
 
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
+        if (KeyboardManager.ControlPressed)
+        {
+            if (keyEvent.Key == ConsoleKeyEx.C)
+            {
+                WindoseClipboard.SetText(text);
+                return;
+            }
+            if (keyEvent.Key == ConsoleKeyEx.X)
+            {
+                WindoseClipboard.SetText(text);
+                if (text.Length == 0) return;
+                text = "";
+                MarkDirty();
+                return;
+            }
+            if (keyEvent.Key == ConsoleKeyEx.V)
+            {
+                if (!WindoseClipboard.HasText) return;
+                text += WindoseClipboard.Text;
+                MarkDirty();
+                return;
+            }
+            return;
+        }
 
+        bool changed = false;
         switch (keyEvent.Key)
         {
             case ConsoleKeyEx.Backspace:
-                if (text.Length != 0) text = text.Substring(0, text.Length - 1);
+                if (text.Length != 0)
+                {
+                    text = text.Substring(0, text.Length - 1);
+                    changed = true;
+                }
                 break;
 
             case ConsoleKeyEx.Enter:
                 text += "\n";
+                changed = true;
                 break;
 
             default:
-                text += keyEvent.KeyChar;
+                if (keyEvent.KeyChar != '\0')
+                {
+                    text += keyEvent.KeyChar;
+                    changed = true;
+                }
                 break;
         }
 
-        MarkDirty();
+        if (changed)
+            MarkDirty();
     }
 
     public override string GetName() => "TextField";

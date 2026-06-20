@@ -39,6 +39,14 @@ public class ListView : Component
         return item;
     }
 
+    public ListViewItem AddItem(FileEntry fileEntry, Bitmap icon = null)
+    {
+        ListViewItem item = new ListViewItem(fileEntry, icon);
+        items.Add(item);
+        MarkDirty();
+        return item;
+    }
+
     public ListViewItem AddFolder(string text, Bitmap icon = null, object tag = null)
     {
         ListViewItem item = AddItem(text, icon, tag);

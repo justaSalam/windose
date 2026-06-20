@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Drawing;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
@@ -8,7 +9,12 @@ using Windose;
 public class WindowManager : SingleThreadedProcess
 {
     public static List<Window> windows = new List<Window>();
+    private static Dictionary<Window, Button> taskbarButtons = new Dictionary<Window, Button>();
     private static List<Rectangle> dirtyRects = new List<Rectangle>();
+    private static List<UiMessage> messageQueue = new List<UiMessage>();
+    private readonly HashSet<Window> failedWindows = new HashSet<Window>();
+    private readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
+    private static int messageReadIndex;
     private static bool hasPreviewRect;
     private static Rectangle previewRect;
     private Window? capturedWindow;
@@ -17,7 +23,7 @@ public class WindowManager : SingleThreadedProcess
     private MouseState mouseState;
     private static int nextZIndex = 1;
 
-    private static readonly Comparison<Window> zIndexCompare = (a, b) => a.zIndex.CompareTo(b.zIndex);
+    private static readonly System.Comparison<Window> zIndexCompare = (a, b) => a.zIndex.CompareTo(b.zIndex);
     private int mx, my;
 
     public WindowManager() : base("Desktop Window Manager", ProcessType.Kernel)
@@ -29,11 +35,26 @@ public class WindowManager : SingleThreadedProcess
 
     public override void Update()
     {
+        try { UpdateDesktop(); }
+        catch (Exception exception)
+        {
+            Window likelyOwner = focusedWindow;
+            capturedWindow = null;
+            capturedComponent = null;
+            FailApplication(likelyOwner, "running", exception);
+        }
+    }
+
+    private void UpdateDesktop()
+    {
+        long updateStartedAt = PerformanceMetrics.Now;
         mx = MouseManager.X;
         my = MouseManager.Y;
         mouseState = Mouse.state;
 
-
+        DispatchMessages();
+        ShowPendingFailures();
+        DispatchMessages();
 
         //Sort Components based on zLayer
         components.Sort((component1, component2) =>
@@ -45,40 +66,62 @@ public class WindowManager : SingleThreadedProcess
         });
         windows.Sort(zIndexCompare);
 
-        for (int i = 0; i < windows.Count; i++) //General window update, called on every window
+        for (int i = windows.Count - 1; i >= 0; i--) //General window update, called on every window
         {
             Window win = windows[i];
-            if (win == null) continue;
-            win.Update();
+            if (win == null || failedWindows.Contains(win)) continue;
+            try { win.Update(); }
+            catch (Exception exception) { FailApplication(win, "updating", exception); }
         }
 
         if (capturedWindow != null) //Handling a captured window
         {
-            capturedWindow.HandleInput(mx, my, mouseState);
+            if (!failedWindows.Contains(capturedWindow))
+            {
+                try { capturedWindow.HandleInput(mx, my, mouseState); }
+                catch (Exception exception) { FailApplication(capturedWindow, "handling mouse input", exception); }
+            }
 
             if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
                 capturedWindow = null;
 
             HandleKeyboardInput();
+            DispatchMessages();
             ComposeDirtyRegions();
             DrawPreviewRect();
+            PerformanceMetrics.AddWindowManager(updateStartedAt);
             return;
         }
 
         if (capturedComponent != null)
         {
-            capturedComponent.HandleInput(mx, my, mouseState);
+            try { capturedComponent.HandleInput(mx, my, mouseState); }
+            catch (Exception exception) { FailApplication(capturedComponent.GetOwningWindow(), "handling mouse input", exception); }
 
             if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
                 capturedComponent = null;
 
             HandleKeyboardInput();
+            DispatchMessages();
             ComposeDirtyRegions();
             DrawPreviewRect();
+            PerformanceMetrics.AddWindowManager(updateStartedAt);
             return;
         }
 
         HandleKeyboardInput();
+
+        bool menuHandled = false;
+        try { menuHandled = MenuPopup.HandleOpenMenuInput(mx, my, mouseState); }
+        catch (Exception exception) { FailApplication(focusedWindow, "handling menu input", exception); }
+        if (menuHandled)
+        {
+            DispatchMessages();
+            ComposeDirtyRegions();
+            DrawPreviewRect();
+            PerformanceMetrics.AddWindowManager(updateStartedAt);
+            return;
+        }
 
         bool hitWindow = false;
         bool hitComponent = false;
@@ -87,7 +130,7 @@ public class WindowManager : SingleThreadedProcess
         {
             Window win = windows[i];
 
-            if (win == null || !win.Visible) continue;
+            if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
             if (!win.HitTest(mx, my)) continue;
 
             hitWindow = true;
@@ -98,7 +141,15 @@ public class WindowManager : SingleThreadedProcess
                 SetFocusedWindow(win);
                 capturedWindow = win;
             }
-            if (win.HandleInput(mx, my, mouseState)) break;
+            try
+            {
+                if (win.HandleInput(mx, my, mouseState)) break;
+            }
+            catch (Exception exception)
+            {
+                FailApplication(win, "handling mouse input", exception);
+                break;
+            }
 
         }
 
@@ -108,17 +159,161 @@ public class WindowManager : SingleThreadedProcess
         if (!hitWindow && !hitComponent && mouseState.left == MouseEvents.Press)
             ClearFocusedWindow();
 
+        DispatchMessages();
         ComposeDirtyRegions();
         DrawPreviewRect();
+        PerformanceMetrics.AddWindowManager(updateStartedAt);
     }
 
+    public static void PostMessage(UiMessage message)
+    {
+        if (message.Type == UiMessageType.None) return;
+        messageQueue.Add(message);
+    }
+
+    public static void PostCommand(string command, Action action = null, Component target = null, object data = null)
+    {
+        PostMessage(UiMessage.ForCommand(command, action, target, data));
+    }
+
+    public static void PostRegister(Window window)
+    {
+        PostMessage(UiMessage.ForWindow(UiMessageType.RegisterWindow, window));
+    }
+
+    public static void PostClose(Window window)
+    {
+        PostMessage(UiMessage.ForWindow(UiMessageType.CloseWindow, window));
+    }
+
+    public static void PostInvalidate(Component component)
+    {
+        PostMessage(UiMessage.ForInvalidate(component));
+    }
+
+    public static void PostInvalidate(Rectangle rectangle)
+    {
+        PostMessage(UiMessage.ForInvalidate(rectangle));
+    }
+
+    public static void PostLayoutChanged(Component component)
+    {
+        PostMessage(new UiMessage
+        {
+            Type = UiMessageType.LayoutChanged,
+            Target = component
+        });
+    }
+
+    public static void PostFocus(Window window)
+    {
+        PostMessage(UiMessage.ForWindow(UiMessageType.FocusWindow, window));
+    }
+
+    private void DispatchMessages()
+    {
+        long startedAt = PerformanceMetrics.Now;
+        int handled = 0;
+
+        while (messageReadIndex < messageQueue.Count && handled < 128)
+        {
+            UiMessage message = messageQueue[messageReadIndex++];
+            handled++;
+
+            try { DispatchMessage(message); }
+            catch (Exception exception)
+            {
+                Window owner = message.Window ?? message.Target?.GetOwningWindow();
+                FailApplication(owner, "processing " + message.Type, exception);
+            }
+        }
+
+        if (messageReadIndex == messageQueue.Count)
+        {
+            messageQueue.Clear();
+            messageReadIndex = 0;
+        }
+
+        PerformanceMetrics.AddMessages(startedAt);
+    }
+
+    private void DispatchMessage(UiMessage message)
+    {
+        switch (message.Type)
+        {
+            case UiMessageType.Command:
+                if (message.Target != null)
+                    message.Target.HandleMessage(message);
+
+                message.Action?.Invoke();
+                if (message.Target != null)
+                    message.Target.MarkDirty();
+                break;
+
+            case UiMessageType.RegisterWindow:
+                RegisterNow(message.Window);
+                break;
+
+            case UiMessageType.CloseWindow:
+                CloseNow(message.Window);
+                break;
+
+            case UiMessageType.InvalidateComponent:
+                if (message.Target != null)
+                    Invalidate(message.Target);
+                break;
+
+            case UiMessageType.InvalidateRectangle:
+                Invalidate(message.Rectangle);
+                break;
+
+            case UiMessageType.LayoutChanged:
+                if (message.Target != null)
+                {
+                    message.Target.ResolveChildren();
+                    message.Target.MarkDirty();
+                }
+                break;
+
+            case UiMessageType.FocusWindow:
+                if (message.Window != null)
+                {
+                    BringToFront(message.Window);
+                    SetFocusedWindow(message.Window);
+                }
+                break;
+        }
+    }
+    public static T FindWindow<T>() where T : Window
+    {
+        for (int i = windows.Count - 1; i >= 0; i--)
+        {
+            if (windows[i] is T window)
+                return window;
+        }
+
+        return null;
+    }
+
+    public static void PostCommand<T>(string command, object data = null) where T : Window
+    {
+        T window = FindWindow<T>();
+        if (window == null) return;
+
+        PostCommand(command, target: window, data: data);
+    }
     private void HandleKeyboardInput()
     {
         if (!KeyboardManager.KeyAvailable) return;
 
         KeyEvent keyEvent = KeyboardManager.ReadKey();
 
-        if (focusedWindow != null) focusedWindow.HandleKeyboard(keyEvent);
+        if (focusedWindow != null && !failedWindows.Contains(focusedWindow))
+        {
+            Window target = focusedWindow;
+            try { target.HandleKeyboard(keyEvent); }
+            catch (Exception exception) { FailApplication(target, "handling keyboard input", exception); }
+        }
 
     }
 
@@ -133,7 +328,13 @@ public class WindowManager : SingleThreadedProcess
             if (!component.isRoot) continue;
             if (!component.IsInsideAbsolute(mx, my)) continue;
 
-            bool handled = component.HandleInput(mx, my, mouseState);
+            bool handled;
+            try { handled = component.HandleInput(mx, my, mouseState); }
+            catch (Exception exception)
+            {
+                FailApplication(component.GetOwningWindow(), "handling mouse input", exception);
+                return true;
+            }
 
             if (handled && mouseState.left == MouseEvents.Press)
                 capturedComponent = component;
@@ -167,29 +368,42 @@ public class WindowManager : SingleThreadedProcess
     {
         if (dirtyRects.Count == 0) return;
 
+        long startedAt = PerformanceMetrics.Now;
+
         for (int i = 0; i < dirtyRects.Count; i++)
         {
             Rectangle dirtyRect = dirtyRects[i];
 
-            foreach (Component component in components)
+            for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
             {
+                Component component = components[componentIndex];
                 if (!component.Visible) continue;
+                Window owner = component.GetOwningWindow();
+                if (owner != null && failedWindows.Contains(owner)) continue;
                 if (!component.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
 
-                if (component.HasDirtyTree())
+                try
                 {
-                    component.DrawDirtyLocal(dirtyRect);
-                    component.DrawToScreen(dirtyRect);
-                    component.MarkCleaned();
+                    if (component.HasDirtyTree())
+                    {
+                        component.DrawDirtyLocal(dirtyRect);
+                        component.DrawToScreen(dirtyRect);
+                        component.MarkCleaned();
+                    }
+                    else
+                    {
+                        component.DrawToScreen(dirtyRect);
+                    }
                 }
-                else
+                catch (Exception exception)
                 {
-                    component.DrawToScreen(dirtyRect);
+                    FailApplication(owner, "drawing", exception);
                 }
             }
         }
 
         dirtyRects.Clear();
+        PerformanceMetrics.AddCompose(startedAt);
     }
 
     public static void ShowPreviewRect(Rectangle rect)
@@ -224,48 +438,210 @@ public class WindowManager : SingleThreadedProcess
 
     public static void Register(Window window)
     {
-        try
-        {
-            window.zIndex = nextZIndex;
-            window.Start();
-            windows.Add(window);
-            nextZIndex++;
-            SetFocusedWindow(window);
+        PostRegister(window);
+    }
 
-            Explorer.taskbar.bar.AddStackChild(new Button(0, 0, 75, 25)
+    private static void RegisterNow(Window window)
+    {
+        window.zIndex = nextZIndex;
+        window.Start();
+        windows.Add(window);
+        nextZIndex++;
+        SetFocusedWindow(window);
+
+        Button taskbarButton = new Button(0, 0, 75, 25)
+        {
+            text = window.text,
+            fontSize = 14,
+            verticalAlignment = VerticalAlignment.Center,
+            useBorders = true,
+
+            leftMouseRelease = () =>
             {
-                text = window.text,
-                fontSize = 14,
-                verticalAlignment = VerticalAlignment.Center,
-                useBorders = true,
-
-                leftMouseRelease = () =>
+                if (window.IsMinimized)
                 {
-                    //window.Visible = !window.Visible;
-                    //window.MarkDirty();
+                    Restore(window);
                 }
-            });
-        }
-        catch (Exception ex)
-        {
-            Serial.WriteString(ex.Message);
-        }//
+                else if (focusedWindow == window)
+                {
+                    Minimize(window);
+                }
+                else
+                {
+                    Activate(window);
+                }
+            }
+        };
+
+        taskbarButtons[window] = taskbarButton;
+        Explorer.taskbar.bar.AddStackChild(taskbarButton);
 
 
     }
 
     public static void Close(Window window)
     {
+        PostClose(window);
+    }
+
+    public static void Minimize(Window window)
+    {
+        if (window == null || !window.canMinimize || window.IsMinimized) return;
+
         Invalidate(window.bounds);
-        ClearPreviewRect();
+        window.SetFocused(false);
+        window.MinimizeWindow();
 
         if (focusedWindow == window)
             focusedWindow = null;
 
-        window.Stop();
-        windows.Remove(window);
+        FocusTopVisibleWindow(window);
+        Explorer.taskbar.MarkDirty();
+    }
 
-        Explorer.taskbar.bar.RemoveStackChild(window);
+    public static void Restore(Window window)
+    {
+        if (window == null) return;
+
+        window.RestoreFromTaskbar();
+        Activate(window);
+        Invalidate(window.bounds);
+        Explorer.taskbar.MarkDirty();
+    }
+
+    public static void ToggleMaximize(Window window)
+    {
+        if (window == null || !window.canMaximize) return;
+
+        Rectangle oldBounds = window.bounds;
+        int workAreaHeight = Explorer.taskbar != null
+            ? Explorer.taskbar.Y
+            : Global.screenHeight;
+
+        window.ToggleMaximized(new Rectangle(0, 0, Global.screenWidth, workAreaHeight));
+        Invalidate(oldBounds);
+        Invalidate(window.bounds);
+        Activate(window);
+    }
+
+    public static void Activate(Window window)
+    {
+        if (window == null) return;
+
+        if (window.IsMinimized)
+            window.RestoreFromTaskbar();
+
+        window.zIndex = nextZIndex++;
+        SetFocusedWindow(window);
+        Invalidate(window.bounds);
+    }
+
+    private static void FocusTopVisibleWindow(Window excludedWindow)
+    {
+        Window nextWindow = null;
+
+        for (int i = 0; i < windows.Count; i++)
+        {
+            Window candidate = windows[i];
+            if (candidate == excludedWindow || !candidate.Visible) continue;
+            if (nextWindow == null || candidate.zIndex > nextWindow.zIndex)
+                nextWindow = candidate;
+        }
+
+        if (nextWindow != null)
+            SetFocusedWindow(nextWindow);
+    }
+
+    private void FailApplication(Window window, string operation, Exception exception)
+    {
+        if (window != null && failedWindows.Contains(window)) return;
+
+        string applicationName = window?.text;
+        if (string.IsNullOrEmpty(applicationName)) applicationName = "Application";
+        string detail = exception?.Message;
+        if (string.IsNullOrEmpty(detail)) detail = "Unknown error";
+
+        Serial.WriteString(applicationName + " failed while " + operation + ": " + detail + "\n");
+        pendingFailures.Add(new ApplicationFailure(applicationName, operation, detail));
+
+        if (window == null) return;
+        failedWindows.Add(window);
+        if (focusedWindow == window) focusedWindow = null;
+        if (capturedWindow == window) capturedWindow = null;
+        if (capturedComponent != null && capturedComponent.GetOwningWindow() == window) capturedComponent = null;
+        PostClose(window);
+    }
+
+    private void ShowPendingFailures()
+    {
+        if (pendingFailures.Count == 0) return;
+
+        for (int i = 0; i < pendingFailures.Count; i++)
+        {
+            ApplicationFailure failure = pendingFailures[i];
+            try
+            {
+                string message = failure.application + " crashed while " + failure.operation + ": " + failure.detail;
+                if (message.Length > 100) message = message.Substring(0, 97) + "...";
+
+                Window error = new Window(140, 140, 680, 130, "Application Error", true)
+                {
+                    canMaximize = false,
+                    canResize = false,
+                };
+                Panel text = new Panel(Palette.ControlFace, 8, 34, 664, 48)
+                {
+                    text = message,
+                    fontSize = 16,
+                    textColor = Palette.ControlBlack,
+                    useBackground = true,
+                    horizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(8, 34, 8, 8),
+                };
+                error.AddChild(text);
+                Register(error);
+            }
+            catch (Exception reportException)
+            {
+                Serial.WriteString("Could not display application error: " + reportException.Message + "\n");
+            }
+        }
+
+        pendingFailures.Clear();
+    }
+
+    private void CloseNow(Window window)
+    {
+        if (window == null) return;
+        BreezeRuntime.NotifyWindowClosed(window);
+        try { Invalidate(window.bounds); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+        try { ClearPreviewRect(); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+
+        if (focusedWindow == window)
+            focusedWindow = null;
+
+        if (capturedWindow == window)
+            capturedWindow = null;
+
+        if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
+            capturedComponent = null;
+
+        try { window.Stop(); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+        windows.Remove(window);
+        failedWindows.Remove(window);
+
+        if (taskbarButtons.ContainsKey(window))
+        {
+            Button taskbarButton = taskbarButtons[window];
+            taskbarButtons.Remove(window);
+            try { Explorer.taskbar.bar.RemoveStackChild(taskbarButton); }
+            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+            try { Explorer.taskbar.MarkDirty(); }
+            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+        }
+
+        try { FocusTopVisibleWindow(window); }
+        catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
     }
 
     public static void Invalidate(Component dirty)
@@ -275,6 +651,10 @@ public class WindowManager : SingleThreadedProcess
 
     public static void Invalidate(Rectangle dirtyRect)
     {
+        dirtyRect = Rectangle.Intersect(
+            dirtyRect,
+            new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
+
         if (dirtyRect.Width <= 0 || dirtyRect.Height <= 0) return;
 
         for (int i = 0; i < dirtyRects.Count; i++)
@@ -299,5 +679,19 @@ public class WindowManager : SingleThreadedProcess
     {
         windows = null;
         base.Dispose();
+    }
+
+    private readonly struct ApplicationFailure
+    {
+        public readonly string application;
+        public readonly string operation;
+        public readonly string detail;
+
+        public ApplicationFailure(string application, string operation, string detail)
+        {
+            this.application = application;
+            this.operation = operation;
+            this.detail = detail;
+        }
     }
 }

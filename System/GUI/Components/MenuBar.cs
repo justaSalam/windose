@@ -40,6 +40,19 @@ public class MenuBar : Component
         return item;
     }
 
+    public MenuPage AddMenuPage(string text, int width = 180)
+    {
+        MenuItem item = AddMenu(text);
+        MenuPage page = new MenuPage(width);
+
+        item.submenu = page;
+        item.openSubmenuBelow = true;
+        item.drawSubmenuArrow = false;
+        item.closeOtherMenusOnOpen = true;
+
+        return page;
+    }
+
     public override void Resize(int width, int height)
     {
         base.Resize(width, height);

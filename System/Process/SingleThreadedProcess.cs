@@ -1,7 +1,6 @@
 
 using System.Runtime.InteropServices;
 using Cosmos.Kernel.Core.IO;
-using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System.Graphics;
 
 
@@ -10,6 +9,9 @@ using Cosmos.Kernel.System.Graphics;
 /// </summary>
 public abstract class SingleThreadedProcess : Process
 {
+    private GCHandle processHandle;
+    private bool handleAllocated;
+
     public SingleThreadedProcess(string name, ProcessType processType)
     {
         this.name = name;
@@ -17,6 +19,7 @@ public abstract class SingleThreadedProcess : Process
 
         Running = false;
         Initialized = false;
+        canTerminate = true;
     }
 
     /// <summary>
@@ -29,11 +32,15 @@ public abstract class SingleThreadedProcess : Process
             if (Initialized) return;
 
             Running = true;
+            Initialized = true;
             startTime = DateTime.Now.ToString("HH:mm:ss");
-            GCHandle.Alloc(this);
+            processHandle = GCHandle.Alloc(this);
+            handleAllocated = true;
         }
         catch (Exception ex)
         {
+            Running = false;
+            Initialized = false;
             Serial.WriteString($"Thread : {name} | failed to start");
             Serial.WriteString(ex.Message);
         }
@@ -65,7 +72,11 @@ public abstract class SingleThreadedProcess : Process
     /// </summary>
     public override void Dispose()
     {
-        GarbageCollector.Collect();
+        Running = false;
+        Initialized = false;
+        if (!handleAllocated) return;
+        processHandle.Free();
+        handleAllocated = false;
     }
 }
 

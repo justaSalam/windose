@@ -17,6 +17,7 @@ public class FileExplorer : Window
     private ScrollView fileScroll;
     private TreeView tree;
     private ListView files;
+    private string currentLocation = "desktop";
 
     public FileExplorer(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height, title, useTitleBar)
     {
@@ -88,11 +89,32 @@ public class FileExplorer : Window
         explorerBody.AddDockChild(splitter, Dock.Left);
         explorerBody.AddDockChild(fileScroll, Dock.Fill);
 
-        menuBar.AddMenu("File");
-        menuBar.AddMenu("Edit");
-        MenuItem viewMenu = menuBar.AddMenu("View");
-        menuBar.AddMenu("Go");
-        menuBar.AddMenu("Help");
+        MenuPage fileMenu = menuBar.AddMenuPage("File");
+        fileMenu.AddItem("Properties", () => ShowSelectedProperties());
+        fileMenu.AddSeparator();
+        fileMenu.AddItem("Close", () => WindowManager.PostClose(this));
+
+        MenuPage editMenu = menuBar.AddMenuPage("Edit");
+        editMenu.AddItem("Cut").enabled = false;
+        editMenu.AddItem("Copy").enabled = false;
+        editMenu.AddItem("Paste").enabled = false;
+        editMenu.AddSeparator();
+        editMenu.AddItem("Delete").enabled = false;
+
+        MenuPage viewMenu = menuBar.AddMenuPage("View");
+        viewMenu.AddItem("Large Icons", () => files.SetViewMode(ListViewMode.LargeIcon));
+        viewMenu.AddItem("List", () => files.SetViewMode(ListViewMode.List));
+        viewMenu.AddItem("Details", () => files.SetViewMode(ListViewMode.Details));
+        viewMenu.AddSeparator();
+        viewMenu.AddItem("Refresh", () => PopulateFiles(currentLocation));
+
+        MenuPage goMenu = menuBar.AddMenuPage("Go");
+        goMenu.AddItem("Desktop", () => NavigateTo("desktop", "Desktop"));
+        goMenu.AddItem("My Computer", () => NavigateTo("computer", "My Computer"));
+        goMenu.AddItem("My Documents", () => NavigateTo("documents", "My Documents"));
+
+        MenuPage helpMenu = menuBar.AddMenuPage("Help");
+        helpMenu.AddItem("Windose File Explorer").enabled = false;
 
         toolbar.AddButton("Back");
         toolbar.AddButton("Forward");
@@ -110,7 +132,7 @@ public class FileExplorer : Window
         toolbar.AddButton("Delete");
         toolbar.AddButton("Properties", () =>
         {
-
+            ShowSelectedProperties();
         });//
 
         toolbar.AddSeparator();
@@ -119,7 +141,7 @@ public class FileExplorer : Window
         toolbar.AddButton("Details", () => files.SetViewMode(ListViewMode.Details), 64);
 
         objectCountPanel = statusBar.AddPanel("0 object(s)", 120);
-        selectedPanel = statusBar.AddPanel("", 180);
+        selectedPanel = statusBar.AddPanel("Selected", 180);
 
         BuildTree();
 
@@ -185,15 +207,28 @@ public class FileExplorer : Window
 
     private void OpenFolderItem(ListViewItem item)
     {
-        string path = item.tag as string;
+        string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : item.tag as string;
         if (path == null) return;
 
         addressBar.Address = item.text;
         PopulateFiles(path);
     }
 
+    private void NavigateTo(string location, string displayName)
+    {
+        addressBar.Address = displayName;
+        PopulateFiles(location);
+    }
+
+    private void ShowSelectedProperties()
+    {
+        if (files.selectedItem != null && files.selectedItem.hasFileEntry)
+            WindowManager.Register(new FileProperties(X + 40, Y + 40, files.selectedItem.fileEntry));
+    }
+
     private void PopulateFiles(string location)
     {
+        currentLocation = location;
         files.ClearItems();
         selectedPanel.text = "";
 
@@ -215,43 +250,43 @@ public class FileExplorer : Window
                 AddFolder("System", "c/system");
                 AddFolder("Programs", "c/programs");
                 AddFolder("Users", "c/users");
-                AddFile("AUTOEXEC.BAT", "1 KB", "Batch File");
-                AddFile("CONFIG.SYS", "1 KB", "System File");
+                AddFile("AUTOEXEC.BAT", 1024, "Batch File");
+                AddFile("CONFIG.SYS", 1024, "System File");
                 break;
 
             case "c/system":
                 AddFolder("Config", "c/system/config");
                 AddFolder("Drivers", "c/system/drivers");
-                AddFile("kernel.sys", "80 KB", "System File");
-                AddFile("shell.dll", "32 KB", "Application Extension");
+                AddFile("kernel.sys", 80 * 1024, "System File");
+                AddFile("shell.dll", 32 * 1024, "Application Extension");
                 break;
 
             case "c/system/config":
-                AddFile("display.ini", "2 KB", "Configuration Settings");
-                AddFile("mouse.ini", "1 KB", "Configuration Settings");
-                AddFile("keyboard.ini", "1 KB", "Configuration Settings");
+                AddFile("display.ini", 2 * 1024, "Configuration Settings");
+                AddFile("mouse.ini", 1024, "Configuration Settings");
+                AddFile("keyboard.ini", 1024, "Configuration Settings");
                 break;
 
             case "c/system/drivers":
-                AddFile("vga.drv", "18 KB", "Device Driver");
-                AddFile("mouse.drv", "12 KB", "Device Driver");
-                AddFile("keyboard.drv", "10 KB", "Device Driver");
+                AddFile("vga.drv", 18 * 1024, "Device Driver");
+                AddFile("mouse.drv", 12 * 1024, "Device Driver");
+                AddFile("keyboard.drv", 10 * 1024, "Device Driver");
                 break;
 
             case "documents":
                 AddFolder("Letters", "documents/letters");
                 AddFolder("Pictures", "documents/pictures");
-                AddFile("notes.txt", "4 KB", "Text Document");
+                AddFile("notes.txt", 4 * 1024, "Text Document");
                 break;
 
             case "documents/letters":
-                AddFile("hello.txt", "2 KB", "Text Document");
-                AddFile("todo.txt", "1 KB", "Text Document");
+                AddFile("hello.txt", 2 * 1024, "Text Document");
+                AddFile("todo.txt", 1024, "Text Document");
                 break;
 
             case "documents/pictures":
-                AddFile("clouds.bmp", "42 KB", "Bitmap Image");
-                AddFile("setup.bmp", "64 KB", "Bitmap Image");
+                AddFile("clouds.bmp", 42 * 1024, "Bitmap Image");
+                AddFile("setup.bmp", 64 * 1024, "Bitmap Image");
                 break;
 
             case "control":
@@ -262,29 +297,36 @@ public class FileExplorer : Window
                 break;
 
             default:
-                AddFile("Empty Folder", "", "Folder");
+                AddFile("Empty Folder", 0, "Folder");
                 break;
         }
 
         objectCountPanel.text = files.items.Count + " object(s)";
         statusBar.MarkDirty();
         fileScroll.RefreshContent(true);
-        MarkDirty();
     }
 
     private ListViewItem AddFolder(string name, string path)
     {
-        ListViewItem item = files.AddFolder(name, null, path);
-        item.modified = "Today";
+        FileEntry entry = new FileEntry(name, FileType.Directory, path, 0, "");
+        ListViewItem item = files.AddItem(entry);
+        item.type = "File Folder";
         return item;
     }
 
-    private ListViewItem AddFile(string name, string size, string type)
+    private ListViewItem AddFile(string name, long sizeBytes, string type)
     {
-        ListViewItem item = files.AddItem(name);
-        item.size = size;
+        FileEntry entry = new FileEntry(name, FileType.File, GetChildLocation(currentLocation, name), sizeBytes);
+        ListViewItem item = files.AddItem(entry);
         item.type = type;
-        item.modified = "Today";
         return item;
+    }
+
+    private string GetChildLocation(string parent, string name)
+    {
+        if (parent == null || parent == "")
+            return name;
+
+        return parent + "/" + name;
     }
 }

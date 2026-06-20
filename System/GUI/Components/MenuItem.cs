@@ -9,6 +9,9 @@ public class MenuItem : Component
     public bool enabled = true;
     public bool drawSeparator;
     public bool closeParentOnClick = true;
+    public bool openSubmenuBelow;
+    public bool drawSubmenuArrow = true;
+    public bool closeOtherMenusOnOpen;
     public MenuPopup submenu;
 
     private bool isPressed;
@@ -51,7 +54,7 @@ public class MenuItem : Component
             DrawString(text, color, textX, textY, fontSize);
         }
 
-        if (hasSubmenu)
+        if (hasSubmenu && drawSubmenuArrow)
         {
             Color arrowColor = highlighted ? Palette.HighlightText : Palette.ControlBlack;
             int arrowX = Width - 12;
@@ -150,7 +153,14 @@ public class MenuItem : Component
 
     private void ShowSubmenu()
     {
-        submenu.ShowAt(AbsoluteX + Width - 2, AbsoluteY - 2);
+        if (closeOtherMenusOnOpen)
+            MenuPopup.HideAll();
+
+        if (openSubmenuBelow)
+            submenu.ShowAt(AbsoluteX, AbsoluteY + Height - 1);
+        else
+            submenu.ShowAt(AbsoluteX + Width - 2, AbsoluteY - 2);
+
         MarkDirty();
     }
 

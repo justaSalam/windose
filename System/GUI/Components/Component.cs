@@ -119,6 +119,17 @@ public class Component : IDisposable
     public List<Component> children = new List<Component>();
     private Component parent;
 
+    public Window GetOwningWindow()
+    {
+        Component current = this;
+        while (current != null)
+        {
+            if (current is Window window) return window;
+            current = current.parent;
+        }
+        return null;
+    }
+
     public string text = "";
 
 
@@ -174,7 +185,6 @@ public class Component : IDisposable
     {
         rectangle = new Rectangle(x, y, width, height);
         buffer = new DirectBitmap(rectangle.Width, rectangle.Height);
-        cacheBuffer = new DirectBitmap(rectangle.Width, rectangle.Height);
 
         children = new List<Component>();
 
@@ -276,9 +286,12 @@ public class Component : IDisposable
 
     public virtual void HandleKeyboard(KeyEvent keyEvent)
     {
-        Serial.WriteString($"[KEY EVENT] | {GetName()} {keyEvent.Key}\n");
-
     }
+
+    public virtual void HandleMessage(UiMessage message)
+    {
+    }
+
 
     public void ResolveHorizontalAnchor()
     {
@@ -390,11 +403,15 @@ public class Component : IDisposable
 
     public void SaveCacheBuffer()
     {
+        if (cacheBuffer == null || cacheBuffer.Width < Width || cacheBuffer.Height < Height)
+            cacheBuffer = new DirectBitmap(buffer.Width, buffer.Height);
+
         cacheBuffer.DrawImage(buffer.GetBufferBitmap, 0, 0);
     }
 
     public void DrawCacheBuffer()
     {
+        if (cacheBuffer == null) return;
         buffer.DrawImage(cacheBuffer.GetBufferBitmap, 0, 0);
     }
 
@@ -476,6 +493,9 @@ public class Component : IDisposable
             width++;
         }
 
+        if (width == Width && height == Height)
+            return;
+
         /*foreach (Component child in children)
         {
             if (child is Button)
@@ -493,7 +513,9 @@ public class Component : IDisposable
             int newBufferHeight = RoundUpToChunk(Math.Max(height, buffer.Height), 64);
 
             buffer = new DirectBitmap(newBufferWidth, newBufferHeight);
-            cacheBuffer = new DirectBitmap(newBufferWidth, newBufferHeight);
+
+            if (cacheBuffer != null)
+                cacheBuffer = new DirectBitmap(newBufferWidth, newBufferHeight);
         }
 
         WindowManager.Invalidate(oldRectangle);
@@ -586,9 +608,11 @@ public class Component : IDisposable
 
     public void RemoveChild(Component child)
     {
-        children.Remove(child);
+        if (!children.Remove(child)) return;
+
+        WindowManager.Invalidate(child.AbsoluteRectangle);
         child.isRoot = true;
-        components.Add(child);
+        components.Remove(child);
         MarkDirty();
     }
 
@@ -735,6 +759,22 @@ public class Component : IDisposable
         if (!isRoot)
             parent.MarkChildDirty();
 
+    }
+
+    protected void InvalidateLocalRegion(Rectangle localRegion)
+    {
+        Rectangle bounds = new Rectangle(0, 0, Width, Height);
+        Rectangle clipped = Rectangle.Intersect(bounds, localRegion);
+        if (clipped.Width <= 0 || clipped.Height <= 0) return;
+
+        WindowManager.Invalidate(new Rectangle(
+            AbsoluteX + clipped.X,
+            AbsoluteY + clipped.Y,
+            clipped.Width,
+            clipped.Height));
+
+        if (!isRoot && parent != null)
+            parent.MarkChildDirty();
     }
 
     protected virtual void MarkChildDirty()

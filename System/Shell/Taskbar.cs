@@ -73,6 +73,7 @@ public class Taskbar : Component
     {
         base.Update();
     }
+
     public override void Draw()
     {
         DrawLocal();

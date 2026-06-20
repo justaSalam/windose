@@ -48,8 +48,16 @@ public class ScrollView : Component
 
         if (content != null)
         {
-            contentWidth = Math.Max(contentWidth, GetViewportWidth());
-            contentHeight = Math.Max(contentHeight, GetViewportHeight());
+            int newContentWidth = Math.Max(contentWidth, GetViewportWidth());
+            int newContentHeight = Math.Max(contentHeight, GetViewportHeight());
+
+            if (newContentWidth != contentWidth || newContentHeight != contentHeight)
+            {
+                contentWidth = newContentWidth;
+                contentHeight = newContentHeight;
+                content.Resize(contentWidth, contentHeight);
+            }
+
             ClampScroll();
             ApplyContentOffset();
         }

@@ -54,6 +54,31 @@ public class StartMenu : Window
             WindowManager.Register(new FileExplorer(100, 100, 800, 500, "Control Panel", true));
 
         });
+        programs.AddSubmenuItem("File Properties", () =>
+{
+    WindowManager.Register(new FileProperties(400, 400, new FileEntry()));
+
+});
+        programs.AddSubmenuItem("Task Manager", () =>
+        {
+            WindowManager.Register(new PerformanceMonitor(180, 120));
+        });
+        programs.AddSubmenuItem("Breeze Demo", () =>
+        {
+            BreezeDemo.Run();
+        });
+        programs.AddSubmenuItem("Breeze Editor", () =>
+        {
+            WindowManager.Register(new BreezeEditor());
+        });
+        programs.AddSubmenuItem("Breeze API", () =>
+        {
+            WindowManager.Register(new BreezeApiBrowser());
+        });
+        programs.AddSubmenuItem("Run main.breeze", () =>
+        {
+            BreezeHost.RunFile(@"0:\Apps\main.breeze");
+        });
         programs.AddSubmenuItem("System Tools");
 
         MenuItem documents = new MenuItem(0, 0, width, 24)

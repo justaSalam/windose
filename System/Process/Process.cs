@@ -4,8 +4,12 @@ public abstract class Process : IDisposable
     public ProcessType processType;
     public int id;
     public string startTime = DateTime.Now.ToString();
-    public bool Running;
+    public volatile bool Running;
     public bool Initialized;
+    public bool canTerminate;
+    public double lastUpdateMs;
+    public double averageUpdateMs;
+    public double peakUpdateMs;
 
     public abstract void Start();
     public abstract void Main();

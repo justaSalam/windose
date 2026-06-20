@@ -43,7 +43,6 @@ public class Checkbox : Component
         {
             isPressed = !isPressed;
             MarkDirty();
-            Serial.WriteString("Checkbox\n");
             return true;
         }
 

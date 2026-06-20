@@ -23,27 +23,34 @@ public class Kernel : Sys.Kernel
     public static Color Gray = Color.FromArgb(123, 126, 121);
     public static Color Blue = Color.FromArgb(0, 0, 128);
 
-    private const int gcrate = 150;
+    private const int gcrate = 1800;
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
     public static Canvas canvas = null!;
+    private DirectBitmap performanceOverlay;
 
     private WindowManager windowManager = null!;
     int tick;
 
+
     protected override void BeforeRun()
     {
+        Console.WriteLine("Booting Windose");
+
         Instance = this;
         GarbageCollector.Initialize();
-        Console.WriteLine("Cosmos booted successfully!");
+
 
         canvas = Canvas.GetFullScreen();
         mainBuffer = new DirectBitmap(canvas.Width, canvas.Height);
+        performanceOverlay = new DirectBitmap(Math.Max(1, Math.Min(800, canvas.Width - 20)), 52);
 
         MouseManager.Initialize();
         MouseManager.SetScreenSize(canvas.Width, canvas.Height);
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
+
+        Console.WriteLine("Windose booted successfully");
 
         Explorer explorer = new Explorer(canvas);
         windowManager = new WindowManager();
@@ -66,28 +73,37 @@ public class Kernel : Sys.Kernel
         {
             Mouse.Update();
 
-
+            PerformanceMetrics.BeginFrame();
+            long processStartedAt = PerformanceMetrics.Now;
             ProcessManger.Update();
+            PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
-
-
+            long uploadStartedAt = PerformanceMetrics.Now;
             canvas.DrawArray(mainBuffer.GetBuffer(), 0, 0, canvas.Width, canvas.Height);
-            canvas.DrawString($"Frametime: {DeltaTimeMs}ms | FPS: {Fps}", PCScreenFont.DefaultFont, Color.White, 10, 45);
+            PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 
+            long overlayStartedAt = PerformanceMetrics.Now;
+
+            canvas.DrawFilledCircle(Color.Black, MouseManager.X, MouseManager.Y, 3);
             canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);
+            PerformanceMetrics.OverlayTicks = PerformanceMetrics.Now - overlayStartedAt;
+
+            long displayStartedAt = PerformanceMetrics.Now;
             canvas.Display();
+            PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
 
 
             Tick();
-            if (tick % gcrate == 0) GarbageCollector.Collect();
+            if (tick > 0 && tick % gcrate == 0) GarbageCollector.Collect();
 
 
             tick++;
         }
         catch (Exception ex)
         {
-            canvas.Disable();
-            Console.WriteLine(ex.Message);
+            string message = "Kernel frame error: " + ex.Message;
+            Serial.WriteString($"{message}\n");
+            Console.WriteLine(message);
         }
 
     }
@@ -110,13 +126,4 @@ public class Kernel : Sys.Kernel
         lastFrameTicks = now;
     }
 
-
-    private int collections, freed, timeInGC;
-    private ulong heap;
-    private void GCINFO()
-    {
-        GarbageCollector.GetStats(out collections, out freed);
-        heap = GarbageCollector.GetHeapSizeBytes();
-        timeInGC = GarbageCollector.GetLastGCPercentTimeInGC();
-    }
 }

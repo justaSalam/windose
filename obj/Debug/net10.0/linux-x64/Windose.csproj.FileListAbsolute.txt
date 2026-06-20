@@ -240,10 +240,10 @@ c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.GeneratedMSBu
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.AssemblyInfoInputs.cache
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.AssemblyInfo.cs
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.csproj.CoreCompileInputs.cache
+c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.sourcelink.json
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.csproj.Up2Date
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.dll
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\refint\Windose.dll
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.pdb
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.genruntimeconfig.cache
 c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\ref\Windose.dll
-c:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\Windose.sourcelink.json

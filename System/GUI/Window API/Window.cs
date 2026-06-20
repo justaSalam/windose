@@ -15,6 +15,9 @@ public class Window : Component
 
     private bool dragging;
     private bool resizing;
+    private bool isMinimized;
+    private bool isMaximized;
+    private Rectangle restoreBounds;
 
     public bool canMaximize = true;
     public bool canMinimize = true;
@@ -116,7 +119,7 @@ public class Window : Component
                 borderColor = Color.White,
                 leftMouseRelease = () =>
                 {
-                    WindowManager.Close(this);
+                    WindowManager.PostClose(this);
                 }
             });
 
@@ -132,6 +135,7 @@ public class Window : Component
                     borderColor = Color.White,
                     leftMouseRelease = () =>
                     {
+                        WindowManager.ToggleMaximize(this);
                     }
                 });
 
@@ -148,8 +152,7 @@ public class Window : Component
                     borderColor = Color.White,
                     leftMouseRelease = () =>
                     {
-                        //Visible = !Visible;
-                        //MarkDirty();
+                        WindowManager.Minimize(this);
                     }
                 });
             }
@@ -161,7 +164,7 @@ public class Window : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
     {
-        if (mouseState.left == MouseEvents.Press)
+        if (mouseState.left == MouseEvents.Press || mouseState.right == MouseEvents.Press)
         {
             inFocus = HitTest(mouseX, mouseY);
 
@@ -210,7 +213,7 @@ public class Window : Component
 
     private void DragWindow(MouseState mouse, int mouseX, int mouseY)
     {
-        if (resizing || !canMove) return;
+        if (resizing || !canMove || isMaximized) return;
 
         if (mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY))
         {
@@ -240,7 +243,7 @@ public class Window : Component
 
     private void ResizeWindow(MouseState mouseState, int mouseX, int mouseY)
     {
-        if (dragging || !canResize) return;
+        if (dragging || !canResize || isMaximized) return;
 
         if (mouseState.left == MouseEvents.Press && ResizeHitTest(mouseX, mouseY))
         {
@@ -316,6 +319,45 @@ public class Window : Component
         WindowManager.Invalidate(bounds);
         MarkDirty();
     }
+
+    internal void MinimizeWindow()
+    {
+        if (isMinimized) return;
+
+        isMinimized = true;
+        Visible = false;
+    }
+
+    internal void RestoreFromTaskbar()
+    {
+        if (!isMinimized) return;
+
+        isMinimized = false;
+        Visible = true;
+        MarkDirty();
+    }
+
+    internal void ToggleMaximized(Rectangle workArea)
+    {
+        if (!canMaximize) return;
+
+        if (isMinimized)
+            RestoreFromTaskbar();
+
+        if (isMaximized)
+        {
+            isMaximized = false;
+            Resize(restoreBounds.X, restoreBounds.Y, restoreBounds.Width, restoreBounds.Height);
+            return;
+        }
+
+        restoreBounds = bounds;
+        isMaximized = true;
+        Resize(workArea.X, workArea.Y, workArea.Width, workArea.Height);
+    }
+
+    public bool IsMinimized => isMinimized;
+    public bool IsMaximized => isMaximized;
     public void Stop() //TODO Dispose, GC wont collect it without proper disposal first
     {
         Visible = false;

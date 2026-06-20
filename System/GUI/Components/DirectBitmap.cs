@@ -1,5 +1,4 @@
 using System.Drawing;
-using System.Runtime.InteropServices;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
@@ -61,8 +60,7 @@ public unsafe class DirectBitmap
     }
     public void Clear(Color color)
     {
-        fixed (int* ptr = buffer.RawData)
-            NativeMemory.Fill(ptr, (nuint)(buffer.RawData.Length * 4), (byte)(color.ToArgb() & 0xFF));
+        Array.Fill(buffer.RawData, color.ToArgb());
     }
     public virtual void DrawPoint(Color color, int x, int y)
     {
@@ -202,30 +200,15 @@ public unsafe class DirectBitmap
 
     public void DrawImageAlpha(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
-        if (preventOffBoundPixels)
-        {
-            uint num = Math.Min(image.Width, (uint)(Width - x));
-            uint num2 = Math.Min(image.Height, (uint)(Height - y));
-            for (int i = 0; i < num; i++)
-            {
-                for (int j = 0; j < num2; j++)
-                {
-                    Color color = Color.FromArgb(image.RawData[i + j * image.Width]);
-                    DrawPoint(color, x + i, y + j);
-                }
-            }
-
-            return;
-        }
-
-        for (int k = 0; k < image.Width; k++)
-        {
-            for (int l = 0; l < image.Height; l++)
-            {
-                Color color = Color.FromArgb(image.RawData[k + l * image.Width]);
-                DrawPoint(color, x + k, y + l);
-            }
-        }
+        DrawArrayAlphaClipped(
+            image.RawData,
+            (int)image.Width,
+            0,
+            0,
+            x,
+            y,
+            (int)image.Width,
+            (int)image.Height);
     }
     public void DrawImageStretchAlpha(Bitmap image, Rectangle sourceRect, Rectangle destRect)
     {
@@ -384,6 +367,25 @@ public unsafe class DirectBitmap
 
     public virtual void DrawArrayClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
+        if (colors == null || sourceWidth <= 0) return;
+        int sourceHeight = colors.Length / sourceWidth;
+
+        if (sourceX < 0)
+        {
+            int clipped = -sourceX;
+            destinationX += clipped;
+            width -= clipped;
+            sourceX = 0;
+        }
+
+        if (sourceY < 0)
+        {
+            int clipped = -sourceY;
+            destinationY += clipped;
+            height -= clipped;
+            sourceY = 0;
+        }
+
         if (destinationX < 0)
         {
             int clipped = -destinationX;
@@ -409,6 +411,12 @@ public unsafe class DirectBitmap
         {
             height = Height - destinationY;
         }
+
+        if (sourceX + width > sourceWidth)
+            width = sourceWidth - sourceX;
+
+        if (sourceY + height > sourceHeight)
+            height = sourceHeight - sourceY;
 
         if (width <= 0 || height <= 0) return;
 
@@ -423,6 +431,25 @@ public unsafe class DirectBitmap
 
     public virtual void DrawArrayAlphaClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
+        if (colors == null || sourceWidth <= 0) return;
+        int sourceHeight = colors.Length / sourceWidth;
+
+        if (sourceX < 0)
+        {
+            int clipped = -sourceX;
+            destinationX += clipped;
+            width -= clipped;
+            sourceX = 0;
+        }
+
+        if (sourceY < 0)
+        {
+            int clipped = -sourceY;
+            destinationY += clipped;
+            height -= clipped;
+            sourceY = 0;
+        }
+
         if (destinationX < 0)
         {
             int clipped = -destinationX;
@@ -444,6 +471,12 @@ public unsafe class DirectBitmap
 
         if (destinationY + height > Height)
             height = Height - destinationY;
+
+        if (sourceX + width > sourceWidth)
+            width = sourceWidth - sourceX;
+
+        if (sourceY + height > sourceHeight)
+            height = sourceHeight - sourceY;
 
         if (width <= 0 || height <= 0) return;
 
@@ -584,10 +617,10 @@ public unsafe class DirectBitmap
 
     public virtual void DrawCircle(Color color, int xCenter, int yCenter, int radius)
     {
-        ThrowIfCoordNotValid(xCenter + radius, yCenter);
-        ThrowIfCoordNotValid(xCenter - radius, yCenter);
-        ThrowIfCoordNotValid(xCenter, yCenter + radius);
-        ThrowIfCoordNotValid(xCenter, yCenter - radius);
+        if (!IsCoordinateValid(xCenter + radius, yCenter)
+            || !IsCoordinateValid(xCenter - radius, yCenter)
+            || !IsCoordinateValid(xCenter, yCenter + radius)
+            || !IsCoordinateValid(xCenter, yCenter - radius)) return;
         int num = radius;
         int num2 = 0;
         int num3 = 0;
@@ -650,10 +683,10 @@ public unsafe class DirectBitmap
 
     public virtual void DrawEllipse(Color color, int xCenter, int yCenter, int xR, int yR)
     {
-        ThrowIfCoordNotValid(xCenter + xR, yCenter);
-        ThrowIfCoordNotValid(xCenter - xR, yCenter);
-        ThrowIfCoordNotValid(xCenter, yCenter + yR);
-        ThrowIfCoordNotValid(xCenter, yCenter - yR);
+        if (!IsCoordinateValid(xCenter + xR, yCenter)
+            || !IsCoordinateValid(xCenter - xR, yCenter)
+            || !IsCoordinateValid(xCenter, yCenter + yR)
+            || !IsCoordinateValid(xCenter, yCenter - yR)) return;
         int num = 2 * xR;
         int num2 = 2 * yR;
         int num3 = num2 & 1;
@@ -715,10 +748,7 @@ public unsafe class DirectBitmap
 
     public virtual void DrawPolygon(Color color, params Point[] points)
     {
-        if (points.Length < 3)
-        {
-            throw new ArgumentException("A polygon requires more than 3 points.");
-        }
+        if (points == null || points.Length < 3) return;
 
         for (int i = 0; i < points.Length - 1; i++)
         {
@@ -842,18 +872,7 @@ public unsafe class DirectBitmap
         DrawLine(color, v2x, v2y, v3x, v3y);
     }
 
-    protected void ThrowIfCoordNotValid(int x, int y)
-    {
-        if (x < 0 || x >= Width)
-        {
-            throw new ArgumentOutOfRangeException("x", $"X coordinate ({x}) is not between 0 and {Width}");
-        }
-
-        if (y < 0 || y >= Height)
-        {
-            throw new ArgumentOutOfRangeException("y", $"Y coordinate ({y}) is not between 0 and {Height}");
-        }
-    }
+    protected bool IsCoordinateValid(int x, int y) => x >= 0 && x < Width && y >= 0 && y < Height;
 
     protected void TrimLine(ref int x1, ref int y1, ref int x2, ref int y2)
     {
