@@ -1,39 +1,77 @@
 using Cosmos.Kernel.Core.IO;
-using System.IO;
 
+/// <summary>
+/// Add a language feature by:
+/// <list type="number">
+/// <item><description>
+/// Defining it in <see cref="CallNative(string, object[])"/>
+/// </description></item>
+/// <item><description>
+/// Declaring its argument count in <see cref="GetExpectedArgumentCount(string)"/>
+/// </description></item>
+/// <item><description>
+/// Adding it into the editors completion list in <see cref="CodeEditor.CompletionItems"/>
+/// </description></item>
+/// </list>
+/// </summary>
 public sealed class BreezeRuntime
 {
+    private sealed class BreezeFileWatch
+    {
+        public string Path;
+        public bool Recursive;
+        public Action<FileSystemChange> Handler;
+    }
+
     private const int MaxOperations = 100000;
     private const int MaxLoopIterations = 10000;
     private const int MaxCallDepth = 64;
     private const int MaxEventsPerUpdate = 32;
     private const int MaxQueuedMessages = 128;
+    private static int nextMessageId;
 
     private readonly List<Dictionary<string, object>> scopes = new List<Dictionary<string, object>>();
     private readonly Dictionary<string, BreezeFunction> functions = new Dictionary<string, BreezeFunction>();
+    private readonly HashSet<string> importedModules = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> grantedCapabilities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private readonly List<Window> applicationWindows = new List<Window>();
+    private readonly List<BreezeFileWatch> fileWatches = new List<BreezeFileWatch>();
     private readonly List<BreezeTimerHandle> timers = new List<BreezeTimerHandle>();
     private readonly List<BreezeProcessMessage> messageQueue = new List<BreezeProcessMessage>();
+    private readonly object messageQueueLock = new object();
     private static readonly Dictionary<Window, BreezeRuntime> windowOwners = new Dictionary<Window, BreezeRuntime>();
     private static readonly Dictionary<string, BreezeProcessHandle> namedProcesses = new Dictionary<string, BreezeProcessHandle>(StringComparer.OrdinalIgnoreCase);
+    private static readonly object processRegistryLock = new object();
     private readonly Action terminatedCallback;
     private readonly Action<string> applicationNameChanged;
     private readonly BreezeProcessHandle processHandle;
+    private BreezeServiceHandle serviceHandle;
+    private readonly bool backgroundMode;
     private List<BreezeStatement> processUpdateBody;
     private List<BreezeStatement> processMessageBody;
     private int operationCount;
     private int callDepth;
-    private bool terminated;
+    private int importDepth;
+    private string currentModuleDirectory = "";
+    private volatile bool terminated;
     private bool keepAliveWithoutWindows;
     private bool hasExplicitProcessName;
     public string LastError { get; private set; }
     public bool IsTerminated => terminated;
+    internal Process OwnerProcess => processHandle.OwnerProcess;
+    internal Action WorkAvailable;
 
-    public BreezeRuntime(Action terminatedCallback = null, Action<string> applicationNameChanged = null)
+    public BreezeRuntime(Action terminatedCallback = null, Action<string> applicationNameChanged = null, bool backgroundMode = false)
     {
         this.terminatedCallback = terminatedCallback;
         this.applicationNameChanged = applicationNameChanged;
+        this.backgroundMode = backgroundMode;
         processHandle = new BreezeProcessHandle(this);
+    }
+
+    internal void AttachProcess(Process process)
+    {
+        processHandle.OwnerProcess = process;
     }
 
     public void Execute(string source)
@@ -46,7 +84,7 @@ public sealed class BreezeRuntime
         processUpdateBody = null;
         processMessageBody = null;
         timers.Clear();
-        messageQueue.Clear();
+        lock (messageQueueLock) messageQueue.Clear();
         LastError = null;
         BreezeLexer lexer = new BreezeLexer(source);
         List<BreezeToken> tokens = lexer.Tokenize();
@@ -66,8 +104,12 @@ public sealed class BreezeRuntime
         scopes.Clear();
         scopes.Add(new Dictionary<string, object>());
         functions.Clear();
+        importedModules.Clear();
+        grantedCapabilities.Clear();
         operationCount = 0;
         callDepth = 0;
+        importDepth = 0;
+        currentModuleDirectory = FileSystemManager.GetParent(OwnerProcess?.startInfo?.ExecutablePath ?? "");
 
         ExecutionResult result = ExecuteBlock(statements);
         if (result.Returned) Fail("return can only be used inside a function");
@@ -142,6 +184,33 @@ public sealed class BreezeRuntime
             }
             return ExecutionResult.None;
         }
+
+        if (statement is BreezeForEach forEach)
+        {
+            List<object> values = GetIterationValues(Evaluate(forEach.Collection));
+            if (HasError || values == null) return ExecutionResult.None;
+            if (values.Count > MaxLoopIterations)
+            {
+                Fail("Loop limit exceeded (" + MaxLoopIterations + ")");
+                return ExecutionResult.None;
+            }
+
+            for (int i = 0; i < values.Count; i++)
+            {
+                Dictionary<string, object> loopScope = new Dictionary<string, object>();
+                loopScope[forEach.Name] = values[i];
+                scopes.Add(loopScope);
+                ExecutionResult result;
+                try { result = ExecuteBlock(forEach.Body); }
+                finally { scopes.RemoveAt(scopes.Count - 1); }
+                if (result.Returned || HasError) return result;
+                CountOperation();
+            }
+            return ExecutionResult.None;
+        }
+
+        if (statement is BreezeImport import)
+            return ExecuteImport(import.Path);
 
         if (statement is BreezeFunction function)
         {
@@ -247,16 +316,32 @@ public sealed class BreezeRuntime
         }
     }
 
-    private object CallNative(string name, object[] args)
+    internal object CallNative(string name, object[] args)
     {
         int expectedCount = GetExpectedArgumentCount(name);
         if (expectedCount < 0) return FailValue<object>("Unknown function '" + name + "'");
         if (args.Length != expectedCount)
             return FailValue<object>(name + " expects " + expectedCount + " argument(s)");
+        string requiredCapability = GetRequiredCapability(name);
+        if (requiredCapability != "" && !EnsureCapability(requiredCapability))
+            return FailValue<object>("Capability denied: " + requiredCapability);
+        if (backgroundMode && IsGuiFunction(name))
+            return FailValue<object>("GUI function '" + name + "' is not available in a background process");
 
         switch (name)
         {
             case "process":
+                if (backgroundMode)
+                    return FailValue<object>("Use scheduledProcess(name) in a background program");
+                RegisterProcessName(ToText(args[0]));
+                keepAliveWithoutWindows = true;
+                hasExplicitProcessName = true;
+                applicationNameChanged?.Invoke(processHandle.name);
+                return processHandle;
+
+            case "scheduledProcess":
+                if (!backgroundMode)
+                    return FailValue<object>("scheduledProcess(name) must be started with Run Background");
                 RegisterProcessName(ToText(args[0]));
                 keepAliveWithoutWindows = true;
                 hasExplicitProcessName = true;
@@ -264,58 +349,319 @@ public sealed class BreezeRuntime
                 return processHandle;
 
             case "stopProcess":
-            {
-                BreezeProcessHandle handle = Require<BreezeProcessHandle>(name, args[0]);
-                if (handle == null) return false;
-                if (handle.Runtime != this) return FailValue<object>("Cannot stop a process owned by another runtime");
-                TerminateApplication();
-                return true;
-            }
+                {
+                    BreezeProcessHandle handle = Require<BreezeProcessHandle>(name, args[0]);
+                    if (handle == null) return false;
+                    if (handle.Runtime != this) return FailValue<object>("Cannot stop a process owned by another runtime");
+                    TerminateApplication();
+                    return true;
+                }
 
             case "findProcess":
-            {
-                string processName = ToText(args[0]);
-                if (namedProcesses.TryGetValue(processName, out BreezeProcessHandle found) && found.Running)
-                    return found;
-                return FailValue<object>("Process '" + processName + "' was not found");
-            }
+                {
+                    string processName = ToText(args[0]);
+                    lock (processRegistryLock)
+                    {
+                        if (namedProcesses.TryGetValue(processName, out BreezeProcessHandle found) && found.Running)
+                            return found;
+                    }
+                    return FailValue<object>("Process '" + processName + "' was not found");
+                }
 
             case "send":
-            {
-                BreezeProcessHandle target = Require<BreezeProcessHandle>(name, args[0]);
-                if (target == null) return false;
-                if (!target.Running) return FailValue<object>("Cannot send to a stopped process");
-                return target.Runtime.EnqueueMessage(new BreezeProcessMessage(
-                    ToText(args[1]), args[2], processHandle.name));
-            }
+                {
+                    BreezeProcessHandle target = Require<BreezeProcessHandle>(name, args[0]);
+                    if (target == null) return false;
+                    if (!target.Running) return FailValue<object>("Cannot send to a stopped process");
+                    return target.Runtime.EnqueueMessage(new BreezeProcessMessage(
+                        ToText(args[1]), args[2], processHandle.name));
+                }
+
+            case "broadcast":
+                return (double)Broadcast(ToText(args[0]), args[1]);
+
+            case "request":
+                {
+                    BreezeProcessHandle target = Require<BreezeProcessHandle>(name, args[0]);
+                    if (target == null || !target.Running) return false;
+                    int id;
+                    lock (processRegistryLock) id = ++nextMessageId;
+                    return target.Runtime.EnqueueMessage(new BreezeProcessMessage(
+                        ToText(args[1]), args[2], processHandle.name, id)) ? (double)id : 0.0;
+                }
+
+            case "reply":
+                {
+                    BreezeProcessMessage request = Require<BreezeProcessMessage>(name, args[0]);
+                    if (request == null || request.Id == 0) return false;
+                    lock (processRegistryLock)
+                    {
+                        if (!namedProcesses.TryGetValue(request.Sender, out BreezeProcessHandle target) || !target.Running) return false;
+                        return target.Runtime.EnqueueMessage(new BreezeProcessMessage(
+                            request.Name + ".reply", args[1], processHandle.name, 0, request.Id));
+                    }
+                }
+
+            case "tryFindProcess":
+                {
+                    string processName = ToText(args[0]);
+                    lock (processRegistryLock)
+                    {
+                        if (namedProcesses.TryGetValue(processName, out BreezeProcessHandle found) && found.Running)
+                            return found;
+                    }
+                    return null;
+                }
+
+            case "service":
+                {
+                    if (!backgroundMode) return FailValue<object>("service must run as a background program");
+                    string serviceName = ToText(args[0]);
+                    RegisterProcessName(serviceName);
+                    serviceHandle = BreezeServiceManager.Register(this, OwnerProcess, serviceName, ToBool(args[1]), ToBool(args[2]));
+                    if (serviceHandle == null) return FailValue<object>("Service '" + serviceName + "' is already running");
+                    keepAliveWithoutWindows = true;
+                    hasExplicitProcessName = true;
+                    applicationNameChanged?.Invoke(processHandle.name);
+                    return serviceHandle;
+                }
+
+            case "serviceDependency":
+                if (serviceHandle == null) return FailValue<object>("Declare a service before adding dependencies");
+                return BreezeServiceManager.AddDependency(serviceHandle, ToText(args[0]));
+
+            case "dependenciesReady":
+                return serviceHandle != null && BreezeServiceManager.DependenciesReady(serviceHandle);
+
+            case "startService":
+                return BreezeServiceManager.StartFile(ToText(args[0]));
+
+            case "stopService":
+                return BreezeServiceManager.Stop(ToText(args[0]));
+
+            case "restartService":
+                return BreezeServiceManager.Restart(ToText(args[0]));
+
+            case "serviceState":
+                return BreezeServiceManager.GetState(ToText(args[0]));
+
+            case "fileExists":
+                return FileSystemManager.Current != null && FileSystemManager.Current.FileExists(ToText(args[0]));
+
+            case "directoryExists":
+                return FileSystemManager.Current != null && FileSystemManager.Current.DirectoryExists(ToText(args[0]));
+
+            case "createDirectory":
+                return FileSystemManager.Current != null && FileSystemManager.Current.CreateDirectory(ToText(args[0]));
+
+            case "deleteFile":
+                return FileSystemManager.Current != null && FileSystemManager.Current.DeleteFile(ToText(args[0]));
+
+            case "deleteDirectory":
+                return FileSystemManager.Current != null && FileSystemManager.Current.DeleteDirectory(ToText(args[0]), ToBool(args[1]));
+
+            case "copyFile":
+                return FileSystemManager.Current != null && FileSystemManager.Current.CopyFile(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+
+            case "copyDirectory":
+                return FileSystemManager.Current != null && FileSystemManager.Current.CopyDirectory(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+
+            case "moveFile":
+                return FileSystemManager.Current != null && FileSystemManager.Current.MoveFile(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+
+            case "moveDirectory":
+                return FileSystemManager.Current != null && FileSystemManager.Current.MoveDirectory(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+
+            case "renamePath":
+                return FileSystemManager.Current != null && FileSystemManager.Current.Rename(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+
+            case "readFile":
+                {
+                    if (FileSystemManager.Current != null && FileSystemManager.Current.TryReadAllText(ToText(args[0]), out string content))
+                        return content;
+                    return FailValue<object>("Could not read file " + ToText(args[0]));
+                }
+
+            case "tryReadFile":
+                {
+                    Dictionary<string, object> result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                    string content = "";
+                    bool success = FileSystemManager.Current != null &&
+                        FileSystemManager.Current.TryReadAllText(ToText(args[0]), out content);
+                    result["ok"] = success;
+                    result["value"] = success ? content : null;
+                    result["error"] = success ? null : "Could not read file " + ToText(args[0]);
+                    return result;
+                }
+
+            case "writeFile":
+                return FileSystemManager.Current != null && FileSystemManager.Current.WriteAllText(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+
+            case "fileInfo":
+                {
+                    if (FileSystemManager.Current != null && FileSystemManager.Current.TryGetInfo(ToText(args[0]), out WindoseFileInfo info))
+                        return info;
+                    return FailValue<object>("Path does not exist: " + ToText(args[0]));
+                }
+
+            case "watchPath":
+                return WatchPath(ToText(args[0]), ToBool(args[1]));
+
+            case "clearWatches":
+                ClearFileWatches();
+                return true;
+
+            case "registryGet":
+                return ToBreezeRegistryValue(SystemRegistry.Get(ToText(args[0])));
+
+            case "registrySet":
+                if (!EnsureRegistryWrite(ToText(args[0]))) return false;
+                return SystemRegistry.Set(ToText(args[0]), args[1]);
+
+            case "registryDefine":
+                if (!EnsureRegistryWrite(ToText(args[0]))) return false;
+                SystemRegistry.Define(ToText(args[0]), args[1], ToText(args[2]), ToBool(args[3]));
+                return SystemRegistry.Save();
+
+            case "registryDelete":
+                if (!EnsureRegistryWrite(ToText(args[0]))) return false;
+                return SystemRegistry.Delete(ToText(args[0]));
+
+            case "registryExists":
+                return SystemRegistry.Exists(ToText(args[0]));
+
+            case "registryKeys":
+                {
+                    List<string> keys = SystemRegistry.GetKeys(ToText(args[0]));
+                    List<object> result = new List<object>(keys.Count);
+                    for (int i = 0; i < keys.Count; i++) result.Add(keys[i]);
+                    return result;
+                }
+
+            case "registryInfo":
+                {
+                    RegistryEntry entry = SystemRegistry.GetEntry(ToText(args[0]));
+                    if (entry == null) return null;
+                    Dictionary<string, object> result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                    result["key"] = entry.Key;
+                    result["value"] = ToBreezeRegistryValue(entry.Value);
+                    result["defaultValue"] = ToBreezeRegistryValue(entry.DefaultValue);
+                    result["description"] = entry.Description;
+                    result["requiresRestart"] = entry.RequiresRestart;
+                    result["builtIn"] = entry.IsBuiltIn;
+                    return result;
+                }
+
+            case "registrySave":
+                return SystemRegistry.Save();
+
+            case "registryRestartRequired":
+                return SystemRegistry.RestartRequired;
+
+            case "clock":
+                return (double)(DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond);
+
+            case "processCount":
+                return (double)ProcessManger.ProcessCount;
+
+            case "log":
+                Serial.WriteString("[Breeze:" + processHandle.name + "] " + ToText(args[0]) + "\n");
+                return true;
+
+            case "capability":
+                return EnsureCapability(ToText(args[0]));
+
+            case "hasCapability":
+                return grantedCapabilities.Contains(ToText(args[0]));
+
+            case "capabilities":
+                {
+                    List<object> result = new List<object>();
+                    foreach (string capability in grantedCapabilities) result.Add(capability);
+                    return result;
+                }
+
+            case "object":
+                return new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+
+            case "objectGet":
+                {
+                    Dictionary<string, object> value = Require<Dictionary<string, object>>(name, args[0]);
+                    if (value == null) return null;
+                    return value.TryGetValue(ToText(args[1]), out object propertyValue) ? propertyValue : null;
+                }
+
+            case "objectSet":
+                {
+                    Dictionary<string, object> value = Require<Dictionary<string, object>>(name, args[0]);
+                    if (value == null) return false;
+                    value[ToText(args[1])] = args[2];
+                    return args[2];
+                }
+
+            case "objectHas":
+                {
+                    Dictionary<string, object> value = Require<Dictionary<string, object>>(name, args[0]);
+                    return value != null && value.ContainsKey(ToText(args[1]));
+                }
+
+            case "objectRemove":
+                {
+                    Dictionary<string, object> value = Require<Dictionary<string, object>>(name, args[0]);
+                    return value != null && value.Remove(ToText(args[1]));
+                }
+
+            case "objectKeys":
+                {
+                    Dictionary<string, object> value = Require<Dictionary<string, object>>(name, args[0]);
+                    if (value == null) return null;
+                    List<object> keys = new List<object>();
+                    foreach (string key in value.Keys) keys.Add(key);
+                    return keys;
+                }
+
+            case "objectCount":
+                {
+                    Dictionary<string, object> value = Require<Dictionary<string, object>>(name, args[0]);
+                    return value == null ? null : (double)value.Count;
+                }
 
             case "timer":
-            {
-                int interval = ToInt(args[0]);
-                if (HasError) return null;
-                if (interval < 1) return FailValue<object>("Timer interval must be at least 1 ms");
-                BreezeTimerHandle timer = new BreezeTimerHandle(this, interval);
-                timers.Add(timer);
-                keepAliveWithoutWindows = true;
-                return timer;
-            }
+                {
+                    int interval = ToInt(args[0]);
+                    if (HasError) return null;
+                    if (interval < 1) return FailValue<object>("Timer interval must be at least 1 ms");
+                    BreezeTimerHandle timer = new BreezeTimerHandle(this, interval);
+                    timers.Add(timer);
+                    keepAliveWithoutWindows = true;
+                    return timer;
+                }
 
             case "startTimer":
-            {
-                BreezeTimerHandle timer = RequireOwnedTimer(name, args[0]);
-                if (timer == null) return false;
-                timer.active = true;
-                timer.Reset();
-                return true;
-            }
+                {
+                    BreezeTimerHandle timer = RequireOwnedTimer(name, args[0]);
+                    if (timer == null) return false;
+                    timer.active = true;
+                    timer.Reset();
+                    return true;
+                }
+
+            case "getDirectories":
+                return GetPaths(ToText(args[0]), true);
+
+            case "getFiles":
+                return GetPaths(ToText(args[0]), false);
+
+            case "fileName":
+                return FileSystemManager.GetName(ToText(args[0]));
 
             case "stopTimer":
-            {
-                BreezeTimerHandle timer = RequireOwnedTimer(name, args[0]);
-                if (timer == null) return false;
-                timer.active = false;
-                return true;
-            }
+                {
+                    BreezeTimerHandle timer = RequireOwnedTimer(name, args[0]);
+                    if (timer == null) return false;
+                    timer.active = false;
+                    return true;
+                }
 
             case "window":
                 {
@@ -691,6 +1037,15 @@ public sealed class BreezeRuntime
             return;
         }
 
+        if (target is BreezeServiceHandle service)
+        {
+            if (service.Runtime != this) { Fail("Service belongs to another runtime"); return; }
+            if (eventName == "update") { processUpdateBody = body; return; }
+            if (eventName == "message") { processMessageBody = body; return; }
+            Fail("Event '" + eventName + "' is not supported by a service");
+            return;
+        }
+
         if (target is BreezeTimerHandle timer)
         {
             if (timer.Runtime != this) { Fail("Timer belongs to another runtime"); return; }
@@ -753,16 +1108,44 @@ public sealed class BreezeRuntime
             if (terminated) return;
         }
 
-        while (messageQueue.Count > 0 && delivered < MaxEventsPerUpdate)
+        while (delivered < MaxEventsPerUpdate)
         {
-            BreezeProcessMessage message = messageQueue[0];
-            messageQueue.RemoveAt(0);
+            BreezeProcessMessage message;
+            lock (messageQueueLock)
+            {
+                if (messageQueue.Count == 0) break;
+                message = messageQueue[0];
+                messageQueue.RemoveAt(0);
+            }
             delivered++;
             if (processMessageBody == null) continue;
             SetGlobal("event", message);
             ExecuteDeferredBody(processMessageBody);
             if (terminated) return;
         }
+    }
+
+    public int GetRecommendedUpdateIntervalMs()
+    {
+        if (terminated) return 250;
+        if (processUpdateBody != null) return 100;
+
+        lock (messageQueueLock)
+            if (messageQueue.Count > 0) return 10;
+
+        long now = DateTime.UtcNow.Ticks;
+        long nearest = long.MaxValue;
+        for (int i = 0; i < timers.Count; i++)
+        {
+            BreezeTimerHandle timer = timers[i];
+            if (!timer.active || timer.TickBody == null) continue;
+            long remaining = timer.NextTick - now;
+            if (remaining < nearest) nearest = remaining;
+        }
+
+        if (nearest == long.MaxValue) return 250;
+        int remainingMs = (int)Math.Max(10, nearest / TimeSpan.TicksPerMillisecond);
+        return Math.Min(250, remainingMs);
     }
 
     private void ExecuteDeferredBody(List<BreezeStatement> body)
@@ -786,6 +1169,9 @@ public sealed class BreezeRuntime
 
     private object GetProperty(object target, string property)
     {
+        if (target is Dictionary<string, object> customObject)
+            return customObject.TryGetValue(property, out object customValue) ? customValue : null;
+
         if (target is BreezeProcessHandle process)
         {
             switch (property)
@@ -813,7 +1199,49 @@ public sealed class BreezeRuntime
                 case "name": return message.Name;
                 case "data": return message.Data;
                 case "sender": return message.Sender;
+                case "id": return (double)message.Id;
+                case "replyTo": return (double)message.ReplyTo;
                 default: return FailValue<object>("Unknown message property '" + property + "'");
+            }
+        }
+
+        if (target is BreezeServiceHandle service)
+        {
+            switch (property)
+            {
+                case "name": return service.Name;
+                case "state": return service.State;
+                case "running": return service.State == "running";
+                case "protected": return service.Protected;
+                case "restartOnFailure": return service.RestartOnFailure;
+                case "dependenciesReady": return BreezeServiceManager.DependenciesReady(service);
+                default: return FailValue<object>("Unknown service property '" + property + "'");
+            }
+        }
+
+        if (target is WindoseFileInfo fileInfo)
+        {
+            switch (property)
+            {
+                case "name": return fileInfo.Name;
+                case "path": return fileInfo.FullPath;
+                case "isDirectory": return fileInfo.IsDirectory;
+                case "size": return (double)fileInfo.Size;
+                case "childCount": return (double)fileInfo.ChildCount;
+                case "created": return fileInfo.CreatedAt.ToString();
+                case "modified": return fileInfo.ModifiedAt.ToString();
+                default: return FailValue<object>("Unknown file info property '" + property + "'");
+            }
+        }
+
+        if (target is FileSystemChange change)
+        {
+            switch (property)
+            {
+                case "type": return change.Type.ToString();
+                case "path": return change.Path;
+                case "previousPath": return change.PreviousPath;
+                default: return FailValue<object>("Unknown filesystem change property '" + property + "'");
             }
         }
 
@@ -857,6 +1285,12 @@ public sealed class BreezeRuntime
 
     private void SetProperty(object target, string property, object value)
     {
+        if (target is Dictionary<string, object> customObject)
+        {
+            customObject[property] = value;
+            return;
+        }
+
         if (target is BreezeProcessHandle process)
         {
             if (process.Runtime != this) { Fail("Process belongs to another runtime"); return; }
@@ -940,20 +1374,111 @@ public sealed class BreezeRuntime
 
     private void RegisterProcessName(string name)
     {
-        if (!string.IsNullOrEmpty(processHandle.name) &&
-            namedProcesses.TryGetValue(processHandle.name, out BreezeProcessHandle current) &&
-            current == processHandle)
-            namedProcesses.Remove(processHandle.name);
+        lock (processRegistryLock)
+        {
+            if (!string.IsNullOrEmpty(processHandle.name) &&
+                namedProcesses.TryGetValue(processHandle.name, out BreezeProcessHandle current) &&
+                current == processHandle)
+                namedProcesses.Remove(processHandle.name);
 
-        processHandle.name = string.IsNullOrEmpty(name) ? "Breeze Application" : name;
-        namedProcesses[processHandle.name] = processHandle;
+            processHandle.name = string.IsNullOrEmpty(name) ? "Breeze Application" : name;
+            namedProcesses[processHandle.name] = processHandle;
+        }
     }
 
     private bool EnqueueMessage(BreezeProcessMessage message)
     {
-        if (terminated || messageQueue.Count >= MaxQueuedMessages) return false;
-        messageQueue.Add(message);
+        bool queued;
+        lock (messageQueueLock)
+        {
+            if (terminated || messageQueue.Count >= MaxQueuedMessages) return false;
+            messageQueue.Add(message);
+            queued = true;
+        }
+        if (queued) WorkAvailable?.Invoke();
+        return queued;
+    }
+
+    private int Broadcast(string messageName, object data)
+    {
+        List<BreezeProcessHandle> targets = new List<BreezeProcessHandle>();
+        lock (processRegistryLock)
+        {
+            foreach (BreezeProcessHandle process in namedProcesses.Values)
+                if (process != processHandle && process.Running) targets.Add(process);
+        }
+
+        int delivered = 0;
+        for (int i = 0; i < targets.Count; i++)
+            if (targets[i].Runtime.EnqueueMessage(new BreezeProcessMessage(messageName, data, processHandle.name))) delivered++;
+        return delivered;
+    }
+
+    private bool WatchPath(string path, bool recursive)
+    {
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (fileSystem == null) return false;
+        string watchedPath = FileSystemManager.NormalizePath(path);
+        BreezeFileWatch watch = new BreezeFileWatch { Path = watchedPath, Recursive = recursive };
+        watch.Handler = change =>
+        {
+            string changedPath = FileSystemManager.NormalizePath(change.Path);
+            bool exact = string.Equals(changedPath, watch.Path, StringComparison.OrdinalIgnoreCase);
+            bool child = recursive && changedPath.StartsWith(
+                watch.Path + (watch.Path.EndsWith("\\") ? "" : "\\"), StringComparison.OrdinalIgnoreCase);
+            if (exact || child)
+                EnqueueMessage(new BreezeProcessMessage("filesystem.changed", change, "filesystem"));
+        };
+        fileSystem.Changed += watch.Handler;
+        fileWatches.Add(watch);
+        keepAliveWithoutWindows = true;
         return true;
+    }
+
+    private void ClearFileWatches()
+    {
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (fileSystem != null)
+            for (int i = 0; i < fileWatches.Count; i++) fileSystem.Changed -= fileWatches[i].Handler;
+        fileWatches.Clear();
+    }
+
+    private static bool IsGuiFunction(string name)
+    {
+        switch (name)
+        {
+            case "window":
+            case "windowRoot":
+            case "dockPanel":
+            case "stackPanel":
+            case "panel":
+            case "button":
+            case "textField":
+            case "toolbar":
+            case "toolbarButton":
+            case "statusBar":
+            case "statusPanel":
+            case "menuBar":
+            case "menu":
+            case "menuItem":
+            case "treeView":
+            case "treeRoot":
+            case "treeChild":
+            case "listView":
+            case "listItem":
+            case "listClear":
+            case "listMode":
+            case "scrollView":
+            case "loadDirectory":
+            case "dock":
+            case "stack":
+            case "add":
+            case "show":
+            case "close":
+                return true;
+            default:
+                return false;
+        }
     }
 
     private BreezeTimerHandle RequireOwnedTimer(string function, object value)
@@ -989,6 +1514,152 @@ public sealed class BreezeRuntime
             return -1;
         }
         return index;
+    }
+
+    private List<object> GetIterationValues(object collection)
+    {
+        if (collection is List<object> list) return new List<object>(list);
+        if (collection is Dictionary<string, object> customObject)
+        {
+            List<object> keys = new List<object>();
+            foreach (string key in customObject.Keys) keys.Add(key);
+            return keys;
+        }
+        Fail("for-in expected a list or object");
+        return null;
+    }
+
+    private ExecutionResult ExecuteImport(string requestedPath)
+    {
+        if (!EnsureCapability("filesystem.read"))
+        {
+            Fail("Capability denied: filesystem.read");
+            return ExecutionResult.None;
+        }
+        if (++importDepth > 32)
+        {
+            importDepth--;
+            Fail("Module import depth exceeded (32)");
+            return ExecutionResult.None;
+        }
+
+        string path = requestedPath != null && requestedPath.Contains(":")
+            ? FileSystemManager.NormalizePath(requestedPath)
+            : FileSystemManager.Combine(currentModuleDirectory == "" ? @"0:\" : currentModuleDirectory, requestedPath);
+        if (importedModules.Contains(path))
+        {
+            importDepth--;
+            return ExecutionResult.None;
+        }
+        if (FileSystemManager.Current == null || !FileSystemManager.Current.TryReadAllText(path, out string source))
+        {
+            importDepth--;
+            Fail("Could not import module " + path);
+            return ExecutionResult.None;
+        }
+
+        importedModules.Add(path);
+        BreezeLexer lexer = new BreezeLexer(source);
+        List<BreezeToken> tokens = lexer.Tokenize();
+        if (lexer.ErrorMessage != null)
+        {
+            importDepth--;
+            Fail(path + ": " + lexer.ErrorMessage);
+            return ExecutionResult.None;
+        }
+        BreezeParser parser = new BreezeParser(tokens);
+        List<BreezeStatement> statements = parser.Parse();
+        if (parser.ErrorMessage != null)
+        {
+            importDepth--;
+            Fail(path + ": " + parser.ErrorMessage);
+            return ExecutionResult.None;
+        }
+
+        string previousDirectory = currentModuleDirectory;
+        currentModuleDirectory = FileSystemManager.GetParent(path);
+        ExecutionResult result;
+        try { result = ExecuteBlock(statements); }
+        finally
+        {
+            currentModuleDirectory = previousDirectory;
+            importDepth--;
+        }
+        if (result.Returned) Fail("return can only be used inside a function");
+        return ExecutionResult.None;
+    }
+
+    private bool EnsureCapability(string capability)
+    {
+        if (string.IsNullOrWhiteSpace(capability)) return false;
+        if (grantedCapabilities.Contains(capability)) return true;
+        string executablePath = OwnerProcess?.startInfo?.ExecutablePath ?? "";
+        if (!BreezeCapabilityPolicy.IsAllowed(executablePath, capability)) return false;
+        grantedCapabilities.Add(capability);
+        return true;
+    }
+
+    private bool EnsureRegistryWrite(string key)
+    {
+        string normalized = SystemRegistry.NormalizeKey(key);
+        string capability = normalized.StartsWith("System/", StringComparison.OrdinalIgnoreCase)
+            ? "registry.write"
+            : "registry.custom.write";
+        if (EnsureCapability(capability)) return true;
+        Fail("Capability denied: " + capability);
+        return false;
+    }
+
+    private static string GetRequiredCapability(string function)
+    {
+        if (function == "capability" || function == "hasCapability" || function == "capabilities") return "";
+        if (IsGuiFunction(function)) return "ui";
+        switch (function)
+        {
+            case "getDirectories":
+            case "getFiles":
+            case "fileName":
+            case "fileExists":
+            case "directoryExists":
+            case "readFile":
+            case "tryReadFile":
+            case "fileInfo":
+            case "loadDirectory":
+            case "watchPath":
+            case "clearWatches": return "filesystem.read";
+            case "registryGet":
+            case "registryExists":
+            case "registryKeys":
+            case "registryInfo":
+            case "registryRestartRequired": return "registry.read";
+            case "createDirectory":
+            case "deleteFile":
+            case "deleteDirectory":
+            case "copyFile":
+            case "copyDirectory":
+            case "moveFile":
+            case "moveDirectory":
+            case "renamePath":
+            case "writeFile": return "filesystem.write";
+            case "registrySave": return "registry.custom.write";
+            case "service":
+            case "serviceDependency":
+            case "dependenciesReady":
+            case "startService":
+            case "stopService":
+            case "restartService":
+            case "serviceState": return "service.control";
+            case "send":
+            case "broadcast":
+            case "request":
+            case "reply":
+            case "findProcess":
+            case "tryFindProcess": return "ipc";
+            case "stopProcess": return "process.control";
+            case "processCount": case "clock": return "process.inspect";
+            case "log": case "print": return "logging";
+            default: return "";
+        }
     }
 
     private Dock ParseDock(string value)
@@ -1028,32 +1699,50 @@ public sealed class BreezeRuntime
 
     private void LoadDirectory(ListView list, string path)
     {
-        if (!Directory.Exists(path))
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (fileSystem == null || !fileSystem.DirectoryExists(path))
         {
             Fail("Directory does not exist: " + path);
             return;
         }
         list.ClearItems();
 
-        string[] directories = Directory.GetDirectories(path);
+        string[] directories = fileSystem.GetDirectories(path);
         for (int i = 0; i < directories.Length; i++)
         {
             string directory = directories[i];
-            ListViewItem item = list.AddItem(Path.GetFileName(directory), tag: directory);
+            ListViewItem item = list.AddItem(FileSystemManager.GetName(directory), tag: directory);
             item.isFolder = true;
             item.type = "File Folder";
         }
 
-        string[] files = Directory.GetFiles(path);
+        string[] files = fileSystem.GetFiles(path);
         for (int i = 0; i < files.Length; i++)
         {
             string file = files[i];
-            ListViewItem item = list.AddItem(Path.GetFileName(file), tag: file);
+            ListViewItem item = list.AddItem(FileSystemManager.GetName(file), tag: file);
             item.isFolder = false;
-            item.type = "File";
+            item.type = string.Equals(FileSystemManager.GetExtension(file), ".breeze", StringComparison.OrdinalIgnoreCase)
+                ? "Breeze Script"
+                : "File";
         }
 
         list.MarkDirty();
+    }
+
+    private List<object> GetPaths(string path, bool directories)
+    {
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (fileSystem == null || !fileSystem.DirectoryExists(path))
+        {
+            Fail("Directory does not exist: " + path);
+            return null;
+        }
+
+        string[] paths = directories ? fileSystem.GetDirectories(path) : fileSystem.GetFiles(path);
+        List<object> result = new List<object>(paths.Length);
+        for (int i = 0; i < paths.Length; i++) result.Add(paths[i]);
+        return result;
     }
 
     private T Require<T>(string function, object value) where T : class
@@ -1097,6 +1786,13 @@ public sealed class BreezeRuntime
         return value.ToString();
     }
 
+    private static object ToBreezeRegistryValue(object value)
+    {
+        if (value is long integer) return (double)integer;
+        if (value is float single) return (double)single;
+        return value;
+    }
+
     private bool HasError => LastError != null;
 
     private void Fail(string message)
@@ -1113,9 +1809,13 @@ public sealed class BreezeRuntime
         processUpdateBody = null;
         processMessageBody = null;
         timers.Clear();
-        messageQueue.Clear();
-        if (namedProcesses.TryGetValue(processHandle.name, out BreezeProcessHandle registered) && registered == processHandle)
-            namedProcesses.Remove(processHandle.name);
+        ClearFileWatches();
+        lock (messageQueueLock) messageQueue.Clear();
+        lock (processRegistryLock)
+        {
+            if (namedProcesses.TryGetValue(processHandle.name, out BreezeProcessHandle registered) && registered == processHandle)
+                namedProcesses.Remove(processHandle.name);
+        }
         terminatedCallback?.Invoke();
         for (int i = applicationWindows.Count - 1; i >= 0; i--)
         {
@@ -1140,16 +1840,69 @@ public sealed class BreezeRuntime
         return default;
     }
 
-    private static int GetExpectedArgumentCount(string name) => name switch
+    internal static int GetExpectedArgumentCount(string name) => name switch
     {
         "window" => 5,
         "process" => 1,
+        "scheduledProcess" => 1,
         "stopProcess" => 1,
         "findProcess" => 1,
+        "tryFindProcess" => 1,
         "send" => 3,
+        "broadcast" => 2,
+        "request" => 3,
+        "reply" => 2,
+        "service" => 3,
+        "serviceDependency" => 1,
+        "dependenciesReady" => 0,
+        "startService" => 1,
+        "stopService" => 1,
+        "restartService" => 1,
+        "serviceState" => 1,
         "timer" => 1,
         "startTimer" => 1,
         "stopTimer" => 1,
+        "getDirectories" => 1,
+        "getFiles" => 1,
+        "fileName" => 1,
+        "fileExists" => 1,
+        "directoryExists" => 1,
+        "createDirectory" => 1,
+        "deleteFile" => 1,
+        "deleteDirectory" => 2,
+        "copyFile" => 3,
+        "copyDirectory" => 3,
+        "moveFile" => 3,
+        "moveDirectory" => 3,
+        "renamePath" => 3,
+        "readFile" => 1,
+        "tryReadFile" => 1,
+        "writeFile" => 3,
+        "fileInfo" => 1,
+        "watchPath" => 2,
+        "clearWatches" => 0,
+        "registryGet" => 1,
+        "registrySet" => 2,
+        "registryDefine" => 4,
+        "registryDelete" => 1,
+        "registryExists" => 1,
+        "registryKeys" => 1,
+        "registryInfo" => 1,
+        "registrySave" => 0,
+        "registryRestartRequired" => 0,
+        "clock" => 0,
+        "processCount" => 0,
+        "log" => 1,
+        "capability" => 1,
+        "hasCapability" => 1,
+        "capabilities" => 0,
+        "object" => 0,
+        "objectGet" => 2,
+        "objectSet" => 3,
+        "objectHas" => 2,
+        "objectRemove" => 2,
+        "objectKeys" => 1,
+        "objectCount" => 1,
         "windowRoot" => 1,
         "dockPanel" => 0,
         "stackPanel" => 1,

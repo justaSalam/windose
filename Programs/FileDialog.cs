@@ -1,5 +1,3 @@
-using System.IO;
-
 public enum FileDialogMode
 {
     Open,
@@ -91,7 +89,7 @@ public sealed class FileDialog : Window
             fontSize = 16,
             clampSize = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(88, 4, 174, 32),
+            Margin = new Thickness(4, 32, 174, 88),
         };
         Button acceptButton = new Button(width - 170, 4, 76, 26)
         {
@@ -120,7 +118,7 @@ public sealed class FileDialog : Window
             useBackground = false,
             clampSize = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(8, 34, 8, 6),
+            Margin = new Thickness(34, 6, 8, 8),
         };
 
         footer.AddChild(fileLabel);
@@ -167,7 +165,7 @@ public sealed class FileDialog : Window
 
     private void NavigateUp()
     {
-        string parent = Path.GetDirectoryName(TrimTrailingSeparator(currentDirectory));
+        string parent = FileSystemManager.GetParent(currentDirectory);
         if (parent == null || parent == "") return;
         NavigateTo(parent);
     }
@@ -176,7 +174,9 @@ public sealed class FileDialog : Window
 
     private void NavigateTo(string path)
     {
-        if (path == null || path == "" || !Directory.Exists(path))
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        path = FileSystemManager.NormalizePath(path);
+        if (fileSystem == null || !fileSystem.DirectoryExists(path))
         {
             SetStatus("Folder not found");
             return;
@@ -186,20 +186,20 @@ public sealed class FileDialog : Window
         addressBar.Address = path;
         files.ClearItems();
 
-        string[] directories = Directory.GetDirectories(path);
+        string[] directories = fileSystem.GetDirectories(path);
         for (int i = 0; i < directories.Length; i++)
         {
             string directory = directories[i];
-            ListViewItem item = files.AddFolder(Path.GetFileName(TrimTrailingSeparator(directory)), tag: directory);
+            ListViewItem item = files.AddFolder(FileSystemManager.GetName(directory), tag: directory);
             item.type = "File Folder";
         }
 
-        string[] paths = Directory.GetFiles(path);
+        string[] paths = fileSystem.GetFiles(path);
         for (int i = 0; i < paths.Length; i++)
         {
             string file = paths[i];
             if (!MatchesFilter(file)) continue;
-            ListViewItem item = files.AddItem(Path.GetFileName(file), tag: file);
+            ListViewItem item = files.AddItem(FileSystemManager.GetName(file), tag: file);
             item.type = options.FilterDescription;
         }
 
@@ -225,13 +225,14 @@ public sealed class FileDialog : Window
         if (defaultExtension != "" && !name.EndsWith(defaultExtension, StringComparison.OrdinalIgnoreCase))
             name += defaultExtension;
 
-        string path = CombinePath(currentDirectory, name);
-        if (options.Mode == FileDialogMode.Open && !File.Exists(path))
+        string path = FileSystemManager.Combine(currentDirectory, name);
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (options.Mode == FileDialogMode.Open && !fileSystem.FileExists(path))
         {
             SetStatus("File not found");
             return;
         }
-        if (options.Mode == FileDialogMode.Save && !options.AllowOverwrite && File.Exists(path))
+        if (options.Mode == FileDialogMode.Save && !options.AllowOverwrite && fileSystem.FileExists(path))
         {
             SetStatus("A file with that name already exists");
             return;
@@ -249,29 +250,18 @@ public sealed class FileDialog : Window
 
     private static string GetInitialDirectory(string path)
     {
-        if (path != null && path != "" && Directory.Exists(path)) return path;
-        string directory = Path.GetDirectoryName(path ?? "");
-        if (directory != null && directory != "" && Directory.Exists(directory)) return directory;
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (path != null && path != "" && fileSystem.DirectoryExists(path)) return FileSystemManager.NormalizePath(path);
+        string directory = FileSystemManager.GetParent(path ?? "");
+        if (directory != null && directory != "" && fileSystem.DirectoryExists(directory)) return directory;
         return @"0:\";
     }
 
     private static string GetInitialFileName(string path, string defaultName)
     {
-        if (path != null && path != "" && Directory.Exists(path)) return defaultName ?? "";
-        string name = Path.GetFileName(path ?? "");
+        if (path != null && path != "" && FileSystemManager.Current.DirectoryExists(path)) return defaultName ?? "";
+        string name = FileSystemManager.GetName(path ?? "");
         return name == "" ? defaultName ?? "" : name;
-    }
-
-    private static string CombinePath(string directory, string name)
-    {
-        if (directory.EndsWith("\\") || directory.EndsWith("/")) return directory + name;
-        return directory + "\\" + name;
-    }
-
-    private static string TrimTrailingSeparator(string path)
-    {
-        if (path == null || path.Length <= 3) return path;
-        return path.TrimEnd('\\', '/');
     }
 
     private bool MatchesFilter(string path)

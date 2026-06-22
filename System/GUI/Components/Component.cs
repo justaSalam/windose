@@ -118,6 +118,8 @@ public class Component : IDisposable
     public static List<Component> components = new List<Component>();
     public List<Component> children = new List<Component>();
     private Component parent;
+    public Component Parent => parent;
+    public virtual bool HandlesMouseWheel => false;
 
     public Window GetOwningWindow()
     {
@@ -302,7 +304,8 @@ public class Component : IDisposable
         switch (horizontalAlignment)
         {
             case HorizontalAlignment.Left:
-                X = Margin.left;
+                // Fixed-position controls keep the X supplied by their parent or constructor.
+                // Layout containers apply margins when they position their children.
                 break;
 
             case HorizontalAlignment.Center:
@@ -332,7 +335,8 @@ public class Component : IDisposable
         switch (verticalAlignment)
         {
             case VerticalAlignment.Top:
-                Y = Margin.top;
+                // Fixed-position controls keep the Y supplied by their parent or constructor.
+                // Layout containers apply margins when they position their children.
                 break;
 
             case VerticalAlignment.Center:

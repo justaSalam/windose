@@ -2,6 +2,7 @@ using System.Drawing;
 
 public class ScrollView : Component
 {
+    public override bool HandlesMouseWheel => true;
     public Component content;
 
     public int scrollX;
@@ -90,6 +91,16 @@ public class ScrollView : Component
     public override void DrawDirtyLocal(Rectangle dirtyRect)
     {
         DrawLocal();
+    }
+
+    protected override void MarkChildDirty()
+    {
+        base.MarkChildDirty();
+
+        // The child is rendered into this component's clipped viewport buffer.
+        // Invalidating only the child's screen bounds can leave that cached
+        // viewport unchanged until an unrelated full-window redraw occurs.
+        WindowManager.Invalidate(this);
     }
 
     private void DrawContent()

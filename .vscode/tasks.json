@@ -87,9 +87,7 @@
         "-m", "512M",
         "-serial", "stdio",
         "-cdrom", "${workspaceFolder}/output-x64/Windose.iso",
-        "-vga", "std",
-        "-no-reboot",
-        "-no-shutdown"
+        "-vga", "std"
       ],
       "problemMatcher": [],
       "presentation": {
@@ -128,7 +126,7 @@
       "command": "bash",
       "args": [
         "-c",
-        "qemu-system-x86_64 -M q35 -cpu max -m 512M -serial stdio -cdrom ${workspaceFolder}/output-x64/Windose.iso -vga std -s -S -no-reboot -no-shutdown & sleep 1 && echo QEMU-DEBUG-READY && wait"
+        "qemu-system-x86_64 -M q35 -cpu max -m 512M -serial stdio -cdrom ${workspaceFolder}/output-x64/Windose.iso -vga std -s -S & sleep 1 && echo QEMU-DEBUG-READY && wait"
       ],
       "isBackground": true,
       "problemMatcher": {

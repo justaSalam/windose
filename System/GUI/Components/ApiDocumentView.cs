@@ -2,6 +2,7 @@ using System.Drawing;
 
 public class ApiDocumentView : Component
 {
+    public override bool HandlesMouseWheel => true;
     private sealed class DisplayLine
     {
         public string text;

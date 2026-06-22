@@ -39,6 +39,8 @@ public class Kernel : Sys.Kernel
 
         Instance = this;
         GarbageCollector.Initialize();
+        FileSystemManager.InitializeTemporary();
+        SystemRegistry.Initialize();
 
 
         canvas = Canvas.GetFullScreen();
@@ -49,6 +51,8 @@ public class Kernel : Sys.Kernel
         MouseManager.SetScreenSize(canvas.Width, canvas.Height);
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
+        SystemRegistry.SetRuntimeValue("System/Display/CurrentWidth", (long)canvas.Width);
+        SystemRegistry.SetRuntimeValue("System/Display/CurrentHeight", (long)canvas.Height);
 
         Console.WriteLine("Windose booted successfully");
 
@@ -59,6 +63,7 @@ public class Kernel : Sys.Kernel
 
         ProcessManger.Start(explorer);
         ProcessManger.Start(windowManager);
+        BreezeHost.RunScheduledFile(@"0:\System\Services\startup.breeze");
 
 
     }
@@ -91,6 +96,8 @@ public class Kernel : Sys.Kernel
             long displayStartedAt = PerformanceMetrics.Now;
             canvas.Display();
             PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
+
+            SystemPowerManager.ExecutePending();
 
 
             Tick();

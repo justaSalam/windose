@@ -1,7 +1,7 @@
 public enum BreezeTokenType
 {
     End, Identifier, String, Number,
-    Let, Set, On, If, Else, While, Function, Return, True, False,
+    Let, Set, On, If, Else, While, For, In, Import, Function, Return, True, False, Null,
     Equals, EqualEqual, Bang, BangEqual,
     Less, LessEqual, Greater, GreaterEqual,
     Plus, Minus, Star, Slash, AndAnd, OrOr,
@@ -96,10 +96,14 @@ public sealed class BreezeLexer
             "if" => BreezeTokenType.If,
             "else" => BreezeTokenType.Else,
             "while" => BreezeTokenType.While,
+            "for" => BreezeTokenType.For,
+            "in" => BreezeTokenType.In,
+            "import" => BreezeTokenType.Import,
             "function" => BreezeTokenType.Function,
             "return" => BreezeTokenType.Return,
             "true" => BreezeTokenType.True,
             "false" => BreezeTokenType.False,
+            "null" => BreezeTokenType.Null,
             _ => BreezeTokenType.Identifier,
         };
         Add(type, text);
@@ -180,6 +184,8 @@ public sealed class BreezeSet : BreezeStatement { public string Target; public s
 public sealed class BreezeOn : BreezeStatement { public string Target; public string Event; public List<BreezeStatement> Body; }
 public sealed class BreezeIf : BreezeStatement { public BreezeExpression Condition; public List<BreezeStatement> ThenBody; public List<BreezeStatement> ElseBody; }
 public sealed class BreezeWhile : BreezeStatement { public BreezeExpression Condition; public List<BreezeStatement> Body; }
+public sealed class BreezeForEach : BreezeStatement { public string Name; public BreezeExpression Collection; public List<BreezeStatement> Body; }
+public sealed class BreezeImport : BreezeStatement { public string Path; }
 public sealed class BreezeFunction : BreezeStatement { public string Name; public List<string> Parameters; public List<BreezeStatement> Body; }
 public sealed class BreezeReturn : BreezeStatement { public BreezeExpression Value; }
 public sealed class BreezeExpressionStatement : BreezeStatement { public BreezeExpression Expression; }
@@ -211,6 +217,8 @@ public sealed class BreezeParser
         if (Match(BreezeTokenType.On)) return ParseOn();
         if (Match(BreezeTokenType.If)) return ParseIf();
         if (Match(BreezeTokenType.While)) return ParseWhile();
+        if (Match(BreezeTokenType.For)) return ParseForEach();
+        if (Match(BreezeTokenType.Import)) return ParseImport();
         if (Match(BreezeTokenType.Function)) return ParseFunction();
         if (Match(BreezeTokenType.Return)) return ParseReturn();
         if (Check(BreezeTokenType.Identifier) && CheckNext(BreezeTokenType.Equals)) return ParseAssignment();
@@ -278,6 +286,23 @@ public sealed class BreezeParser
         BreezeExpression condition = ParseExpression();
         Consume(BreezeTokenType.RightParenthesis, "Expected ')' after condition");
         return new BreezeWhile { Condition = condition, Body = ParseRequiredBlock("while") };
+    }
+
+    private BreezeStatement ParseForEach()
+    {
+        Consume(BreezeTokenType.LeftParenthesis, "Expected '(' after for");
+        string name = Consume(BreezeTokenType.Identifier, "Expected loop variable").Text;
+        Consume(BreezeTokenType.In, "Expected 'in' after loop variable");
+        BreezeExpression collection = ParseExpression();
+        Consume(BreezeTokenType.RightParenthesis, "Expected ')' after collection");
+        return new BreezeForEach { Name = name, Collection = collection, Body = ParseRequiredBlock("for") };
+    }
+
+    private BreezeStatement ParseImport()
+    {
+        string path = Consume(BreezeTokenType.String, "Expected module path after import").Text;
+        ConsumeStatementEnd("import");
+        return new BreezeImport { Path = path };
     }
 
     private BreezeStatement ParseFunction()
@@ -368,6 +393,7 @@ public sealed class BreezeParser
         if (Match(BreezeTokenType.Number)) return new BreezeLiteral { Value = double.Parse(Previous().Text) };
         if (Match(BreezeTokenType.True)) return new BreezeLiteral { Value = true };
         if (Match(BreezeTokenType.False)) return new BreezeLiteral { Value = false };
+        if (Match(BreezeTokenType.Null)) return new BreezeLiteral { Value = null };
         if (Match(BreezeTokenType.LeftParenthesis))
         {
             BreezeExpression expression = ParseExpression();

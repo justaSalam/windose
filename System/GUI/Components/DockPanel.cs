@@ -11,6 +11,7 @@ public class DockPanel : Component
     public DockPanel(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        Margin = new Thickness(28, 2, 2, 2);  //Default Panel spanning the window leaving space for the title bar 
     }
 
     public void AddDockChild(Component child, Dock dock)

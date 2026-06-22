@@ -16,6 +16,7 @@ public abstract class SingleThreadedProcess : Process
     {
         this.name = name;
         this.processType = processType;
+        startInfo.Name = name;
 
         Running = false;
         Initialized = false;

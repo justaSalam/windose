@@ -12,9 +12,9 @@ public class WindowManager : SingleThreadedProcess
     private static Dictionary<Window, Button> taskbarButtons = new Dictionary<Window, Button>();
     private static List<Rectangle> dirtyRects = new List<Rectangle>();
     private static List<UiMessage> messageQueue = new List<UiMessage>();
+    private static readonly object messageQueueLock = new object();
     private readonly HashSet<Window> failedWindows = new HashSet<Window>();
     private readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
-    private static int messageReadIndex;
     private static bool hasPreviewRect;
     private static Rectangle previewRect;
     private Window? capturedWindow;
@@ -23,7 +23,11 @@ public class WindowManager : SingleThreadedProcess
     private MouseState mouseState;
     private static int nextZIndex = 1;
 
-    private static readonly System.Comparison<Window> zIndexCompare = (a, b) => a.zIndex.CompareTo(b.zIndex);
+    private static readonly System.Comparison<Window> zIndexCompare = (a, b) =>
+    {
+        int layer = a.zLayer.CompareTo(b.zLayer);
+        return layer != 0 ? layer : a.zIndex.CompareTo(b.zIndex);
+    };
     private int mx, my;
 
     public WindowManager() : base("Desktop Window Manager", ProcessType.Kernel)
@@ -168,7 +172,7 @@ public class WindowManager : SingleThreadedProcess
     public static void PostMessage(UiMessage message)
     {
         if (message.Type == UiMessageType.None) return;
-        messageQueue.Add(message);
+        lock (messageQueueLock) messageQueue.Add(message);
     }
 
     public static void PostCommand(string command, Action action = null, Component target = null, object data = null)
@@ -213,25 +217,28 @@ public class WindowManager : SingleThreadedProcess
     private void DispatchMessages()
     {
         long startedAt = PerformanceMetrics.Now;
-        int handled = 0;
-
-        while (messageReadIndex < messageQueue.Count && handled < 128)
+        List<UiMessage> pending;
+        lock (messageQueueLock)
         {
-            UiMessage message = messageQueue[messageReadIndex++];
-            handled++;
+            int count = Math.Min(128, messageQueue.Count);
+            if (count == 0)
+            {
+                PerformanceMetrics.AddMessages(startedAt);
+                return;
+            }
+            pending = messageQueue.GetRange(0, count);
+            messageQueue.RemoveRange(0, count);
+        }
 
+        for (int i = 0; i < pending.Count; i++)
+        {
+            UiMessage message = pending[i];
             try { DispatchMessage(message); }
             catch (Exception exception)
             {
                 Window owner = message.Window ?? message.Target?.GetOwningWindow();
                 FailApplication(owner, "processing " + message.Type, exception);
             }
-        }
-
-        if (messageReadIndex == messageQueue.Count)
-        {
-            messageQueue.Clear();
-            messageReadIndex = 0;
         }
 
         PerformanceMetrics.AddMessages(startedAt);
@@ -449,6 +456,13 @@ public class WindowManager : SingleThreadedProcess
         nextZIndex++;
         SetFocusedWindow(window);
 
+        // A newly registered window has no previous dirty rectangle to drive its
+        // first composition pass. Explicitly schedule that first paint.
+        window.ForceDirty();
+        Invalidate(window.bounds);
+
+        if (!window.showInTaskbar || Explorer.taskbar == null) return;
+
         Button taskbarButton = new Button(0, 0, 75, 25)
         {
             text = window.text,
@@ -474,9 +488,10 @@ public class WindowManager : SingleThreadedProcess
         };
 
         taskbarButtons[window] = taskbarButton;
+        Explorer.taskbar.windows.Add(taskbarButton);
         Explorer.taskbar.bar.AddStackChild(taskbarButton);
-
-
+        Explorer.taskbar.ForceDirty();
+        Invalidate(Explorer.taskbar.AbsoluteRectangle);
     }
 
     public static void Close(Window window)
@@ -612,7 +627,7 @@ public class WindowManager : SingleThreadedProcess
 
     private void CloseNow(Window window)
     {
-        if (window == null) return;
+        if (window == null || !windows.Contains(window)) return;
         BreezeRuntime.NotifyWindowClosed(window);
         try { Invalidate(window.bounds); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
         try { ClearPreviewRect(); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
@@ -626,19 +641,28 @@ public class WindowManager : SingleThreadedProcess
         if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
             capturedComponent = null;
 
-        try { window.Stop(); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
-        windows.Remove(window);
-        failedWindows.Remove(window);
-
         if (taskbarButtons.ContainsKey(window))
         {
             Button taskbarButton = taskbarButtons[window];
             taskbarButtons.Remove(window);
+            try { Explorer.taskbar.windows.Remove(taskbarButton); }
+            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
             try { Explorer.taskbar.bar.RemoveStackChild(taskbarButton); }
             catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
-            try { Explorer.taskbar.MarkDirty(); }
+            try { taskbarButton.Dispose(); }
+            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+            try
+            {
+                Explorer.taskbar.bar.ForceDirty();
+                Explorer.taskbar.ForceDirty();
+                Invalidate(Explorer.taskbar.AbsoluteRectangle);
+            }
             catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
         }
+
+        try { window.Stop(); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+        windows.Remove(window);
+        failedWindows.Remove(window);
 
         try { FocusTopVisibleWindow(window); }
         catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }

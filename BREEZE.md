@@ -558,6 +558,166 @@ send(indexer, "scan", "0:\\Documents");
 order with a bounded number processed per scheduler update so a busy sender
 cannot monopolize a frame.
 
+### Background programs
+
+Choose **Run Background** in Breeze Editor and declare the process with
+`scheduledProcess(name)`. It runs cooperatively as a headless background process
+and appears in Task Manager without creating a window.
+
+Scheduled Breeze processes use adaptive cooperative pacing. Update handlers run
+at most every 100 ms, idle services execute at most every 250 ms, and queued
+messages make the process eligible on the next desktop update. This avoids the
+Cosmos thread scheduler wake storm while retaining interpreter operation limits.
+
+```text
+let worker = scheduledProcess("File Indexer");
+let root = "0:\\Documents";
+
+let files = getFiles(root);
+let index = 0;
+while (index < listCount(files)) {
+    print(fileName(listGet(files, index)));
+    index = index + 1;
+}
+```
+
+`getDirectories(path)` and `getFiles(path)` return Breeze lists containing full
+paths. `fileName(path)` returns only the final name.
+
+Background programs may use computation, lists, filesystem functions, timers,
+and process messages. Window and control functions are rejected at runtime and
+stop only the offending background process. Use `send` to pass results to a GUI
+application.
+
+### System services
+
+A service is a scheduled Breeze process with a registered system name,
+dependency list, protection setting, and restart policy:
+
+```text
+let indexer = service("File Indexer", true, true);
+serviceDependency("Storage");
+
+on indexer.message {
+    if (value(event, "name") == "scan") {
+        let files = getFiles(value(event, "data"));
+        log("Indexed " + listCount(files) + " files");
+    }
+}
+```
+
+The second argument enables up to three automatic restarts after runtime
+failure. The third protects the service from normal stop requests. A startup
+program can call `startService(path)`, `stopService(name)`,
+`restartService(name)`, and `serviceState(name)`. `dependenciesReady()` reports
+whether every name added through `serviceDependency` is running.
+
+Use `tryFindProcess(name)` for optional discovery, `send` for directed IPC, and
+`broadcast(name, data)` to publish to every other named Breeze process.
+`request(target, name, data)` returns a correlation ID. A receiver calls
+`reply(event, data)`; the response has an event name ending in `.reply` and its
+`replyTo` property contains that ID.
+
+At boot, Windose runs `0:\System\Services\startup.breeze`. It launches every
+other `.breeze` file in that directory as a scheduled service, so adding a
+service does not require another native kernel edit.
+
+### Filesystem functions
+
+Services can call `fileExists`, `directoryExists`, `createDirectory`,
+`readFile`, `writeFile`, `deleteFile`, `deleteDirectory`, `copyFile`,
+`copyDirectory`, `moveFile`, `moveDirectory`, `renamePath`, and `fileInfo`.
+Copy, move, delete-directory, rename, and write operations take an explicit
+boolean overwrite or recursive argument where applicable. Ordinary operation
+failures return `false`.
+
+`fileInfo(path)` exposes `name`, `path`, `isDirectory`, `size`, `childCount`,
+`created`, and `modified` through `value`. `clock()`, `processCount()`, and
+`log(value)` provide basic system diagnostics.
+
+#### `watchPath(path, recursive) -> boolean`
+
+Subscribes the current Breeze process to filesystem changes. `path` is
+normalized before comparison. When `recursive` is `false`, only a change whose
+path exactly matches the watched path is delivered. When it is `true`, changes
+to that path and every descendant are delivered.
+
+The function returns `true` after registering the subscription, or `false` if
+no filesystem backend is active. Registering a watch keeps a windowless process
+alive.
+
+Changes arrive through the process `message` event. The message name is
+`filesystem.changed`, its sender is `filesystem`, and its `data` value has:
+
+- `type`: `Created`, `Modified`, `Deleted`, or `Moved`.
+- `path`: the new or affected normalized path.
+- `previousPath`: the old path for `Moved`; otherwise an empty string.
+
+```text
+let watcher = process("Document Watcher");
+watchPath("0:\\Documents", true);
+
+on watcher.message {
+    if (value(event, "name") == "filesystem.changed") {
+        let change = value(event, "data");
+        log(value(change, "type") + ": " + value(change, "path"));
+    }
+}
+```
+
+#### `clearWatches() -> boolean`
+
+Removes every filesystem watch owned by the current Breeze process. It takes no
+arguments, does not affect other processes, and does not delete files. It always
+returns `true`. Watches are also removed automatically when their process
+terminates or fails.
+
+## Modules and imports
+
+Import another Breeze source file with an absolute or module-relative path:
+
+```text
+import "lib/logger.breeze";
+import "0:\\System\\Services\\common.breeze";
+```
+
+Each normalized path executes once per application. Imported functions and
+variables enter the current application scope. Circular imports are ignored
+after the first visit, and import depth is capped at 32.
+
+## Objects and iteration
+
+Custom objects are case-insensitive property maps:
+
+```text
+let settings = object();
+set settings.mode = "automatic";
+objectSet(settings, "retries", 3);
+
+for (key in objectKeys(settings)) {
+    log(key + "=" + value(settings, key));
+}
+```
+
+Available operations are `objectGet`, `objectSet`, `objectHas`, `objectRemove`,
+`objectKeys`, and `objectCount`. `for (item in collection)` accepts lists and
+objects; object iteration yields keys. `null` represents an absent value.
+
+`tryReadFile(path)` returns an object containing `ok`, `value`, and `error`, so
+expected failures can be handled without exception or kernel-level throw
+behavior.
+
+## Capabilities
+
+Privileged native functions are grouped under `ui`, `filesystem.read`,
+`filesystem.write`, `ipc`, `logging`, `process.inspect`, `process.control`, and
+`service.control`. Use `capability(name)` to request one, `hasCapability(name)`
+to inspect it, and `capabilities()` to enumerate granted names.
+
+Scripts under `0:\System\Services` are trusted. Other applications receive a
+small default set; native policy can grant or revoke additional access with
+`BreezeCapabilityPolicy.Grant(path, capability)` and `Revoke`.
+
 ### `show(window)`
 
 Registers the window with `WindowManager`, gives it focus, and adds its taskbar
@@ -587,6 +747,379 @@ debugging scripts.
 ```text
 print("Application started");
 ```
+
+## Tutorials
+
+### Create a windowed process
+
+Save this as `0:\Apps\hello.breeze`, open it in Breeze Editor, and choose
+**Run Script**:
+
+```text
+let app = process("Hello App");
+let main = window("Hello", 140, 100, 480, 260);
+let root = windowRoot(main);
+let body = stackPanel("vertical");
+let output = panel("Ready", 28);
+let greet = button("Greet", 100, 28);
+
+dock(root, body, "fill");
+stack(body, output);
+stack(body, greet);
+
+on greet.click {
+    set output.text = "Hello from Breeze";
+}
+
+show(main);
+```
+
+`process` gives the application a Task Manager name and deliberately keeps it
+alive without windows. An Exit command should call `stopProcess(app)`. Omit the
+`process` declaration when closing the final window should end the application
+automatically. `show` registers the finished window.
+
+### Create a headless process
+
+Use a timer instead of doing work on every desktop update:
+
+```text
+let worker = process("Clock Logger");
+let pulse = timer(1000);
+
+on pulse.tick {
+    log("Clock: " + clock());
+}
+```
+
+Run it with **Run Script**. It creates no window, stays visible in Task Manager,
+and logs once per second. Call `stopProcess(worker)` to end itself.
+
+### Create a managed service
+
+Save this as `0:\System\Services\indexer.breeze`, then choose **Run
+Background**:
+
+```text
+let indexer = service("Document Indexer", true, false);
+watchPath("0:\\Documents", true);
+
+on indexer.message {
+    if (value(event, "name") == "filesystem.changed") {
+        let change = value(event, "data");
+        log("Changed: " + value(change, "path"));
+    }
+}
+```
+
+The second `service` argument enables bounded crash restart. The third controls
+protection from normal stop requests. Breeze services run cooperatively, so
+message and timer handlers must return quickly. With persistent storage, the
+boot `startup.breeze` launcher starts files in this directory automatically;
+the current in-memory filesystem is cleared at restart.
+
+### Send messages between programs
+
+For a request/reply indexer, use this complete service:
+
+```text
+let indexer = service("Document Indexer", true, false);
+
+on indexer.message {
+    if (value(event, "name") == "scan") {
+        let files = getFiles(value(event, "data"));
+        reply(event, listCount(files));
+    }
+}
+```
+
+Create a client application:
+
+```text
+let client = process("Indexer Client");
+let main = window("Indexer Client", 180, 140, 420, 220);
+let root = windowRoot(main);
+let scan = button("Scan Documents", 150, 28);
+let status = panel("Idle", 28);
+dock(root, scan, "top");
+dock(root, status, "top");
+
+on scan.click {
+    let indexer = tryFindProcess("Document Indexer");
+    if (indexer != null) {
+        request(indexer, "scan", "0:\\Documents");
+    } else {
+        set status.text = "Service is not running";
+    }
+}
+
+on client.message {
+    if (value(event, "name") == "scan.reply") {
+        set status.text = "Files: " + value(event, "data");
+    }
+}
+
+show(main);
+```
+
+`request` assigns a correlation ID. `reply` sends that ID back through the
+message's `replyTo` property. Use `send` when no response is needed and
+`broadcast` for every named Breeze process.
+
+### Store settings safely
+
+```text
+let path = "0:\\Documents\\settings.txt";
+if (!fileExists(path)) {
+    writeFile(path, "automatic", false);
+}
+
+let result = tryReadFile(path);
+if (value(result, "ok")) {
+    log("Mode: " + value(result, "value"));
+} else {
+    log(value(result, "error"));
+}
+```
+
+Use `tryReadFile` for expected failures. Mutating filesystem calls return a
+boolean, allowing a service to report failure without crashing.
+
+### Create and import a module
+
+Save `0:\Apps\lib\format.breeze`:
+
+```text
+function formatCount(value) {
+    return "Items: " + value;
+}
+```
+
+Import it from an application beside the `lib` directory:
+
+```text
+import "lib/format.breeze";
+log(formatCount(12));
+```
+
+Relative imports resolve from the importing file. Modules execute once per
+application and share its scope and capabilities.
+
+### Grant a privileged capability
+
+Normal applications cannot control system services. Native code can grant that
+permission to a specific script before it runs:
+
+```csharp
+BreezeCapabilityPolicy.Grant(
+    @"0:\Apps\service-manager.breeze",
+    "service.control");
+```
+
+The script can then verify access with `hasCapability("service.control")` and
+call `startService`, `stopService`, or `restartService`.
+
+## Complete system API reference
+
+### Service lifecycle
+
+```text
+service(name, restartOnFailure, protected) -> service
+serviceDependency(name)                    -> boolean
+dependenciesReady()                       -> boolean
+startService(path)                         -> boolean
+stopService(name)                          -> boolean
+restartService(name)                       -> boolean
+serviceState(name)                         -> string
+```
+
+`service` is valid only in a scheduled background program. A protected service
+rejects `stopService`, while `restartService` remains available to the service
+manager. `serviceState` returns `running`, `stopped`, or `missing`. Runtime
+failures restart an opted-in service at most three times; the counter resets
+after it has run for 30 seconds. `startService` queues work onto the process
+manager and does not mutate process lists from the service thread.
+
+At boot, `0:\System\Services\startup.breeze` starts every other Breeze file in
+that directory. A service should use `dependenciesReady()` before beginning
+work that depends on another registered service.
+
+Service properties available through `value` are `name`, `state`, `running`,
+`protected`, `restartOnFailure`, and `dependenciesReady`. Service events are
+`update` and `message`.
+
+### Process communication
+
+```text
+findProcess(name)             -> process or runtime error
+tryFindProcess(name)          -> process or null
+send(process, name, data)     -> boolean
+broadcast(name, data)         -> delivered count
+request(process, name, data)  -> correlation ID, or 0
+reply(requestEvent, data)     -> boolean
+```
+
+Message queues hold at most 128 messages and deliver at most 32 events per
+update. Message properties are `name`, `data`, `sender`, `id`, and `replyTo`.
+A reply is named `<request-name>.reply`; `replyTo` contains the request ID.
+
+### Files and directories
+
+```text
+fileExists(path)                                      -> boolean
+directoryExists(path)                                 -> boolean
+createDirectory(path)                                 -> boolean
+readFile(path)                                        -> string or runtime error
+tryReadFile(path)                                     -> result object
+writeFile(path, content, overwrite)                   -> boolean
+deleteFile(path)                                      -> boolean
+deleteDirectory(path, recursive)                      -> boolean
+copyFile(source, destination, overwrite)              -> boolean
+copyDirectory(source, destination, overwrite)         -> boolean
+moveFile(source, destination, overwrite)              -> boolean
+moveDirectory(source, destination, overwrite)         -> boolean
+renamePath(path, newName, overwrite)                  -> boolean
+getFiles(path)                                        -> list
+getDirectories(path)                                  -> list
+fileName(path)                                        -> string
+fileInfo(path)                                        -> metadata object
+watchPath(path, recursive)                            -> boolean
+clearWatches()                                        -> boolean
+```
+
+`tryReadFile` properties are `ok`, `value`, and `error`. `fileInfo` properties
+are `name`, `path`, `isDirectory`, `size`, `childCount`, `created`, and
+`modified`. Watches arrive through the process `message` event with the name
+`filesystem.changed`; the data properties are `type`, `path`, and
+`previousPath`. Watch subscriptions are removed automatically when the process
+terminates.
+
+Directory copying, moving, and recursive deletion include all descendants.
+Root deletion and moving a directory into itself are rejected. These calls use
+the same `IWindoseFileSystem` contract as Explorer and the editor.
+
+### Objects, modules, and iteration
+
+```text
+import "module.breeze";
+let value = null;
+let data = object();
+objectGet(data, key)          -> value or null
+objectSet(data, key, value)   -> value
+objectHas(data, key)          -> boolean
+objectRemove(data, key)       -> boolean
+objectKeys(data)              -> list
+objectCount(data)             -> number
+
+for (item in collection) {
+    // collection may be a list or object
+}
+```
+
+Object keys are case-insensitive. `set data.property = value` writes an object
+property, and `value(data, "property")` reads one. For-in over an object yields
+its keys. Imports execute once, resolve relative to the importing module, share
+the application scope, and have a maximum nesting depth of 32.
+
+### System registry
+
+The registry stores named system and application settings in a case-insensitive
+hierarchy. Use `/` between key segments. Applications should keep their own
+settings below `Apps/<application name>`:
+
+```text
+registryDefine("Apps/Notes/Autosave", true,
+    "Save the current document automatically.", false);
+registrySet("Apps/Notes/Autosave", false);
+
+let enabled = registryGet("Apps/Notes/Autosave");
+let exists = registryExists("Apps/Notes/Autosave");
+let keys = registryKeys("Apps/Notes");
+let details = registryInfo("Apps/Notes/Autosave");
+```
+
+`registryDefine(key, defaultValue, description, requiresRestart)` creates a
+documented setting if it does not exist. Calling it again updates the setting's
+metadata without replacing the user's current value. `registrySet` creates an
+undocumented custom setting when necessary and saves it immediately.
+`registryDelete` removes a setting, `registrySave` explicitly flushes all
+settings, and `registryRestartRequired` reports whether a restart-required
+value has changed since boot.
+
+`registryInfo` returns an object with `key`, `value`, `defaultValue`,
+`description`, `requiresRestart`, and `builtIn`. `registryKeys(prefix)` returns
+every matching key below a prefix, so a settings program can discover custom
+entries created while the system is running.
+
+Normal applications receive `registry.read` and `registry.custom.write`, which
+allow reads and writes outside `System/`. Changing a protected `System/...`
+setting requires `registry.write`. System services are trusted, or native code
+may grant it to a settings application:
+
+```csharp
+BreezeCapabilityPolicy.Grant(@"0:\Apps\settings.breeze", "registry.write");
+```
+
+The desktop background color updates immediately:
+
+```text
+registrySet("System/Desktop/BackgroundColor", "#202840");
+```
+
+`System/Desktop/Wallpaper` and `System/Desktop/WallpaperMode` are reserved for
+bitmap wallpaper support. Display keys record the desired boot mode:
+
+```text
+registrySet("System/Display/Width", 1920);
+registrySet("System/Display/Height", 1080);
+registrySet("System/Display/BitsPerPixel", 32);
+```
+
+GOP selects the framebuffer before Windose runs, so these display values cannot
+resize the current framebuffer. They set `registryRestartRequired()` to true and
+must later be consumed by the boot configuration or display bootstrap during a
+restart. `System/Display/CurrentWidth` and `CurrentHeight` are read-only runtime
+observations and are not persisted.
+
+Registry storage uses `IWindoseFileSystem` at `0:\System\registry.db`. With the
+current temporary filesystem, values survive application restarts but not a
+machine reboot. They become durable automatically when a persistent filesystem
+backend replaces the temporary one.
+
+### Capabilities and system information
+
+```text
+capability(name)       -> boolean
+hasCapability(name)    -> boolean
+capabilities()         -> list
+clock()                -> milliseconds
+processCount()         -> number
+log(value)             -> true
+```
+
+Capability names are `ui`, `filesystem.read`, `filesystem.write`,
+`registry.read`, `registry.custom.write`, `registry.write`, `ipc`, `logging`,
+`process.inspect`, `process.control`, and `service.control`.
+Applications receive UI, filesystem, IPC, logging, and inspection access by
+default. Process and service control require a native grant. Scripts under
+`0:\System\Services` are trusted. Native hosts grant or revoke access through
+`BreezeCapabilityPolicy.Grant(path, capability)` and `Revoke`.
+
+## Temporary filesystem
+
+Windose currently mounts an in-memory disk at `0:\`. It contains `Apps`,
+`Documents`, and `System` directories. Files saved there remain available to
+the editor, File Explorer, file dialogs, and Breeze processes until reboot.
+
+Native file access goes through `IWindoseFileSystem` and
+`FileSystemManager.Current`. When persistent filesystem support is ready,
+implement that interface and replace the boot initialization:
+
+```csharp
+FileSystemManager.Initialize(new CosmosFileSystem());
+```
+
+No Breeze, editor, dialog, or Explorer code needs to change.
 
 ## Loading scripts from C #
 

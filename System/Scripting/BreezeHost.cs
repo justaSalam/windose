@@ -1,14 +1,13 @@
-using System.IO;
 using Cosmos.Kernel.Core.IO;
 
 public static class BreezeHost
 {
-    public static BreezeRuntime RunSource(string source)
+    public static BreezeRuntime RunSource(string source, string executablePath = "", string arguments = "")
     {
         BreezeRuntime runtime = null;
         try
         {
-            BreezeApplicationProcess process = new BreezeApplicationProcess(source);
+            BreezeApplicationProcess process = new BreezeApplicationProcess(source, executablePath, arguments);
             runtime = process.Runtime;
             ProcessManger.Start(process);
             if (runtime.LastError != null)
@@ -31,7 +30,45 @@ public static class BreezeHost
     {
         try
         {
-            return RunSource(File.ReadAllText(path));
+            if (!FileSystemManager.Current.TryReadAllText(path, out string source))
+            {
+                QueueError("Could not load " + path);
+                return null;
+            }
+            return RunSource(source, path);
+        }
+        catch (Exception exception)
+        {
+            QueueError("Could not load " + path + ": " + exception.Message);
+            return null;
+        }
+    }
+
+    public static BreezeRuntime RunScheduledSource(string source, string executablePath = "", string arguments = "")
+    {
+        try
+        {
+            BreezeScheduledApplicationProcess process = new BreezeScheduledApplicationProcess(source, executablePath, arguments);
+            ProcessManger.Start(process);
+            return process.Runtime;
+        }
+        catch (Exception exception)
+        {
+            QueueError(exception.Message);
+            return null;
+        }
+    }
+
+    public static BreezeRuntime RunScheduledFile(string path)
+    {
+        try
+        {
+            if (!FileSystemManager.Current.TryReadAllText(path, out string source))
+            {
+                QueueError("Could not load " + path);
+                return null;
+            }
+            return RunScheduledSource(source, path);
         }
         catch (Exception exception)
         {
@@ -77,6 +114,8 @@ public static class BreezeHost
             canResize = false,
         };
 
+
+
         Panel text = new Panel(Palette.ControlFace, 8, 34, 624, 36)
         {
             text = visibleMessage,
@@ -87,7 +126,19 @@ public static class BreezeHost
             Margin = new Thickness(8, 34, 8, 8),
         };
 
-        error.AddChild(text);
+        DockPanel root = new DockPanel(0, 0, error.Width, error.Height)
+        {
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Stretch,
+            Margin = new Thickness(28, 2, 2, 2),
+            Padding = new Thickness(4),
+            useBackground = true,
+            backgroundColor = Palette.ControlFace,
+        };
+
+        root.AddChild(text);
+
+        error.AddChild(root);
         WindowManager.Register(error);
     }
 }

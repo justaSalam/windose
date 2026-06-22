@@ -18,6 +18,7 @@ public class FileExplorer : Window
     private TreeView tree;
     private ListView files;
     private string currentLocation = "desktop";
+    private readonly IWindoseFileSystem subscribedFileSystem;
 
     public FileExplorer(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height, title, useTitleBar)
     {
@@ -161,18 +162,23 @@ public class FileExplorer : Window
         {
             selectedPanel.text = item.text + " selected";
             statusBar.MarkDirty();
+            RefreshExplorerVisuals();
         };
 
         files.itemDoubleClick = item =>
         {
             if (item.isFolder)
                 OpenFolderItem(item);
+            else
+                OpenFileItem(item);
         };
 
         OpenLocation(tree.roots[0]);
 
         AddChild(root);
         files.SetViewMode(ListViewMode.Details);
+        subscribedFileSystem = FileSystemManager.Current;
+        if (subscribedFileSystem != null) subscribedFileSystem.Changed += OnFileSystemChanged;
     }
 
     private void BuildTree()
@@ -183,6 +189,7 @@ public class FileExplorer : Window
         TreeViewItem cDrive = computer.AddChild("Windose (C:)", "c");
         TreeViewItem floppyDrive = computer.AddChild("3.5 Floppy (A:)", "a");
         TreeViewItem controlPanel = computer.AddChild("Control Panel", "control");
+        TreeViewItem temporaryDrive = computer.AddChild("Temporary Disk (0:)", @"0:\");
 
         TreeViewItem system = cDrive.AddChild("System", "c/system");
         system.AddChild("Config", "c/system/config");
@@ -192,6 +199,10 @@ public class FileExplorer : Window
 
         documents.AddChild("Letters", "documents/letters");
         documents.AddChild("Pictures", "documents/pictures");
+
+        temporaryDrive.AddChild("Apps", @"0:\Apps");
+        temporaryDrive.AddChild("Documents", @"0:\Documents");
+        temporaryDrive.AddChild("System", @"0:\System");
 
         floppyDrive.expanded = false;
         controlPanel.expanded = false;
@@ -214,10 +225,26 @@ public class FileExplorer : Window
         PopulateFiles(path);
     }
 
+    private void OpenFileItem(ListViewItem item)
+    {
+        string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : item.tag as string;
+        if (string.IsNullOrEmpty(path)) return;
+        if (!string.Equals(FileSystemManager.GetExtension(path), ".breeze", StringComparison.OrdinalIgnoreCase)) return;
+
+        WindowManager.Register(new BreezeEditor(X + 40, Y + 40, 900, 620, path));
+    }
+
     private void NavigateTo(string location, string displayName)
     {
         addressBar.Address = displayName;
         PopulateFiles(location);
+    }
+
+    public void NavigateToPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        addressBar.Address = path;
+        PopulateFiles(path);
     }
 
     private void ShowSelectedProperties()
@@ -244,6 +271,7 @@ public class FileExplorer : Window
                 AddFolder("Windose (C:)", "c");
                 AddFolder("3.5 Floppy (A:)", "a");
                 AddFolder("Control Panel", "control");
+                AddFolder("Temporary Disk (0:)", @"0:\");
                 break;
 
             case "c":
@@ -297,13 +325,51 @@ public class FileExplorer : Window
                 break;
 
             default:
-                AddFile("Empty Folder", 0, "Folder");
+                PopulateFilesystemLocation(location);
                 break;
         }
 
         objectCountPanel.text = files.items.Count + " object(s)";
         statusBar.MarkDirty();
         fileScroll.RefreshContent(true);
+        RefreshExplorerVisuals();
+    }
+
+    private void RefreshExplorerVisuals()
+    {
+        files.MarkDirty(false);
+        fileScroll.ForceDirty();
+        statusBar.ForceDirty();
+
+        // Explorer contains several cached layout buffers. Redraw the owning
+        // window after interaction so those updated buffers reach the screen.
+        ForceDirty();
+    }
+
+    private void PopulateFilesystemLocation(string location)
+    {
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (fileSystem == null || !fileSystem.DirectoryExists(location))
+        {
+            AddFile("Empty Folder", 0, "Folder");
+            return;
+        }
+
+        string[] directories = fileSystem.GetDirectories(location);
+        for (int i = 0; i < directories.Length; i++)
+            AddFolder(FileSystemManager.GetName(directories[i]), directories[i]);
+
+        string[] filePaths = fileSystem.GetFiles(location);
+        for (int i = 0; i < filePaths.Length; i++)
+        {
+            string filePath = filePaths[i];
+            long size = fileSystem.GetFileSize(filePath);
+            FileEntry entry = new FileEntry(FileSystemManager.GetName(filePath), FileType.File, filePath, size);
+            ListViewItem item = files.AddItem(entry);
+            item.type = string.Equals(FileSystemManager.GetExtension(filePath), ".breeze", StringComparison.OrdinalIgnoreCase)
+                ? "Breeze Script"
+                : "File";
+        }
     }
 
     private ListViewItem AddFolder(string name, string path)
@@ -328,5 +394,23 @@ public class FileExplorer : Window
             return name;
 
         return parent + "/" + name;
+    }
+
+    public override void HandleMessage(UiMessage message)
+    {
+        if (message.Command == "filesystem.changed" &&
+            currentLocation != null && currentLocation.StartsWith("0:", StringComparison.OrdinalIgnoreCase))
+            PopulateFiles(currentLocation);
+    }
+
+    private void OnFileSystemChanged(FileSystemChange change)
+    {
+        WindowManager.PostCommand("filesystem.changed", target: this, data: change);
+    }
+
+    public override void Dispose()
+    {
+        if (subscribedFileSystem != null) subscribedFileSystem.Changed -= OnFileSystemChanged;
+        base.Dispose();
     }
 }

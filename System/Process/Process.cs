@@ -7,9 +7,11 @@ public abstract class Process : IDisposable
     public volatile bool Running;
     public bool Initialized;
     public bool canTerminate;
+    public ProcessStartInfo startInfo = new ProcessStartInfo();
     public double lastUpdateMs;
     public double averageUpdateMs;
     public double peakUpdateMs;
+    public bool CanRestart => startInfo?.RestartFactory != null;
 
     public abstract void Start();
     public abstract void Main();

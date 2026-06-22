@@ -13,11 +13,14 @@ public abstract class ScheduledProcess : Process
     private Thread workerThread;
     private volatile bool stopRequested;
     private volatile bool workerExited = true;
+    private readonly int updateIntervalMs;
 
-    protected ScheduledProcess(string name, ProcessType processType)
+    protected ScheduledProcess(string name, ProcessType processType, int updateIntervalMs = 100)
     {
         this.name = name;
         this.processType = processType;
+        startInfo.Name = name;
+        this.updateIntervalMs = Math.Max(1, updateIntervalMs);
         Running = false;
         Initialized = false;
         canTerminate = true;
@@ -61,14 +64,19 @@ public abstract class ScheduledProcess : Process
             {
                 long started = DateTime.UtcNow.Ticks;
                 Update();
-                double elapsedMs = (DateTime.UtcNow.Ticks - started) / 10000.0;
+                long elapsedTicks = DateTime.UtcNow.Ticks - started;
+                double elapsedMs = elapsedTicks / 10000.0;
                 lastUpdateMs = elapsedMs;
                 averageUpdateMs = averageUpdateMs == 0
                     ? elapsedMs
                     : averageUpdateMs * 0.9 + elapsedMs * 0.1;
                 if (elapsedMs > peakUpdateMs) peakUpdateMs = elapsedMs;
 
-                Thread.Sleep(1);
+                int elapsedWholeMs = (int)((elapsedTicks + TimeSpan.TicksPerMillisecond - 1)
+                    / TimeSpan.TicksPerMillisecond);
+                int targetIntervalMs = Math.Max(10, GetNextUpdateIntervalMs());
+                int sleepMs = targetIntervalMs - elapsedWholeMs;
+                Thread.Sleep(sleepMs > 10 ? sleepMs : 10);
             }
         }
         catch (Exception exception)
@@ -85,6 +93,8 @@ public abstract class ScheduledProcess : Process
 
     public abstract void Update();
 
+    protected virtual int GetNextUpdateIntervalMs() => updateIntervalMs;
+
     internal void RequestStop()
     {
         stopRequested = true;
@@ -92,6 +102,7 @@ public abstract class ScheduledProcess : Process
     }
 
     internal bool HasExited => workerExited;
+    public int UpdateIntervalMs => updateIntervalMs;
 
     public override void Dispose()
     {

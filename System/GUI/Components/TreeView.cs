@@ -19,6 +19,7 @@ public class TreeView : Component
     private TreeViewItem pressedItem;
     private int lastClickRow = -1;
     private int lastClickTick;
+    public int doubleClickInterval = 1200;
 
     public TreeView(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -143,13 +144,17 @@ public class TreeView : Component
         SelectItem(item);
 
         int tick = Environment.TickCount;
-        if (row == lastClickRow && tick - lastClickTick < 500)
+        int elapsed = unchecked(tick - lastClickTick);
+        if (row == lastClickRow && elapsed >= 0 && elapsed <= doubleClickInterval)
         {
             if (item.HasChildren())
                 item.expanded = !item.expanded;
 
             itemDoubleClick?.Invoke(item);
             MarkDirty();
+            lastClickRow = -1;
+            lastClickTick = 0;
+            return;
         }
 
         lastClickRow = row;

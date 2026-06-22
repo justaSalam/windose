@@ -23,6 +23,7 @@ public class Window : Component
     public bool canMinimize = true;
     public bool canResize = true;
     public bool canMove = true;
+    public bool showInTaskbar = true;
 
 
 
@@ -164,6 +165,17 @@ public class Window : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
     {
+        if (Mouse.scroll != 0)
+        {
+            Component wheelTarget = GetChildAt(mouseX, mouseY);
+            while (wheelTarget != null && wheelTarget != this)
+            {
+                if (wheelTarget.HandlesMouseWheel)
+                    return wheelTarget.HandleInput(mouseX, mouseY, mouseState);
+                wheelTarget = wheelTarget.Parent;
+            }
+        }
+
         if (mouseState.left == MouseEvents.Press || mouseState.right == MouseEvents.Press)
         {
             inFocus = HitTest(mouseX, mouseY);

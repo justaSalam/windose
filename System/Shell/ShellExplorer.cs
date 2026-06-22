@@ -26,6 +26,7 @@ public class Explorer : SingleThreadedProcess
         taskbar = new Taskbar(0, Kernel.canvas.Height - 20, canvas.Width, 20);
         startMenu = new StartMenu(taskbar.X, taskbar.Y - 500, 300, 500, "Start Menu", false);
         WindowManager.Register(startMenu);
+
     }
 
     public override void Update()

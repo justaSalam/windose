@@ -3,6 +3,26 @@ using Cosmos.Kernel.System.Keyboard;
 
 public class CodeEditor : Component
 {
+    public readonly struct Diagnostic
+    {
+        public readonly int Line;
+        public readonly string Message;
+
+        public Diagnostic(int line, string message)
+        {
+            Line = line;
+            Message = message ?? "";
+        }
+    }
+
+    private sealed class EditorSnapshot
+    {
+        public string Source;
+        public int CursorLine;
+        public int CursorColumn;
+    }
+
+    public override bool HandlesMouseWheel => true;
     private readonly List<string> lines = new List<string>();
     private readonly List<List<SyntaxSpan>> highlightCache = new List<List<SyntaxSpan>>();
     private int cursorLine;
@@ -20,21 +40,24 @@ public class CodeEditor : Component
     private int completionSelection;
     private int completionStartColumn;
     private Rectangle completionBounds;
+    private bool signatureVisible;
+    private string signatureText = "";
+    private Rectangle signatureBounds;
 
     private static readonly string[] CompletionItems =
     {
-        "add", "button", "close", "dock", "dockPanel", "else", "false", "function",
-        "findProcess", "if", "let", "list", "listAdd", "listClear", "listCount", "listGet", "listItem",
+        "add", "broadcast", "button", "capabilities", "capability", "clearWatches", "clock", "close", "copyDirectory", "copyFile", "createDirectory", "deleteDirectory", "deleteFile", "dependenciesReady", "directoryExists", "dock", "dockPanel", "else", "false", "for", "function",
+        "fileExists", "fileInfo", "fileName", "findProcess", "getDirectories", "getFiles", "if", "let", "list", "listAdd", "listClear", "listCount", "listGet", "listItem", "log",
         "listMode", "listRemove", "listSet", "listView", "loadDirectory", "menu", "menuBar",
-        "menuItem", "on", "panel", "print", "process", "return", "scrollView", "send", "set", "show", "stack",
+        "hasCapability", "import", "in", "menuItem", "moveDirectory", "moveFile", "null", "object", "objectCount", "objectGet", "objectHas", "objectKeys", "objectRemove", "objectSet", "on", "panel", "print", "process", "processCount", "readFile", "registryDefine", "registryDelete", "registryExists", "registryGet", "registryInfo", "registryKeys", "registryRestartRequired", "registrySave", "registrySet", "renamePath", "reply", "request", "restartService", "return", "scheduledProcess", "scrollView", "send", "service", "serviceDependency", "serviceState", "set", "show", "stack", "startService", "stopService",
         "stackPanel", "statusBar", "statusPanel", "textField", "toolbar", "toolbarButton", "treeChild",
-        "startTimer", "stopTimer", "timer", "treeRoot", "treeView", "true", "value", "while", "window", "windowRoot", "stopProcess",
+        "startTimer", "stopTimer", "timer", "treeRoot", "treeView", "true", "tryFindProcess", "tryReadFile", "value", "watchPath", "while", "window", "windowRoot", "writeFile", "stopProcess",
     };
 
     private static readonly string[] MemberItems =
     {
         "canMaximize", "canMinimize", "canResize", "click", "doubleClick", "expanded",
-        "active", "data", "fontSize", "height", "interval", "isFolder", "message", "name", "path", "running",
+        "active", "childCount", "created", "data", "dependenciesReady", "fontSize", "height", "id", "interval", "isDirectory", "isFolder", "message", "modified", "name", "path", "previousPath", "protected", "replyTo", "restartOnFailure", "running", "state",
         "select", "sender", "size", "text", "tick", "type", "update", "visible", "width",
     };
 
@@ -53,8 +76,12 @@ public class CodeEditor : Component
     public Color operatorColor = Color.FromArgb(64, 64, 64);
     public Action changed;
     public Action cursorChanged;
-    private int diagnosticLine = -1;
-    private string diagnosticMessage = "";
+    private readonly List<Diagnostic> diagnostics = new List<Diagnostic>();
+    private readonly List<EditorSnapshot> undoHistory = new List<EditorSnapshot>();
+    private readonly List<EditorSnapshot> redoHistory = new List<EditorSnapshot>();
+    private const int MaxHistoryEntries = 64;
+    private string lastEditKind = "";
+    private int lastEditTick;
 
     public CodeEditor(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -73,7 +100,10 @@ public class CodeEditor : Component
     public int CursorLine => cursorLine + 1;
     public int CursorColumn => cursorColumn + 1;
     public bool HasSelection => hasSelection;
-    public string DiagnosticMessage => diagnosticMessage;
+    public string DiagnosticMessage => diagnostics.Count == 0 ? "" : diagnostics[0].Message;
+    public int DiagnosticCount => diagnostics.Count;
+    public bool CanUndo => undoHistory.Count > 0;
+    public bool CanRedo => redoHistory.Count > 0;
 
     public string SelectedText
     {
@@ -99,6 +129,7 @@ public class CodeEditor : Component
     public void CutSelection()
     {
         if (!hasSelection) return;
+        RecordUndo("cut", false);
         CopySelection();
         DeleteSelectionAndRefresh();
     }
@@ -106,16 +137,104 @@ public class CodeEditor : Component
     public void PasteClipboard()
     {
         if (!WindoseClipboard.HasText) return;
+        RecordUndo("paste", false);
         ReplaceSelection(WindoseClipboard.Text);
+    }
+
+    public void Undo()
+    {
+        if (undoHistory.Count == 0) return;
+        EditorSnapshot current = CaptureSnapshot();
+        EditorSnapshot target = undoHistory[undoHistory.Count - 1];
+        undoHistory.RemoveAt(undoHistory.Count - 1);
+        AddHistoryEntry(redoHistory, current);
+        RestoreSnapshot(target);
+    }
+
+    public void Redo()
+    {
+        if (redoHistory.Count == 0) return;
+        EditorSnapshot current = CaptureSnapshot();
+        EditorSnapshot target = redoHistory[redoHistory.Count - 1];
+        redoHistory.RemoveAt(redoHistory.Count - 1);
+        AddHistoryEntry(undoHistory, current);
+        RestoreSnapshot(target);
+    }
+
+    private void RecordUndo(string editKind, bool allowGrouping)
+    {
+        int tick = Environment.TickCount;
+        int elapsed = unchecked(tick - lastEditTick);
+        bool grouped = allowGrouping && editKind == lastEditKind && elapsed >= 0 && elapsed <= 750;
+        if (!grouped) AddHistoryEntry(undoHistory, CaptureSnapshot());
+        redoHistory.Clear();
+        lastEditKind = editKind;
+        lastEditTick = tick;
+    }
+
+    private EditorSnapshot CaptureSnapshot()
+    {
+        return new EditorSnapshot
+        {
+            Source = Source,
+            CursorLine = cursorLine,
+            CursorColumn = cursorColumn,
+        };
+    }
+
+    private static void AddHistoryEntry(List<EditorSnapshot> history, EditorSnapshot snapshot)
+    {
+        history.Add(snapshot);
+        if (history.Count > MaxHistoryEntries) history.RemoveAt(0);
+    }
+
+    private void RestoreSnapshot(EditorSnapshot snapshot)
+    {
+        lines.Clear();
+        highlightCache.Clear();
+        string[] restoredLines = (snapshot.Source ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        for (int i = 0; i < restoredLines.Length; i++)
+        {
+            lines.Add(restoredLines[i]);
+            highlightCache.Add(null);
+        }
+        if (lines.Count == 0)
+        {
+            lines.Add("");
+            highlightCache.Add(null);
+        }
+
+        cursorLine = Math.Max(0, Math.Min(lines.Count - 1, snapshot.CursorLine));
+        cursorColumn = Math.Max(0, Math.Min(lines[cursorLine].Length, snapshot.CursorColumn));
+        ClearSelection();
+        ClearCompletionState();
+        ClearSignatureState();
+        diagnostics.Clear();
+        lastEditKind = "";
+        EnsureCursorVisible();
+        MarkDirty();
+        cursorChanged?.Invoke();
+        changed?.Invoke();
     }
 
     public void SetDiagnostic(int line, string message)
     {
-        int nextLine = string.IsNullOrEmpty(message) ? -1 : Math.Max(0, Math.Min(lines.Count - 1, line));
-        string nextMessage = message ?? "";
-        if (diagnosticLine == nextLine && diagnosticMessage == nextMessage) return;
-        diagnosticLine = nextLine;
-        diagnosticMessage = nextMessage;
+        List<Diagnostic> next = new List<Diagnostic>();
+        if (!string.IsNullOrEmpty(message)) next.Add(new Diagnostic(line, message));
+        SetDiagnostics(next);
+    }
+
+    public void SetDiagnostics(List<Diagnostic> next)
+    {
+        diagnostics.Clear();
+        if (next != null)
+        {
+            for (int i = 0; i < next.Count; i++)
+            {
+                Diagnostic item = next[i];
+                diagnostics.Add(new Diagnostic(Math.Max(0, Math.Min(lines.Count - 1, item.Line)), item.Message));
+            }
+        }
         MarkDirty();
     }
 
@@ -130,8 +249,11 @@ public class CodeEditor : Component
     public void SetSource(string source)
     {
         ClearCompletionState();
-        diagnosticLine = -1;
-        diagnosticMessage = "";
+        ClearSignatureState();
+        diagnostics.Clear();
+        undoHistory.Clear();
+        redoHistory.Clear();
+        lastEditKind = "";
         lines.Clear();
         highlightCache.Clear();
         string normalized = (source ?? "").Replace("\r\n", "\n").Replace('\r', '\n');
@@ -170,6 +292,7 @@ public class CodeEditor : Component
         for (int row = 0; row < visibleLines; row++)
             DrawVisibleRow(row, characterWidth, visibleColumns, false);
 
+        DrawSignaturePopup();
         DrawCompletionPopup();
     }
 
@@ -182,6 +305,7 @@ public class CodeEditor : Component
             ClearCompletionState();
             firstVisibleLine -= (int)Mouse.scroll * 3;
             ClampScroll();
+            RefreshSignatureHint();
             MarkDirty();
             return true;
         }
@@ -210,6 +334,7 @@ public class CodeEditor : Component
             EnsureCursorVisible();
             RedrawSelectionChange(oldCursorLine, oldSelectionAnchorLine, oldHasSelection,
                 oldFirstVisibleLine, oldFirstVisibleColumn);
+            RefreshSignatureHint();
             cursorChanged?.Invoke();
         }
         else if (mouse.left == MouseEvents.Hold && mouseSelecting)
@@ -224,6 +349,7 @@ public class CodeEditor : Component
             EnsureCursorVisible();
             RedrawSelectionChange(oldCursorLine, selectionAnchorLine, true,
                 oldFirstVisibleLine, oldFirstVisibleColumn);
+            RefreshSignatureHint();
             cursorChanged?.Invoke();
         }
         else if (mouse.left == MouseEvents.Release || mouse.left == MouseEvents.None)
@@ -239,6 +365,8 @@ public class CodeEditor : Component
         bool shiftPressed = KeyboardManager.ShiftPressed;
         if (KeyboardManager.ControlPressed)
         {
+            if (keyEvent.Key == ConsoleKeyEx.Z) { Undo(); return; }
+            if (keyEvent.Key == ConsoleKeyEx.Y) { Redo(); return; }
             if (keyEvent.Key == ConsoleKeyEx.C) { CopySelection(); return; }
             if (keyEvent.Key == ConsoleKeyEx.X) { CutSelection(); return; }
             if (keyEvent.Key == ConsoleKeyEx.V) { PasteClipboard(); return; }
@@ -296,6 +424,15 @@ public class CodeEditor : Component
         int oldFirstVisibleColumn = firstVisibleColumn;
 
         bool navigationKey = IsNavigationKey(keyEvent.Key);
+        bool editingKey = keyEvent.Key == ConsoleKeyEx.Backspace || keyEvent.Key == ConsoleKeyEx.Delete
+            || keyEvent.Key == ConsoleKeyEx.Enter || keyEvent.Key == ConsoleKeyEx.Tab || keyEvent.KeyChar != '\0';
+        if (editingKey)
+        {
+            string editKind = keyEvent.Key == ConsoleKeyEx.Backspace || keyEvent.Key == ConsoleKeyEx.Delete
+                ? "delete"
+                : keyEvent.KeyChar != '\0' ? "typing" : "structure";
+            RecordUndo(editKind, editKind == "typing" || editKind == "delete");
+        }
         if (navigationKey && shiftPressed && !hasSelection)
         {
             selectionAnchorLine = cursorLine;
@@ -409,6 +546,7 @@ public class CodeEditor : Component
             else
                 HideCompletions();
         }
+        RefreshSignatureHint();
         cursorChanged?.Invoke();
         if (modified) changed?.Invoke();
     }
@@ -470,6 +608,7 @@ public class CodeEditor : Component
 
         ClearCompletionState();
         EnsureCursorVisible();
+        RefreshSignatureHint();
         if (structureChanged)
             MarkDirty();
         else
@@ -515,6 +654,7 @@ public class CodeEditor : Component
         ClearSelection();
         ClearCompletionState();
         EnsureCursorVisible();
+        RefreshSignatureHint();
         if (structureChanged)
             MarkDirty();
         else
@@ -587,6 +727,7 @@ public class CodeEditor : Component
     {
         if (!completionVisible || completionSelection < 0 || completionSelection >= completionMatches.Count) return;
 
+        RecordUndo("completion", false);
         Rectangle oldBounds = completionBounds;
         string completion = completionMatches[completionSelection];
         string line = lines[cursorLine];
@@ -597,6 +738,7 @@ public class CodeEditor : Component
         InvalidateHighlight(cursorLine);
         ClearCompletionState();
         EnsureCursorVisible();
+        RefreshSignatureHint();
         RedrawLine(cursorLine, Math.Max(1, MeasureStringWidth("W", fontSize)),
             Math.Max(1, (Width - gutterWidth - 6) / Math.Max(1, MeasureStringWidth("W", fontSize))));
         RedrawCompletionArea(oldBounds);
@@ -607,7 +749,10 @@ public class CodeEditor : Component
     private Rectangle CalculateCompletionBounds()
     {
         int characterWidth = Math.Max(1, MeasureStringWidth("W", fontSize));
-        int width = Math.Min(230, Math.Max(80, Width - 4));
+        int widest = 80;
+        for (int i = 0; i < completionMatches.Count; i++)
+            widest = Math.Max(widest, MeasureStringWidth(GetCompletionDisplayText(completionMatches[i]), fontSize) + 12);
+        int width = Math.Min(500, Math.Min(widest, Math.Max(80, Width - 4)));
         int height = completionMatches.Count * lineHeight + 4;
         int x = gutterWidth + 3 + (cursorColumn - firstVisibleColumn) * characterWidth;
         x = Math.Max(2, Math.Min(x, Width - width - 2));
@@ -635,8 +780,243 @@ public class CodeEditor : Component
                     completionBounds.Width - 4, lineHeight);
                 color = Palette.HighlightText;
             }
-            DrawString(completionMatches[i], color, completionBounds.X + 6, y, fontSize);
+            DrawString(GetCompletionDisplayText(completionMatches[i]), color, completionBounds.X + 6, y, fontSize);
         }
+    }
+
+    private string GetCompletionDisplayText(string name)
+    {
+        return TryGetSignature(name, out string parameters, out _)
+            ? name + "(" + parameters + ")"
+            : name;
+    }
+
+    private void RefreshSignatureHint()
+    {
+        Rectangle oldBounds = signatureBounds;
+        string oldText = signatureText;
+        bool oldVisible = signatureVisible;
+
+        signatureVisible = false;
+        signatureText = "";
+        signatureBounds = Rectangle.Empty;
+
+        if (TryGetActiveCall(out string name, out int argumentIndex))
+        {
+            if (TryGetSignature(name, out string parameters, out int count))
+            {
+                signatureText = name + "(" + parameters + ")";
+                signatureText += count == 0
+                    ? " | no arguments"
+                    : " | argument " + (argumentIndex + 1) + " of " + count;
+                signatureVisible = true;
+                signatureBounds = CalculateSignatureBounds();
+            }
+        }
+
+        if (oldVisible != signatureVisible || oldText != signatureText || oldBounds != signatureBounds)
+            RedrawCompletionArea(oldBounds);
+    }
+
+    private bool TryGetSignature(string name, out string parameters, out int count)
+    {
+        count = BreezeRuntime.GetExpectedArgumentCount(name);
+        if (count >= 0)
+        {
+            parameters = GetParameterNames(name, count);
+            return true;
+        }
+
+        if (!functionSymbols.Contains(name))
+        {
+            parameters = "";
+            return false;
+        }
+
+        string declaration = "function " + name;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            string line = lines[i].TrimStart();
+            if (!line.StartsWith(declaration)) continue;
+            if (line.Length > declaration.Length &&
+                !char.IsWhiteSpace(line[declaration.Length]) && line[declaration.Length] != '(') continue;
+            int open = line.IndexOf('(', declaration.Length);
+            int close = open < 0 ? -1 : line.IndexOf(')', open + 1);
+            if (open < 0 || close < 0) continue;
+
+            parameters = line.Substring(open + 1, close - open - 1).Trim();
+            count = parameters.Length == 0 ? 0 : parameters.Split(',').Length;
+            return true;
+        }
+
+        parameters = "";
+        return false;
+    }
+
+    private bool TryGetActiveCall(out string name, out int argumentIndex)
+    {
+        name = "";
+        argumentIndex = 0;
+        int depth = 0;
+        int openLine = -1;
+        int openColumn = -1;
+
+        for (int lineIndex = cursorLine; lineIndex >= 0 && openLine < 0; lineIndex--)
+        {
+            string line = lines[lineIndex];
+            int column = lineIndex == cursorLine ? Math.Min(cursorColumn, line.Length) - 1 : line.Length - 1;
+            for (; column >= 0; column--)
+            {
+                char value = line[column];
+                if (value == ')') depth++;
+                else if (value == '(')
+                {
+                    if (depth == 0)
+                    {
+                        openLine = lineIndex;
+                        openColumn = column;
+                        break;
+                    }
+                    depth--;
+                }
+            }
+        }
+
+        if (openLine < 0) return false;
+
+        string openText = lines[openLine];
+        int end = openColumn;
+        while (end > 0 && char.IsWhiteSpace(openText[end - 1])) end--;
+        int start = end;
+        while (start > 0 && IsIdentifierCharacter(openText[start - 1])) start--;
+        if (start == end) return false;
+        name = openText.Substring(start, end - start);
+
+        depth = 0;
+        bool inString = false;
+        for (int lineIndex = openLine; lineIndex <= cursorLine; lineIndex++)
+        {
+            string line = lines[lineIndex];
+            int startColumn = lineIndex == openLine ? openColumn + 1 : 0;
+            int endColumn = lineIndex == cursorLine ? Math.Min(cursorColumn, line.Length) : line.Length;
+            for (int column = startColumn; column < endColumn; column++)
+            {
+                char value = line[column];
+                if (value == '"' && (column == 0 || line[column - 1] != '\\'))
+                {
+                    inString = !inString;
+                    continue;
+                }
+                if (inString) continue;
+                if (value == '(') depth++;
+                else if (value == ')' && depth > 0) depth--;
+                else if (value == ',' && depth == 0) argumentIndex++;
+            }
+        }
+
+        return true;
+    }
+
+    private Rectangle CalculateSignatureBounds()
+    {
+        int characterWidth = Math.Max(1, MeasureStringWidth("W", fontSize));
+        int width = Math.Min(Math.Max(160, MeasureStringWidth(signatureText, fontSize) + 12), Math.Max(1, Width - 4));
+        int height = lineHeight + 4;
+        int x = gutterWidth + 3 + (cursorColumn - firstVisibleColumn) * characterWidth;
+        x = Math.Max(2, Math.Min(x, Width - width - 2));
+        int y = 2 + (cursorLine - firstVisibleLine + 1) * lineHeight;
+        if (completionVisible && y < completionBounds.Bottom && y + height > completionBounds.Top)
+            y = completionBounds.Bottom + 2;
+        if (y + height >= Height - 1)
+            y = 2 + (cursorLine - firstVisibleLine) * lineHeight - height;
+        y = Math.Max(2, Math.Min(y, Height - height - 2));
+        return new Rectangle(x, y, width, height);
+    }
+
+    private void DrawSignaturePopup()
+    {
+        if (!signatureVisible) return;
+        DrawFilledRectangle(Palette.ControlFace, signatureBounds.X, signatureBounds.Y,
+            signatureBounds.Width, signatureBounds.Height);
+        DrawRaisedRectangle(signatureBounds.X, signatureBounds.Y, signatureBounds.Width, signatureBounds.Height);
+        DrawString(signatureText, textColor, signatureBounds.X + 6, signatureBounds.Y + 2, fontSize);
+    }
+
+    private void ClearSignatureState()
+    {
+        signatureVisible = false;
+        signatureText = "";
+        signatureBounds = Rectangle.Empty;
+    }
+
+    private static string GetParameterNames(string name, int count)
+    {
+        string parameters = name switch
+        {
+            "window" => "title, x, y, width, height",
+            "process" or "scheduledProcess" => "name",
+            "stopProcess" => "process",
+            "findProcess" or "tryFindProcess" => "name",
+            "send" => "target, message, data",
+            "broadcast" => "message, data",
+            "request" => "target, message, data",
+            "reply" => "request, data",
+            "service" => "name, restartOnFailure, protected",
+            "serviceDependency" => "name",
+            "startService" or "stopService" or "restartService" or "serviceState" => "service",
+            "timer" => "interval",
+            "startTimer" or "stopTimer" => "timer",
+            "getDirectories" or "getFiles" or "fileName" or "fileExists" or "directoryExists" or "createDirectory" or "deleteFile" or "readFile" or "tryReadFile" or "fileInfo" => "path",
+            "deleteDirectory" => "path, recursive",
+            "copyFile" or "copyDirectory" or "moveFile" or "moveDirectory" => "source, destination, overwrite",
+            "renamePath" => "path, newPath, overwrite",
+            "writeFile" => "path, text, overwrite",
+            "watchPath" => "path, recursive",
+            "registryGet" or "registryDelete" or "registryExists" or "registryInfo" => "key",
+            "registrySet" => "key, value",
+            "registryDefine" => "key, defaultValue, description, requiresRestart",
+            "registryKeys" => "prefix",
+            "log" or "capability" or "hasCapability" => "value",
+            "objectGet" or "objectHas" or "objectRemove" => "object, key",
+            "objectSet" => "object, key, value",
+            "objectKeys" or "objectCount" => "object",
+            "windowRoot" => "window",
+            "stackPanel" => "orientation",
+            "panel" => "text, height",
+            "button" => "text, width, command",
+            "textField" => "text, width",
+            "toolbarButton" => "toolbar, text, command",
+            "statusPanel" => "statusBar, text, width",
+            "menu" => "menuBar, text",
+            "menuItem" => "menu, text",
+            "treeRoot" => "treeView, text, path",
+            "treeChild" => "parent, text, path",
+            "listView" => "mode",
+            "listItem" => "listView, text, path, isFolder",
+            "listClear" => "listView",
+            "listMode" => "listView, mode",
+            "scrollView" => "content",
+            "loadDirectory" => "listView, path",
+            "listAdd" => "list, value",
+            "listGet" => "list, index",
+            "listSet" => "list, index, value",
+            "listRemove" => "list, index",
+            "listCount" => "list",
+            "dock" => "panel, child, side",
+            "stack" or "add" => "parent, child",
+            "show" or "close" => "window",
+            "value" => "object, property",
+            "print" => "value",
+            _ => "",
+        };
+
+        if (parameters.Length > 0 || count == 0) return parameters;
+        for (int i = 0; i < count; i++)
+        {
+            if (i > 0) parameters += ", ";
+            parameters += "argument" + (i + 1);
+        }
+        return parameters;
     }
 
     private void RedrawCompletionArea(Rectangle oldBounds)
@@ -644,6 +1024,8 @@ public class CodeEditor : Component
         Rectangle area = oldBounds;
         if (completionVisible)
             area = area.IsEmpty ? completionBounds : Rectangle.Union(area, completionBounds);
+        if (signatureVisible)
+            area = area.IsEmpty ? signatureBounds : Rectangle.Union(area, signatureBounds);
         if (area.IsEmpty) return;
 
         int cursorRow = cursorLine - firstVisibleLine;
@@ -662,6 +1044,7 @@ public class CodeEditor : Component
         for (int row = firstRow; row <= lastRow; row++)
             DrawVisibleRow(row, characterWidth, visibleColumns, true);
 
+        DrawSignaturePopup();
         DrawCompletionPopup();
         InvalidateLocalRegion(area);
     }
@@ -790,7 +1173,14 @@ public class CodeEditor : Component
 
     private void DrawDiagnostic(int lineIndex, string line, int y, int characterWidth, int visibleColumns)
     {
-        if (lineIndex != diagnosticLine) return;
+        bool hasDiagnostic = false;
+        for (int i = 0; i < diagnostics.Count; i++)
+        {
+            if (diagnostics[i].Line != lineIndex) continue;
+            hasDiagnostic = true;
+            break;
+        }
+        if (!hasDiagnostic) return;
         int visibleLength = Math.Min(visibleColumns, Math.Max(1, line.Length - firstVisibleColumn));
         int startX = gutterWidth + 3;
         int endX = Math.Min(Width - 3, startX + visibleLength * characterWidth);
@@ -839,6 +1229,15 @@ public class CodeEditor : Component
     private void InsertText(string value)
     {
         string line = lines[cursorLine];
+
+        if (value == "}" && line.Substring(0, cursorColumn).Trim().Length == 0 && cursorColumn >= 4)
+        {
+            int remove = Math.Min(4, cursorColumn);
+            lines[cursorLine] = line.Remove(cursorColumn - remove, remove);
+            cursorColumn -= remove;
+            line = lines[cursorLine];
+        }
+
         lines[cursorLine] = line.Insert(cursorColumn, value);
         InvalidateHighlight(cursorLine);
         cursorColumn += value.Length;
@@ -850,13 +1249,22 @@ public class CodeEditor : Component
         string indentation = GetIndentation(line);
         string before = line.Substring(0, cursorColumn);
         string after = line.Substring(cursorColumn);
+        bool opensBlock = before.TrimEnd().EndsWith("{");
+        bool closesBlock = after.TrimStart().StartsWith("}");
+        string nextIndentation = opensBlock ? indentation + "    " : indentation;
 
         lines[cursorLine] = before;
-        lines.Insert(cursorLine + 1, indentation + after);
+        lines.Insert(cursorLine + 1, nextIndentation + (closesBlock ? "" : after));
         InvalidateHighlight(cursorLine);
         highlightCache.Insert(cursorLine + 1, null);
         cursorLine++;
-        cursorColumn = indentation.Length;
+        cursorColumn = nextIndentation.Length;
+
+        if (opensBlock && closesBlock)
+        {
+            lines.Insert(cursorLine + 1, indentation + after.TrimStart());
+            highlightCache.Insert(cursorLine + 1, null);
+        }
     }
 
     private bool Backspace()
@@ -1036,10 +1444,14 @@ public class CodeEditor : Component
         "if" => true,
         "else" => true,
         "while" => true,
+        "for" => true,
+        "in" => true,
+        "import" => true,
         "function" => true,
         "return" => true,
         "true" => true,
         "false" => true,
+        "null" => true,
         _ => false,
     };
 

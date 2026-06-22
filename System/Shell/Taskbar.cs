@@ -54,6 +54,7 @@ public class Taskbar : Component
                 {
                     Explorer.startMenu.Visible = true;
                     Explorer.startMenu.MarkDirty();
+                    WindowManager.Activate(Explorer.startMenu);
                 }
             }
         });

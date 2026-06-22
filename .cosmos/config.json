@@ -7,6 +7,6 @@
     "serialMode": "stdio",
     "enableNetwork": false,
     "networkPorts": "5555",
-    "extraArgs": ""
+    "extraArgs": "-display sdl -full-screen"
   }
 }

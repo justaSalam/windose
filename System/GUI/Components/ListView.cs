@@ -18,6 +18,13 @@ public class ListView : Component
     public bool useBackground = true;
     public Color backgroundColor = Palette.ControlWhite;
     public Color textColor = Palette.ControlBlack;
+    public string nameHeader = "Name";
+    public string sizeHeader = "Size";
+    public string typeHeader = "Type";
+    public string modifiedHeader = "Modified";
+    public int nameColumnWidth = 180;
+    public int sizeColumnWidth = 80;
+    public int typeColumnWidth = 120;
 
     public Action<ListViewItem> selectedChanged;
     public Action<ListViewItem> itemDoubleClick;
@@ -25,6 +32,7 @@ public class ListView : Component
     private int pressedIndex = -1;
     private int lastClickIndex = -1;
     private int lastClickTick;
+    public int doubleClickInterval = 1200;
 
     public ListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -179,15 +187,18 @@ public class ListView : Component
     private void DrawDetailsHeader()
     {
         DrawFilledRectangle(Palette.ControlFace, 0, 0, Width, headerHeight);
-        DrawSunkenRectangle(0, 0, 180, headerHeight);
-        DrawSunkenRectangle(180, 0, 80, headerHeight);
-        DrawSunkenRectangle(260, 0, 120, headerHeight);
-        DrawSunkenRectangle(380, 0, Math.Max(1, Width - 380), headerHeight);
+        int sizeX = nameColumnWidth;
+        int typeX = sizeX + sizeColumnWidth;
+        int modifiedX = typeX + typeColumnWidth;
+        DrawSunkenRectangle(0, 0, nameColumnWidth, headerHeight);
+        DrawSunkenRectangle(sizeX, 0, sizeColumnWidth, headerHeight);
+        DrawSunkenRectangle(typeX, 0, typeColumnWidth, headerHeight);
+        DrawSunkenRectangle(modifiedX, 0, Math.Max(1, Width - modifiedX), headerHeight);
 
-        DrawString("Name", Palette.ControlBlack, 4, 2, fontSize);
-        DrawString("Size", Palette.ControlBlack, 184, 2, fontSize);
-        DrawString("Type", Palette.ControlBlack, 264, 2, fontSize);
-        DrawString("Modified", Palette.ControlBlack, 384, 2, fontSize);
+        DrawString(nameHeader, Palette.ControlBlack, 4, 2, fontSize);
+        DrawString(sizeHeader, Palette.ControlBlack, sizeX + 4, 2, fontSize);
+        DrawString(typeHeader, Palette.ControlBlack, typeX + 4, 2, fontSize);
+        DrawString(modifiedHeader, Palette.ControlBlack, modifiedX + 4, 2, fontSize);
     }
 
     private void DrawDetailsRow(ListViewItem item, int y)
@@ -201,9 +212,12 @@ public class ListView : Component
 
         DrawItemIcon(item, 4, y + 2, smallIconSize);
         DrawString(item.text, color, 24, y + 2, fontSize);
-        DrawString(item.size, color, 184, y + 2, fontSize);
-        DrawString(item.type, color, 264, y + 2, fontSize);
-        DrawString(item.modified, color, 384, y + 2, fontSize);
+        int sizeX = nameColumnWidth;
+        int typeX = sizeX + sizeColumnWidth;
+        int modifiedX = typeX + typeColumnWidth;
+        DrawString(item.size, color, sizeX + 4, y + 2, fontSize);
+        DrawString(item.type, color, typeX + 4, y + 2, fontSize);
+        DrawString(item.modified, color, modifiedX + 4, y + 2, fontSize);
     }
 
     private void DrawItemRow(ListViewItem item, int x, int y, int width, int height, bool drawIcon)
@@ -292,8 +306,15 @@ public class ListView : Component
         SelectItem(items[index]);
 
         int tick = Environment.TickCount;
-        if (index == lastClickIndex && tick - lastClickTick < 500)
+        int elapsed = unchecked(tick - lastClickTick);
+        if (index == lastClickIndex && elapsed >= 0 && elapsed <= doubleClickInterval)
+        {
             itemDoubleClick?.Invoke(items[index]);
+
+            lastClickIndex = -1;
+            lastClickTick = 0;
+            return;
+        }
 
         lastClickIndex = index;
         lastClickTick = tick;

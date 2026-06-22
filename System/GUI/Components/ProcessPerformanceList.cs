@@ -7,13 +7,19 @@ public class ProcessPerformanceList : Component
     public Color textColor = Palette.ControlBlack;
     public bool programsOnly;
     private readonly MenuPopup contextMenu;
+    private readonly MenuItem endTaskItem;
+    private readonly MenuItem restartTaskItem;
+    private readonly MenuItem openLocationItem;
     private Process selectedProcess;
 
     public ProcessPerformanceList(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
-        contextMenu = new MenuPopup(132, 28);
-        contextMenu.AddItem("End Task", EndSelectedProcess);
+        contextMenu = new MenuPopup(200, 28 * 4);
+        endTaskItem = contextMenu.AddItem("End Task", EndSelectedProcess);
+        restartTaskItem = contextMenu.AddItem("Restart Task", RestartSelectedProcess);
+        openLocationItem = contextMenu.AddItem("Open File Location", OpenProcessFileLocation);
+        contextMenu.AddItem("Properties", OpenProcessProperties);
     }
 
     public override void DrawLocal()
@@ -64,8 +70,11 @@ public class ProcessPerformanceList : Component
         {
             selectedProcess = GetProcessAt(mouseY - AbsoluteY);
             MarkDirty();
-            if (selectedProcess != null && selectedProcess.canTerminate)
+            if (selectedProcess != null)
             {
+                endTaskItem.enabled = selectedProcess.canTerminate;
+                restartTaskItem.enabled = selectedProcess.canTerminate && selectedProcess.CanRestart;
+                openLocationItem.enabled = selectedProcess.startInfo?.HasExecutablePath == true;
                 int x = Math.Min(mouseX, Math.Max(0, Global.screenWidth - contextMenu.Width));
                 int y = Math.Min(mouseY, Math.Max(0, Global.screenHeight - contextMenu.Height));
                 contextMenu.ShowAt(x, y);
@@ -93,9 +102,40 @@ public class ProcessPerformanceList : Component
 
     private void EndSelectedProcess()
     {
-        if (selectedProcess == null || !selectedProcess.canTerminate
-            || !ProcessManger.Contains(selectedProcess)) return;
+        if (selectedProcess == null || !selectedProcess.canTerminate || !ProcessManger.Contains(selectedProcess)) return;
         ProcessManger.Stop(selectedProcess);
+        selectedProcess = null;
+        MarkDirty();
+    }
+
+    private void RestartSelectedProcess()
+    {
+        if (selectedProcess == null || !ProcessManger.Contains(selectedProcess)) return;
+        ProcessManger.Restart(selectedProcess);
+        selectedProcess = null;
+        MarkDirty();
+    }
+
+    private void OpenProcessFileLocation()
+    {
+        string path = selectedProcess?.startInfo?.ExecutablePath;
+        if (string.IsNullOrEmpty(path)) return;
+        string directory = FileSystemManager.Current?.DirectoryExists(path) == true
+            ? FileSystemManager.NormalizePath(path)
+            : FileSystemManager.GetParent(path);
+        if (string.IsNullOrEmpty(directory)) return;
+
+        FileExplorer explorer = new FileExplorer(100, 100, 800, 500, "File Location", true);
+        explorer.NavigateToPath(directory);
+        WindowManager.Register(explorer);
+        selectedProcess = null;
+        MarkDirty();
+    }
+
+    private void OpenProcessProperties()
+    {
+        if (selectedProcess == null) return;
+        WindowManager.Register(new ProcessProperties(200, 200, selectedProcess));
         selectedProcess = null;
         MarkDirty();
     }

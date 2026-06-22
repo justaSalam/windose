@@ -6,6 +6,7 @@ public class TextField : Component
 {
     public bool useBackground = true;
     public bool truncate = true;
+    public bool readOnly;
 
     public int fontSize = 0;
     public Color textColor = Color.Black;
@@ -46,7 +47,8 @@ public class TextField : Component
             DrawString(visibleText, textColor, 2, textY, effectiveFontSize);
         }
 
-        DrawString("_", MeasureStringWidth(visibleText, effectiveFontSize), textY);
+        if (!readOnly)
+            DrawString("_", MeasureStringWidth(visibleText, effectiveFontSize), textY);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
@@ -56,6 +58,8 @@ public class TextField : Component
 
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
+        if (readOnly) return;
+
         if (KeyboardManager.ControlPressed)
         {
             if (keyEvent.Key == ConsoleKeyEx.C)

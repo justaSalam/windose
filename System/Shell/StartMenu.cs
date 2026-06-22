@@ -1,6 +1,5 @@
 using System.Drawing;
 using Cosmos.Kernel.Core;
-using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System;
 using Windose;
 
@@ -14,6 +13,7 @@ public class StartMenu : Window
         Visible = false;
         canResize = false;
         canMove = false;
+        showInTaskbar = false;
 
         panel = new StackPanel(Color.White, 0, 0, width, height)
         {
@@ -63,23 +63,32 @@ public class StartMenu : Window
         {
             WindowManager.Register(new PerformanceMonitor(180, 120));
         });
-        programs.AddSubmenuItem("Breeze Demo", () =>
-        {
-            BreezeDemo.Run();
-        });
-        programs.AddSubmenuItem("Breeze Editor", () =>
+        MenuItem breeze = programs.AddSubmenuItem("Breeze");
+        breeze.AddSubmenuItem("Breeze Editor", () =>
         {
             WindowManager.Register(new BreezeEditor());
         });
-        programs.AddSubmenuItem("Breeze API", () =>
+        breeze.AddSubmenuItem("Breeze API", () =>
         {
             WindowManager.Register(new BreezeApiBrowser());
         });
-        programs.AddSubmenuItem("Run main.breeze", () =>
+        breeze.AddSubmenuItem("Breeze Demo", () =>
+        {
+            BreezeDemo.Run();
+        });
+        breeze.AddSubmenuItem("Run main.breeze", () =>
         {
             BreezeHost.RunFile(@"0:\Apps\main.breeze");
         });
-        programs.AddSubmenuItem("System Tools");
+        programs.AddSubmenuItem("Command Prompt", () =>
+        {
+            WindowManager.Register(new CommandPrompt());
+        });
+        MenuItem systemTools = programs.AddSubmenuItem("System Tools");
+        systemTools.AddSubmenuItem("Registry Editor", () =>
+        {
+            WindowManager.Register(new RegistryEditor());
+        });
 
         MenuItem documents = new MenuItem(0, 0, width, 24)
         {
@@ -118,15 +127,14 @@ public class StartMenu : Window
         powerOptions.AddSubmenuItem("Log Off");
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {
-            GarbageCollector.Collect();
-            Power.Shutdown();
+            HideMenu();
+            SystemPowerManager.RequestShutdown();
         });
 
         powerOptions.AddSubmenuItem("Reboot", () =>
         {
-            GarbageCollector.Collect();
-
-            Power.Reboot();
+            HideMenu();
+            SystemPowerManager.RequestReboot();
         });
 
         powerOptions.AddSubmenuItem("PANIC", () =>

@@ -1,16 +1,35 @@
 
 public static class ProcessManger
 {
+    private sealed class PendingRestart
+    {
+        public Process Original;
+        public Func<Process> Factory;
+    }
+
+    private sealed class PendingRestartRequest
+    {
+        public Process Process;
+        public bool Force;
+    }
+
     public static List<SingleThreadedProcess> processes = new();
     public static List<ScheduledProcess> scheduledProcesses = new();
+    private static readonly List<PendingRestart> pendingRestarts = new();
+    private static readonly List<Process> pendingStarts = new();
+    private static readonly List<Process> pendingStops = new();
+    private static readonly List<PendingRestartRequest> pendingRestartRequests = new();
+    private static readonly object pendingLock = new object();
     private static int processId;
 
     public static SingleThreadedProcess Start(SingleThreadedProcess process)
     {
         process.id = processId++;
+
         processes.Add(process);
         process.Start();
         return process;
+
     }
 
     public static ScheduledProcess Start(ScheduledProcess process)
@@ -23,6 +42,7 @@ public static class ProcessManger
 
     public static void Update()
     {
+        ApplyPendingRequests();
         for (int i = 0; i < processes.Count; i++)
         {
             SingleThreadedProcess process = processes[i];
@@ -55,6 +75,51 @@ public static class ProcessManger
             scheduledProcesses.RemoveAt(i);
             process.Dispose();
         }
+
+        StartPendingRestarts();
+        ApplyPendingRequests();
+    }
+
+    public static void QueueStart(Process process)
+    {
+        if (process == null) return;
+        lock (pendingLock) pendingStarts.Add(process);
+    }
+
+    public static void QueueStop(Process process)
+    {
+        if (process == null) return;
+        lock (pendingLock) pendingStops.Add(process);
+    }
+
+    public static void QueueRestart(Process process, bool force = false)
+    {
+        if (process == null) return;
+        lock (pendingLock) pendingRestartRequests.Add(new PendingRestartRequest { Process = process, Force = force });
+    }
+
+    private static void ApplyPendingRequests()
+    {
+        List<Process> starts;
+        List<Process> stops;
+        List<PendingRestartRequest> restarts;
+        lock (pendingLock)
+        {
+            starts = new List<Process>(pendingStarts);
+            stops = new List<Process>(pendingStops);
+            restarts = new List<PendingRestartRequest>(pendingRestartRequests);
+            pendingStarts.Clear();
+            pendingStops.Clear();
+            pendingRestartRequests.Clear();
+        }
+
+        for (int i = 0; i < stops.Count; i++) Stop(stops[i]);
+        for (int i = 0; i < restarts.Count; i++) RestartInternal(restarts[i].Process, restarts[i].Force);
+        for (int i = 0; i < starts.Count; i++)
+        {
+            if (starts[i] is ScheduledProcess scheduled) Start(scheduled);
+            else if (starts[i] is SingleThreadedProcess singleThreaded) Start(singleThreaded);
+        }
     }
 
     public static void Stop(SingleThreadedProcess process)
@@ -71,6 +136,50 @@ public static class ProcessManger
     {
         if (process is ScheduledProcess scheduled) Stop(scheduled);
         else if (process is SingleThreadedProcess singleThreaded) Stop(singleThreaded);
+    }
+
+    public static bool Restart(Process process)
+    {
+        return RestartInternal(process, false);
+    }
+
+    private static bool RestartInternal(Process process, bool force)
+    {
+        if (process == null || (!force && !process.canTerminate) || !process.CanRestart || !Contains(process))
+            return false;
+
+        for (int i = 0; i < pendingRestarts.Count; i++)
+            if (pendingRestarts[i].Original == process)
+                return false;
+
+        pendingRestarts.Add(new PendingRestart
+        {
+            Original = process,
+            Factory = process.startInfo.RestartFactory,
+        });
+        Stop(process);
+        return true;
+    }
+
+    private static void StartPendingRestarts()
+    {
+        for (int i = pendingRestarts.Count - 1; i >= 0; i--)
+        {
+            PendingRestart pending = pendingRestarts[i];
+            if (Contains(pending.Original)) continue;
+            pendingRestarts.RemoveAt(i);
+
+            Process replacement = null;
+            try { replacement = pending.Factory?.Invoke(); }
+            catch (Exception exception)
+            {
+                Cosmos.Kernel.Core.IO.Serial.WriteString(
+                    "Could not restart " + pending.Original.name + ": " + exception.Message + "\n");
+            }
+
+            if (replacement is ScheduledProcess scheduled) Start(scheduled);
+            else if (replacement is SingleThreadedProcess singleThreaded) Start(singleThreaded);
+        }
     }
 
     public static int ProcessCount => processes.Count + scheduledProcesses.Count;
