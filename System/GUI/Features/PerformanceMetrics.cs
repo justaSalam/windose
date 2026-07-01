@@ -28,6 +28,9 @@ public static class PerformanceMetrics
         WindowManagerTicks = 0;
         MessageTicks = 0;
         ComposeTicks = 0;
+        UploadTicks = 0;
+        OverlayTicks = 0;
+        DisplayTicks = 0;
     }
 
     public static void AddWindowManager(long startedAt)

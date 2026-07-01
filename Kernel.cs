@@ -8,7 +8,7 @@ using Cosmos.Kernel.Core.Runtime;
 using Cosmos.Kernel.HAL;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
-using Cosmos.Kernel.System.Mouse;
+using Windose.Drivers;
 using Sys = Cosmos.Kernel.System;
 
 
@@ -27,13 +27,27 @@ public class Kernel : Sys.Kernel
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
     public static Canvas canvas = null!;
-    private DirectBitmap performanceOverlay;
 
     private WindowManager windowManager = null!;
+    private CosmosDisplayDriver displayDriver = null!;
+    private CosmosMouseDriver mouseDriver = null!;
     int tick;
 
 
     protected override void BeforeRun()
+    {
+        KernelPanic.Install();
+        try
+        {
+            InitializeKernel();
+        }
+        catch (Exception exception)
+        {
+            KernelPanic.Show("KERNEL_INITIALIZATION_FAILURE", exception);
+        }
+    }
+
+    private void InitializeKernel()
     {
         Console.WriteLine("Booting Windose");
 
@@ -41,18 +55,24 @@ public class Kernel : Sys.Kernel
         GarbageCollector.Initialize();
         FileSystemManager.InitializeTemporary();
         SystemRegistry.Initialize();
+        Palette.Initialize();
 
 
-        canvas = Canvas.GetFullScreen();
-        mainBuffer = new DirectBitmap(canvas.Width, canvas.Height);
-        performanceOverlay = new DirectBitmap(Math.Max(1, Math.Min(800, canvas.Width - 20)), 52);
+        displayDriver = new CosmosDisplayDriver();
+        DriverManager.Register(displayDriver);
+        DriverManager.Start(displayDriver);
 
-        MouseManager.Initialize();
-        MouseManager.SetScreenSize(canvas.Width, canvas.Height);
-        Global.screenHeight = canvas.Height;
-        Global.screenWidth = canvas.Width;
-        SystemRegistry.SetRuntimeValue("System/Display/CurrentWidth", (long)canvas.Width);
-        SystemRegistry.SetRuntimeValue("System/Display/CurrentHeight", (long)canvas.Height);
+        canvas = displayDriver.Canvas;
+        mainBuffer = displayDriver.BackBuffer;
+
+        mouseDriver = new CosmosMouseDriver(displayDriver.Width, displayDriver.Height);
+        DriverManager.Register(mouseDriver);
+        DriverManager.Start(mouseDriver);
+
+        Global.screenHeight = displayDriver.Height;
+        Global.screenWidth = displayDriver.Width;
+        SystemRegistry.SetRuntimeValue("System/Display/CurrentWidth", (long)displayDriver.Width);
+        SystemRegistry.SetRuntimeValue("System/Display/CurrentHeight", (long)displayDriver.Height);
 
         Console.WriteLine("Windose booted successfully");
 
@@ -76,31 +96,19 @@ public class Kernel : Sys.Kernel
     {
         try
         {
-            Mouse.Update();
+            mouseDriver.Update();
+
+            Tick();
 
             PerformanceMetrics.BeginFrame();
             long processStartedAt = PerformanceMetrics.Now;
             ProcessManger.Update();
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
-            long uploadStartedAt = PerformanceMetrics.Now;
-            canvas.DrawArray(mainBuffer.GetBuffer(), 0, 0, canvas.Width, canvas.Height);
-            PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
-
-            long overlayStartedAt = PerformanceMetrics.Now;
-
-            canvas.DrawFilledCircle(Color.Black, MouseManager.X, MouseManager.Y, 3);
-            canvas.DrawFilledCircle(Color.White, MouseManager.X, MouseManager.Y, 2);
-            PerformanceMetrics.OverlayTicks = PerformanceMetrics.Now - overlayStartedAt;
-
-            long displayStartedAt = PerformanceMetrics.Now;
-            canvas.Display();
-            PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
+            displayDriver.Present(mainBuffer, (int)mouseDriver.X, (int)mouseDriver.Y);
 
             SystemPowerManager.ExecutePending();
 
-
-            Tick();
             if (tick > 0 && tick % gcrate == 0) GarbageCollector.Collect();
 
 
@@ -108,9 +116,7 @@ public class Kernel : Sys.Kernel
         }
         catch (Exception ex)
         {
-            string message = "Kernel frame error: " + ex.Message;
-            Serial.WriteString($"{message}\n");
-            Console.WriteLine(message);
+            KernelPanic.Show("KERNEL_FRAME_FAILURE", ex);
         }
 
     }

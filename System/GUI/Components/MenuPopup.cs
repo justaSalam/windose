@@ -120,15 +120,21 @@ public class MenuPopup : Component
 
     public override void DrawLocal()
     {
-        DrawRaisedRectangle(0, 0, Width, Height);
+        if (Palette.FlatControls)
+        {
+            DrawFilledRectangle(Palette.MenuBackground, 0, 0, Width, Height);
+            DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
+        }
+        else
+        {
+            DrawRaisedRectangle(0, 0, Width, Height);
+        }
 
         foreach (Component child in children)
         {
             if (!child.Visible) continue;
 
-            child.DrawLocal();
             DrawChild(child);
-            child.MarkCleaned();
         }
     }
 

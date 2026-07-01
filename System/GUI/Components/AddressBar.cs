@@ -76,9 +76,7 @@ public class AddressBar : Component
         {
             if (!child.Visible) continue;
 
-            child.DrawLocal();
             DrawChild(child);
-            child.MarkCleaned();
         }
     }
 

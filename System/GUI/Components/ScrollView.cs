@@ -80,9 +80,7 @@ public class ScrollView : Component
 
         if (content != null)
         {
-            content.DrawLocal();
-            DrawContent();
-            content.MarkCleaned();
+            DrawChild(content, new Rectangle(2, 2, GetViewportWidth(), GetViewportHeight()));
         }
 
         DrawScrollbars();
@@ -97,26 +95,8 @@ public class ScrollView : Component
     {
         base.MarkChildDirty();
 
-        // The child is rendered into this component's clipped viewport buffer.
-        // Invalidating only the child's screen bounds can leave that cached
-        // viewport unchanged until an unrelated full-window redraw occurs.
+        // Changes inside the scrolled content redraw this clipped viewport.
         WindowManager.Invalidate(this);
-    }
-
-    private void DrawContent()
-    {
-        int viewportWidth = GetViewportWidth();
-        int viewportHeight = GetViewportHeight();
-
-        buffer.DrawArrayClipped(
-            content.GetRawBuffer(),
-            (int)content.GetBuffer().Width,
-            scrollX,
-            scrollY,
-            2,
-            2,
-            viewportWidth,
-            viewportHeight);
     }
 
     private void DrawScrollbars()

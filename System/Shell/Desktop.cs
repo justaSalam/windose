@@ -26,15 +26,24 @@ public class Desktop : Component
 
     private void OnRegistryChanged(RegistryChange change)
     {
-        if (!change.Key.Equals("System/Desktop/BackgroundColor", StringComparison.OrdinalIgnoreCase)) return;
+        if (!change.Key.Equals("System/Desktop/BackgroundColor", StringComparison.OrdinalIgnoreCase) &&
+            !change.Key.Equals("System/Theme/Name", StringComparison.OrdinalIgnoreCase)) return;
         ApplyRegistryBackground();
         ForceDirty();
     }
 
     private void ApplyRegistryBackground()
     {
-        string value = SystemRegistry.GetString("System/Desktop/BackgroundColor", "#008080");
-        backgroundColor = TryParseColor(value, out Color color) ? color : Color.FromArgb(0, 128, 128);
+        string value = SystemRegistry.GetString("System/Desktop/BackgroundColor", "theme");
+        backgroundColor = IsThemeBackground(value)
+            ? Palette.DesktopBackground
+            : TryParseColor(value, out Color color) ? color : Palette.DesktopBackground;
+    }
+
+    private static bool IsThemeBackground(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ||
+            value.Trim().Equals("theme", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryParseColor(string value, out Color color)

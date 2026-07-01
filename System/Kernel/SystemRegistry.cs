@@ -47,7 +47,8 @@ public static class SystemRegistry
         {
             if (initialized) return;
             initialized = true;
-            DefineNoLock("System/Desktop/BackgroundColor", "#008080", "Desktop background color in #RRGGBB format.", false, true);
+            DefineNoLock("System/Theme/Name", "classic", "Current UI theme: classic or modern.", false, true);
+            DefineNoLock("System/Desktop/BackgroundColor", "theme", "Desktop background color in #RRGGBB format, or theme to use the active theme background.", false, true);
             DefineNoLock("System/Desktop/Wallpaper", "", "Wallpaper path. Reserved until bitmap-backed storage is available.", false, true);
             DefineNoLock("System/Desktop/WallpaperMode", "center", "Wallpaper layout: center, tile, or stretch.", false, true);
             DefineNoLock("System/Display/Width", 1920L, "Requested boot framebuffer width.", true, true);

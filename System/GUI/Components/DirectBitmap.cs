@@ -12,6 +12,15 @@ public unsafe class DirectBitmap
     internal int Stride;
     internal int Pitch;
 
+    private const int MaxClipDepth = 32;
+    private readonly int[] originXStack = new int[MaxClipDepth];
+    private readonly int[] originYStack = new int[MaxClipDepth];
+    private readonly Rectangle[] clipStack = new Rectangle[MaxClipDepth];
+    private int contextDepth;
+    private int originX;
+    private int originY;
+    private Rectangle clipBounds;
+
     public Bitmap GetBufferBitmap
     {
         get
@@ -29,18 +38,77 @@ public unsafe class DirectBitmap
 
         Stride = 32 / 8;
         Pitch = Width * Stride;
+        clipBounds = new Rectangle(0, 0, Width, Height);
+    }
+
+    public bool HasVisibleClip => clipBounds.Width > 0 && clipBounds.Height > 0;
+
+    public void ResetContext(Rectangle clip)
+    {
+        contextDepth = 0;
+        originX = 0;
+        originY = 0;
+        clipBounds = Rectangle.Intersect(new Rectangle(0, 0, Width, Height), clip);
+    }
+
+    public void ResetContext()
+    {
+        ResetContext(new Rectangle(0, 0, Width, Height));
+    }
+
+    public bool PushContext(int x, int y, int width, int height)
+    {
+        return PushContext(x, y, width, height, new Rectangle(x, y, width, height));
+    }
+
+    public bool PushContext(int x, int y, int width, int height, Rectangle parentLocalClip)
+    {
+        if (contextDepth >= MaxClipDepth) return false;
+
+        originXStack[contextDepth] = originX;
+        originYStack[contextDepth] = originY;
+        clipStack[contextDepth] = clipBounds;
+        contextDepth++;
+
+        Rectangle componentBounds = new Rectangle(originX + x, originY + y, width, height);
+        Rectangle requestedClip = new Rectangle(
+            originX + parentLocalClip.X,
+            originY + parentLocalClip.Y,
+            parentLocalClip.Width,
+            parentLocalClip.Height);
+
+        originX += x;
+        originY += y;
+        clipBounds = Rectangle.Intersect(clipBounds, componentBounds);
+        clipBounds = Rectangle.Intersect(clipBounds, requestedClip);
+        return true;
+    }
+
+    public void PopContext()
+    {
+        if (contextDepth <= 0) return;
+        contextDepth--;
+        originX = originXStack[contextDepth];
+        originY = originYStack[contextDepth];
+        clipBounds = clipStack[contextDepth];
     }
 
     public void SetPixel(int x, int y, Color color)
     {
+        x += originX;
+        y += originY;
+        if (!ContainsClipped(x, y)) return;
         buffer.RawData[x + y * Width] = color.ToArgb();
     }
 
     public void SetPixelAlpha(int x, int y, int colour)
     {
+        x += originX;
+        y += originY;
+        if (!ContainsClipped(x, y)) return;
         int index = x + y * Width;
 
-        if (index < buffer.RawData.Length)
+        if (index >= 0 && index < buffer.RawData.Length)
         {
             if ((colour >> 24) == 0xFF)
             {
@@ -64,7 +132,9 @@ public unsafe class DirectBitmap
     }
     public virtual void DrawPoint(Color color, int x, int y)
     {
-        if (buffer == null || x < 0 || x >= Width || y < 0 || y >= Height)
+        x += originX;
+        y += originY;
+        if (buffer == null || !ContainsClipped(x, y))
         {
             return;
         }
@@ -76,7 +146,7 @@ public unsafe class DirectBitmap
                 return;
             }
 
-            color = AlphaBlend(color, GetPointColor(x, y), color.A);
+            color = AlphaBlend(color, Color.FromArgb(buffer.RawData[y * Width + x]), color.A);
         }
 
         buffer.RawData[y * Width + x] = color.ToArgb();
@@ -84,7 +154,9 @@ public unsafe class DirectBitmap
 
     public virtual void DrawPoint(int color, int x, int y)
     {
-        if (buffer == null || x < 0 || x >= Width || y < 0 || y >= Height)
+        x += originX;
+        y += originY;
+        if (buffer == null || !ContainsClipped(x, y))
         {
             return;
         }
@@ -93,30 +165,8 @@ public unsafe class DirectBitmap
 
     public virtual void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
-        if (preventOffBoundPixels)
-        {
-            uint num = Math.Min(image.Width, (uint)(Width - x));
-            uint num2 = Math.Min(image.Height, (uint)(Height - y));
-            for (int i = 0; i < num; i++)
-            {
-                for (int j = 0; j < num2; j++)
-                {
-                    Color color = Color.FromArgb(image.RawData[i + j * image.Width]);
-                    DrawPoint(color, x + i, y + j);
-                }
-            }
-
-            return;
-        }
-
-        for (int k = 0; k < image.Width; k++)
-        {
-            for (int l = 0; l < image.Height; l++)
-            {
-                Color color = Color.FromArgb(image.RawData[k + l * image.Width]);
-                DrawPoint(color, x + k, y + l);
-            }
-        }
+        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y,
+            (int)image.Width, (int)image.Height);
     }
 
     public virtual Bitmap GetImage(int x, int y, int width, int height)
@@ -133,67 +183,43 @@ public unsafe class DirectBitmap
         return bitmap;
     }
 
-    private static int[] ScaleImage(Image image, int newWidth, int newHeight)
-    {
-        int[] rawData = image.RawData;
-        int width = (int)image.Width;
-        uint height = image.Height;
-        int[] array = new int[newWidth * newHeight];
-        int num = (width << 16) / newWidth + 1;
-        int num2 = (int)(height << 16) / newHeight + 1;
-        for (int i = 0; i < newHeight; i++)
-        {
-            for (int j = 0; j < newWidth; j++)
-            {
-                int num3 = j * num >> 16;
-                int num4 = i * num2 >> 16;
-                array[i * newWidth + j] = rawData[num4 * width + num3];
-            }
-        }
-
-        return array;
-    }
-
     public virtual void DrawImage(Image image, int x, int y, int w, int h, bool preventOffBoundPixels = true)
     {
-        int[] array = ScaleImage(image, w, h);
-        if (preventOffBoundPixels)
-        {
-            int num = Math.Min(w, (int)Width - x);
-            int num2 = Math.Min(h, (int)Height - y);
-            for (int i = 0; i < num; i++)
-            {
-                for (int j = 0; j < num2; j++)
-                {
-                    Color color = Color.FromArgb(array[i + j * w]);
-                    DrawPoint(color, x + i, y + j);
-                }
-            }
-
-            return;
-        }
-
-        for (int k = 0; k < w; k++)
-        {
-            for (int l = 0; l < h; l++)
-            {
-                Color color = Color.FromArgb(array[k + l * w]);
-                DrawPoint(color, x + k, y + l);
-            }
-        }
+        DrawScaledImageAlpha(image, x, y, w, h);
     }
 
     public virtual void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
     {
         int num = Math.Min((int)image.Width, maxWidth);
         int num2 = Math.Min((int)image.Height, maxHeight);
-        int[] rawData = image.RawData;
-        for (int i = 0; i < num; i++)
+        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, num, num2);
+    }
+
+    private void DrawScaledImageAlpha(Image image, int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0 || image.Width == 0 || image.Height == 0) return;
+
+        int targetX = originX + x;
+        int targetY = originY + y;
+        int left = Math.Max(Math.Max(targetX, clipBounds.Left), 0);
+        int top = Math.Max(Math.Max(targetY, clipBounds.Top), 0);
+        int right = Math.Min(Math.Min(targetX + width, clipBounds.Right), Width);
+        int bottom = Math.Min(Math.Min(targetY + height, clipBounds.Bottom), Height);
+        if (left >= right || top >= bottom) return;
+
+        int sourceWidth = (int)image.Width;
+        int sourceHeight = (int)image.Height;
+        int[] source = image.RawData;
+
+        for (int targetRow = top; targetRow < bottom; targetRow++)
         {
-            for (int j = 0; j < num2; j++)
+            int sourceY = (targetRow - targetY) * sourceHeight / height;
+            int sourceRow = sourceY * sourceWidth;
+
+            for (int targetColumn = left; targetColumn < right; targetColumn++)
             {
-                Color color = Color.FromArgb(rawData[i + j * image.Width]);
-                DrawPoint(color, x + i, y + j);
+                int sourceX = (targetColumn - targetX) * sourceWidth / width;
+                BlendTargetPixel(targetColumn, targetRow, source[sourceRow + sourceX]);
             }
         }
     }
@@ -264,6 +290,7 @@ public unsafe class DirectBitmap
         for (int destY = 0; destY < height; destY++)
         {
             int sourceY = destY * font.Height / height;
+            int runStart = -1;
 
             for (int destX = 0; destX < width; destX++)
             {
@@ -271,9 +298,17 @@ public unsafe class DirectBitmap
 
                 if (FontPixelSet(c, font, sourceX, sourceY))
                 {
-                    DrawPoint(color, x + destX, y + destY);
+                    if (runStart < 0) runStart = destX;
+                }
+                else if (runStart >= 0)
+                {
+                    DrawHorizontalSpan(color, x + runStart, y + destY, destX - runStart);
+                    runStart = -1;
                 }
             }
+
+            if (runStart >= 0)
+                DrawHorizontalSpan(color, x + runStart, y + destY, width - runStart);
         }
     }
 
@@ -286,14 +321,23 @@ public unsafe class DirectBitmap
         int num2 = height * num * (byte)c;
         for (int i = 0; i < height; i++)
         {
+            int runStart = -1;
             for (byte b = 0; b < width; b++)
             {
                 byte byteToConvert = data[num2 + i * num + b / 8];
                 if (font.ConvertByteToBitAddress(byteToConvert, b % 8 + 1))
                 {
-                    DrawPoint(color, (ushort)(x + b), (ushort)(y + i));
+                    if (runStart < 0) runStart = b;
+                }
+                else if (runStart >= 0)
+                {
+                    DrawHorizontalSpan(color, x + runStart, y + i, b - runStart);
+                    runStart = -1;
                 }
             }
+
+            if (runStart >= 0)
+                DrawHorizontalSpan(color, x + runStart, y + i, width - runStart);
         }
     }
     public virtual Color GetPointColor(int x, int y)
@@ -303,6 +347,8 @@ public unsafe class DirectBitmap
             return Color.Black;
         }
 
+        x += originX;
+        y += originY;
         if (x < 0 || x >= Width || y < 0 || y >= Height)
         {
             return Color.Black;
@@ -317,6 +363,8 @@ public unsafe class DirectBitmap
             return 0;
         }
 
+        x += originX;
+        y += originY;
         if (x < 0 || x >= Width || y < 0 || y >= Height)
         {
             return 0;
@@ -347,13 +395,7 @@ public unsafe class DirectBitmap
     }
     public virtual void DrawArray(int[] colors, int x, int y, int width, int height)
     {
-        for (int i = 0; i < width; i++)
-        {
-            for (int j = 0; j < height; j++)
-            {
-                DrawPoint(colors[j * width + i], x + i, y + j);
-            }
-        }
+        DrawArrayClipped(colors, width, 0, 0, x, y, width, height);
     }
 
     private bool FontPixelSet(char c, Font font, int x, int y)
@@ -369,6 +411,9 @@ public unsafe class DirectBitmap
     {
         if (colors == null || sourceWidth <= 0) return;
         int sourceHeight = colors.Length / sourceWidth;
+
+        destinationX += originX;
+        destinationY += originY;
 
         if (sourceX < 0)
         {
@@ -411,6 +456,28 @@ public unsafe class DirectBitmap
         {
             height = Height - destinationY;
         }
+
+        if (destinationX < clipBounds.Left)
+        {
+            int clipped = clipBounds.Left - destinationX;
+            sourceX += clipped;
+            width -= clipped;
+            destinationX = clipBounds.Left;
+        }
+
+        if (destinationY < clipBounds.Top)
+        {
+            int clipped = clipBounds.Top - destinationY;
+            sourceY += clipped;
+            height -= clipped;
+            destinationY = clipBounds.Top;
+        }
+
+        if (destinationX + width > clipBounds.Right)
+            width = clipBounds.Right - destinationX;
+
+        if (destinationY + height > clipBounds.Bottom)
+            height = clipBounds.Bottom - destinationY;
 
         if (sourceX + width > sourceWidth)
             width = sourceWidth - sourceX;
@@ -431,8 +498,16 @@ public unsafe class DirectBitmap
 
     public virtual void DrawArrayAlphaClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
+        DrawArrayAlphaClipped(colors, sourceWidth, sourceX, sourceY, destinationX, destinationY, width, height, 255);
+    }
+
+    public virtual void DrawArrayAlphaClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height, byte globalOpacity)
+    {
         if (colors == null || sourceWidth <= 0) return;
         int sourceHeight = colors.Length / sourceWidth;
+
+        destinationX += originX;
+        destinationY += originY;
 
         if (sourceX < 0)
         {
@@ -472,6 +547,28 @@ public unsafe class DirectBitmap
         if (destinationY + height > Height)
             height = Height - destinationY;
 
+        if (destinationX < clipBounds.Left)
+        {
+            int clipped = clipBounds.Left - destinationX;
+            sourceX += clipped;
+            width -= clipped;
+            destinationX = clipBounds.Left;
+        }
+
+        if (destinationY < clipBounds.Top)
+        {
+            int clipped = clipBounds.Top - destinationY;
+            sourceY += clipped;
+            height -= clipped;
+            destinationY = clipBounds.Top;
+        }
+
+        if (destinationX + width > clipBounds.Right)
+            width = clipBounds.Right - destinationX;
+
+        if (destinationY + height > clipBounds.Bottom)
+            height = clipBounds.Bottom - destinationY;
+
         if (sourceX + width > sourceWidth)
             width = sourceWidth - sourceX;
 
@@ -489,6 +586,9 @@ public unsafe class DirectBitmap
             {
                 int color = colors[sourceIndex + x];
                 int alpha = (color >> 24) & 0xff;
+
+                if (globalOpacity < 255)
+                    alpha = (alpha * globalOpacity) >> 8;
 
                 if (alpha == 0)
                     continue;
@@ -511,18 +611,60 @@ public unsafe class DirectBitmap
     }
     internal void DrawHorizontalLine(Color color, int dx, int x1, int y1)
     {
-        for (int i = 0; i < dx; i++)
-        {
-            DrawPoint(color, x1 + i, y1);
-        }
+        if (dx >= 0)
+            DrawHorizontalSpan(color, x1, y1, dx);
+        else
+            DrawHorizontalSpan(color, x1 + dx, y1, -dx);
     }
 
     internal void DrawVerticalLine(Color color, int dy, int x1, int y1)
     {
-        for (int i = 0; i < dy; i++)
+        int startY = dy >= 0 ? y1 : y1 + dy;
+        int length = Math.Abs(dy);
+        int targetX = originX + x1;
+        int targetY = originY + startY;
+
+        if (targetX < clipBounds.Left || targetX >= clipBounds.Right ||
+            targetX < 0 || targetX >= Width || length <= 0)
+            return;
+
+        int top = Math.Max(Math.Max(targetY, clipBounds.Top), 0);
+        int bottom = Math.Min(Math.Min(targetY + length, clipBounds.Bottom), Height);
+        int argb = color.ToArgb();
+
+        for (int y = top; y < bottom; y++)
         {
-            DrawPoint(color, x1, y1 + i);
+            if (color.A == byte.MaxValue)
+                buffer.RawData[y * Width + targetX] = argb;
+            else
+                BlendTargetPixel(targetX, y, argb);
         }
+    }
+
+    private void DrawHorizontalSpan(Color color, int x, int y, int length)
+    {
+        if (length <= 0 || color.A == 0) return;
+
+        int targetX = originX + x;
+        int targetY = originY + y;
+        if (targetY < clipBounds.Top || targetY >= clipBounds.Bottom ||
+            targetY < 0 || targetY >= Height)
+            return;
+
+        int left = Math.Max(Math.Max(targetX, clipBounds.Left), 0);
+        int right = Math.Min(Math.Min(targetX + length, clipBounds.Right), Width);
+        if (left >= right) return;
+
+        int argb = color.ToArgb();
+        int index = targetY * Width + left;
+        if (color.A == byte.MaxValue)
+        {
+            Array.Fill(buffer.RawData, argb, index, right - left);
+            return;
+        }
+
+        for (int target = left; target < right; target++)
+            BlendTargetPixel(target, targetY, argb);
     }
 
     internal void DrawDiagonalLine(Color color, int dx, int dy, int x1, int y1)
@@ -569,7 +711,6 @@ public unsafe class DirectBitmap
 
     public virtual void DrawLine(Color color, int x1, int y1, int x2, int y2)
     {
-        TrimLine(ref x1, ref y1, ref x2, ref y2);
         int num = x2 - x1;
         int num2 = y2 - y1;
         if (num2 == 0)
@@ -582,6 +723,9 @@ public unsafe class DirectBitmap
         }
         else
         {
+            TrimLine(ref x1, ref y1, ref x2, ref y2);
+            num = x2 - x1;
+            num2 = y2 - y1;
             DrawDiagonalLine(color, num, num2, x1, y1);
         }
     }
@@ -617,10 +761,6 @@ public unsafe class DirectBitmap
 
     public virtual void DrawCircle(Color color, int xCenter, int yCenter, int radius)
     {
-        if (!IsCoordinateValid(xCenter + radius, yCenter)
-            || !IsCoordinateValid(xCenter - radius, yCenter)
-            || !IsCoordinateValid(xCenter, yCenter + radius)
-            || !IsCoordinateValid(xCenter, yCenter - radius)) return;
         int num = radius;
         int num2 = 0;
         int num3 = 0;
@@ -683,10 +823,6 @@ public unsafe class DirectBitmap
 
     public virtual void DrawEllipse(Color color, int xCenter, int yCenter, int xR, int yR)
     {
-        if (!IsCoordinateValid(xCenter + xR, yCenter)
-            || !IsCoordinateValid(xCenter - xR, yCenter)
-            || !IsCoordinateValid(xCenter, yCenter + yR)
-            || !IsCoordinateValid(xCenter, yCenter - yR)) return;
         int num = 2 * xR;
         int num2 = 2 * yR;
         int num3 = num2 & 1;
@@ -777,6 +913,13 @@ public unsafe class DirectBitmap
 
     public virtual void DrawRaisedRect(int x, int y, int width, int height)
     {
+        if (Palette.FlatControls)
+        {
+            DrawFilledRectangle(Palette.ControlFace, x, y, width, height);
+            DrawRectangle(Palette.WindowBorder, x, y, width, height);
+            return;
+        }
+
         DrawRaisedRect(x, y, width, height, Palette.ControlFace, Palette.ControlWhite, Palette.ControlShadow, Palette.ControlBlack);
     }
 
@@ -804,6 +947,13 @@ public unsafe class DirectBitmap
 
     public virtual void DrawSunkenRect(int x, int y, int width, int height)
     {
+        if (Palette.FlatControls)
+        {
+            DrawFilledRectangle(Palette.ControlWhite, x, y, width, height);
+            DrawRectangle(Palette.WindowBorder, x, y, width, height);
+            return;
+        }
+
         DrawSunkenRect(x, y, width, height, Palette.ControlFace, Palette.ControlBlack, Palette.ControlShadow, Palette.ControlHighlight);
     }
 
@@ -854,15 +1004,22 @@ public unsafe class DirectBitmap
             height = width;
         }
 
-        if (preventOffBoundPixels)
+        Rectangle target = new Rectangle(originX + xStart, originY + yStart, width, height);
+        target = Rectangle.Intersect(target, clipBounds);
+        target = Rectangle.Intersect(target, new Rectangle(0, 0, Width, Height));
+        if (target.Width <= 0 || target.Height <= 0) return;
+
+        int argb = color.ToArgb();
+        if (color.A == byte.MaxValue)
         {
-            width = Math.Min(width, (int)Width - xStart);
-            height = Math.Min(height, (int)Height - yStart);
+            for (int y = target.Top; y < target.Bottom; y++)
+                Array.Fill(buffer.RawData, argb, y * Width + target.Left, target.Width);
+            return;
         }
-        for (int i = yStart; i < yStart + height; i++)
-        {
-            DrawLine(color, xStart, i, xStart + width - 1, i);
-        }
+
+        for (int y = target.Top; y < target.Bottom; y++)
+            for (int x = target.Left; x < target.Right; x++)
+                BlendTargetPixel(x, y, argb);
     }
 
     public virtual void DrawTriangle(Color color, int v1x, int v1y, int v2x, int v2y, int v3x, int v3y)
@@ -872,7 +1029,38 @@ public unsafe class DirectBitmap
         DrawLine(color, v2x, v2y, v3x, v3y);
     }
 
-    protected bool IsCoordinateValid(int x, int y) => x >= 0 && x < Width && y >= 0 && y < Height;
+    protected bool IsCoordinateValid(int x, int y)
+    {
+        x += originX;
+        y += originY;
+        return ContainsClipped(x, y);
+    }
+
+    private bool ContainsClipped(int x, int y)
+    {
+        return x >= 0 && x < Width && y >= 0 && y < Height &&
+            x >= clipBounds.Left && x < clipBounds.Right &&
+            y >= clipBounds.Top && y < clipBounds.Bottom;
+    }
+
+    private void BlendTargetPixel(int x, int y, int color)
+    {
+        int index = x + y * Width;
+        int alpha = (color >> 24) & 0xff;
+        if (alpha == 0) return;
+        if (alpha == 0xff)
+        {
+            buffer.RawData[index] = color;
+            return;
+        }
+
+        int background = buffer.RawData[index];
+        int inverse = 255 - alpha;
+        int red = (((color >> 16) & 0xff) * alpha + ((background >> 16) & 0xff) * inverse) >> 8;
+        int green = (((color >> 8) & 0xff) * alpha + ((background >> 8) & 0xff) * inverse) >> 8;
+        int blue = ((color & 0xff) * alpha + (background & 0xff) * inverse) >> 8;
+        buffer.RawData[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+    }
 
     protected void TrimLine(ref int x1, ref int y1, ref int x2, ref int y2)
     {

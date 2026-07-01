@@ -14,6 +14,7 @@ public class WindowManager : SingleThreadedProcess
     private static List<UiMessage> messageQueue = new List<UiMessage>();
     private static readonly object messageQueueLock = new object();
     private readonly HashSet<Window> failedWindows = new HashSet<Window>();
+    private readonly HashSet<Component> renderedComponents = new HashSet<Component>();
     private readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
     private static bool hasPreviewRect;
     private static Rectangle previewRect;
@@ -55,6 +56,8 @@ public class WindowManager : SingleThreadedProcess
         mx = MouseManager.X;
         my = MouseManager.Y;
         mouseState = Mouse.state;
+
+        AnimationManager.Update(Kernel.DeltaTimeMs);
 
         DispatchMessages();
         ShowPendingFailures();
@@ -376,6 +379,7 @@ public class WindowManager : SingleThreadedProcess
         if (dirtyRects.Count == 0) return;
 
         long startedAt = PerformanceMetrics.Now;
+        renderedComponents.Clear();
 
         for (int i = 0; i < dirtyRects.Count; i++)
         {
@@ -395,7 +399,7 @@ public class WindowManager : SingleThreadedProcess
                     {
                         component.DrawDirtyLocal(dirtyRect);
                         component.DrawToScreen(dirtyRect);
-                        component.MarkCleaned();
+                        renderedComponents.Add(component);
                     }
                     else
                     {
@@ -408,6 +412,9 @@ public class WindowManager : SingleThreadedProcess
                 }
             }
         }
+
+        foreach (Component component in renderedComponents)
+            component.MarkCleaned();
 
         dirtyRects.Clear();
         PerformanceMetrics.AddCompose(startedAt);
@@ -501,6 +508,11 @@ public class WindowManager : SingleThreadedProcess
 
     public static void Minimize(Window window)
     {
+        UiAnimations.MinimizeWindow(window);
+    }
+
+    internal static void MinimizeImmediate(Window window)
+    {
         if (window == null || !window.canMinimize || window.IsMinimized) return;
 
         Invalidate(window.bounds);
@@ -518,10 +530,23 @@ public class WindowManager : SingleThreadedProcess
     {
         if (window == null) return;
 
-        window.RestoreFromTaskbar();
-        Activate(window);
-        Invalidate(window.bounds);
-        Explorer.taskbar.MarkDirty();
+        if (window.IsMinimized)
+            UiAnimations.RestoreWindow(window);
+        else
+            Activate(window);
+    }
+
+    public static Rectangle GetTaskbarButtonBounds(Window window)
+    {
+        if (window == null || !taskbarButtons.TryGetValue(window, out Button taskbarButton))
+            return Rectangle.Empty;
+
+        return taskbarButton.AbsoluteRectangle;
+    }
+
+    internal static void FocusTopVisibleWindowPublic(Window excludedWindow)
+    {
+        FocusTopVisibleWindow(excludedWindow);
     }
 
     public static void ToggleMaximize(Window window)
@@ -692,6 +717,28 @@ public class WindowManager : SingleThreadedProcess
         }
 
         dirtyRects.Add(dirtyRect);
+    }
+
+    public static void InvalidateAll()
+    {
+        for (int i = 0; i < Component.components.Count; i++)
+        {
+            Component component = Component.components[i];
+            if (component == null || !component.Visible) continue;
+            component.ForceDirty();
+        }
+
+        Invalidate(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
+    }
+
+    public static void RefreshThemeStyles()
+    {
+        for (int i = 0; i < windows.Count; i++)
+            windows[i]?.ApplyThemeStyle();
+
+        Explorer.taskbar?.ApplyThemeStyle();
+        Explorer.startMenu?.ApplyThemeStyle();
+        Explorer.desktop?.ForceDirty();
     }
 
     public void BringToFront(Window window)

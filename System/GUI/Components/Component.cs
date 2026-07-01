@@ -58,6 +58,8 @@ public class Component : IDisposable
                 visible = value;
                 dirty = true;
                 WindowManager.Invalidate(this);
+                if (!isRoot && parent != null)
+                    parent.MarkChildDirty();
 
                 foreach (Component component in children)
                 {
@@ -147,7 +149,20 @@ public class Component : IDisposable
     public bool clampSize = true;
     public bool forceDirty { get; private set; }
     protected bool visible;
+    private byte opacity = 255;
     public bool isRoot;
+
+    public byte Opacity
+    {
+        get => opacity;
+        set
+        {
+            byte clamped = value;
+            if (opacity == clamped) return;
+            opacity = clamped;
+            MarkDirty();
+        }
+    }
 
     protected Frame frame;
     protected Frame normalFrame;
@@ -371,7 +386,22 @@ public class Component : IDisposable
 
     public void DrawToScreen()
     {
-        Kernel.mainBuffer.DrawArrayClipped(buffer.GetBuffer(), buffer.Width, 0, 0, AbsoluteX, AbsoluteY, Width, Height);
+        if (opacity >= 255)
+        {
+            Kernel.mainBuffer.DrawArrayClipped(buffer.GetBuffer(), buffer.Width, 0, 0, AbsoluteX, AbsoluteY, Width, Height);
+            return;
+        }
+
+        Kernel.mainBuffer.DrawArrayAlphaClipped(
+            buffer.GetBuffer(),
+            buffer.Width,
+            0,
+            0,
+            AbsoluteX,
+            AbsoluteY,
+            Width,
+            Height,
+            opacity);
     }
 
     public void DrawToScreen(Rectangle dirtyRect)
@@ -379,7 +409,21 @@ public class Component : IDisposable
         Rectangle clipped = Rectangle.Intersect(AbsoluteRectangle, dirtyRect);
         if (clipped.Width <= 0 || clipped.Height <= 0) return;
 
-        Kernel.mainBuffer.DrawArrayClipped(
+        if (opacity >= 255)
+        {
+            Kernel.mainBuffer.DrawArrayClipped(
+                buffer.GetBuffer(),
+                buffer.Width,
+                clipped.X - AbsoluteX,
+                clipped.Y - AbsoluteY,
+                clipped.X,
+                clipped.Y,
+                clipped.Width,
+                clipped.Height);
+            return;
+        }
+
+        Kernel.mainBuffer.DrawArrayAlphaClipped(
             buffer.GetBuffer(),
             buffer.Width,
             clipped.X - AbsoluteX,
@@ -387,7 +431,8 @@ public class Component : IDisposable
             clipped.X,
             clipped.Y,
             clipped.Width,
-            clipped.Height);
+            clipped.Height,
+            opacity);
     }
 
     public virtual void Draw(Component component)
@@ -511,12 +556,15 @@ public class Component : IDisposable
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
         rectangle = new Rectangle(X, Y, width, height);
 
-        if (width > buffer.Width || height > buffer.Height)
+        if (isRoot && (width > buffer.Width || height > buffer.Height))
         {
             int newBufferWidth = RoundUpToChunk(Math.Max(width, buffer.Width), 64);
             int newBufferHeight = RoundUpToChunk(Math.Max(height, buffer.Height), 64);
 
             buffer = new DirectBitmap(newBufferWidth, newBufferHeight);
+
+            for (int i = 0; i < children.Count; i++)
+                children[i].BindRenderSurface(buffer);
 
             if (cacheBuffer != null)
                 cacheBuffer = new DirectBitmap(newBufferWidth, newBufferHeight);
@@ -605,6 +653,7 @@ public class Component : IDisposable
 
         child.ResolveHorizontalAnchor();
         child.ResolveVerticalAnchor();
+        child.BindRenderSurface(buffer);
         components.Remove(child);
         children.Add(child);
         MarkDirty();
@@ -751,7 +800,7 @@ public class Component : IDisposable
 
     public virtual bool IsDirty() => dirty;
     public virtual bool HasDirtyTree() => dirty || childrenDirty || forceDirty;
-    public virtual bool IsOpaqueForCopy() => true;
+    public virtual bool IsOpaqueForCopy() => opacity >= 255;
 
     public virtual void MarkDirty(bool invalidate = true)
     {
@@ -791,6 +840,28 @@ public class Component : IDisposable
 
     public virtual void DrawDirtyLocal(Rectangle dirtyRect)
     {
+        if (isRoot)
+        {
+            Rectangle localClip = new Rectangle(
+                dirtyRect.X - AbsoluteX,
+                dirtyRect.Y - AbsoluteY,
+                dirtyRect.Width,
+                dirtyRect.Height);
+            localClip = Rectangle.Intersect(new Rectangle(0, 0, Width, Height), localClip);
+            if (localClip.Width <= 0 || localClip.Height <= 0) return;
+
+            buffer.ResetContext(localClip);
+            try
+            {
+                DrawLocal();
+            }
+            finally
+            {
+                buffer.ResetContext();
+            }
+            return;
+        }
+
         if (dirty || forceDirty)
         {
             DrawLocal();
@@ -816,6 +887,12 @@ public class Component : IDisposable
 
     protected void DrawChildClipped(Component child, Rectangle dirtyRect)
     {
+        if (ReferenceEquals(buffer, child.buffer))
+        {
+            DrawChild(child);
+            return;
+        }
+
         Rectangle clipped = Rectangle.Intersect(child.AbsoluteRectangle, dirtyRect);
         if (clipped.Width <= 0 || clipped.Height <= 0) return;
 
@@ -824,6 +901,31 @@ public class Component : IDisposable
 
     protected void DrawChild(Component child)
     {
+        DrawChild(child, new Rectangle(0, 0, Width, Height));
+    }
+
+    protected void DrawChild(Component child, Rectangle parentLocalClip)
+    {
+        if (child == null || !child.Visible) return;
+
+        if (ReferenceEquals(buffer, child.buffer))
+        {
+            bool pushed = buffer.PushContext(child.X, child.Y, child.Width, child.Height, parentLocalClip);
+            try
+            {
+                if (pushed && buffer.HasVisibleClip)
+                {
+                    child.DrawLocal();
+                    child.MarkCleaned();
+                }
+            }
+            finally
+            {
+                if (pushed) buffer.PopContext();
+            }
+            return;
+        }
+
         DrawChildArea(child, 0, 0, child.X, child.Y, child.Width, child.Height);
     }
 
@@ -869,6 +971,13 @@ public class Component : IDisposable
         dirty = false;
         childrenDirty = false;
         forceDirty = false;
+    }
+
+    private void BindRenderSurface(DirectBitmap surface)
+    {
+        buffer = surface;
+        for (int i = 0; i < children.Count; i++)
+            children[i].BindRenderSurface(surface);
     }
 
 

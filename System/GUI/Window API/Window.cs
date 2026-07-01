@@ -4,6 +4,7 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
+using Windose;
 
 public class Window : Component
 {
@@ -18,6 +19,8 @@ public class Window : Component
     private bool isMinimized;
     private bool isMaximized;
     private Rectangle restoreBounds;
+    private Rectangle savedRestoreBounds;
+    private bool isAnimatingBounds;
 
     public bool canMaximize = true;
     public bool canMinimize = true;
@@ -39,6 +42,7 @@ public class Window : Component
 
     private Panel titlebar;
     private bool hasTitleBar;
+    private bool windowFocused;
 
 
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height)
@@ -75,20 +79,21 @@ public class Window : Component
     /// </summary>
     public override void DrawLocal()
     {
-        DrawRaisedRectangle(0, 0, Width, Height);
-
-
-
-        //DrawRectangle(Palette.ControlHighlight, 0, 0, Width, Height);
+        if (Palette.FlatControls)
+        {
+            DrawFilledRectangle(Palette.WindowBackground, 0, 0, Width, Height);
+            DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
+        }
+        else
+        {
+            DrawRaisedRectangle(0, 0, Width, Height);
+        }
 
         foreach (Component child in children)
         {
             if (!child.Visible) continue;
 
-
-            child.DrawLocal();
             DrawChild(child);
-            child.MarkCleaned();
         }
     }
 
@@ -97,27 +102,34 @@ public class Window : Component
     {
         if (useTitleBar)
         {
-            titlebar = new Panel(Palette.InactiveTitle, 2, 2, Width - 4, 25)
+            int border = Palette.BorderSize;
+            int titleHeight = Palette.TitleBarHeight;
+            titlebar = new Panel(Palette.InactiveTitle, border, border, Width - border * 2, titleHeight)
             {
                 useBackground = true,
-                textColor = Color.White,
+                textColor = Palette.TitleTextInactive,
                 clampSize = false,
                 text = title,
                 fontSize = 16,
                 horizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(2, 2, 2, 2)
+                Margin = new Thickness(border, border, border, border)
             };
             AddChild(titlebar);
             hasTitleBar = true;
 
-            AddChild(new Button(0, 0, 20, 20)
+            int titleButtonSize = Math.Max(20, titleHeight - 5);
+            int titleButtonTop = Math.Max(2, border + 1);
+            Color chromeBorder = Palette.FlatControls ? Palette.WindowBorder : Palette.ControlHighlight;
+
+            AddChild(new Button(0, 0, titleButtonSize, titleButtonSize)
             {
                 text = "X",
                 verticalAlignment = VerticalAlignment.Top,
                 horizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(3, 3, 3, 3),
+                Margin = new Thickness(3, titleButtonTop, 3, 3),
                 useBorders = true,
-                borderColor = Color.White,
+                borderColor = chromeBorder,
+                textColor = Palette.FlatControls ? Palette.ControlBlack : Palette.ControlBlack,
                 leftMouseRelease = () =>
                 {
                     WindowManager.PostClose(this);
@@ -126,14 +138,15 @@ public class Window : Component
 
             if (canMaximize)
             {
-                AddChild(new Button(25, 0, 20, 20)
+                AddChild(new Button(25, 0, titleButtonSize, titleButtonSize)
                 {
                     text = "O",
                     verticalAlignment = VerticalAlignment.Top,
                     horizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(3, 3, 23, 3),
+                    Margin = new Thickness(3, titleButtonTop, 3 + titleButtonSize, 3),
                     useBorders = true,
-                    borderColor = Color.White,
+                    borderColor = chromeBorder,
+                    textColor = Palette.ControlBlack,
                     leftMouseRelease = () =>
                     {
                         WindowManager.ToggleMaximize(this);
@@ -143,14 +156,15 @@ public class Window : Component
             }
             if (canMinimize)
             {
-                AddChild(new Button(50, 0, 20, 20)
+                AddChild(new Button(50, 0, titleButtonSize, titleButtonSize)
                 {
                     text = "_",
                     verticalAlignment = VerticalAlignment.Top,
                     horizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(3, 3, 46, 3),
+                    Margin = new Thickness(3, titleButtonTop, 3 + titleButtonSize * 2, 3),
                     useBorders = true,
-                    borderColor = Color.White,
+                    borderColor = chromeBorder,
+                    textColor = Palette.ControlBlack,
                     leftMouseRelease = () =>
                     {
                         WindowManager.Minimize(this);
@@ -159,6 +173,21 @@ public class Window : Component
             }
         }
 
+    }
+
+    public void ApplyThemeStyle()
+    {
+        ApplyTitlebarTheme();
+        MarkDirty();
+    }
+
+    private void ApplyTitlebarTheme()
+    {
+        if (!hasTitleBar || titlebar == null) return;
+
+        titlebar.color1 = windowFocused ? Palette.ActiveTitle : Palette.InactiveTitle;
+        titlebar.textColor = windowFocused ? Palette.TitleText : Palette.TitleTextInactive;
+        titlebar.MarkDirty();
     }
 
 
@@ -195,16 +224,12 @@ public class Window : Component
 
     public void SetFocused(bool focused)
     {
+        windowFocused = focused;
         if (!focused) OnLoseFocus();
 
         if (!hasTitleBar) return;
 
-        Color titlebarColor = focused ? Palette.ActiveTitle : Palette.InactiveTitle;
-        if (titlebar.color1 == titlebarColor) return;
-
-        titlebar.color1 = titlebarColor;
-        titlebar.MarkDirty();
-
+        ApplyTitlebarTheme();
     }
 
     public virtual void OnLoseFocus()
@@ -292,6 +317,8 @@ public class Window : Component
 
     public virtual bool HitTest(int mouseX, int mouseY)
     {
+        if (isMinimized || IsAnimatingBounds) return false;
+
         return mouseX >= bounds.X && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y && mouseY < bounds.Y + bounds.Height;
     }
 
@@ -307,6 +334,12 @@ public class Window : Component
 
     private void Move(int x, int y)
     {
+        if (isAnimatingBounds)
+        {
+            ApplyAnimatedBounds(new Rectangle(x, y, Width, Height));
+            return;
+        }
+
         Rectangle oldBounds = bounds;
 
         X = x;
@@ -320,6 +353,12 @@ public class Window : Component
 
     private void Resize(int x, int y, int width, int height)
     {
+        if (isAnimatingBounds)
+        {
+            ApplyAnimatedBounds(new Rectangle(x, y, width, height));
+            return;
+        }
+
         Rectangle oldBounds = bounds;
 
         X = x;
@@ -330,6 +369,55 @@ public class Window : Component
         WindowManager.Invalidate(oldBounds);
         WindowManager.Invalidate(bounds);
         MarkDirty();
+    }
+
+    internal void ApplyAnimatedBounds(Rectangle rect)
+    {
+        Rectangle oldBounds = bounds;
+
+        X = rect.X;
+        Y = rect.Y;
+        if (rect.Width != Width || rect.Height != Height)
+            base.Resize(rect.Width, rect.Height);
+
+        bounds = new Rectangle(X, Y, Width, Height);
+        ComputeAbsoluteCoordinates();
+
+        WindowManager.Invalidate(oldBounds);
+        WindowManager.Invalidate(bounds);
+        MarkDirty(false);
+    }
+
+    internal void RememberBoundsForRestore()
+    {
+        savedRestoreBounds = bounds;
+    }
+
+    internal Rectangle GetSavedRestoreBounds()
+    {
+        if (savedRestoreBounds.Width > 0 && savedRestoreBounds.Height > 0)
+            return savedRestoreBounds;
+
+        return bounds;
+    }
+
+    internal void BeginRestoreAnimation(Rectangle startBounds)
+    {
+        isMinimized = false;
+        Visible = true;
+        isAnimatingBounds = true;
+        ApplyAnimatedBounds(startBounds);
+    }
+
+    internal void EndBoundsAnimation()
+    {
+        isAnimatingBounds = false;
+    }
+
+    internal void FinishMinimize()
+    {
+        isAnimatingBounds = false;
+        MinimizeWindow();
     }
 
     internal void MinimizeWindow()
@@ -370,6 +458,7 @@ public class Window : Component
 
     public bool IsMinimized => isMinimized;
     public bool IsMaximized => isMaximized;
+    public bool IsAnimatingBounds => isAnimatingBounds || AnimationManager.IsAnimating(this);
     public void Stop() //TODO Dispose, GC wont collect it without proper disposal first
     {
         Visible = false;

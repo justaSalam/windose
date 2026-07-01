@@ -28,6 +28,7 @@ public class ListView : Component
 
     public Action<ListViewItem> selectedChanged;
     public Action<ListViewItem> itemDoubleClick;
+    public Action<ListViewItem, int, int> itemRightClick;
 
     private int pressedIndex = -1;
     private int lastClickIndex = -1;
@@ -283,6 +284,17 @@ public class ListView : Component
             return false;
 
         int index = GetItemIndexAt(mouseX - AbsoluteX, mouseY - AbsoluteY);
+
+        if (mouse.right == MouseEvents.Release)
+        {
+            if (index >= 0)
+            {
+                SelectItem(items[index]);
+                itemRightClick?.Invoke(items[index], mouseX, mouseY);
+            }
+
+            return true;
+        }
 
         switch (mouse.left)
         {

@@ -123,6 +123,7 @@ public static class CommandRegistry
         Register("move", "Moves a file.", "move <source> <destination> [/y]", MoveFile);
         Register("ps", "Lists running processes.", "ps", ListProcesses);
         RegisterAlias("processes", "ps");
+        Register("theme", "Shows or changes the active UI theme.", "theme [classic|modern]", Theme);
 
         Register("run", "Runs a Breeze application file.", "run <file.breeze>", RunBreeze);
         Register("service", "Starts a Breeze file in background mode.", "service <file.breeze>", RunService);
@@ -246,6 +247,29 @@ public static class CommandRegistry
             Process process = ProcessManger.GetProcessAt(i);
             if (process != null) context.WriteLine(process.id.ToString().PadLeft(4) + "  " + process.name);
         }
+    }
+
+    private static void Theme(CommandContext context, string[] args)
+    {
+        if (args.Length == 0)
+        {
+            context.WriteLine("Current theme: " + Palette.ThemeDisplayName + " (" + Palette.ThemeName + ")");
+            context.WriteLine("Available themes: classic, modern");
+            return;
+        }
+
+        string requested = args[0].Trim().ToLowerInvariant();
+        if (!Palette.IsKnownTheme(requested))
+        {
+            context.WriteLine("Unknown theme: " + args[0]);
+            context.WriteLine("Available themes: classic, modern");
+            return;
+        }
+
+        if (Palette.Apply(requested))
+            context.WriteLine("Theme changed to " + Palette.ThemeDisplayName);
+        else
+            context.WriteLine("Could not change theme.");
     }
 
     private static void RunBreeze(CommandContext context, string[] args)

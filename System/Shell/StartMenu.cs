@@ -7,6 +7,7 @@ public class StartMenu : Window
 {
 
     private StackPanel panel;
+    private readonly Rectangle homeBounds;
     public StartMenu(int x, int y, int width, int height, string title, bool useTitleBar) : base(x, y, width, height, title, useTitleBar)
     {
         zLayer = DrawLayer.Popup;
@@ -15,7 +16,7 @@ public class StartMenu : Window
         canMove = false;
         showInTaskbar = false;
 
-        panel = new StackPanel(Color.White, 0, 0, width, height)
+        panel = new StackPanel(Palette.MenuBackground, 0, 0, width, height)
         {
             verticalAlignment = VerticalAlignment.Stretch,
             horizontalAlignment = HorizontalAlignment.Stretch,
@@ -51,7 +52,7 @@ public class StartMenu : Window
         programs.AddSubmenuItem("Accessories");
         programs.AddSubmenuItem("File Explorer", () =>
         {
-            WindowManager.Register(new FileExplorer(100, 100, 800, 500, "Control Panel", true));
+            WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", true));
 
         });
         programs.AddSubmenuItem("File Properties", () =>
@@ -108,10 +109,21 @@ public class StartMenu : Window
             Margin = new Thickness(0)
         };
 
+
+        settings.AddSubmenuItem("Theme Settings", () =>
+        {
+            HideMenuImmediate();
+            WindowManager.Register(new ThemeSettings());
+        });
+
         settings.AddSubmenuItem("Control Panel", () =>
         {
+            FileExplorer explorer =
+                new FileExplorer(100, 100, 700, 480, "Control Panel", true);
+
+            explorer.NavigateToPath("control");
+            WindowManager.Register(explorer);
         });
-        settings.AddSubmenuItem("Resource Manager");
 
 
 
@@ -127,27 +139,38 @@ public class StartMenu : Window
         powerOptions.AddSubmenuItem("Log Off");
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {
-            HideMenu();
+            HideMenuImmediate();
             SystemPowerManager.RequestShutdown();
         });
 
         powerOptions.AddSubmenuItem("Reboot", () =>
         {
-            HideMenu();
+            HideMenuImmediate();
             SystemPowerManager.RequestReboot();
         });
 
         powerOptions.AddSubmenuItem("PANIC", () =>
 {
-
-    Panic.Halt("Forced panic");
+    KernelPanic.Show("MANUALLY_INITIATED_CRASH", "The crash screen was started from the system menu.");
 });
+
 
         panel.AddStackChild(programs);
         panel.AddStackChild(documents);
         panel.AddStackChild(settings);
         panel.AddStackChild(powerOptions);
+        homeBounds = bounds;
         MarkDirty();
+    }
+
+    public Rectangle HomeBounds => homeBounds;
+
+    public bool AtHomePosition()
+    {
+        return bounds.X == homeBounds.X &&
+               bounds.Y == homeBounds.Y &&
+               bounds.Width == homeBounds.Width &&
+               bounds.Height == homeBounds.Height;
     }
 
 
@@ -166,26 +189,43 @@ public class StartMenu : Window
 
     public override void DrawLocal()
     {
-        DrawRaisedRectangle(0, 0, Width, Height);
+        if (Palette.FlatControls)
+        {
+            DrawFilledRectangle(Palette.MenuBackground, 0, 0, Width, Height);
+            DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
+        }
+        else
+        {
+            DrawRaisedRectangle(0, 0, Width, Height);
+        }
 
         foreach (Component child in children)
         {
             if (!child.Visible) continue;
 
-            child.DrawLocal();
             DrawChild(child);
-            child.MarkCleaned();
         }
+    }
+
+    public void ApplyThemeStyle()
+    {
+        panel.color1 = Palette.MenuBackground;
+        panel.MarkDirty();
+        MarkDirty();
     }
 
     public override void OnLoseFocus()
     {
-        MenuPopup.HideAll();
-        Visible = false;
-        MarkDirty();
+        if (Visible)
+            UiAnimations.HideStartMenu(this);
     }
 
     public void HideMenu()
+    {
+        UiAnimations.HideStartMenu(this);
+    }
+
+    public void HideMenuImmediate()
     {
         MenuPopup.HideAll();
         Visible = false;

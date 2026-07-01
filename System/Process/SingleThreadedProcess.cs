@@ -60,6 +60,7 @@ public abstract class SingleThreadedProcess : Process
         {
             Serial.WriteString($"Thread : {name} | An exception occurred");
             Serial.WriteString(ex.Message);
+            Running = false;
         }
     }
 

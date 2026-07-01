@@ -61,9 +61,7 @@ public class Panel : Component
         {
             if (!child.Visible) continue;
 
-            child.DrawLocal();
             DrawChild(child);
-            child.MarkCleaned();
         }
     }
 

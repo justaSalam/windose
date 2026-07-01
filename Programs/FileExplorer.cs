@@ -17,6 +17,10 @@ public class FileExplorer : Window
     private ScrollView fileScroll;
     private TreeView tree;
     private ListView files;
+    private readonly MenuPopup fileContextMenu;
+    private readonly MenuItem openContextItem;
+    private readonly MenuItem editContextItem;
+    private ListViewItem contextItem;
     private string currentLocation = "desktop";
     private readonly IWindoseFileSystem subscribedFileSystem;
 
@@ -76,6 +80,11 @@ public class FileExplorer : Window
             useBackground = true,
             backgroundColor = Palette.ControlWhite,
         };
+
+        fileContextMenu = new MenuPopup(160, 24 * 3);
+        openContextItem = fileContextMenu.AddItem("Open", OpenContextItem);
+        editContextItem = fileContextMenu.AddItem("Edit", EditContextItem);
+        fileContextMenu.AddItem("Properties", ShowContextProperties);
 
         root.AddDockChild(menuBar, Dock.Top);
         root.AddDockChild(toolbar, Dock.Top);
@@ -173,6 +182,8 @@ public class FileExplorer : Window
                 OpenFileItem(item);
         };
 
+        files.itemRightClick = ShowFileContextMenu;
+
         OpenLocation(tree.roots[0]);
 
         AddChild(root);
@@ -229,9 +240,52 @@ public class FileExplorer : Window
     {
         string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : item.tag as string;
         if (string.IsNullOrEmpty(path)) return;
-        if (!string.Equals(FileSystemManager.GetExtension(path), ".breeze", StringComparison.OrdinalIgnoreCase)) return;
 
+        BreezeHost.RunFile(path);
+
+    }
+
+    private void ShowFileContextMenu(ListViewItem item, int mouseX, int mouseY)
+    {
+        contextItem = item;
+        openContextItem.enabled = item != null;
+        editContextItem.enabled = item != null && !item.isFolder && item.hasFileEntry;
+
+        int x = Math.Min(mouseX, Math.Max(0, Global.screenWidth - fileContextMenu.Width));
+        int y = Math.Min(mouseY, Math.Max(0, Global.screenHeight - fileContextMenu.Height));
+        fileContextMenu.ShowAt(x, y);
+        RefreshExplorerVisuals();
+    }
+
+    private void OpenContextItem()
+    {
+        ListViewItem item = contextItem;
+        contextItem = null;
+        if (item == null) return;
+
+        if (item.isFolder)
+            OpenFolderItem(item);
+        else
+            OpenFileItem(item);
+    }
+
+    private void EditContextItem()
+    {
+        ListViewItem item = contextItem;
+        contextItem = null;
+        if (item == null || item.isFolder || !item.hasFileEntry) return;
+
+        string path = item.fileEntry.AbsoluteLocation;
+        if (string.IsNullOrEmpty(path)) return;
         WindowManager.Register(new BreezeEditor(X + 40, Y + 40, 900, 620, path));
+    }
+
+    private void ShowContextProperties()
+    {
+        ListViewItem item = contextItem;
+        contextItem = null;
+        if (item != null && item.hasFileEntry)
+            WindowManager.Register(new FileProperties(X + 40, Y + 40, item.fileEntry));
     }
 
     private void NavigateTo(string location, string displayName)
@@ -318,10 +372,7 @@ public class FileExplorer : Window
                 break;
 
             case "control":
-                AddFolder("Display", "control/display");
-                AddFolder("Keyboard", "control/keyboard");
-                AddFolder("Mouse", "control/mouse");
-                AddFolder("System", "control/system");
+                PopulateControlPanel();
                 break;
 
             default:
@@ -372,6 +423,28 @@ public class FileExplorer : Window
         }
     }
 
+    private void PopulateControlPanel()
+    {
+        const string appletDirectory = @"0:\System\ControlPanel";
+        IWindoseFileSystem fileSystem = FileSystemManager.Current;
+        if (fileSystem == null || !fileSystem.DirectoryExists(appletDirectory)) return;
+
+        string[] appletPaths = fileSystem.GetFiles(appletDirectory);
+        for (int i = 0; i < appletPaths.Length; i++)
+        {
+            string path = appletPaths[i];
+            const string extension = ".breeze";
+            if (!string.Equals(FileSystemManager.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            string fileName = FileSystemManager.GetName(path);
+            string displayName = fileName.Substring(0, fileName.Length - extension.Length);
+            FileEntry entry = new FileEntry(displayName, FileType.File, path, fileSystem.GetFileSize(path));
+            ListViewItem item = files.AddItem(entry);
+            item.type = "Control Panel Applet";
+        }
+    }
+
     private ListViewItem AddFolder(string name, string path)
     {
         FileEntry entry = new FileEntry(name, FileType.Directory, path, 0, "");
@@ -387,7 +460,6 @@ public class FileExplorer : Window
         item.type = type;
         return item;
     }
-
     private string GetChildLocation(string parent, string name)
     {
         if (parent == null || parent == "")
@@ -399,7 +471,8 @@ public class FileExplorer : Window
     public override void HandleMessage(UiMessage message)
     {
         if (message.Command == "filesystem.changed" &&
-            currentLocation != null && currentLocation.StartsWith("0:", StringComparison.OrdinalIgnoreCase))
+            currentLocation != null && (currentLocation.StartsWith("0:", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(currentLocation, "control", StringComparison.OrdinalIgnoreCase)))
             PopulateFiles(currentLocation);
     }
 
@@ -411,6 +484,8 @@ public class FileExplorer : Window
     public override void Dispose()
     {
         if (subscribedFileSystem != null) subscribedFileSystem.Changed -= OnFileSystemChanged;
+        fileContextMenu.Hide();
+        fileContextMenu.Dispose();
         base.Dispose();
     }
 }

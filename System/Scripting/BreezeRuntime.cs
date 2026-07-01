@@ -24,9 +24,11 @@ public sealed class BreezeRuntime
     }
 
     private const int MaxOperations = 100000;
+    private const int MaxBackgroundOperations = 5000;
     private const int MaxLoopIterations = 10000;
     private const int MaxCallDepth = 64;
     private const int MaxEventsPerUpdate = 32;
+    private const int MaxBackgroundEventsPerUpdate = 8;
     private const int MaxQueuedMessages = 128;
     private static int nextMessageId;
 
@@ -1089,6 +1091,7 @@ public sealed class BreezeRuntime
     {
         if (terminated) return;
         int delivered = 0;
+        int eventLimit = backgroundMode ? MaxBackgroundEventsPerUpdate : MaxEventsPerUpdate;
 
         if (processUpdateBody != null)
         {
@@ -1097,7 +1100,7 @@ public sealed class BreezeRuntime
         }
 
         long now = DateTime.UtcNow.Ticks;
-        for (int i = 0; i < timers.Count && delivered < MaxEventsPerUpdate; i++)
+        for (int i = 0; i < timers.Count && delivered < eventLimit; i++)
         {
             BreezeTimerHandle timer = timers[i];
             if (!timer.active || timer.TickBody == null || now < timer.NextTick) continue;
@@ -1108,7 +1111,7 @@ public sealed class BreezeRuntime
             if (terminated) return;
         }
 
-        while (delivered < MaxEventsPerUpdate)
+        while (delivered < eventLimit)
         {
             BreezeProcessMessage message;
             lock (messageQueueLock)
@@ -1492,8 +1495,9 @@ public sealed class BreezeRuntime
 
     private void CountOperation()
     {
-        if (++operationCount > MaxOperations)
-            Fail("Execution limit exceeded (" + MaxOperations + " operations)");
+        int limit = backgroundMode ? MaxBackgroundOperations : MaxOperations;
+        if (++operationCount > limit)
+            Fail("Execution limit exceeded (" + limit + " operations)");
     }
 
     private bool ValuesEqual(object left, object right)

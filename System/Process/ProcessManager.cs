@@ -21,8 +21,21 @@ public static class ProcessManger
     private static readonly List<PendingRestartRequest> pendingRestartRequests = new();
     private static readonly object pendingLock = new object();
     private static int processId;
+    private static bool isUpdating;
 
     public static SingleThreadedProcess Start(SingleThreadedProcess process)
+    {
+        if (process == null) return null;
+        if (isUpdating)
+        {
+            QueueStart(process);
+            return process;
+        }
+
+        return StartNow(process);
+    }
+
+    private static SingleThreadedProcess StartNow(SingleThreadedProcess process)
     {
         process.id = processId++;
 
@@ -34,6 +47,18 @@ public static class ProcessManger
 
     public static ScheduledProcess Start(ScheduledProcess process)
     {
+        if (process == null) return null;
+        if (isUpdating)
+        {
+            QueueStart(process);
+            return process;
+        }
+
+        return StartNow(process);
+    }
+
+    private static ScheduledProcess StartNow(ScheduledProcess process)
+    {
         process.id = processId++;
         scheduledProcesses.Add(process);
         process.Start();
@@ -42,42 +67,50 @@ public static class ProcessManger
 
     public static void Update()
     {
-        ApplyPendingRequests();
-        for (int i = 0; i < processes.Count; i++)
+        isUpdating = true;
+        try
         {
-            SingleThreadedProcess process = processes[i];
-            if (!process.Running) continue;
-            long started = DateTime.UtcNow.Ticks;
-            process.Main();
+            ApplyPendingRequests();
+            for (int i = 0; i < processes.Count; i++)
+            {
+                SingleThreadedProcess process = processes[i];
+                if (!process.Running) continue;
+                long started = DateTime.UtcNow.Ticks;
+                process.Main();
 
-            double elapsedMs = (DateTime.UtcNow.Ticks - started) / 10000.0;
-            process.lastUpdateMs = elapsedMs;
-            process.averageUpdateMs = process.averageUpdateMs == 0
-                ? elapsedMs
-                : process.averageUpdateMs * 0.9 + elapsedMs * 0.1;
+                double elapsedMs = (DateTime.UtcNow.Ticks - started) / 10000.0;
+                process.lastUpdateMs = elapsedMs;
+                process.averageUpdateMs = process.averageUpdateMs == 0
+                    ? elapsedMs
+                    : process.averageUpdateMs * 0.9 + elapsedMs * 0.1;
 
-            if (elapsedMs > process.peakUpdateMs)
-                process.peakUpdateMs = elapsedMs;
+                if (elapsedMs > process.peakUpdateMs)
+                    process.peakUpdateMs = elapsedMs;
+            }
+
+            for (int i = processes.Count - 1; i >= 0; i--)
+            {
+                SingleThreadedProcess process = processes[i];
+                if (process.Running) continue;
+                processes.RemoveAt(i);
+                process.Dispose();
+            }
+
+            for (int i = scheduledProcesses.Count - 1; i >= 0; i--)
+            {
+                ScheduledProcess process = scheduledProcesses[i];
+                if (process.Running || !process.HasExited) continue;
+                scheduledProcesses.RemoveAt(i);
+                process.Dispose();
+            }
+
+            StartPendingRestarts();
+            ApplyPendingRequests();
         }
-
-        for (int i = processes.Count - 1; i >= 0; i--)
+        finally
         {
-            SingleThreadedProcess process = processes[i];
-            if (process.Running) continue;
-            processes.RemoveAt(i);
-            process.Dispose();
+            isUpdating = false;
         }
-
-        for (int i = scheduledProcesses.Count - 1; i >= 0; i--)
-        {
-            ScheduledProcess process = scheduledProcesses[i];
-            if (process.Running || !process.HasExited) continue;
-            scheduledProcesses.RemoveAt(i);
-            process.Dispose();
-        }
-
-        StartPendingRestarts();
-        ApplyPendingRequests();
     }
 
     public static void QueueStart(Process process)
@@ -117,8 +150,8 @@ public static class ProcessManger
         for (int i = 0; i < restarts.Count; i++) RestartInternal(restarts[i].Process, restarts[i].Force);
         for (int i = 0; i < starts.Count; i++)
         {
-            if (starts[i] is ScheduledProcess scheduled) Start(scheduled);
-            else if (starts[i] is SingleThreadedProcess singleThreaded) Start(singleThreaded);
+            if (starts[i] is ScheduledProcess scheduled) StartNow(scheduled);
+            else if (starts[i] is SingleThreadedProcess singleThreaded) StartNow(singleThreaded);
         }
     }
 
@@ -177,8 +210,8 @@ public static class ProcessManger
                     "Could not restart " + pending.Original.name + ": " + exception.Message + "\n");
             }
 
-            if (replacement is ScheduledProcess scheduled) Start(scheduled);
-            else if (replacement is SingleThreadedProcess singleThreaded) Start(singleThreaded);
+            if (replacement is ScheduledProcess scheduled) StartNow(scheduled);
+            else if (replacement is SingleThreadedProcess singleThreaded) StartNow(singleThreaded);
         }
     }
 

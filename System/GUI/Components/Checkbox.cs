@@ -25,7 +25,13 @@ public class Checkbox : Component
     {
 
 
-        if (isPressed) DrawRaisedRectangle(0, 0, Width, Height);
+        if (Palette.FlatControls)
+        {
+            DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
+            if (isPressed)
+                DrawFilledRectangle(Palette.Highlight, 3, 3, Width - 6, Height - 6);
+        }
+        else if (isPressed) DrawRaisedRectangle(0, 0, Width, Height);
         else DrawSunkenRectangle(0, 0, Width, Height);
 
         if (text != "")

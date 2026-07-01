@@ -68,9 +68,11 @@ public static class FileSystemManager
         Initialize(memory);
         memory.CreateDirectory(@"0:\Apps");
         memory.CreateDirectory(@"0:\Documents");
+        memory.CreateDirectory(@"0:\System\ControlPanel");
         memory.CreateDirectory(@"0:\System\Services");
         memory.WriteAllText(@"0:\Apps\hello.breeze", StarterProgram);
         memory.WriteAllText(@"0:\Apps\main.breeze", StarterProgram);
+        memory.WriteAllText(@"0:\System\ControlPanel\About Windose.breeze", AboutControlPanelApplet);
         memory.WriteAllText(@"0:\System\Services\startup.breeze", StartupService);
     }
 
@@ -128,6 +130,23 @@ let main = window(""Hello Breeze"", 180, 120, 520, 260);
 let root = windowRoot(main);
 let message = panel(""This file was opened from the temporary disk."", 40);
 dock(root, message, ""top"");
+show(main);
+";
+
+    private const string AboutControlPanelApplet = @"// Control Panel applet
+let main = window(""About Windose"", 180, 140, 480, 240);
+let root = windowRoot(main);
+let body = stackPanel(""vertical"");
+dock(root, body, ""fill"");
+let heading = panel(""Windose Control Panel"", 36);
+let description = panel(""This applet is written in Breeze."", 36);
+let closeButton = button(""OK"", 80, 28);
+stack(body, heading);
+stack(body, description);
+stack(body, closeButton);
+on closeButton.click {
+    close(main);
+}
 show(main);
 ";
 

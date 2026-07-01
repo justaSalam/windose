@@ -28,13 +28,18 @@ public class MenuItem : Component
 
     public override void DrawLocal()
     {
-        DrawFilledRectangle(Palette.ControlFace, 0, 0, Width, Height);
+        DrawFilledRectangle(Palette.MenuBackground, 0, 0, Width, Height);
 
         if (drawSeparator)
         {
             int y = Height / 2;
-            DrawLine(Palette.ControlShadow, 2, y, Width - 3, y);
-            DrawLine(Palette.ControlWhite, 2, y + 1, Width - 3, y + 1);
+            if (Palette.FlatControls)
+                DrawLine(Palette.WindowBorder, 2, y, Width - 3, y);
+            else
+            {
+                DrawLine(Palette.ControlShadow, 2, y, Width - 3, y);
+                DrawLine(Palette.ControlWhite, 2, y + 1, Width - 3, y + 1);
+            }
             return;
         }
 
@@ -169,10 +174,7 @@ public class MenuItem : Component
         MenuPopup.HideAll();
 
         if (Explorer.startMenu != null)
-        {
-            Explorer.startMenu.Visible = false;
-            Explorer.startMenu.MarkDirty();
-        }
+            Explorer.startMenu.HideMenuImmediate();
     }
 
     public override string GetName() => "MenuItem";

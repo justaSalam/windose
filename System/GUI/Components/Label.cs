@@ -5,6 +5,7 @@ public class Label : Component
 
     public bool useBackground = true;
     public int fontSize = 0;
+    public Color textColor = Palette.ControlBlack;
 
     public Label(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -31,7 +32,7 @@ public class Label : Component
             int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
             int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
 
-            DrawString(text, Palette.ControlWhite, 2, textY, effectiveFontSize);
+            DrawString(text, textColor, 2, textY, effectiveFontSize);
         }
     }
 

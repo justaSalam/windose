@@ -61,9 +61,7 @@ public class StatusBar : Component
         {
             if (!child.Visible) continue;
 
-            child.DrawLocal();
             DrawChild(child);
-            child.MarkCleaned();
         }
 
         for (int i = 0; i < panels.children.Count; i++)
