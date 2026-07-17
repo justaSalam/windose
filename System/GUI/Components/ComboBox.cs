@@ -107,39 +107,17 @@ public class ComboBox : Component
         int textAreaWidth = Width - arrowWidth;
         int boxHeight = collapsedHeight;
 
-        if (Palette.FlatControls)
-        {
-            // Main box
-            Color face = GUIFeatures.Blend(Palette.ControlFace, Palette.Highlight, hoverBlend * 0.1f);
-            if (isPressed)
-                face = GUIFeatures.Blend(face, Palette.ControlShadow, 0.15f);
+        // Classic: raised combo box
+        DrawRaisedRectangle(0, 0, Width, boxHeight);
 
-            DrawFilledRectangle(face, 0, 0, Width, boxHeight);
-            if (useBorders)
-                DrawRectangle(borderColor, 0, 0, Width, boxHeight);
+        // Dropdown arrow
+        DrawFilledRectangle(Palette.ControlFace, textAreaWidth + 1, 1, arrowWidth - 2, boxHeight - 2);
+        DrawRectangle(Palette.ControlShadow, textAreaWidth, 0, arrowWidth, boxHeight);
 
-            // Dropdown arrow area
-            DrawFilledRectangle(Palette.ControlFace, textAreaWidth, 0, arrowWidth, boxHeight);
-            DrawRectangle(borderColor, textAreaWidth, 0, arrowWidth, boxHeight);
+        int arrowCenterX = textAreaWidth + arrowWidth / 2;
+        int arrowCenterY = boxHeight / 2;
+        DrawFilledTriangle(Palette.ControlBlack, arrowCenterX, arrowCenterY, 5);
 
-            // Arrow
-            int arrowCenterX = textAreaWidth + arrowWidth / 2;
-            int arrowCenterY = boxHeight / 2;
-            DrawFilledTriangle(Palette.ControlBlack, arrowCenterX, arrowCenterY, 5);
-        }
-        else
-        {
-            // Classic: raised combo box
-            DrawRaisedRectangle(0, 0, Width, boxHeight);
-
-            // Dropdown arrow
-            DrawFilledRectangle(Palette.ControlFace, textAreaWidth + 1, 1, arrowWidth - 2, boxHeight - 2);
-            DrawRectangle(Palette.ControlShadow, textAreaWidth, 0, arrowWidth, boxHeight);
-
-            int arrowCenterX = textAreaWidth + arrowWidth / 2;
-            int arrowCenterY = boxHeight / 2;
-            DrawFilledTriangle(Palette.ControlBlack, arrowCenterX, arrowCenterY, 5);
-        }
 
         // Selected text
         string displayText = selectedIndex >= 0 && selectedIndex < items.Count
@@ -158,15 +136,9 @@ public class ComboBox : Component
             int listHeight = DropDownHeight;
             int listY = boxHeight;
 
-            if (Palette.FlatControls)
-            {
-                DrawFilledRectangle(dropDownBackColor, 0, listY, Width, listHeight);
-                DrawRectangle(borderColor, 0, listY, Width, listHeight);
-            }
-            else
-            {
-                DrawRaisedRectangle(0, listY, Width, listHeight);
-            }
+
+            DrawRaisedRectangle(0, listY, Width, listHeight);
+
 
             for (int i = 0; i < items.Count; i++)
             {

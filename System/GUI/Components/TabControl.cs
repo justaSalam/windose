@@ -179,32 +179,16 @@ public class TabControl : Component
         int tabCount = pages.Count;
         if (tabCount == 0)
         {
-            // Empty tab control - just draw the page area
-            if (Palette.FlatControls)
-            {
-                DrawFilledRectangle(pageBackColor, 0, pageAreaY, Width, pageAreaHeight);
-                DrawRectangle(tabBorderColor, 0, pageAreaY, Width, pageAreaHeight);
-            }
-            else
-            {
-                DrawSunkenRectangle(0, pageAreaY, Width, pageAreaHeight);
-            }
+            DrawSunkenRectangle(0, pageAreaY, Width, pageAreaHeight);
             return;
         }
 
         int tabWidth = Math.Min(120, tabAreaWidth / tabCount);
         if (tabWidth < 40) tabWidth = Math.Max(40, tabAreaWidth / tabCount);
 
-        // Draw page area first (behind tabs)
-        if (Palette.FlatControls)
-        {
-            DrawFilledRectangle(pageBackColor, 0, pageAreaY, Width, pageAreaHeight);
-            DrawRectangle(tabBorderColor, 0, pageAreaY, Width, pageAreaHeight);
-        }
-        else
-        {
-            DrawSunkenRectangle(0, pageAreaY, Width, pageAreaHeight);
-        }
+
+        DrawSunkenRectangle(0, pageAreaY, Width, pageAreaHeight);
+
 
         // Draw tabs
         for (int i = 0; i < tabCount; i++)
@@ -214,36 +198,20 @@ public class TabControl : Component
 
             Color tabColor;
             if (isActive)
-                tabColor = Palette.FlatControls ? tabActiveColor : Palette.ControlFace;
+                tabColor = Palette.ControlFace;
             else
                 tabColor = GUIFeatures.Blend(tabInactiveColor, Palette.Highlight, tabHoverBlends[i] * 0.08f);
 
-            if (Palette.FlatControls)
+
+            if (isActive)
             {
-                DrawFilledRectangle(tabColor, tabX, 0, tabWidth, tabBarHeight);
-                if (isActive)
-                {
-                    // Active tab: no bottom border (connects to page area)
-                    DrawRectangle(tabBorderColor, tabX, 0, tabWidth, tabBarHeight);
-                    // Clear the bottom border line for active tab
-                    DrawLine(tabActiveColor, tabX + 1, tabBarHeight - 1, tabWidth - 2, 1);
-                }
-                else
-                {
-                    DrawRectangle(tabBorderColor, tabX, 0, tabWidth, tabBarHeight);
-                }
+                DrawRaisedRectangle(tabX, 0, tabWidth, tabBarHeight + 1);
             }
             else
             {
-                if (isActive)
-                {
-                    DrawRaisedRectangle(tabX, 0, tabWidth, tabBarHeight + 1);
-                }
-                else
-                {
-                    DrawRaisedRectangle(tabX, 2, tabWidth, tabBarHeight - 1);
-                }
+                DrawRaisedRectangle(tabX, 2, tabWidth, tabBarHeight - 1);
             }
+
 
             // Tab text
             string tabText = pages[i].Text;

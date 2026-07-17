@@ -119,13 +119,6 @@ public class StartMenu : Window
             Margin = new Thickness(0)
         };
 
-
-        settings.AddSubmenuItem("Theme Settings", () =>
-        {
-            HideMenuImmediate();
-            WindowManager.Register(new ThemeSettings());
-        });
-
         settings.AddSubmenuItem("Control Panel", () =>
         {
             FileExplorer explorer =
@@ -194,15 +187,9 @@ public class StartMenu : Window
 
     public override void DrawLocal()
     {
-        if (Palette.FlatControls)
-        {
-            DrawFilledRectangle(Palette.MenuGlass, 0, 0, Width, Height);
-            DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
-        }
-        else
-        {
-            DrawRaisedRectangle(0, 0, Width, Height);
-        }
+
+        DrawRaisedRectangle(0, 0, Width, Height);
+
 
         foreach (Component child in children)
         {
@@ -214,20 +201,13 @@ public class StartMenu : Window
 
     public void ApplyThemeStyle()
     {
-        panel.color1 = Palette.MenuGlass;
         panel.MarkDirty();
         MarkDirty();
     }
 
     public override void OnLoseFocus()
     {
-        if (Visible)
-            UiAnimations.HideStartMenu(this);
-    }
-
-    public void HideMenu()
-    {
-        UiAnimations.HideStartMenu(this);
+        Visible = false;
     }
 
     public void HideMenuImmediate()

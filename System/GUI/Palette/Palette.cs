@@ -57,13 +57,8 @@ public static class Palette
     public static Color MenuBackground { get; private set; }
     public static Color TitleText { get; private set; }
     public static Color TitleTextInactive { get; private set; }
-    public static Color TaskbarGlass { get; private set; }
-    public static Color WindowGlass { get; private set; }
-    public static Color MenuGlass { get; private set; }
-    public static Color TitleBarGlass { get; private set; }
     public static int TitleBarHeight { get; private set; }
     public static int BorderSize { get; private set; }
-    public static bool FlatControls { get; private set; }
     public static string ThemeName { get; private set; } = "classic";
     public static string ThemeDisplayName { get; private set; } = "Classic Windows";
 
@@ -91,7 +86,7 @@ public static class Palette
 
     public static bool Apply(string name, bool persist = true)
     {
-        UiTheme theme = CreateTheme(name);
+        UiTheme theme = CreateClassicTheme();
         ApplyTheme(theme);
 
         if (persist)
@@ -104,13 +99,6 @@ public static class Palette
         return true;
     }
 
-    public static UiTheme CreateTheme(string name)
-    {
-        string normalized = (name ?? "").Trim().ToLowerInvariant();
-        if (normalized == "modern" || normalized == "windose modern")
-            return CreateModernTheme();
-        return CreateClassicTheme();
-    }
 
     public static bool IsKnownTheme(string name)
     {
@@ -129,13 +117,13 @@ public static class Palette
 
         string requested = SystemRegistry.GetString(ThemeRegistryKey, "classic");
         if (!requested.Equals(ThemeName, StringComparison.OrdinalIgnoreCase))
-            ApplyTheme(CreateTheme(requested));
 
-        WindowManager.PostCommand("theme.changed", () =>
-        {
-            WindowManager.RefreshThemeStyles();
-            WindowManager.InvalidateAll();
-        });
+
+            WindowManager.PostCommand("theme.changed", () =>
+            {
+                WindowManager.RefreshThemeStyles();
+                WindowManager.InvalidateAll();
+            });
     }
 
     private static void ApplyTheme(UiTheme theme)
@@ -158,13 +146,8 @@ public static class Palette
         MenuBackground = theme.MenuBackground;
         TitleText = theme.TitleText;
         TitleTextInactive = theme.TitleTextInactive;
-        TaskbarGlass = theme.TaskbarGlass;
-        WindowGlass = theme.WindowGlass;
-        MenuGlass = theme.MenuGlass;
-        TitleBarGlass = theme.TitleBarGlass;
         TitleBarHeight = theme.TitleBarHeight;
         BorderSize = theme.BorderSize;
-        FlatControls = theme.FlatControls;
 
         ThemeChanged?.Invoke();
     }
@@ -203,37 +186,4 @@ public static class Palette
         };
     }
 
-    private static UiTheme CreateModernTheme()
-    {
-        return new UiTheme
-        {
-            Name = "modern",
-            DisplayName = "Modern Windose",
-            Description = "Flat surfaces, soft borders, accent highlights, and a dark desktop.",
-            ControlFace = Color.FromArgb(238, 241, 245),
-            ControlWhite = Color.FromArgb(255, 255, 255),
-            ControlHighlight = Color.FromArgb(250, 252, 255),
-            ControlShadow = Color.FromArgb(142, 153, 168),
-            ControlBlack = Color.FromArgb(25, 31, 39),
-            ActiveTitle = Color.FromArgb(37, 99, 235),
-            InactiveTitle = Color.FromArgb(226, 232, 240),
-            Highlight = Color.FromArgb(37, 99, 235),
-            HighlightText = Color.White,
-            DesktopBackground = Color.FromArgb(24, 28, 35),
-            WindowBackground = Color.FromArgb(255, 255, 255),
-            WindowBorder = Color.FromArgb(195, 202, 212),
-            TaskbarBackground = Color.FromArgb(30, 36, 46),
-            MenuBackground = Color.FromArgb(255, 255, 255),
-            TitleText = Color.White,
-            TitleTextInactive = Color.FromArgb(25, 31, 39),
-            // Modern theme: translucent glass effects
-            TaskbarGlass = Color.FromArgb(200, 30, 36, 46),
-            WindowGlass = Color.FromArgb(230, 255, 255, 255),
-            MenuGlass = Color.FromArgb(240, 255, 255, 255),
-            TitleBarGlass = Color.FromArgb(200, 37, 99, 235),
-            TitleBarHeight = 30,
-            BorderSize = 1,
-            FlatControls = true,
-        };
-    }
 }

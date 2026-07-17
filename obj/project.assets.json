@@ -220,6 +220,12 @@
           "build/Cosmos.Kernel.Native.MultiArch.props": {}
         }
       },
+      "Cosmos.Kernel.Native.X64/3.0.68": {
+        "type": "package",
+        "build": {
+          "build/Cosmos.Kernel.Native.X64.props": {}
+        }
+      },
       "Cosmos.Kernel.Plugs/3.0.68": {
         "type": "package",
         "dependencies": {
@@ -723,7 +729,7 @@
         }
       }
     },
-    "net10.0/win-x64": {
+    "net10.0/linux-x64": {
       "Cosmos.Build.Analyzer.Patcher/3.0.68": {
         "type": "package",
         "dependencies": {
@@ -820,6 +826,9 @@
           "Cosmos.Kernel.System": "3.0.68",
           "Cosmos.Kernel.System.Core": "3.0.68"
         },
+        "runtime": {
+          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.dll": {}
+        },
         "build": {
           "build/Cosmos.Kernel.props": {}
         }
@@ -875,6 +884,9 @@
           "Cosmos.Kernel.HAL.Interfaces": "3.0.68",
           "Cosmos.Kernel.System.Core": "3.0.68"
         },
+        "runtime": {
+          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.HAL.dll": {}
+        },
         "build": {
           "build/Cosmos.Kernel.HAL.props": {}
         }
@@ -922,6 +934,12 @@
           "build/Cosmos.Kernel.Native.MultiArch.props": {}
         }
       },
+      "Cosmos.Kernel.Native.X64/3.0.68": {
+        "type": "package",
+        "build": {
+          "build/Cosmos.Kernel.Native.X64.props": {}
+        }
+      },
       "Cosmos.Kernel.Plugs/3.0.68": {
         "type": "package",
         "dependencies": {
@@ -929,6 +947,9 @@
           "Cosmos.Kernel.HAL.X64": "3.0.68",
           "Cosmos.Kernel.System": "3.0.68",
           "Cosmos.Kernel.System.Core": "3.0.68"
+        },
+        "runtime": {
+          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Plugs.dll": {}
         },
         "build": {
           "build/Cosmos.Kernel.Plugs.props": {}
@@ -957,6 +978,9 @@
           "Cosmos.Kernel.HAL": "3.0.68",
           "Cosmos.Kernel.System.Core": "3.0.68"
         },
+        "runtime": {
+          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.System.dll": {}
+        },
         "build": {
           "build/Cosmos.Kernel.System.props": {}
         }
@@ -967,6 +991,9 @@
           "Cosmos.Build.API": "3.0.68",
           "Cosmos.Kernel.Boot.Limine": "3.0.68",
           "Cosmos.Kernel.Debug": "3.0.68"
+        },
+        "runtime": {
+          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Core.dll": {}
         },
         "build": {
           "build/Cosmos.Kernel.System.Core.props": {},
@@ -1714,6 +1741,29 @@
         "build/Cosmos.Kernel.Native.MultiArch.props",
         "cosmos.kernel.native.multiarch.3.0.68.nupkg.sha512",
         "cosmos.kernel.native.multiarch.nuspec"
+      ]
+    },
+    "Cosmos.Kernel.Native.X64/3.0.68": {
+      "sha512": "qKJe0EZOxD5k6gXzU/1Y1lsIUbrBBj4ZRSzSfB8Quh3oMWZTmcmLb3FD+L7265mpriKsPyFAf0+79L1eBJsEww==",
+      "type": "package",
+      "path": "cosmos.kernel.native.x64/3.0.68",
+      "files": [
+        ".nupkg.metadata",
+        "build/CPU/ContextCapture.s",
+        "build/CPU/CpuOps.s",
+        "build/CPU/ExceptionHandling.s",
+        "build/CPU/Interrupts.s",
+        "build/CPU/SIMD.s",
+        "build/CPU/TripleFault.s",
+        "build/Cosmos.Kernel.Native.X64.props",
+        "build/Debug/Breakpoint.s",
+        "build/IO/PortIO.s",
+        "build/Memory/MemoryCopy.s",
+        "build/Runtime/InterfaceDispatch.s",
+        "build/Runtime/Runtime.s",
+        "build/Runtime/WriteBarriers.s",
+        "cosmos.kernel.native.x64.3.0.68.nupkg.sha512",
+        "cosmos.kernel.native.x64.nuspec"
       ]
     },
     "Cosmos.Kernel.Plugs/3.0.68": {
@@ -2999,7 +3049,10 @@
       "Cosmos.Build.Ilc >= 3.0.68",
       "Cosmos.Build.Patcher >= 3.0.68",
       "Cosmos.Kernel >= 3.0.68",
+      "Cosmos.Kernel.Core.X64 >= 3.0.68",
+      "Cosmos.Kernel.HAL.X64 >= 3.0.68",
       "Cosmos.Kernel.Native.MultiArch >= 3.0.68",
+      "Cosmos.Kernel.Native.X64 >= 3.0.68",
       "Cosmos.Kernel.SourceGenerators >= 3.0.68",
       "Cosmos.Kernel.System >= 3.0.68",
       "Microsoft.NET.ILLink.Tasks >= 10.0.9"
@@ -3011,14 +3064,14 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
+      "projectUniqueName": "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
       "projectName": "Windose",
-      "projectPath": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
+      "projectPath": "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
       "packagesPath": "C:\\Users\\salam\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\salam\\Desktop\\windose\\obj\\",
+      "outputPath": "c:\\Users\\salam\\Desktop\\windose\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\salam\\Desktop\\windose\\NuGet.Config",
+        "c:\\Users\\salam\\Desktop\\windose\\NuGet.Config",
         "C:\\Users\\salam\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -3083,7 +3136,19 @@
             "target": "Package",
             "version": "[3.0.68, )"
           },
+          "Cosmos.Kernel.Core.X64": {
+            "target": "Package",
+            "version": "[3.0.68, )"
+          },
+          "Cosmos.Kernel.HAL.X64": {
+            "target": "Package",
+            "version": "[3.0.68, )"
+          },
           "Cosmos.Kernel.Native.MultiArch": {
+            "target": "Package",
+            "version": "[3.0.68, )"
+          },
+          "Cosmos.Kernel.Native.X64": {
             "target": "Package",
             "version": "[3.0.68, )"
           },
@@ -3115,7 +3180,11 @@
         "warn": true,
         "downloadDependencies": [
           {
-            "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+            "name": "Microsoft.AspNetCore.App.Runtime.linux-x64",
+            "version": "[10.0.9, 10.0.9]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.linux-x64",
             "version": "[10.0.9, 10.0.9]"
           },
           {
@@ -3123,15 +3192,11 @@
             "version": "[10.0.9, 10.0.9]"
           },
           {
-            "name": "Microsoft.NETCore.App.Runtime.NativeAOT.win-x64",
+            "name": "Microsoft.NETCore.App.Runtime.linux-x64",
             "version": "[10.0.9, 10.0.9]"
           },
           {
-            "name": "Microsoft.NETCore.App.Runtime.win-x64",
-            "version": "[10.0.9, 10.0.9]"
-          },
-          {
-            "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+            "name": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64",
             "version": "[10.0.9, 10.0.9]"
           },
           {
@@ -3422,7 +3487,7 @@
       }
     },
     "runtimes": {
-      "win-x64": {
+      "linux-x64": {
         "#import": []
       }
     }

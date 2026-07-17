@@ -21,6 +21,7 @@
     <Import Project="$(NuGetPackageRoot)cosmos.kernel.system\3.0.68\build\Cosmos.Kernel.System.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel.system\3.0.68\build\Cosmos.Kernel.System.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.kernel.sourcegenerators\3.0.68\build\Cosmos.Kernel.SourceGenerators.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel.sourcegenerators\3.0.68\build\Cosmos.Kernel.SourceGenerators.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.kernel.plugs\3.0.68\build\Cosmos.Kernel.Plugs.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel.plugs\3.0.68\build\Cosmos.Kernel.Plugs.props')" />
+    <Import Project="$(NuGetPackageRoot)cosmos.kernel.native.x64\3.0.68\build\Cosmos.Kernel.Native.X64.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel.native.x64\3.0.68\build\Cosmos.Kernel.Native.X64.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.kernel.native.multiarch\3.0.68\build\Cosmos.Kernel.Native.MultiArch.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel.native.multiarch\3.0.68\build\Cosmos.Kernel.Native.MultiArch.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.kernel\3.0.68\build\Cosmos.Kernel.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel\3.0.68\build\Cosmos.Kernel.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.build.patcher\3.0.68\build\Cosmos.Build.Patcher.props" Condition="Exists('$(NuGetPackageRoot)cosmos.build.patcher\3.0.68\build\Cosmos.Build.Patcher.props')" />

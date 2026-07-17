@@ -914,13 +914,6 @@ public class DirectBitmap : IDisposable
 
     public virtual void DrawRaisedRect(int x, int y, int width, int height)
     {
-        if (Palette.FlatControls)
-        {
-            DrawFilledRectangle(Palette.ControlFace, x, y, width, height);
-            DrawRectangle(Palette.WindowBorder, x, y, width, height);
-            return;
-        }
-
         DrawRaisedRect(x, y, width, height, Palette.ControlFace, Palette.ControlWhite, Palette.ControlShadow, Palette.ControlBlack);
     }
 
@@ -948,13 +941,6 @@ public class DirectBitmap : IDisposable
 
     public virtual void DrawSunkenRect(int x, int y, int width, int height)
     {
-        if (Palette.FlatControls)
-        {
-            DrawFilledRectangle(Palette.ControlWhite, x, y, width, height);
-            DrawRectangle(Palette.WindowBorder, x, y, width, height);
-            return;
-        }
-
         DrawSunkenRect(x, y, width, height, Palette.ControlFace, Palette.ControlBlack, Palette.ControlShadow, Palette.ControlHighlight);
     }
 

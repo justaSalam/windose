@@ -75,15 +75,9 @@ public class Window : Component
     /// </summary>
     public override void DrawLocal()
     {
-        if (Palette.FlatControls)
-        {
-            DrawFilledRectangle(Palette.WindowGlass, 0, 0, Width, Height);
-            DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
-        }
-        else
-        {
-            DrawRaisedRectangle(0, 0, Width, Height);
-        }
+
+        DrawRaisedRectangle(0, 0, Width, Height);
+
 
         foreach (Component child in children)
         {
@@ -115,7 +109,7 @@ public class Window : Component
 
             int titleButtonSize = Math.Max(20, titleHeight - 5);
             int titleButtonTop = Math.Max(2, border + 1);
-            Color chromeBorder = Palette.FlatControls ? Palette.WindowBorder : Palette.ControlHighlight;
+            Color chromeBorder = Palette.ControlHighlight;
 
             AddChild(new Button(0, 0, titleButtonSize, titleButtonSize)
             {
@@ -125,7 +119,7 @@ public class Window : Component
                 Margin = new Thickness(3, titleButtonTop, 3, 3),
                 useBorders = true,
                 borderColor = chromeBorder,
-                textColor = Palette.FlatControls ? Palette.ControlBlack : Palette.ControlBlack,
+                textColor = Palette.ControlBlack,
                 leftMouseRelease = () =>
                 {
                     WindowManager.PostClose(this);
@@ -181,15 +175,9 @@ public class Window : Component
     {
         if (!hasTitleBar || titlebar == null) return;
 
-        // Use glass color for modern theme (alpha-blended), fall back to solid for classic
-        if (Palette.FlatControls)
-        {
-            titlebar.color1 = windowFocused ? Palette.TitleBarGlass : Palette.InactiveTitle;
-        }
-        else
-        {
-            titlebar.color1 = windowFocused ? Palette.ActiveTitle : Palette.InactiveTitle;
-        }
+
+        titlebar.color1 = windowFocused ? Palette.ActiveTitle : Palette.InactiveTitle;
+
         titlebar.textColor = windowFocused ? Palette.TitleText : Palette.TitleTextInactive;
         titlebar.MarkDirty();
     }
@@ -322,7 +310,7 @@ public class Window : Component
 
     public virtual bool HitTest(int mouseX, int mouseY)
     {
-        if (isMinimized || IsAnimatingBounds) return false;
+        if (isMinimized) return false;
 
         return mouseX >= bounds.X && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y && mouseY < bounds.Y + bounds.Height;
     }
@@ -476,7 +464,7 @@ public class Window : Component
 
     public bool IsMinimized => isMinimized;
     public bool IsMaximized => isMaximized;
-    public bool IsAnimatingBounds => isAnimatingBounds || AnimationManager.IsAnimating(this);
+
     public void Stop() //TODO Dispose, GC wont collect it without proper disposal first
     {
         Visible = false;

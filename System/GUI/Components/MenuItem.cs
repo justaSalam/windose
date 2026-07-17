@@ -33,13 +33,10 @@ public class MenuItem : Component
         if (drawSeparator)
         {
             int y = Height / 2;
-            if (Palette.FlatControls)
-                DrawLine(Palette.WindowBorder, 2, y, Width - 3, y);
-            else
-            {
-                DrawLine(Palette.ControlShadow, 2, y, Width - 3, y);
-                DrawLine(Palette.ControlWhite, 2, y + 1, Width - 3, y + 1);
-            }
+
+            DrawLine(Palette.ControlShadow, 2, y, Width - 3, y);
+            DrawLine(Palette.ControlWhite, 2, y + 1, Width - 3, y + 1);
+
             return;
         }
 

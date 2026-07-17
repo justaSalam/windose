@@ -56,7 +56,6 @@ public class WindowManager : SingleThreadedProcess
         my = MouseManager.Y;
         mouseState = Mouse.state;
 
-        AnimationManager.Update(Kernel.DeltaTimeMs);
 
         DispatchMessages();
         ShowPendingFailures();
@@ -516,7 +515,7 @@ public class WindowManager : SingleThreadedProcess
 
     public static void Minimize(Window window)
     {
-        UiAnimations.MinimizeWindow(window);
+        window.Visible = false;
     }
 
     internal static void MinimizeImmediate(Window window)
@@ -539,7 +538,10 @@ public class WindowManager : SingleThreadedProcess
         if (window == null) return;
 
         if (window.IsMinimized)
-            UiAnimations.RestoreWindow(window);
+        {
+            window.Visible = false;
+            window.MarkDirty();
+        }
         else
             Activate(window);
     }

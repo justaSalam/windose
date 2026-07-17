@@ -46,32 +46,19 @@ public class Button : Component
         base.Draw();
     }
 
+    Color face = Palette.ControlFace;
+    Color highlight = Palette.ControlHighlight;
+    Color shadow = Palette.ControlShadow;
+    Color darkShadow = Palette.ControlBlack;
+
     public override void DrawLocal()
     {
 
         if (useBackground)
         {
-            if (Palette.FlatControls)
-            {
-                Color baseFace = useCustomFace ? customFaceColor : Palette.ControlFace;
-                Color face = GUIFeatures.Blend(baseFace, Palette.Highlight, hoverBlend * 0.14f);
-                if (isPressed)
-                    face = GUIFeatures.Blend(face, Palette.ControlShadow, 0.18f);
+            if (isPressed) DrawSunkenRectangle(0, 0, Width, Height, face, darkShadow, shadow, highlight);
+            else DrawRaisedRectangle(0, 0, Width, Height, face, highlight, shadow, darkShadow);
 
-                DrawFilledRectangle(face, 0, 0, Width, Height);
-                if (useBorders)
-                    DrawRectangle(borderColor, 0, 0, Width, Height);
-            }
-            else
-            {
-                Color face = Palette.ControlFace;
-                Color highlight = Palette.ControlHighlight;
-                Color shadow = Palette.ControlShadow;
-                Color darkShadow = Palette.ControlBlack;
-
-                if (isPressed) DrawSunkenRectangle(0, 0, Width, Height, face, darkShadow, shadow, highlight);
-                else DrawRaisedRectangle(0, 0, Width, Height, face, highlight, shadow, darkShadow);
-            }
         }
         if (text != "")
         {

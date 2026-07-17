@@ -115,61 +115,25 @@ public class Slider : Component
         float normalized = range > 0 ? (_value - _min) / range : 0;
         int thumbX = trackLeft + (int)(trackWidth * normalized);
 
-        if (Palette.FlatControls)
+
+        DrawSunkenRectangle(trackLeft, trackY, trackWidth, trackHeight);
+
+        Color thumbFace = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.15f);
+        DrawRaisedRectangle(thumbX - thumbSize / 2, (Height - thumbSize) / 2, thumbSize, thumbSize);
+        DrawFilledRectangle(thumbFace, thumbX - thumbSize / 2 + 1, (Height - thumbSize) / 2 + 1, thumbSize - 2, thumbSize - 2);
+
+        // Ticks
+        if (showTicks)
         {
-            // Track (inactive part)
-            DrawFilledRectangle(trackColor, trackLeft, trackY, trackWidth, trackHeight);
-            if (useBorders)
-                DrawRectangle(Palette.ControlShadow, trackLeft, trackY, trackWidth, trackHeight);
-
-            // Track (active part - from start to thumb)
-            if (thumbX > trackLeft)
+            int tickCount = 10;
+            for (int i = 0; i <= tickCount; i++)
             {
-                DrawFilledRectangle(trackActiveColor, trackLeft, trackY, thumbX - trackLeft, trackHeight);
-            }
-
-            // Thumb
-            Color thumbFace = GUIFeatures.Blend(thumbColor, Palette.Highlight, hoverBlend * 0.2f);
-            if (isDragging)
-                thumbFace = GUIFeatures.Blend(thumbFace, Palette.Highlight, 0.3f);
-
-            DrawFilledRectangle(thumbFace, thumbX - thumbSize / 2, (Height - thumbSize) / 2, thumbSize, thumbSize);
-            DrawRectangle(thumbBorderColor, thumbX - thumbSize / 2, (Height - thumbSize) / 2, thumbSize, thumbSize);
-
-            // Ticks
-            if (showTicks)
-            {
-                int tickCount = 10;
-                for (int i = 0; i <= tickCount; i++)
-                {
-                    int tickX = trackLeft + (trackWidth * i / tickCount);
-                    DrawLine(Palette.ControlShadow, tickX, trackY + trackHeight + 2, 1, 3);
-                }
-            }
-        }
-        else
-        {
-            // Classic: sunken track
-            DrawSunkenRectangle(trackLeft, trackY, trackWidth, trackHeight);
-
-            // Thumb with raised border
-            Color thumbFace = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.15f);
-            DrawRaisedRectangle(thumbX - thumbSize / 2, (Height - thumbSize) / 2, thumbSize, thumbSize);
-            DrawFilledRectangle(thumbFace, thumbX - thumbSize / 2 + 1, (Height - thumbSize) / 2 + 1, thumbSize - 2, thumbSize - 2);
-
-            // Ticks
-            if (showTicks)
-            {
-                int tickCount = 10;
-                for (int i = 0; i <= tickCount; i++)
-                {
-                    int tickX = trackLeft + (trackWidth * i / tickCount);
-                    DrawLine(Palette.ControlShadow, tickX, trackY + trackHeight + 2, 1, 3);
-                }
+                int tickX = trackLeft + (trackWidth * i / tickCount);
+                DrawLine(Palette.ControlShadow, tickX, trackY + trackHeight + 2, 1, 3);
             }
         }
 
-        // Value text
+
         if (showValue)
         {
             string valueText = ((int)_value).ToString();
@@ -195,51 +159,22 @@ public class Slider : Component
         float normalized = range > 0 ? (_value - _min) / range : 0;
         int thumbY = trackBottom - (int)(trackHeight * normalized);
 
-        if (Palette.FlatControls)
+
+        DrawSunkenRectangle(trackX, trackTop, trackWidth, trackHeight);
+
+        Color thumbFace = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.15f);
+        DrawRaisedRectangle((Width - thumbSize) / 2, thumbY - thumbSize / 2, thumbSize, thumbSize);
+        DrawFilledRectangle(thumbFace, (Width - thumbSize) / 2 + 1, thumbY - thumbSize / 2 + 1, thumbSize - 2, thumbSize - 2);
+
+        if (showTicks)
         {
-            DrawFilledRectangle(trackColor, trackX, trackTop, trackWidth, trackHeight);
-            if (useBorders)
-                DrawRectangle(Palette.ControlShadow, trackX, trackTop, trackWidth, trackHeight);
-
-            if (thumbY > trackTop)
+            int tickCount = 10;
+            for (int i = 0; i <= tickCount; i++)
             {
-                DrawFilledRectangle(trackActiveColor, trackX, trackTop, trackWidth, thumbY - trackTop);
+                int tickY = trackTop + (trackHeight * i / tickCount);
+                DrawLine(Palette.ControlShadow, trackX + trackWidth + 2, tickY, 3, 1);
             }
 
-            Color thumbFace = GUIFeatures.Blend(thumbColor, Palette.Highlight, hoverBlend * 0.2f);
-            if (isDragging)
-                thumbFace = GUIFeatures.Blend(thumbFace, Palette.Highlight, 0.3f);
-
-            DrawFilledRectangle(thumbFace, (Width - thumbSize) / 2, thumbY - thumbSize / 2, thumbSize, thumbSize);
-            DrawRectangle(thumbBorderColor, (Width - thumbSize) / 2, thumbY - thumbSize / 2, thumbSize, thumbSize);
-
-            if (showTicks)
-            {
-                int tickCount = 10;
-                for (int i = 0; i <= tickCount; i++)
-                {
-                    int tickY = trackTop + (trackHeight * i / tickCount);
-                    DrawLine(Palette.ControlShadow, trackX + trackWidth + 2, tickY, 3, 1);
-                }
-            }
-        }
-        else
-        {
-            DrawSunkenRectangle(trackX, trackTop, trackWidth, trackHeight);
-
-            Color thumbFace = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.15f);
-            DrawRaisedRectangle((Width - thumbSize) / 2, thumbY - thumbSize / 2, thumbSize, thumbSize);
-            DrawFilledRectangle(thumbFace, (Width - thumbSize) / 2 + 1, thumbY - thumbSize / 2 + 1, thumbSize - 2, thumbSize - 2);
-
-            if (showTicks)
-            {
-                int tickCount = 10;
-                for (int i = 0; i <= tickCount; i++)
-                {
-                    int tickY = trackTop + (trackHeight * i / tickCount);
-                    DrawLine(Palette.ControlShadow, trackX + trackWidth + 2, tickY, 3, 1);
-                }
-            }
         }
 
         if (showValue)

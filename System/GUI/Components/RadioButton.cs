@@ -62,29 +62,15 @@ public class RadioButton : Component
         int radius = Math.Min(Width, Height) / 2 - 2;
         int dotRadius = Math.Max(3, radius - 5);
 
-        if (Palette.FlatControls)
-        {
-            // Outer circle
-            Color face = GUIFeatures.Blend(Palette.ControlWhite, Palette.Highlight, hoverBlend * 0.1f);
-            if (isPressed)
-                face = GUIFeatures.Blend(face, Palette.ControlShadow, 0.15f);
 
-            DrawFilledCircle(face, centerX, centerY, radius);
-            DrawCircle(borderColor, centerX, centerY, radius);
+        // Classic: sunken circle
+        DrawFilledCircle(Palette.ControlWhite, centerX, centerY, radius);
+        DrawCircle(Palette.ControlShadow, centerX, centerY, radius);
+        DrawCircle(Palette.ControlBlack, centerX, centerY, radius - 1);
 
-            if (_checked)
-                DrawFilledCircle(circleColor, centerX, centerY, dotRadius);
-        }
-        else
-        {
-            // Classic: sunken circle
-            DrawFilledCircle(Palette.ControlWhite, centerX, centerY, radius);
-            DrawCircle(Palette.ControlShadow, centerX, centerY, radius);
-            DrawCircle(Palette.ControlBlack, centerX, centerY, radius - 1);
+        if (_checked)
+            DrawFilledCircle(Palette.ControlBlack, centerX, centerY, dotRadius);
 
-            if (_checked)
-                DrawFilledCircle(Palette.ControlBlack, centerX, centerY, dotRadius);
-        }
 
         if (text != "")
         {

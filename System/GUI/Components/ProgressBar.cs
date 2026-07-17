@@ -79,57 +79,31 @@ public class ProgressBar : Component
 
     public override void DrawLocal()
     {
-        if (Palette.FlatControls)
-        {
-            // Track
-            DrawFilledRectangle(trackColor, 0, 0, Width, Height);
-            if (useBorders)
-                DrawRectangle(borderColor, 0, 0, Width, Height);
 
-            // Bar
-            if (_indeterminate)
-            {
-                int barWidth = Math.Max(20, Width / 4);
-                int barX = (int)_marqueeOffset;
-                DrawFilledRectangle(barColor, barX, 2, barWidth, Height - 4);
-            }
-            else
-            {
-                float range = _max - _min;
-                if (range > 0)
-                {
-                    int barWidth = (int)((Width - 4) * ((_value - _min) / range));
-                    if (barWidth > 0)
-                        DrawFilledRectangle(barColor, 2, 2, barWidth, Height - 4);
-                }
-            }
+        // Classic: sunken track
+        DrawSunkenRectangle(0, 0, Width, Height);
+
+        if (_indeterminate)
+        {
+            int barWidth = Math.Max(20, Width / 4);
+            int barX = (int)_marqueeOffset;
+            DrawFilledRectangle(barColor, barX + 2, 2, barWidth, Height - 4);
         }
         else
         {
-            // Classic: sunken track
-            DrawSunkenRectangle(0, 0, Width, Height);
-
-            if (_indeterminate)
+            float range = _max - _min;
+            if (range > 0)
             {
-                int barWidth = Math.Max(20, Width / 4);
-                int barX = (int)_marqueeOffset;
-                DrawFilledRectangle(barColor, barX + 2, 2, barWidth, Height - 4);
-            }
-            else
-            {
-                float range = _max - _min;
-                if (range > 0)
+                int barWidth = (int)((Width - 4) * ((_value - _min) / range));
+                if (barWidth > 0)
                 {
-                    int barWidth = (int)((Width - 4) * ((_value - _min) / range));
-                    if (barWidth > 0)
-                    {
-                        DrawFilledRectangle(barColor, 2, 2, barWidth, Height - 4);
-                        // Add segments for classic look
-                        for (int x = 2; x < barWidth; x += 4)
-                            DrawLine(Palette.ControlHighlight, x, 2, 1, Height - 4);
-                    }
+                    DrawFilledRectangle(barColor, 2, 2, barWidth, Height - 4);
+                    // Add segments for classic look
+                    for (int x = 2; x < barWidth; x += 4)
+                        DrawLine(Palette.ControlHighlight, x, 2, 1, Height - 4);
                 }
             }
+
         }
 
         if (showText && text != "")

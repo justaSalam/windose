@@ -288,10 +288,11 @@ c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patc
 --initassembly:System.Private.Reflection.Execution
 --initassembly:System.Private.StackTraceMetadata
 --systemmodule:System.Private.CoreLib
---directpinvokelist:"C:\Users\salam\.nuget\packages\cosmos.kernel.system.core\3.0.66\build\\InteropAPI.txt"
+--directpinvokelist:"C:\Users\salam\.nuget\packages\cosmos.kernel.system.core\3.0.68\build\\InteropAPI.txt"
 --splitinit
 --nativelib
 --noinlinetls
+--scanreflection
 -g
 --gdwarf-5
 -O

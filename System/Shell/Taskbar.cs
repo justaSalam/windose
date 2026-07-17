@@ -65,10 +65,7 @@ public class Taskbar : Component
             Margin = new Thickness(0),
             leftMouseRelease = () =>
             {
-                if (Explorer.startMenu.Visible)
-                    UiAnimations.HideStartMenu(Explorer.startMenu);
-                else
-                    UiAnimations.ShowStartMenu(Explorer.startMenu);
+                Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
             }
         };
         bar.AddStackChild(startButton);
@@ -102,15 +99,9 @@ public class Taskbar : Component
 
     public override void DrawLocal()
     {
-        if (Palette.FlatControls)
-        {
-            DrawFilledRectangle(Palette.TaskbarGlass, 0, 0, Width, Height);
-            DrawLine(Palette.WindowBorder, 0, 0, Width, 0);
-        }
-        else
-        {
-            DrawRaisedRectangle(0, 0, Width, Height);
-        }
+
+        DrawRaisedRectangle(0, 0, Width, Height);
+
 
         if (text != "") DrawString(text, 0, 0);
 
@@ -126,23 +117,13 @@ public class Taskbar : Component
 
     public void ApplyThemeStyle()
     {
-        if (Palette.FlatControls)
-        {
-            startButton.useCustomFace = true;
-            startButton.customFaceColor = Palette.Highlight;
-            startButton.textColor = Palette.HighlightText;
-            startButton.borderColor = Palette.Highlight;
-            timeLabel.textColor = Palette.HighlightText;
-            bar.color1 = Palette.TaskbarBackground;
-        }
-        else
-        {
-            startButton.useCustomFace = false;
-            startButton.textColor = Color.White;
-            startButton.borderColor = Palette.ControlHighlight;
-            timeLabel.textColor = Palette.ControlBlack;
-            bar.color1 = Palette.ControlFace;
-        }
+
+        startButton.useCustomFace = false;
+        startButton.textColor = Color.White;
+        startButton.borderColor = Palette.ControlHighlight;
+        timeLabel.textColor = Palette.ControlBlack;
+        bar.color1 = Palette.ControlFace;
+
 
         startButton.MarkDirty();
         timeLabel.MarkDirty();
