@@ -1,5 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.System.Mouse;
 using Windose;
 
 public class Taskbar : Component
@@ -16,6 +17,9 @@ public class Taskbar : Component
     private Button startButton;
     private Label timeLabel;
 
+    private readonly MenuPopup contextMenu;
+
+
     public Taskbar(int x, int y, int width, int height) : base(x, y, width, height)
     {
 
@@ -31,9 +35,22 @@ public class Taskbar : Component
             verticalAlignment = VerticalAlignment.Stretch,
             orientation = StackOrientation.Horizontal,
             Margin = new Thickness(0),
-            Padding = new Thickness(0)
-
+            Padding = new Thickness(0),
+            rightClickAction = ShowContextMenu
         };
+
+        contextMenu = new MenuPopup(230, 24 * 3)
+        {
+            itemHeight = 18
+        };
+        contextMenu.AddItem("Task Manager", () =>
+        {
+            WindowManager.Register(new PerformanceMonitor(180, 120));
+        });
+        contextMenu.AddSeparator();
+        contextMenu.AddItem("Minimize All Windows");
+        contextMenu.AddItem("Properties");
+
 
 
 
@@ -56,12 +73,12 @@ public class Taskbar : Component
         };
         bar.AddStackChild(startButton);
 
-        timeLabel = new Label(0, 0, 50, Height - 6)
+        timeLabel = new Label(0, 0, 50, Height)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
             text = DateTime.Now.ToString("H:mm:ss"),
-            Margin = new Thickness(0)
+            Margin = new Thickness(0, 0, 0, 4),
         };
         AddChild(timeLabel);
 
@@ -72,19 +89,22 @@ public class Taskbar : Component
     public override void Update()
     {
         base.Update();
+        timeLabel.MarkDirty();
     }
 
     public override void Draw()
     {
         DrawLocal();
         DrawToScreen();
+        timeLabel.MarkDirty();
+
     }
 
     public override void DrawLocal()
     {
         if (Palette.FlatControls)
         {
-            DrawFilledRectangle(Palette.TaskbarBackground, 0, 0, Width, Height);
+            DrawFilledRectangle(Palette.TaskbarGlass, 0, 0, Width, Height);
             DrawLine(Palette.WindowBorder, 0, 0, Width, 0);
         }
         else
@@ -100,6 +120,8 @@ public class Taskbar : Component
 
             DrawChild(child);
         }
+
+        timeLabel.MarkDirty();
     }
 
     public void ApplyThemeStyle()
@@ -111,6 +133,7 @@ public class Taskbar : Component
             startButton.textColor = Palette.HighlightText;
             startButton.borderColor = Palette.Highlight;
             timeLabel.textColor = Palette.HighlightText;
+            bar.color1 = Palette.TaskbarBackground;
         }
         else
         {
@@ -118,10 +141,20 @@ public class Taskbar : Component
             startButton.textColor = Color.White;
             startButton.borderColor = Palette.ControlHighlight;
             timeLabel.textColor = Palette.ControlBlack;
+            bar.color1 = Palette.ControlFace;
         }
 
         startButton.MarkDirty();
         timeLabel.MarkDirty();
+        MarkDirty();
+    }
+
+    private void ShowContextMenu()
+    {
+        int x = Math.Min(MouseManager.X, Math.Max(0, Global.screenWidth - contextMenu.Width));
+        int y = Math.Min(MouseManager.Y, Math.Max(0, Global.screenHeight - contextMenu.Height));
+        contextMenu.ShowAt(x, y);
+
         MarkDirty();
     }
 

@@ -24,6 +24,12 @@ public sealed class UiTheme
     public Color TitleText;
     public Color TitleTextInactive;
 
+    // Glass / translucent color variants for modern transparency effects
+    public Color TaskbarGlass;
+    public Color WindowGlass;
+    public Color MenuGlass;
+    public Color TitleBarGlass;
+
     public int TitleBarHeight;
     public int BorderSize;
     public bool FlatControls;
@@ -51,6 +57,10 @@ public static class Palette
     public static Color MenuBackground { get; private set; }
     public static Color TitleText { get; private set; }
     public static Color TitleTextInactive { get; private set; }
+    public static Color TaskbarGlass { get; private set; }
+    public static Color WindowGlass { get; private set; }
+    public static Color MenuGlass { get; private set; }
+    public static Color TitleBarGlass { get; private set; }
     public static int TitleBarHeight { get; private set; }
     public static int BorderSize { get; private set; }
     public static bool FlatControls { get; private set; }
@@ -148,6 +158,10 @@ public static class Palette
         MenuBackground = theme.MenuBackground;
         TitleText = theme.TitleText;
         TitleTextInactive = theme.TitleTextInactive;
+        TaskbarGlass = theme.TaskbarGlass;
+        WindowGlass = theme.WindowGlass;
+        MenuGlass = theme.MenuGlass;
+        TitleBarGlass = theme.TitleBarGlass;
         TitleBarHeight = theme.TitleBarHeight;
         BorderSize = theme.BorderSize;
         FlatControls = theme.FlatControls;
@@ -178,6 +192,11 @@ public static class Palette
             MenuBackground = Color.FromArgb(192, 192, 192),
             TitleText = Color.White,
             TitleTextInactive = Color.White,
+            // Classic theme: no transparency (fully opaque glass = same as base colors)
+            TaskbarGlass = Color.FromArgb(192, 192, 192),
+            WindowGlass = Color.FromArgb(192, 192, 192),
+            MenuGlass = Color.FromArgb(192, 192, 192),
+            TitleBarGlass = Color.FromArgb(0, 0, 128),
             TitleBarHeight = 25,
             BorderSize = 2,
             FlatControls = false,
@@ -207,6 +226,11 @@ public static class Palette
             MenuBackground = Color.FromArgb(255, 255, 255),
             TitleText = Color.White,
             TitleTextInactive = Color.FromArgb(25, 31, 39),
+            // Modern theme: translucent glass effects
+            TaskbarGlass = Color.FromArgb(200, 30, 36, 46),
+            WindowGlass = Color.FromArgb(230, 255, 255, 255),
+            MenuGlass = Color.FromArgb(240, 255, 255, 255),
+            TitleBarGlass = Color.FromArgb(200, 37, 99, 235),
             TitleBarHeight = 30,
             BorderSize = 1,
             FlatControls = true,

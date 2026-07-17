@@ -14,10 +14,17 @@ public class ListViewItem
     public string modified = "";
     public bool isFolder;
 
+
     public ListViewItem(string text, Bitmap icon = null, object tag = null)
     {
         this.text = text;
         this.icon = icon;
+        this.tag = tag;
+    }
+
+    public ListViewItem(string text, object tag = null)
+    {
+        this.text = text;
         this.tag = tag;
     }
 

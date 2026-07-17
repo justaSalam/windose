@@ -1,3 +1,8 @@
+using Cosmos.Kernel.HAL.Interfaces.Devices;
+using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.System.Storage;
+using Cosmos.Kernel.System.Vfs;
+
 public delegate void CommandHandler(CommandContext context, string[] arguments);
 
 public sealed class ShellCommand
@@ -22,7 +27,7 @@ public sealed class CommandContext
     private readonly Action clear;
     private readonly Action close;
 
-    public string CurrentDirectory { get; set; } = @"0:\";
+    public string CurrentDirectory { get; set; } = VfsManager.CurrentDirectory;
 
     public CommandContext(Action<string> writeLine, Action clear, Action close)
     {
@@ -37,11 +42,19 @@ public sealed class CommandContext
 
     public string ResolvePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return CurrentDirectory;
-        if (path.Contains(":")) return FileSystemManager.NormalizePath(path);
-        if (path == ".") return CurrentDirectory;
-        if (path == "..") return FileSystemManager.GetParent(CurrentDirectory);
-        return FileSystemManager.Combine(CurrentDirectory, path);
+        if (string.IsNullOrWhiteSpace(path))
+            return CurrentDirectory;
+
+        if (path.Contains(":"))
+            return FileSystemManager.NormalizePath(path);
+
+        if (path == ".")
+            return CurrentDirectory;
+
+        if (path == "..")
+            return Path.GetPathRoot(path);
+
+        return Path.Combine(CurrentDirectory, path);
     }
 }
 
@@ -130,6 +143,41 @@ public static class CommandRegistry
 
         Register("exit", "Closes Command Prompt.", "exit", (context, args) => context.Close());
 
+
+
+        Register("diskmgr", "Disk Management Utility", "diskmgr", (context, agrs) =>
+        {
+            context.WriteLine($"Devices: {StorageManager.DeviceCount}");
+            context.WriteLine($"Primary Device: {StorageManager.PrimaryDevice?.Name}");
+            context.WriteLine($"Partitions: {StorageManager.Partitions.Count}");
+
+
+            context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
+            foreach (Partition partition in StorageManager.Partitions)
+            {
+
+                context.WriteLine($"    {partition.Name} | {partition.BlockSize}B | {partition.BlockCount}");
+            }
+
+            context.WriteLine($"\nDevices: (Name | Block size | Block count)");
+            for (int i = 0; i < StorageManager.DeviceCount; i++)
+            {
+                IBlockDevice? device = StorageManager.GetDevice(i);
+                context.WriteLine($"    {device.Name} | {device.BlockSize}B | {device.BlockCount}");
+
+            }
+
+            context.WriteLine($"\nMounted Devices: (Name | Mount point | Source)");
+            foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
+            {
+
+                context.WriteLine($"    {mount.Name} | {mount.MountPoint} | {mount.Source}");
+            }
+
+
+
+        });
+
     }
 
     private static void Help(CommandContext context, string[] args)
@@ -156,49 +204,70 @@ public static class CommandRegistry
     {
         if (args.Length == 0) { context.WriteLine(context.CurrentDirectory); return; }
         string path = context.ResolvePath(args[0]);
-        if (path == "") path = @"0:\";
-        if (FileSystemManager.Current == null || !FileSystemManager.Current.DirectoryExists(path))
+        if (path == "") path = @"/mnt";
+        if (!VfsManager.TryOpenDirectory(path, out IVfsDirectoryHandle? directory))
         {
+
             context.WriteLine("Directory not found: " + path);
             return;
         }
-        context.CurrentDirectory = path;
+        context.CurrentDirectory = NormalizeDrive(path);
+    }
+    public static string NormalizeDrive(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return @"C:\";
+
+        path = path.Replace("/", "\\");
+
+        if (path.StartsWith("\\"))
+            path = path.Substring(1);
+
+        if (path.Length == 2 && path[1] == ':')
+            path += "\\";
+
+        return path;
     }
 
     private static void ListDirectory(CommandContext context, string[] args)
     {
         string path = context.ResolvePath(args.Length == 0 ? "" : args[0]);
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem == null || !fileSystem.DirectoryExists(path))
+
+
+        if (!VfsManager.TryOpenDirectory(path, out IVfsDirectoryHandle? handle))
         {
             context.WriteLine("Directory not found: " + path);
             return;
         }
 
         context.WriteLine("Directory of " + path);
-        string[] directories = fileSystem.GetDirectories(path);
-        string[] files = fileSystem.GetFiles(path);
+
+        string[] directories = Directory.GetDirectories(path);
+        string[] files = Directory.GetFiles(path);
+
         for (int i = 0; i < directories.Length; i++)
             context.WriteLine("<DIR>          " + FileSystemManager.GetName(directories[i]));
+
         for (int i = 0; i < files.Length; i++)
-            context.WriteLine(fileSystem.GetFileSize(files[i]).ToString().PadLeft(12) + "   " + FileSystemManager.GetName(files[i]));
-        context.WriteLine("        " + files.Length + " file(s), " + directories.Length + " dir(s)");
+            //context.WriteLine(VfsManager.G.GetFileSize(files[i]).ToString().PadLeft(12) + "   " + FileSystemManager.GetName(files[i]));
+
+
+            context.WriteLine("        " + files.Length + " file(s), " + directories.Length + " dir(s)");
     }
 
     private static void TypeFile(CommandContext context, string[] args)
     {
         if (!RequireArguments(context, args, 1, "type <file>")) return;
         string path = context.ResolvePath(args[0]);
-        if (FileSystemManager.Current != null && FileSystemManager.Current.TryReadAllText(path, out string content))
-            context.WriteLine(content);
-        else context.WriteLine("File not found: " + path);
+        context.WriteLine(File.ReadAllText(path));
+
     }
 
     private static void MakeDirectory(CommandContext context, string[] args)
     {
         if (!RequireArguments(context, args, 1, "mkdir <path>")) return;
         string path = context.ResolvePath(args[0]);
-        context.WriteLine(FileSystemManager.Current != null && FileSystemManager.Current.CreateDirectory(path)
+        context.WriteLine(VfsManager.TryCreateDirectory(path, ModeEnum.Directory)
             ? "Directory created: " + path : "Could not create directory: " + path);
     }
 
@@ -206,8 +275,7 @@ public static class CommandRegistry
     {
         if (!RequireArguments(context, args, 1, "del <file>")) return;
         string path = context.ResolvePath(args[0]);
-        context.WriteLine(FileSystemManager.Current != null && FileSystemManager.Current.DeleteFile(path)
-            ? "Deleted: " + path : "Could not delete: " + path);
+        File.Delete(path);
     }
 
     private static void DeleteDirectory(CommandContext context, string[] args)
@@ -215,8 +283,8 @@ public static class CommandRegistry
         if (!RequireArguments(context, args, 1, "rmdir <path> [/s]")) return;
         string path = context.ResolvePath(args[0]);
         bool recursive = args.Length > 1 && string.Equals(args[1], "/s", StringComparison.OrdinalIgnoreCase);
-        context.WriteLine(FileSystemManager.Current != null && FileSystemManager.Current.DeleteDirectory(path, recursive)
-            ? "Directory deleted: " + path : "Could not delete directory: " + path);
+        Directory.Delete(path, recursive);
+
     }
 
     private static void CopyFile(CommandContext context, string[] args)
@@ -225,8 +293,8 @@ public static class CommandRegistry
         bool overwrite = args.Length > 2 && string.Equals(args[2], "/y", StringComparison.OrdinalIgnoreCase);
         string source = context.ResolvePath(args[0]);
         string destination = context.ResolvePath(args[1]);
-        context.WriteLine(FileSystemManager.Current != null && FileSystemManager.Current.CopyFile(source, destination, overwrite)
-            ? "Copied to " + destination : "Copy failed.");
+        File.Copy(source, destination, overwrite);
+
     }
 
     private static void MoveFile(CommandContext context, string[] args)
@@ -235,8 +303,9 @@ public static class CommandRegistry
         bool overwrite = args.Length > 2 && string.Equals(args[2], "/y", StringComparison.OrdinalIgnoreCase);
         string source = context.ResolvePath(args[0]);
         string destination = context.ResolvePath(args[1]);
-        context.WriteLine(FileSystemManager.Current != null && FileSystemManager.Current.MoveFile(source, destination, overwrite)
-            ? "Moved to " + destination : "Move failed.");
+
+        File.Move(source, destination, overwrite);
+
     }
 
     private static void ListProcesses(CommandContext context, string[] args)

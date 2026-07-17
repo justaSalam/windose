@@ -30,7 +30,7 @@ public readonly struct RegistryChange
 
 public static class SystemRegistry
 {
-    public const string StoragePath = @"0:\System\registry.db";
+    public const string StoragePath = @"mnt/System/registry.db";
 
     private static readonly Dictionary<string, RegistryEntry> entries =
         new Dictionary<string, RegistryEntry>(StringComparer.OrdinalIgnoreCase);
@@ -43,6 +43,11 @@ public static class SystemRegistry
 
     public static void Initialize()
     {
+        Console.WriteLine("[Registry] Init");
+
+        Directory.CreateDirectory("/mnt/System");
+        if (!File.Exists(StoragePath)) File.Create(StoragePath);
+
         lock (sync)
         {
             if (initialized) return;
@@ -155,9 +160,6 @@ public static class SystemRegistry
 
     public static bool Save()
     {
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem == null) return false;
-
         StringBuilder output = new StringBuilder();
         lock (sync)
         {
@@ -175,18 +177,19 @@ public static class SystemRegistry
                     .Append(entry.RequiresRestart ? "true" : "false").Append('\n');
             }
         }
+        Console.WriteLine("reg save");
 
-        string directory = FileSystemManager.GetParent(StoragePath);
-        if (!fileSystem.DirectoryExists(directory)) fileSystem.CreateDirectory(directory);
-        return fileSystem.WriteAllText(StoragePath, output.ToString());
+        Console.WriteLine(Directory.Exists("/mnt/System"));
+        File.WriteAllText(StoragePath, output.ToString());
+
+        return true;
     }
 
     public static void Load()
     {
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem == null || !fileSystem.TryReadAllText(StoragePath, out string content)) return;
 
-        string[] lines = content.Replace("\r\n", "\n").Split('\n');
+        Console.WriteLine("reg loading");
+        string[] lines = File.ReadAllText(StoragePath).Replace("\r\n", "\n").Split('\n');
         for (int i = 0; i < lines.Length; i++)
         {
             string[] parts = lines[i].Split('|');

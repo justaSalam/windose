@@ -60,7 +60,9 @@ public class TextField : Component
     {
         if (readOnly) return;
 
-        if (KeyboardManager.ControlPressed)
+        bool isControlPressed = IsControlPressed(keyEvent);
+
+        if (isControlPressed)
         {
             if (keyEvent.Key == ConsoleKeyEx.C)
             {
@@ -102,9 +104,10 @@ public class TextField : Component
                 break;
 
             default:
-                if (keyEvent.KeyChar != '\0')
+                char printable = GetPrintableCharacter(keyEvent);
+                if (printable != '\0')
                 {
-                    text += keyEvent.KeyChar;
+                    text += printable;
                     changed = true;
                 }
                 break;

@@ -30,12 +30,12 @@ public static class BreezeHost
     {
         try
         {
-            if (!FileSystemManager.Current.TryReadAllText(path, out string source))
+            if (File.ReadAllText(path) == string.Empty)
             {
                 QueueError("Could not load " + path);
                 return null;
             }
-            return RunSource(source, path);
+            return RunSource(File.ReadAllText(path), path);
         }
         catch (Exception exception)
         {
@@ -63,12 +63,7 @@ public static class BreezeHost
     {
         try
         {
-            if (!FileSystemManager.Current.TryReadAllText(path, out string source))
-            {
-                QueueError("Could not load " + path);
-                return null;
-            }
-            return RunScheduledSource(source, path);
+            return RunScheduledSource(File.ReadAllText(path), path);
         }
         catch (Exception exception)
         {

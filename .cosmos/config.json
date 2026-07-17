@@ -1,12 +1,27 @@
 {
   "targetArch": "x64",
   "qemu": {
-    "memory": "4G",
+    "memory": "256M",
     "machineType": "q35",
     "cpuModel": "max",
     "serialMode": "stdio",
+    "networkCard": "none",
+    "keyboard": "ps2",
+    "mouse": "ps2",
     "enableNetwork": false,
     "networkPorts": "5555",
-    "extraArgs": "-display sdl -full-screen"
+    "extraArgs": "",
+    "disks": [
+      {
+        "path": "disk.img",
+        "type": "ahci",
+        "size": "256M"
+      },
+      {
+        "path": "disk2.img",
+        "type": "ahci",
+        "size": "16M"
+      }
+    ]
   }
 }

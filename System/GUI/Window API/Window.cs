@@ -1,8 +1,4 @@
 using System.Drawing;
-using System.Runtime.CompilerServices;
-using Cosmos.Kernel.Core.IO;
-using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
 using Windose;
 
@@ -63,7 +59,7 @@ public class Window : Component
     public override void Update()
     {
         // Window movement is handled by the compositor; hover state is for child controls.
-
+        base.Update();
     }
 
     /// <summary>
@@ -81,7 +77,7 @@ public class Window : Component
     {
         if (Palette.FlatControls)
         {
-            DrawFilledRectangle(Palette.WindowBackground, 0, 0, Width, Height);
+            DrawFilledRectangle(Palette.WindowGlass, 0, 0, Width, Height);
             DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
         }
         else
@@ -161,7 +157,7 @@ public class Window : Component
                     text = "_",
                     verticalAlignment = VerticalAlignment.Top,
                     horizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(3, titleButtonTop, 3 + titleButtonSize * 2, 3),
+                    Margin = new Thickness(6, titleButtonTop, 6 + titleButtonSize * 2, 3),
                     useBorders = true,
                     borderColor = chromeBorder,
                     textColor = Palette.ControlBlack,
@@ -185,7 +181,15 @@ public class Window : Component
     {
         if (!hasTitleBar || titlebar == null) return;
 
-        titlebar.color1 = windowFocused ? Palette.ActiveTitle : Palette.InactiveTitle;
+        // Use glass color for modern theme (alpha-blended), fall back to solid for classic
+        if (Palette.FlatControls)
+        {
+            titlebar.color1 = windowFocused ? Palette.TitleBarGlass : Palette.InactiveTitle;
+        }
+        else
+        {
+            titlebar.color1 = windowFocused ? Palette.ActiveTitle : Palette.InactiveTitle;
+        }
         titlebar.textColor = windowFocused ? Palette.TitleText : Palette.TitleTextInactive;
         titlebar.MarkDirty();
     }
@@ -310,6 +314,7 @@ public class Window : Component
             if (newWidth > 2 && newHeight > 2)
             {
                 previewBounds = new Rectangle(original.X, original.Y, newWidth, newHeight);
+
                 WindowManager.ShowPreviewRect(previewBounds);
             }
         }
@@ -344,7 +349,11 @@ public class Window : Component
 
         X = x;
         Y = y;
-        bounds = new Rectangle(X, Y, Width, Height);
+
+        bounds.X = X;
+        bounds.Y = Y;
+        bounds.Width = Width;
+        bounds.Height = Height;
 
         WindowManager.Invalidate(oldBounds);
         WindowManager.Invalidate(bounds);
@@ -364,10 +373,15 @@ public class Window : Component
         X = x;
         Y = y;
         base.Resize(width, height);
-        bounds = new Rectangle(X, Y, Width, Height);
+
+        bounds.X = X;
+        bounds.Y = Y;
+        bounds.Width = Width;
+        bounds.Height = Height;
 
         WindowManager.Invalidate(oldBounds);
         WindowManager.Invalidate(bounds);
+
         MarkDirty();
     }
 
@@ -380,7 +394,11 @@ public class Window : Component
         if (rect.Width != Width || rect.Height != Height)
             base.Resize(rect.Width, rect.Height);
 
-        bounds = new Rectangle(X, Y, Width, Height);
+        bounds.X = X;
+        bounds.Y = Y;
+        bounds.Width = Width;
+        bounds.Height = Height;
+
         ComputeAbsoluteCoordinates();
 
         WindowManager.Invalidate(oldBounds);
@@ -465,8 +483,23 @@ public class Window : Component
         Dispose();
     }
 
+
+    bool disposed = false;
     public override void Dispose()
     {
+        if (disposed)
+            return;
+
+        disposed = true;
+
+        dragging = false;
+        resizing = false;
+
+        focusedComponent = null;
+        titlebar = null;
+
+
+        children.Clear();
         base.Dispose();
     }
 

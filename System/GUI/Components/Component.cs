@@ -250,6 +250,13 @@ public class Component : IDisposable
         {
             UpdateFrame();
         }
+
+        for (int i = 0; i < children.Count; i++)
+        {
+            Component child = children[i];
+            if (child.Visible)
+                child.Update();
+        }
     }
 
     public void UpdateFrame()
@@ -303,6 +310,67 @@ public class Component : IDisposable
 
     public virtual void HandleKeyboard(KeyEvent keyEvent)
     {
+    }
+
+    protected static bool IsControlPressed(KeyEvent keyEvent)
+        => (keyEvent.Modifiers & ConsoleModifiers.Control) != 0 || KeyboardManager.ControlPressed;
+
+    protected static bool IsShiftPressed(KeyEvent keyEvent)
+        => (keyEvent.Modifiers & ConsoleModifiers.Shift) != 0 || KeyboardManager.ShiftPressed;
+
+    protected static char GetPrintableCharacter(KeyEvent keyEvent)
+    {
+        switch (keyEvent.Key)
+        {
+            case ConsoleKeyEx.LeftArrow:
+            case ConsoleKeyEx.RightArrow:
+            case ConsoleKeyEx.UpArrow:
+            case ConsoleKeyEx.DownArrow:
+            case ConsoleKeyEx.Home:
+            case ConsoleKeyEx.End:
+            case ConsoleKeyEx.PageUp:
+            case ConsoleKeyEx.PageDown:
+            case ConsoleKeyEx.Backspace:
+            case ConsoleKeyEx.Delete:
+            case ConsoleKeyEx.Enter:
+            case ConsoleKeyEx.Tab:
+            case ConsoleKeyEx.Escape:
+                return '\0';
+        }
+
+        char value = keyEvent.KeyChar;
+        if (value == '\0') return '\0';
+
+        if (!IsShiftPressed(keyEvent)) return value;
+
+        if (value >= 'a' && value <= 'z')
+            return (char)(value - 32);
+
+        switch (value)
+        {
+            case '1': return '!';
+            case '2': return '@';
+            case '3': return '#';
+            case '4': return '$';
+            case '5': return '%';
+            case '6': return '^';
+            case '7': return '&';
+            case '8': return '*';
+            case '9': return '(';
+            case '0': return ')';
+            case '-': return '_';
+            case '=': return '+';
+            case '[': return '{';
+            case ']': return '}';
+            case '\\': return '|';
+            case ';': return ':';
+            case '\'': return '"';
+            case ',': return '<';
+            case '.': return '>';
+            case '/': return '?';
+            case '`': return '~';
+            default: return value;
+        }
     }
 
     public virtual void HandleMessage(UiMessage message)
@@ -386,12 +454,9 @@ public class Component : IDisposable
 
     public void DrawToScreen()
     {
-        if (opacity >= 255)
-        {
-            Kernel.mainBuffer.DrawArrayClipped(buffer.GetBuffer(), buffer.Width, 0, 0, AbsoluteX, AbsoluteY, Width, Height);
-            return;
-        }
-
+        // Always use alpha-blended copy so that pixels with alpha < 255
+        // (e.g. glass/translucent theme colors) blend with the desktop
+        // background behind this component.
         Kernel.mainBuffer.DrawArrayAlphaClipped(
             buffer.GetBuffer(),
             buffer.Width,
@@ -400,8 +465,7 @@ public class Component : IDisposable
             AbsoluteX,
             AbsoluteY,
             Width,
-            Height,
-            opacity);
+            Height);
     }
 
     public void DrawToScreen(Rectangle dirtyRect)
@@ -409,20 +473,7 @@ public class Component : IDisposable
         Rectangle clipped = Rectangle.Intersect(AbsoluteRectangle, dirtyRect);
         if (clipped.Width <= 0 || clipped.Height <= 0) return;
 
-        if (opacity >= 255)
-        {
-            Kernel.mainBuffer.DrawArrayClipped(
-                buffer.GetBuffer(),
-                buffer.Width,
-                clipped.X - AbsoluteX,
-                clipped.Y - AbsoluteY,
-                clipped.X,
-                clipped.Y,
-                clipped.Width,
-                clipped.Height);
-            return;
-        }
-
+        // Always use alpha-blended copy for proper transparency compositing.
         Kernel.mainBuffer.DrawArrayAlphaClipped(
             buffer.GetBuffer(),
             buffer.Width,
@@ -431,8 +482,7 @@ public class Component : IDisposable
             clipped.X,
             clipped.Y,
             clipped.Width,
-            clipped.Height,
-            opacity);
+            clipped.Height);
     }
 
     public virtual void Draw(Component component)
@@ -771,6 +821,11 @@ public class Component : IDisposable
         buffer.DrawFilledCircle(color, x, y, radius);
     }
 
+    public void DrawCircle(Color color, int xCenter, int yCenter, int radius)
+    {
+        buffer.DrawCircle(color, xCenter, yCenter, radius);
+    }
+
     public void DrawGradient(Color color1, Color color2, int x, int y, int width, int height)
     {
         for (int i = 0; i < width; i++)
@@ -984,13 +1039,31 @@ public class Component : IDisposable
 
     public virtual void Dispose()
     {
-        if (disposed) return;
+        if (disposed)
+            return;
+
         disposed = true;
 
         for (int i = children.Count - 1; i >= 0; i--)
             children[i].Dispose();
 
         children.Clear();
+
+        buffer?.Dispose();
+        cacheBuffer?.Dispose();
+
+        buffer = null;
+        cacheBuffer = null;
+
+        frame = null;
+        normalFrame = null;
+        highlightedFrame = null;
+        pressedFrame = null;
+
+        contextWindow = null;
+        rightClickAction = null;
+
+        parent = null;
 
         components.Remove(this);
     }

@@ -448,70 +448,66 @@ public sealed class BreezeRuntime
                 return BreezeServiceManager.GetState(ToText(args[0]));
 
             case "fileExists":
-                return FileSystemManager.Current != null && FileSystemManager.Current.FileExists(ToText(args[0]));
+                return File.Exists(ToText(args[0]));
 
             case "directoryExists":
-                return FileSystemManager.Current != null && FileSystemManager.Current.DirectoryExists(ToText(args[0]));
+                return Directory.Exists(ToText(args[0]));
 
             case "createDirectory":
-                return FileSystemManager.Current != null && FileSystemManager.Current.CreateDirectory(ToText(args[0]));
+                return Directory.CreateDirectory(ToText(args[0]));
 
             case "deleteFile":
-                return FileSystemManager.Current != null && FileSystemManager.Current.DeleteFile(ToText(args[0]));
+                File.Delete(ToText(args[0]));
+                break;
 
             case "deleteDirectory":
-                return FileSystemManager.Current != null && FileSystemManager.Current.DeleteDirectory(ToText(args[0]), ToBool(args[1]));
+                Directory.Delete(ToText(args[0]), ToBool(args[1]));
+                break;
 
             case "copyFile":
-                return FileSystemManager.Current != null && FileSystemManager.Current.CopyFile(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                File.Copy(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                break;
 
             case "copyDirectory":
-                return FileSystemManager.Current != null && FileSystemManager.Current.CopyDirectory(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                File.Copy(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                break;
 
             case "moveFile":
-                return FileSystemManager.Current != null && FileSystemManager.Current.MoveFile(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                File.Move(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                break;
 
             case "moveDirectory":
-                return FileSystemManager.Current != null && FileSystemManager.Current.MoveDirectory(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                Directory.Move(ToText(args[0]), ToText(args[1]));
+                break;
 
             case "renamePath":
-                return FileSystemManager.Current != null && FileSystemManager.Current.Rename(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                File.Copy(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                break;
 
             case "readFile":
                 {
-                    if (FileSystemManager.Current != null && FileSystemManager.Current.TryReadAllText(ToText(args[0]), out string content))
-                        return content;
-                    return FailValue<object>("Could not read file " + ToText(args[0]));
+                    return File.ReadAllText(ToText(args[0]));
                 }
 
             case "tryReadFile":
                 {
-                    Dictionary<string, object> result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-                    string content = "";
-                    bool success = FileSystemManager.Current != null &&
-                        FileSystemManager.Current.TryReadAllText(ToText(args[0]), out content);
-                    result["ok"] = success;
-                    result["value"] = success ? content : null;
-                    result["error"] = success ? null : "Could not read file " + ToText(args[0]);
-                    return result;
+                    ;
+                    return File.ReadAllText(ToText(args[0])); ;
                 }
 
             case "writeFile":
-                return FileSystemManager.Current != null && FileSystemManager.Current.WriteAllText(ToText(args[0]), ToText(args[1]), ToBool(args[2]));
+                File.WriteAllText(ToText(args[0]), ToText(args[1]));
+                break;
 
             case "fileInfo":
                 {
-                    if (FileSystemManager.Current != null && FileSystemManager.Current.TryGetInfo(ToText(args[0]), out WindoseFileInfo info))
-                        return info;
-                    return FailValue<object>("Path does not exist: " + ToText(args[0]));
+                    //if (FileSystemManager.Current != null && FileSystemManager.Current.TryGetInfo(ToText(args[0]), out WindoseFileInfo info))
+                    //    return info;
+                    return FailValue<object>("fileInfo not implemented " + ToText(args[0]));
                 }
 
             case "watchPath":
                 return WatchPath(ToText(args[0]), ToBool(args[1]));
-
-            case "clearWatches":
-                ClearFileWatches();
-                return true;
 
             case "registryGet":
                 return ToBreezeRegistryValue(SystemRegistry.Get(ToText(args[0])));
@@ -1021,9 +1017,220 @@ public sealed class BreezeRuntime
                 Serial.WriteString(ToText(args[0]) + "\n");
                 return args[0];
 
+            // === NEW CONTROLS ===
+
+            case "progressBar":
+                RequireCount(name, args, 3);
+                {
+                    int width = ToInt(args[1]);
+                    int height = ToInt(args[2]);
+                    if (HasError) return null;
+                    return new ProgressBar(0, 0, width, height)
+                    {
+                        text = ToText(args[0]),
+                        clampSize = false,
+                        Margin = new Thickness(0),
+                    };
+                }
+
+            case "progressValue":
+                RequireCount(name, args, 2);
+                {
+                    ProgressBar bar = Require<ProgressBar>(name, args[0]);
+                    if (bar == null) return null;
+                    bar.Value = (float)ToNumber(args[1]);
+                    return args[0];
+                }
+
+            case "progressIndeterminate":
+                RequireCount(name, args, 2);
+                {
+                    ProgressBar bar = Require<ProgressBar>(name, args[0]);
+                    if (bar == null) return null;
+                    bar.Indeterminate = ToBool(args[1]);
+                    return args[0];
+                }
+
+            case "checkbox":
+                RequireCount(name, args, 1);
+                {
+                    Checkbox cb = new Checkbox(0, 0)
+                    {
+                        text = ToText(args[0]),
+                        clampSize = false,
+                        Margin = new Thickness(0),
+                    };
+                    return cb;
+                }
+
+            case "radioButton":
+                RequireCount(name, args, 2);
+                {
+                    string group = ToText(args[1]);
+                    if (HasError) return null;
+                    RadioButton rb = new RadioButton(0, 0)
+                    {
+                        text = ToText(args[0]),
+                        Group = group,
+                        clampSize = false,
+                        Margin = new Thickness(0),
+                    };
+                    return rb;
+                }
+
+            case "radioChecked":
+                RequireCount(name, args, 1);
+                {
+                    RadioButton rb = Require<RadioButton>(name, args[0]);
+                    if (rb == null) return null;
+                    return rb.Checked;
+                }
+
+            case "comboBox":
+                RequireCount(name, args, 2);
+                {
+                    int width = ToInt(args[1]);
+                    if (HasError) return null;
+                    return new ComboBox(0, 0, width)
+                    {
+                        text = ToText(args[0]),
+                        clampSize = false,
+                        Margin = new Thickness(0),
+                    };
+                }
+
+            case "comboAdd":
+                RequireCount(name, args, 2);
+                {
+                    ComboBox combo = Require<ComboBox>(name, args[0]);
+                    if (combo == null) return null;
+                    combo.AddItem(args[1]);
+                    return args[0];
+                }
+
+            case "comboClear":
+                RequireCount(name, args, 1);
+                {
+                    ComboBox combo = Require<ComboBox>(name, args[0]);
+                    if (combo == null) return null;
+                    combo.ClearItems();
+                    return args[0];
+                }
+
+            case "comboSelected":
+                RequireCount(name, args, 1);
+                {
+                    ComboBox combo = Require<ComboBox>(name, args[0]);
+                    if (combo == null) return null;
+                    return (double)combo.SelectedIndex;
+                }
+
+            case "comboText":
+                RequireCount(name, args, 1);
+                {
+                    ComboBox combo = Require<ComboBox>(name, args[0]);
+                    if (combo == null) return null;
+                    return combo.SelectedText;
+                }
+
+            case "tabControl":
+                RequireCount(name, args, 3);
+                {
+                    int width = ToInt(args[1]);
+                    int height = ToInt(args[2]);
+                    if (HasError) return null;
+                    return new TabControl(0, 0, width, height)
+                    {
+                        text = ToText(args[0]),
+                        clampSize = false,
+                        Margin = new Thickness(0),
+                    };
+                }
+
+            case "tabAdd":
+                RequireCount(name, args, 2);
+                {
+                    TabControl tabs = Require<TabControl>(name, args[0]);
+                    if (tabs == null) return null;
+                    return tabs.AddPage(ToText(args[1]));
+                }
+
+            case "tabRemove":
+                RequireCount(name, args, 2);
+                {
+                    TabControl tabs = Require<TabControl>(name, args[0]);
+                    if (tabs == null) return null;
+                    int index = ToInt(args[1]);
+                    if (HasError) return null;
+                    tabs.RemovePageAt(index);
+                    return args[0];
+                }
+
+            case "tabSelected":
+                RequireCount(name, args, 1);
+                {
+                    TabControl tabs = Require<TabControl>(name, args[0]);
+                    if (tabs == null) return null;
+                    return (double)tabs.SelectedIndex;
+                }
+
+            case "slider":
+                RequireCount(name, args, 3);
+                {
+                    int width = ToInt(args[1]);
+                    int height = ToInt(args[2]);
+                    if (HasError) return null;
+                    return new Slider(0, 0, width, height, Orientation.Horizontal)
+                    {
+                        text = ToText(args[0]),
+                        clampSize = false,
+                        Margin = new Thickness(0),
+                    };
+                }
+
+            case "sliderValue":
+                RequireCount(name, args, 2);
+                {
+                    Slider slider = Require<Slider>(name, args[0]);
+                    if (slider == null) return null;
+                    if (args.Length > 1)
+                    {
+                        slider.Value = (float)ToNumber(args[1]);
+                        return args[0];
+                    }
+                    return (double)slider.Value;
+                }
+
+            case "sliderRange":
+                RequireCount(name, args, 3);
+                {
+                    Slider slider = Require<Slider>(name, args[0]);
+                    if (slider == null) return null;
+                    slider.Minimum = (float)ToNumber(args[1]);
+                    slider.Maximum = (float)ToNumber(args[2]);
+                    return args[0];
+                }
+
+            case "tooltip":
+                RequireCount(name, args, 0);
+                return new Tooltip();
+
+            case "tooltipAttach":
+                RequireCount(name, args, 3);
+                {
+                    Tooltip tip = Require<Tooltip>(name, args[0]);
+                    Component target = Require<Component>(name, args[1]);
+                    if (tip == null || target == null) return null;
+                    tip.AttachTo(target, ToText(args[2]));
+                    return args[0];
+                }
+
             default:
                 return FailValue<object>("Unknown function '" + name + "'");
         }
+
+        return null;
+
     }
 
     private void BindEvent(object target, string eventName, List<BreezeStatement> body)
@@ -1057,6 +1264,12 @@ public sealed class BreezeRuntime
         }
 
         if (target is Button button && eventName == "click") { button.leftMouseRelease = callback; return; }
+        if (target is Checkbox checkbox && eventName == "click") { checkbox.Click = callback; return; }
+        if (target is Checkbox checkboxChange && eventName == "change") { checkboxChange.CheckedChanged += _ => callback(); return; }
+        if (target is RadioButton radio && eventName == "change") { radio.CheckedChanged += _ => callback(); return; }
+        if (target is ComboBox combo && eventName == "change") { combo.SelectedIndexChanged += _ => callback(); return; }
+        if (target is Slider slider && eventName == "change") { slider.ValueChanged += _ => callback(); return; }
+        if (target is TabControl tabs && eventName == "change") { tabs.SelectedIndexChanged += _ => callback(); return; }
         if (target is MenuItem menuItem && eventName == "click") { menuItem.click = callback; return; }
         if (target is TreeView tree)
         {
@@ -1280,6 +1493,21 @@ public sealed class BreezeRuntime
                 case "width": return (double)component.Width;
                 case "height": return (double)component.Height;
                 case "visible": return component.Visible;
+                case "value":
+                    if (component is ProgressBar progress) return (double)progress.Value;
+                    if (component is Slider slider) return (double)slider.Value;
+                    return FailValue<object>("This component has no value property");
+                case "checked":
+                    if (component is Checkbox checkbox) return checkbox.Checked;
+                    if (component is RadioButton radio) return radio.Checked;
+                    return FailValue<object>("This component has no checked property");
+                case "selectedIndex":
+                    if (component is ComboBox combo) return (double)combo.SelectedIndex;
+                    if (component is TabControl tabs) return (double)tabs.SelectedIndex;
+                    return FailValue<object>("This component has no selectedIndex property");
+                case "selectedText":
+                    if (component is ComboBox comboText) return comboText.SelectedText;
+                    return FailValue<object>("This component has no selectedText property");
                 default: return FailValue<object>("Unknown component property '" + property + "'");
             }
         }
@@ -1335,7 +1563,65 @@ public sealed class BreezeRuntime
                     if (component is Button button) button.fontSize = fontSize;
                     else if (component is Panel panel) panel.fontSize = fontSize;
                     else if (component is TextField field) field.fontSize = fontSize;
+                    else if (component is ProgressBar progress) progress.fontSize = fontSize;
+                    else if (component is RadioButton radio) radio.fontSize = fontSize;
+                    else if (component is ComboBox combo) combo.fontSize = fontSize;
+                    else if (component is Slider slider) slider.fontSize = fontSize;
+                    else if (component is TabControl tabs) tabs.fontSize = fontSize;
+                    else if (component is Tooltip tooltip) tooltip.fontSize = fontSize;
                     else { Fail("This component has no fontSize property"); return; }
+                    break;
+                }
+            case "value":
+                {
+                    if (component is ProgressBar progress) progress.Value = (float)ToNumber(value);
+                    else if (component is Slider slider) slider.Value = (float)ToNumber(value);
+                    else { Fail("This component has no value property"); return; }
+                    break;
+                }
+            case "minimum":
+                {
+                    if (component is ProgressBar progress) progress.Minimum = (float)ToNumber(value);
+                    else if (component is Slider slider) slider.Minimum = (float)ToNumber(value);
+                    else { Fail("This component has no minimum property"); return; }
+                    break;
+                }
+            case "maximum":
+                {
+                    if (component is ProgressBar progress) progress.Maximum = (float)ToNumber(value);
+                    else if (component is Slider slider) slider.Maximum = (float)ToNumber(value);
+                    else { Fail("This component has no maximum property"); return; }
+                    break;
+                }
+            case "checked":
+                {
+                    if (component is Checkbox checkbox) checkbox.Checked = ToBool(value);
+                    else if (component is RadioButton radio) radio.Checked = ToBool(value);
+                    else { Fail("This component has no checked property"); return; }
+                    break;
+                }
+            case "indeterminate":
+                {
+                    if (component is ProgressBar progress) progress.Indeterminate = ToBool(value);
+                    else { Fail("This component has no indeterminate property"); return; }
+                    break;
+                }
+            case "showTicks":
+                {
+                    if (component is Slider slider) slider.showTicks = ToBool(value);
+                    else { Fail("This component has no showTicks property"); return; }
+                    break;
+                }
+            case "showValue":
+                {
+                    if (component is Slider slider) slider.ShowValue = ToBool(value);
+                    else { Fail("This component has no showValue property"); return; }
+                    break;
+                }
+            case "showText":
+                {
+                    if (component is ProgressBar progress) progress.showText = ToBool(value);
+                    else { Fail("This component has no showText property"); return; }
                     break;
                 }
             case "canResize":
@@ -1419,8 +1705,6 @@ public sealed class BreezeRuntime
 
     private bool WatchPath(string path, bool recursive)
     {
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem == null) return false;
         string watchedPath = FileSystemManager.NormalizePath(path);
         BreezeFileWatch watch = new BreezeFileWatch { Path = watchedPath, Recursive = recursive };
         watch.Handler = change =>
@@ -1432,19 +1716,11 @@ public sealed class BreezeRuntime
             if (exact || child)
                 EnqueueMessage(new BreezeProcessMessage("filesystem.changed", change, "filesystem"));
         };
-        fileSystem.Changed += watch.Handler;
         fileWatches.Add(watch);
         keepAliveWithoutWindows = true;
         return true;
     }
 
-    private void ClearFileWatches()
-    {
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem != null)
-            for (int i = 0; i < fileWatches.Count; i++) fileSystem.Changed -= fileWatches[i].Handler;
-        fileWatches.Clear();
-    }
 
     private static bool IsGuiFunction(string name)
     {
@@ -1478,6 +1754,27 @@ public sealed class BreezeRuntime
             case "add":
             case "show":
             case "close":
+            // New controls
+            case "progressBar":
+            case "progressValue":
+            case "progressIndeterminate":
+            case "checkbox":
+            case "radioButton":
+            case "radioChecked":
+            case "comboBox":
+            case "comboAdd":
+            case "comboClear":
+            case "comboSelected":
+            case "comboText":
+            case "tabControl":
+            case "tabAdd":
+            case "tabRemove":
+            case "tabSelected":
+            case "slider":
+            case "sliderValue":
+            case "sliderRange":
+            case "tooltip":
+            case "tooltipAttach":
                 return true;
             default:
                 return false;
@@ -1555,7 +1852,9 @@ public sealed class BreezeRuntime
             importDepth--;
             return ExecutionResult.None;
         }
-        if (FileSystemManager.Current == null || !FileSystemManager.Current.TryReadAllText(path, out string source))
+
+        string source = File.ReadAllText(path);
+        if (source == string.Empty)
         {
             importDepth--;
             Fail("Could not import module " + path);
@@ -1703,15 +2002,14 @@ public sealed class BreezeRuntime
 
     private void LoadDirectory(ListView list, string path)
     {
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem == null || !fileSystem.DirectoryExists(path))
+        if (!Directory.Exists(path))
         {
             Fail("Directory does not exist: " + path);
             return;
         }
         list.ClearItems();
 
-        string[] directories = fileSystem.GetDirectories(path);
+        string[] directories = Directory.GetDirectories(path);
         for (int i = 0; i < directories.Length; i++)
         {
             string directory = directories[i];
@@ -1720,7 +2018,7 @@ public sealed class BreezeRuntime
             item.type = "File Folder";
         }
 
-        string[] files = fileSystem.GetFiles(path);
+        string[] files = Directory.GetFiles(path);
         for (int i = 0; i < files.Length; i++)
         {
             string file = files[i];
@@ -1736,14 +2034,13 @@ public sealed class BreezeRuntime
 
     private List<object> GetPaths(string path, bool directories)
     {
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem == null || !fileSystem.DirectoryExists(path))
+        if (!Directory.Exists(path))
         {
             Fail("Directory does not exist: " + path);
             return null;
         }
 
-        string[] paths = directories ? fileSystem.GetDirectories(path) : fileSystem.GetFiles(path);
+        string[] paths = directories ? Directory.GetDirectories(path) : Directory.GetFiles(path);
         List<object> result = new List<object>(paths.Length);
         for (int i = 0; i < paths.Length; i++) result.Add(paths[i]);
         return result;
@@ -1813,7 +2110,6 @@ public sealed class BreezeRuntime
         processUpdateBody = null;
         processMessageBody = null;
         timers.Clear();
-        ClearFileWatches();
         lock (messageQueueLock) messageQueue.Clear();
         lock (processRegistryLock)
         {
@@ -1875,7 +2171,7 @@ public sealed class BreezeRuntime
         "deleteFile" => 1,
         "deleteDirectory" => 2,
         "copyFile" => 3,
-        "copyDirectory" => 3,
+        "copyDirectory" => 2,
         "moveFile" => 3,
         "moveDirectory" => 3,
         "renamePath" => 3,
@@ -1942,6 +2238,27 @@ public sealed class BreezeRuntime
         "close" => 1,
         "value" => 2,
         "print" => 1,
+        // New controls
+        "progressBar" => 3,
+        "progressValue" => 2,
+        "progressIndeterminate" => 2,
+        "checkbox" => 1,
+        "radioButton" => 2,
+        "radioChecked" => 1,
+        "comboBox" => 2,
+        "comboAdd" => 2,
+        "comboClear" => 1,
+        "comboSelected" => 1,
+        "comboText" => 1,
+        "tabControl" => 3,
+        "tabAdd" => 2,
+        "tabRemove" => 2,
+        "tabSelected" => 1,
+        "slider" => 3,
+        "sliderValue" => 2,
+        "sliderRange" => 3,
+        "tooltip" => 0,
+        "tooltipAttach" => 3,
         _ => -1,
     };
 

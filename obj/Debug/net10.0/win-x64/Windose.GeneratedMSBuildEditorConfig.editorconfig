@@ -25,6 +25,7 @@ build_property._SupportedPlatformList = Linux,macOS,Windows
 build_property.CosmosArch = x64
 build_property.TargetFrameworkIdentifier = .NETCoreApp
 build_property.TargetFrameworkVersion = v10.0
+build_property.EntryPointFilePath = 
 build_property.RootNamespace = Windose
 build_property.ProjectDir = C:\Users\salam\Desktop\windose\
 build_property.EnableComHosting = 

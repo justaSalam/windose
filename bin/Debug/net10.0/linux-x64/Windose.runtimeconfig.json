@@ -4,7 +4,7 @@
     "includedFrameworks": [
       {
         "name": "Microsoft.NETCore.App",
-        "version": "10.0.8"
+        "version": "10.0.9"
       }
     ],
     "configProperties": {
@@ -15,9 +15,10 @@
       "Cosmos.Kernel.System.Input.Keyboard.Enabled": true,
       "Cosmos.Kernel.System.Input.Mouse.Enabled": true,
       "Cosmos.Kernel.System.Network.Enabled": true,
+      "Cosmos.Kernel.System.Storage.Enabled": true,
+      "Cosmos.Kernel.System.Filesystems.Fat.Enabled": true,
       "Cosmos.Kernel.System.Graphics.Enabled": true,
       "Cosmos.Kernel.Core.Scheduler.Enabled": true,
-      "Cosmos.Kernel.System.Graphics.Fonts.CustomFont": "Cosmos.Kernel.System.Graphics.Fonts.CustomFont.psf",
       "Microsoft.Extensions.DependencyInjection.VerifyOpenGenericServiceTrimmability": true,
       "System.ComponentModel.DefaultValueAttribute.IsSupported": false,
       "System.ComponentModel.Design.IDesignerHost.IsSupported": false,

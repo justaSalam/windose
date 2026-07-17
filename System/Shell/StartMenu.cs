@@ -10,6 +10,7 @@ public class StartMenu : Window
     private readonly Rectangle homeBounds;
     public StartMenu(int x, int y, int width, int height, string title, bool useTitleBar) : base(x, y, width, height, title, useTitleBar)
     {
+
         zLayer = DrawLayer.Popup;
         Visible = false;
         canResize = false;
@@ -49,17 +50,14 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
-        programs.AddSubmenuItem("Accessories");
-        programs.AddSubmenuItem("File Explorer", () =>
+        programs.AddSubmenuItem("Accessories", () => WindowManager.Register(new EmptyWindow()));
+        programs.AddSubmenuItem("File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", true)));
+
+        programs.AddSubmenuItem("Disk Management", () =>
         {
-            WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", true));
+            WindowManager.Register(new DiskManagement(100, 100, 600, 350));
 
         });
-        programs.AddSubmenuItem("File Properties", () =>
-{
-    WindowManager.Register(new FileProperties(400, 400, new FileEntry()));
-
-});
         programs.AddSubmenuItem("Task Manager", () =>
         {
             WindowManager.Register(new PerformanceMonitor(180, 120));
@@ -77,10 +75,22 @@ public class StartMenu : Window
         {
             BreezeDemo.Run();
         });
-        breeze.AddSubmenuItem("Run main.breeze", () =>
+
+        MenuItem apps = breeze.AddSubmenuItem("Applications");
+
+        apps.AddSubmenuItem("Run main.breeze", () =>
         {
             BreezeHost.RunFile(@"0:\Apps\main.breeze");
         });
+        apps.AddSubmenuItem("Control Test", () =>
+        {
+            BreezeHost.RunFile(@"0:\Programs\ControlTest.breeze");
+        });
+        apps.AddSubmenuItem("ControlTest.breeze", () =>
+        {
+            BreezeHost.RunFile(@"0:\Programs\ControlTest.breeze");
+        });
+
         programs.AddSubmenuItem("Command Prompt", () =>
         {
             WindowManager.Register(new CommandPrompt());
@@ -139,20 +149,14 @@ public class StartMenu : Window
         powerOptions.AddSubmenuItem("Log Off");
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {
-            HideMenuImmediate();
-            SystemPowerManager.RequestShutdown();
+            Power.Shutdown();
         });
 
         powerOptions.AddSubmenuItem("Reboot", () =>
         {
-            HideMenuImmediate();
-            SystemPowerManager.RequestReboot();
+            Power.Reboot();
         });
 
-        powerOptions.AddSubmenuItem("PANIC", () =>
-{
-    KernelPanic.Show("MANUALLY_INITIATED_CRASH", "The crash screen was started from the system menu.");
-});
 
 
         panel.AddStackChild(programs);
@@ -161,6 +165,7 @@ public class StartMenu : Window
         panel.AddStackChild(powerOptions);
         homeBounds = bounds;
         MarkDirty();
+
     }
 
     public Rectangle HomeBounds => homeBounds;
@@ -191,7 +196,7 @@ public class StartMenu : Window
     {
         if (Palette.FlatControls)
         {
-            DrawFilledRectangle(Palette.MenuBackground, 0, 0, Width, Height);
+            DrawFilledRectangle(Palette.MenuGlass, 0, 0, Width, Height);
             DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
         }
         else
@@ -209,7 +214,7 @@ public class StartMenu : Window
 
     public void ApplyThemeStyle()
     {
-        panel.color1 = Palette.MenuBackground;
+        panel.color1 = Palette.MenuGlass;
         panel.MarkDirty();
         MarkDirty();
     }

@@ -106,9 +106,7 @@ public static class BreezeServiceManager
 
     public static bool StartFile(string path)
     {
-        IWindoseFileSystem fileSystem = FileSystemManager.Current;
-        if (fileSystem == null || !fileSystem.TryReadAllText(path, out string source)) return false;
-        ProcessManger.QueueStart(new BreezeScheduledApplicationProcess(source, path));
+        ProcessManger.QueueStart(new BreezeScheduledApplicationProcess(File.ReadAllText(path), path));
         return true;
     }
 

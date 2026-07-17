@@ -13,13 +13,9 @@
         "packagesPath": "C:\\Users\\salam\\.nuget\\packages\\",
         "outputPath": "C:\\Users\\salam\\Desktop\\windose\\obj\\",
         "projectStyle": "PackageReference",
-        "fallbackFolders": [
-          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-        ],
         "configFilePaths": [
           "C:\\Users\\salam\\Desktop\\windose\\NuGet.Config",
           "C:\\Users\\salam\\AppData\\Roaming\\NuGet\\NuGet.Config",
-          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -27,11 +23,13 @@
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+          "C:\\Users\\salam\\AppData\\Local\\Cosmos\\Packages": {},
           "C:\\Users\\salam\\AppData\\Roaming\\Cosmos User Kit\\packages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
           "net10.0": {
+            "framework": "net10.0",
             "targetAlias": "net10.0",
             "projectReferences": {}
           }
@@ -46,56 +44,57 @@
           "auditLevel": "low",
           "auditMode": "all"
         },
-        "SdkAnalysisLevel": "10.0.200"
+        "SdkAnalysisLevel": "10.0.300"
       },
       "frameworks": {
         "net10.0": {
+          "framework": "net10.0",
           "targetAlias": "net10.0",
           "dependencies": {
             "Cosmos.Build.Analyzer.Patcher": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Build.Asm": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Build.CC": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Build.Common": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Build.Ilc": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Build.Patcher": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Kernel": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Kernel.Native.MultiArch": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Kernel.SourceGenerators": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Cosmos.Kernel.System": {
               "target": "Package",
-              "version": "[3.0.58, )"
+              "version": "[3.0.68, )"
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
               "target": "Package",
-              "version": "[10.0.8, )",
+              "version": "[10.0.9, )",
               "autoReferenced": true
             }
           },
@@ -113,27 +112,27 @@
           "downloadDependencies": [
             {
               "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
-              "version": "[10.0.8, 10.0.8]"
+              "version": "[10.0.9, 10.0.9]"
             },
             {
               "name": "Microsoft.NETCore.App.Ref",
-              "version": "[10.0.8, 10.0.8]"
+              "version": "[10.0.9, 10.0.9]"
             },
             {
               "name": "Microsoft.NETCore.App.Runtime.NativeAOT.win-x64",
-              "version": "[10.0.8, 10.0.8]"
+              "version": "[10.0.9, 10.0.9]"
             },
             {
               "name": "Microsoft.NETCore.App.Runtime.win-x64",
-              "version": "[10.0.8, 10.0.8]"
+              "version": "[10.0.9, 10.0.9]"
             },
             {
               "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
-              "version": "[10.0.8, 10.0.8]"
+              "version": "[10.0.9, 10.0.9]"
             },
             {
               "name": "runtime.win-x64.Microsoft.DotNet.ILCompiler",
-              "version": "[10.0.8, 10.0.8]"
+              "version": "[10.0.9, 10.0.9]"
             }
           ],
           "frameworkReferences": {
@@ -141,7 +140,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.204/PortableRuntimeIdentifierGraph.json",
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json",
           "packagesToPrune": {
             "Microsoft.CSharp": "(,4.7.32767]",
             "Microsoft.VisualBasic": "(,10.4.32767]",

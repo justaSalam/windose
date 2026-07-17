@@ -10,20 +10,20 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
     public WindoseDriverState State { get; private set; } = WindoseDriverState.Created;
 
     public Canvas Canvas { get; private set; }
-    public global::DirectBitmap BackBuffer { get; private set; }
-    public global::DirectBitmap PerformanceOverlay { get; private set; }
+    public DirectBitmap BackBuffer { get; private set; }
+    public DirectBitmap PerformanceOverlay { get; private set; }
     public int Width => Canvas == null ? 0 : Canvas.Width;
     public int Height => Canvas == null ? 0 : Canvas.Height;
 
     public void Start()
     {
-        Canvas = Cosmos.Kernel.System.Graphics.Canvas.GetFullScreen();
-        BackBuffer = new global::DirectBitmap(Canvas.Width, Canvas.Height);
-        PerformanceOverlay = new global::DirectBitmap(Math.Max(1, Math.Min(800, Canvas.Width - 20)), 52);
+        Canvas = Canvas.GetFullScreen();
+        BackBuffer = new DirectBitmap(Canvas.Width, Canvas.Height);
+        PerformanceOverlay = new DirectBitmap(Math.Max(1, Math.Min(800, Canvas.Width - 20)), 52);
         State = WindoseDriverState.Started;
     }
 
-    public void Present(global::DirectBitmap frame, int cursorX, int cursorY)
+    public void Present(DirectBitmap frame, int cursorX, int cursorY)
     {
         if (State != WindoseDriverState.Started || Canvas == null || frame == null) return;
 

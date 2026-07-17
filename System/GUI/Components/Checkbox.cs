@@ -9,6 +9,20 @@ public class Checkbox : Component
     public Color borderColor = Color.White;
     public int fontSize = 0;
     public Color textColor = Color.Black;
+    public event Action<bool> CheckedChanged;
+    public Action Click;
+
+    public bool Checked
+    {
+        get => isPressed;
+        set
+        {
+            if (isPressed == value) return;
+            isPressed = value;
+            MarkDirty();
+            CheckedChanged?.Invoke(isPressed);
+        }
+    }
 
     public Checkbox(int x, int y) : base(x, y, 25, 25)
     {
@@ -47,8 +61,8 @@ public class Checkbox : Component
     {
         if (mouse.left == MouseEvents.Release)
         {
-            isPressed = !isPressed;
-            MarkDirty();
+            Checked = !Checked;
+            Click?.Invoke();
             return true;
         }
 

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Drawing;
 using Cosmos.Kernel.Core.IO;
-using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
@@ -79,6 +78,15 @@ public class WindowManager : SingleThreadedProcess
             if (win == null || failedWindows.Contains(win)) continue;
             try { win.Update(); }
             catch (Exception exception) { FailApplication(win, "updating", exception); }
+        }
+
+        for (int i = components.Count - 1; i >= 0; i--)
+        {
+            Component component = components[i];
+            if (component == null || component is Window || !component.isRoot) continue;
+            if (!component.Visible && component is not Tooltip) continue;
+            try { component.Update(); }
+            catch (Exception exception) { FailApplication(component.GetOwningWindow(), "updating component", exception); }
         }
 
         if (capturedWindow != null) //Handling a captured window

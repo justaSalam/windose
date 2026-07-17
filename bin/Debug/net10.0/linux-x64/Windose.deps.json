@@ -9,707 +9,708 @@
     ".NETCoreApp,Version=v10.0/linux-x64": {
       "Windose/1.0.0": {
         "dependencies": {
-          "Cosmos.Build.Ilc": "3.0.58",
-          "Cosmos.Kernel": "3.0.58",
-          "Cosmos.Kernel.Core.X64": "3.0.58",
-          "Cosmos.Kernel.HAL.X64": "3.0.58",
-          "Cosmos.Kernel.SourceGenerators": "3.0.58",
-          "Cosmos.Kernel.System": "3.0.58",
-          "runtimepack.Microsoft.NETCore.App.Runtime.linux-x64": "10.0.8"
+          "Cosmos.Build.Analyzer.Patcher": "3.0.68",
+          "Cosmos.Build.Ilc": "3.0.68",
+          "Cosmos.Kernel": "3.0.68",
+          "Cosmos.Kernel.Core.X64": "3.0.68",
+          "Cosmos.Kernel.HAL.X64": "3.0.68",
+          "Cosmos.Kernel.SourceGenerators": "3.0.68",
+          "Cosmos.Kernel.System": "3.0.68",
+          "runtimepack.Microsoft.NETCore.App.Runtime.linux-x64": "10.0.9"
         },
         "runtime": {
           "Windose.dll": {}
         }
       },
-      "runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/10.0.8": {
+      "runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/10.0.9": {
         "runtime": {
           "Microsoft.CSharp.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "Microsoft.VisualBasic.Core.dll": {
             "assemblyVersion": "15.0.0.0",
-            "fileVersion": "15.0.826.23019"
+            "fileVersion": "15.0.926.27113"
           },
           "Microsoft.VisualBasic.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "Microsoft.Win32.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "Microsoft.Win32.Registry.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.AppContext.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Buffers.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Collections.Concurrent.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Collections.Immutable.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Collections.NonGeneric.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Collections.Specialized.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Collections.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ComponentModel.Annotations.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ComponentModel.DataAnnotations.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ComponentModel.EventBasedAsync.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ComponentModel.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ComponentModel.TypeConverter.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ComponentModel.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Configuration.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Console.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Core.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Data.Common.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Data.DataSetExtensions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Data.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.Contracts.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.Debug.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.DiagnosticSource.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.FileVersionInfo.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.Process.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.StackTrace.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.TextWriterTraceListener.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.Tools.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.TraceSource.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Diagnostics.Tracing.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Drawing.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Drawing.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Dynamic.Runtime.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Formats.Asn1.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Formats.Tar.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Globalization.Calendars.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Globalization.Extensions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Globalization.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.Compression.Brotli.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.Compression.FileSystem.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.Compression.ZipFile.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.Compression.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.FileSystem.AccessControl.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.FileSystem.DriveInfo.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.FileSystem.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.FileSystem.Watcher.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.FileSystem.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.IsolatedStorage.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.MemoryMappedFiles.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.Pipelines.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.Pipes.AccessControl.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.Pipes.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.UnmanagedMemoryStream.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.IO.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Linq.AsyncEnumerable.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Linq.Expressions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Linq.Parallel.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Linq.Queryable.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Linq.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Memory.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Http.Json.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Http.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.HttpListener.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Mail.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.NameResolution.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.NetworkInformation.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Ping.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Quic.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Requests.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Security.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.ServerSentEvents.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.ServicePoint.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.Sockets.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.WebClient.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.WebHeaderCollection.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.WebProxy.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.WebSockets.Client.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.WebSockets.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Net.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Numerics.Vectors.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Numerics.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ObjectModel.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Private.CoreLib.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Private.DataContractSerialization.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Private.Uri.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Private.Xml.Linq.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Private.Xml.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.DispatchProxy.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.Emit.ILGeneration.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.Emit.Lightweight.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.Emit.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.Extensions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.Metadata.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.TypeExtensions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Reflection.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Resources.Reader.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Resources.ResourceManager.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Resources.Writer.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.CompilerServices.Unsafe.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.CompilerServices.VisualC.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Extensions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Handles.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.InteropServices.JavaScript.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.InteropServices.RuntimeInformation.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.InteropServices.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Intrinsics.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Loader.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Numerics.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Serialization.Formatters.dll": {
             "assemblyVersion": "8.1.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Serialization.Json.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Serialization.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Serialization.Xml.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.Serialization.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Runtime.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.AccessControl.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Claims.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.Algorithms.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.Cng.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.Csp.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.Encoding.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.OpenSsl.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.Primitives.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.X509Certificates.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Cryptography.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Principal.Windows.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.Principal.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.SecureString.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Security.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ServiceModel.Web.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ServiceProcess.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Text.Encoding.CodePages.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Text.Encoding.Extensions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Text.Encoding.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Text.Encodings.Web.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Text.Json.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Text.RegularExpressions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.AccessControl.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Channels.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Overlapped.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Tasks.Dataflow.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Tasks.Extensions.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Tasks.Parallel.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Tasks.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Thread.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.ThreadPool.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.Timer.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Threading.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Transactions.Local.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Transactions.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.ValueTuple.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Web.HttpUtility.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Web.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Windows.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.Linq.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.ReaderWriter.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.Serialization.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.XDocument.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.XPath.XDocument.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.XPath.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.XmlDocument.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.XmlSerializer.dll": {
             "assemblyVersion": "10.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.Xml.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "System.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "WindowsBase.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "mscorlib.dll": {
             "assemblyVersion": "4.0.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           },
           "netstandard.dll": {
             "assemblyVersion": "2.1.0.0",
-            "fileVersion": "10.0.826.23019"
+            "fileVersion": "10.0.926.27113"
           }
         },
         "native": {
@@ -760,147 +761,180 @@
           }
         }
       },
-      "Cosmos.Build.API/3.0.58": {
+      "Cosmos.Build.Analyzer.Patcher/3.0.68": {
+        "dependencies": {
+          "Cosmos.Build.Analyzer.Patcher.CodeFixes": "3.0.68",
+          "_Cosmos.Build.Analyzer.Patcher": "3.0.68"
+        },
         "runtime": {
-          "lib/netstandard2.0/Cosmos.Build.API.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+          "lib/netstandard2.0/Cosmos.Build.Analyzer.Patcher.Package.dll": {
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Build.Ilc/3.0.58": {
+      "Cosmos.Build.Analyzer.Patcher.CodeFixes/3.0.68": {
+        "dependencies": {
+          "Microsoft.CodeAnalysis.CSharp.Workspaces": "4.14.0",
+          "Microsoft.CodeAnalysis.Common": "4.14.0",
+          "_Cosmos.Build.Analyzer.Patcher": "3.0.68"
+        },
+        "runtime": {
+          "lib/netstandard2.0/Cosmos.Build.Analyzer.Patcher.CodeFixes.dll": {
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
+          }
+        }
+      },
+      "Cosmos.Build.API/3.0.68": {
+        "runtime": {
+          "lib/netstandard2.0/Cosmos.Build.API.dll": {
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
+          }
+        }
+      },
+      "Cosmos.Build.Ilc/3.0.68": {
         "dependencies": {
           "Mono.Cecil": "0.11.6"
         }
       },
-      "Cosmos.Kernel/3.0.58": {
+      "Cosmos.Kernel/3.0.68": {
         "dependencies": {
-          "Cosmos.Kernel.Boot.Limine": "3.0.58",
-          "Cosmos.Kernel.HAL": "3.0.58",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.58",
-          "Cosmos.Kernel.Plugs": "3.0.58",
-          "Cosmos.Kernel.System": "3.0.58",
-          "Cosmos.Kernel.System.Core": "3.0.58"
+          "Cosmos.Kernel.Boot.Limine": "3.0.68",
+          "Cosmos.Kernel.HAL": "3.0.68",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.68",
+          "Cosmos.Kernel.Plugs": "3.0.68",
+          "Cosmos.Kernel.System": "3.0.68",
+          "Cosmos.Kernel.System.Core": "3.0.68"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.Boot.Limine/3.0.58": {
+      "Cosmos.Kernel.Boot.Limine/3.0.68": {
         "runtime": {
           "lib/net10.0/Cosmos.Kernel.Boot.Limine.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.Core.X64/3.0.58": {
+      "Cosmos.Kernel.Core.X64/3.0.68": {
         "dependencies": {
-          "Cosmos.Kernel.System.Core": "3.0.58"
+          "Cosmos.Kernel.System.Core": "3.0.68"
         },
         "runtime": {
           "lib/net10.0/Cosmos.Kernel.Core.X64.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.Debug/3.0.58": {
+      "Cosmos.Kernel.Debug/3.0.68": {
         "runtime": {
           "lib/net10.0/Cosmos.Kernel.Debug.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.HAL/3.0.58": {
+      "Cosmos.Kernel.HAL/3.0.68": {
         "dependencies": {
-          "Cosmos.Build.API": "3.0.58",
-          "Cosmos.Kernel.Boot.Limine": "3.0.58",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.58",
-          "Cosmos.Kernel.System.Core": "3.0.58"
+          "Cosmos.Build.API": "3.0.68",
+          "Cosmos.Kernel.Boot.Limine": "3.0.68",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.68",
+          "Cosmos.Kernel.System.Core": "3.0.68"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.HAL.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.HAL.Interfaces/3.0.58": {
+      "Cosmos.Kernel.HAL.Interfaces/3.0.68": {
         "dependencies": {
-          "Cosmos.Build.API": "3.0.58",
-          "Cosmos.Kernel.System.Core": "3.0.58"
+          "Cosmos.Build.API": "3.0.68",
+          "Cosmos.Kernel.System.Core": "3.0.68"
         },
         "runtime": {
           "lib/net10.0/Cosmos.Kernel.HAL.Interfaces.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.HAL.X64/3.0.58": {
+      "Cosmos.Kernel.HAL.X64/3.0.68": {
         "dependencies": {
-          "Cosmos.Kernel.Boot.Limine": "3.0.58",
-          "Cosmos.Kernel.Core.X64": "3.0.58",
-          "Cosmos.Kernel.HAL": "3.0.58",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.58",
-          "Cosmos.Kernel.System.Core": "3.0.58"
+          "Cosmos.Kernel.Boot.Limine": "3.0.68",
+          "Cosmos.Kernel.Core.X64": "3.0.68",
+          "Cosmos.Kernel.HAL": "3.0.68",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.68",
+          "Cosmos.Kernel.System.Core": "3.0.68"
         },
         "runtime": {
           "lib/net10.0/Cosmos.Kernel.HAL.X64.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.Plugs/3.0.58": {
+      "Cosmos.Kernel.Plugs/3.0.68": {
         "dependencies": {
-          "Cosmos.Build.API": "3.0.58",
-          "Cosmos.Kernel.HAL.X64": "3.0.58",
-          "Cosmos.Kernel.System": "3.0.58",
-          "Cosmos.Kernel.System.Core": "3.0.58"
+          "Cosmos.Build.API": "3.0.68",
+          "Cosmos.Kernel.HAL.X64": "3.0.68",
+          "Cosmos.Kernel.System": "3.0.68",
+          "Cosmos.Kernel.System.Core": "3.0.68"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Plugs.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.SourceGenerators/3.0.58": {
+      "Cosmos.Kernel.SourceGenerators/3.0.68": {
         "runtime": {
           "lib/netstandard2.0/Cosmos.Kernel.SourceGenerators.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.System/3.0.58": {
+      "Cosmos.Kernel.System/3.0.68": {
         "dependencies": {
-          "Cosmos.Kernel.HAL": "3.0.58",
-          "Cosmos.Kernel.System.Core": "3.0.58"
+          "Cosmos.Kernel.HAL": "3.0.68",
+          "Cosmos.Kernel.System.Core": "3.0.68"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.System.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       },
-      "Cosmos.Kernel.System.Core/3.0.58": {
+      "Cosmos.Kernel.System.Core/3.0.68": {
         "dependencies": {
-          "Cosmos.Build.API": "3.0.58",
-          "Cosmos.Kernel.Boot.Limine": "3.0.58",
-          "Cosmos.Kernel.Debug": "3.0.58"
+          "Cosmos.Build.API": "3.0.68",
+          "Cosmos.Kernel.Boot.Limine": "3.0.68",
+          "Cosmos.Kernel.Debug": "3.0.68"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Core.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
+          }
+        }
+      },
+      "Humanizer.Core/2.14.1": {
+        "runtime": {
+          "lib/net6.0/Humanizer.dll": {
+            "assemblyVersion": "2.14.0.0",
+            "fileVersion": "2.14.1.48190"
           }
         }
       },
@@ -1005,6 +1039,116 @@
           }
         }
       },
+      "Microsoft.CodeAnalysis.CSharp.Workspaces/4.14.0": {
+        "dependencies": {
+          "Humanizer.Core": "2.14.1",
+          "Microsoft.CodeAnalysis.CSharp": "4.14.0",
+          "Microsoft.CodeAnalysis.Common": "4.14.0",
+          "Microsoft.CodeAnalysis.Workspaces.Common": "4.14.0",
+          "System.Composition": "9.0.0"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.CodeAnalysis.CSharp.Workspaces.dll": {
+            "assemblyVersion": "4.14.0.0",
+            "fileVersion": "4.1400.25.26210"
+          }
+        },
+        "resources": {
+          "lib/net9.0/cs/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net9.0/de/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net9.0/es/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net9.0/fr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net9.0/it/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net9.0/ja/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net9.0/ko/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net9.0/pl/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net9.0/pt-BR/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net9.0/ru/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net9.0/tr/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net9.0/zh-Hans/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net9.0/zh-Hant/Microsoft.CodeAnalysis.CSharp.Workspaces.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Microsoft.CodeAnalysis.Workspaces.Common/4.14.0": {
+        "dependencies": {
+          "Humanizer.Core": "2.14.1",
+          "Microsoft.CodeAnalysis.Common": "4.14.0",
+          "System.Composition": "9.0.0"
+        },
+        "runtime": {
+          "lib/net9.0/Microsoft.CodeAnalysis.Workspaces.dll": {
+            "assemblyVersion": "4.14.0.0",
+            "fileVersion": "4.1400.25.26210"
+          }
+        },
+        "resources": {
+          "lib/net9.0/cs/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "cs"
+          },
+          "lib/net9.0/de/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net9.0/es/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net9.0/fr/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net9.0/it/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net9.0/ja/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net9.0/ko/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net9.0/pl/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net9.0/pt-BR/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "pt-BR"
+          },
+          "lib/net9.0/ru/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net9.0/tr/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "tr"
+          },
+          "lib/net9.0/zh-Hans/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net9.0/zh-Hant/Microsoft.CodeAnalysis.Workspaces.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
       "Mono.Cecil/0.11.6": {
         "runtime": {
           "lib/netstandard2.0/Mono.Cecil.Mdb.dll": {
@@ -1025,15 +1169,75 @@
           }
         }
       },
-      "_Cosmos.Build.Analyzer.Patcher/3.0.58": {
+      "System.Composition/9.0.0": {
         "dependencies": {
-          "Cosmos.Build.API": "3.0.58",
+          "System.Composition.AttributedModel": "9.0.0",
+          "System.Composition.Convention": "9.0.0",
+          "System.Composition.Hosting": "9.0.0",
+          "System.Composition.Runtime": "9.0.0",
+          "System.Composition.TypedParts": "9.0.0"
+        }
+      },
+      "System.Composition.AttributedModel/9.0.0": {
+        "runtime": {
+          "lib/net9.0/System.Composition.AttributedModel.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809"
+          }
+        }
+      },
+      "System.Composition.Convention/9.0.0": {
+        "dependencies": {
+          "System.Composition.AttributedModel": "9.0.0"
+        },
+        "runtime": {
+          "lib/net9.0/System.Composition.Convention.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809"
+          }
+        }
+      },
+      "System.Composition.Hosting/9.0.0": {
+        "dependencies": {
+          "System.Composition.Runtime": "9.0.0"
+        },
+        "runtime": {
+          "lib/net9.0/System.Composition.Hosting.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809"
+          }
+        }
+      },
+      "System.Composition.Runtime/9.0.0": {
+        "runtime": {
+          "lib/net9.0/System.Composition.Runtime.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809"
+          }
+        }
+      },
+      "System.Composition.TypedParts/9.0.0": {
+        "dependencies": {
+          "System.Composition.AttributedModel": "9.0.0",
+          "System.Composition.Hosting": "9.0.0",
+          "System.Composition.Runtime": "9.0.0"
+        },
+        "runtime": {
+          "lib/net9.0/System.Composition.TypedParts.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.24.52809"
+          }
+        }
+      },
+      "_Cosmos.Build.Analyzer.Patcher/3.0.68": {
+        "dependencies": {
+          "Cosmos.Build.API": "3.0.68",
           "Microsoft.CodeAnalysis.CSharp": "4.14.0"
         },
         "runtime": {
           "lib/netstandard2.0/Cosmos.Build.Analyzer.Patcher.dll": {
-            "assemblyVersion": "3.0.58.0",
-            "fileVersion": "3.0.58.0"
+            "assemblyVersion": "3.0.68.0",
+            "fileVersion": "3.0.68.0"
           }
         }
       }
@@ -1045,101 +1249,122 @@
       "serviceable": false,
       "sha512": ""
     },
-    "runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/10.0.8": {
+    "runtimepack.Microsoft.NETCore.App.Runtime.linux-x64/10.0.9": {
       "type": "runtimepack",
       "serviceable": false,
       "sha512": ""
     },
-    "Cosmos.Build.API/3.0.58": {
+    "Cosmos.Build.Analyzer.Patcher/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-Hl37DjB+XCT3PWIBsdVq4BjjS8GpS0G7jPy0C7NwT0t1AR3a3dbuU1OtPui7qP+UgawcPUiQL1Jl5bHVUfv38w==",
-      "path": "cosmos.build.api/3.0.58",
-      "hashPath": "cosmos.build.api.3.0.58.nupkg.sha512"
+      "sha512": "sha512-ig5W5wKwswJw8KlTenAPp5WaJuvAnaot8TOPmwySD8/jz8eIBrQtk430bxbR6C4v52mGh4dDSTjrhE2DZ39L7A==",
+      "path": "cosmos.build.analyzer.patcher/3.0.68",
+      "hashPath": "cosmos.build.analyzer.patcher.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Build.Ilc/3.0.58": {
+    "Cosmos.Build.Analyzer.Patcher.CodeFixes/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-9D82hGIinn/BGICmKeHhadZTIep6QzQJZbTt43iGkiW3+5AuzC+QC6tD3oi+u331uFShQD0NU2FeZSUzXB4CWw==",
-      "path": "cosmos.build.ilc/3.0.58",
-      "hashPath": "cosmos.build.ilc.3.0.58.nupkg.sha512"
+      "sha512": "sha512-QD6dszmIZVJKNLdwTQugbshatGgrLq1LxilgVIxds+dU0J7cC6JwNMusIKsh5/mQGJeD8YDr/WsM7SATXSZkjQ==",
+      "path": "cosmos.build.analyzer.patcher.codefixes/3.0.68",
+      "hashPath": "cosmos.build.analyzer.patcher.codefixes.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel/3.0.58": {
+    "Cosmos.Build.API/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-+XWBqTL8ArXTv742CSLEGGq45x7cuGmH/SoIgoANo6dI6q/+HAYREGCcXelQp5IJP6bCfzx+wx8hk8tyvF230A==",
-      "path": "cosmos.kernel/3.0.58",
-      "hashPath": "cosmos.kernel.3.0.58.nupkg.sha512"
+      "sha512": "sha512-/h0ESvbcxlS2F+iNQmt902MaO3fN0Uni5QTaSX6CRkGwUty6u1GErFgS0w2IbG3WQcvPHP+q2HxXdBS2iQ0wzg==",
+      "path": "cosmos.build.api/3.0.68",
+      "hashPath": "cosmos.build.api.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.Boot.Limine/3.0.58": {
+    "Cosmos.Build.Ilc/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-qe44gtLZ1k/z7kT6pqGJMVwJMhupSWvI0rReRh4rfx7HLeRxfN+2uTC+IeXVovJ5SvLkKTdGMjL4FsTuT/6bUQ==",
-      "path": "cosmos.kernel.boot.limine/3.0.58",
-      "hashPath": "cosmos.kernel.boot.limine.3.0.58.nupkg.sha512"
+      "sha512": "sha512-DwcJgZrZLJXst9jVFqN0N5oMXbf0Z+UrS//Wn05yGxP/F/OTvV7tvELBQverRzPGzZ9PNO5ApYNa6fTKUpeyeg==",
+      "path": "cosmos.build.ilc/3.0.68",
+      "hashPath": "cosmos.build.ilc.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.Core.X64/3.0.58": {
+    "Cosmos.Kernel/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-i6ocLFgqxvpN2wSXRQr6Kqzwi/UoDQ8dy7yglZSWqm0FsRgXQuiOTIYezc4tFWoIpNRg/9h0w9yw/kKtQ4v1Cg==",
-      "path": "cosmos.kernel.core.x64/3.0.58",
-      "hashPath": "cosmos.kernel.core.x64.3.0.58.nupkg.sha512"
+      "sha512": "sha512-SFZt+YzBPm1GhvyBH1AH1elTgRWE1DHG0cr46WUcHEBjo4yu8eZ7dSJWNrj+byyrAniLjHsvFkdWhaqOAjENtw==",
+      "path": "cosmos.kernel/3.0.68",
+      "hashPath": "cosmos.kernel.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.Debug/3.0.58": {
+    "Cosmos.Kernel.Boot.Limine/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-Mx4p3ngEhvEbiAtvW5B+NuKokmwZQ2DeeB79YsXvXj9/ciuVeTJMxe9GN4Pz4ldTxRlwjcXiLlO2p9WI92sRDw==",
-      "path": "cosmos.kernel.debug/3.0.58",
-      "hashPath": "cosmos.kernel.debug.3.0.58.nupkg.sha512"
+      "sha512": "sha512-Y5tcepS45IyrXBYAN/iXN286nkSRLQfC1Y1MsjiJ7MiFl8Mr6n+7waF1P6qrAf+7QsUpbmjMifYpfgGAoGAAjQ==",
+      "path": "cosmos.kernel.boot.limine/3.0.68",
+      "hashPath": "cosmos.kernel.boot.limine.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.HAL/3.0.58": {
+    "Cosmos.Kernel.Core.X64/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-50wZghGgFzn/iErIKQrKOuJzXRxWPZUUko3nXMkM/Vft2BiQx5wxVTr+cW8ESdJj1C1aRkaCSk4zPFhdH7KQ7Q==",
-      "path": "cosmos.kernel.hal/3.0.58",
-      "hashPath": "cosmos.kernel.hal.3.0.58.nupkg.sha512"
+      "sha512": "sha512-cPCokSp4YZ3iKLsvHrucSHsOpt+DlOwzzb3bDvF5iQ8gh1TzsAwiHnS1Cp1RThDzhcfGzy/w2SOxaN6ayZDI9g==",
+      "path": "cosmos.kernel.core.x64/3.0.68",
+      "hashPath": "cosmos.kernel.core.x64.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.HAL.Interfaces/3.0.58": {
+    "Cosmos.Kernel.Debug/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-rvdkEOd6mYumdFNUQIRCNKQlrfw28xWja0D/f5z1NvROEhEHXYRrvOKwWlNciZPCJUno1TiTkttTitJtxMyp/g==",
-      "path": "cosmos.kernel.hal.interfaces/3.0.58",
-      "hashPath": "cosmos.kernel.hal.interfaces.3.0.58.nupkg.sha512"
+      "sha512": "sha512-MT03nTZQUNohjc/Q/iy4Yl7Y7t60TR2d9BCodIJA49NwWelEqKbYO3Nb2nfoPIRMMQHwZxQRHM7P0u1VqJsFag==",
+      "path": "cosmos.kernel.debug/3.0.68",
+      "hashPath": "cosmos.kernel.debug.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.HAL.X64/3.0.58": {
+    "Cosmos.Kernel.HAL/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-1OxON1OhcKg+1plcy593V1QHBulKOw8+MEx0QqKl43+RIRWGe/ddfhCr2DctH0GSlqqmsgZ2AhjfTvuQTZdzeA==",
-      "path": "cosmos.kernel.hal.x64/3.0.58",
-      "hashPath": "cosmos.kernel.hal.x64.3.0.58.nupkg.sha512"
+      "sha512": "sha512-+1yCd2fozOOSa8hF0wFSgNamYkR1F7PbTQHVCLCCMQMcrorsvR1DlM+Dn7rOUjLvQOgfHodT/YMoSqJMe+jQ+A==",
+      "path": "cosmos.kernel.hal/3.0.68",
+      "hashPath": "cosmos.kernel.hal.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.Plugs/3.0.58": {
+    "Cosmos.Kernel.HAL.Interfaces/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-hbr2e99CUoooHhHLObFxpeW275/aQWjpdeEIUEhePqvIzJq3rCwSA2oV03MaAWJ1RvFaNTE99jyswXSkHgSqHg==",
-      "path": "cosmos.kernel.plugs/3.0.58",
-      "hashPath": "cosmos.kernel.plugs.3.0.58.nupkg.sha512"
+      "sha512": "sha512-jiVBW9KTmHrLXuIMJp/rkupQc8aEHVG51pCYYMIHld8KB3PDU6gkLX1se7Sb9g0KPMKTmUeOJ9WHyQ2No6c8mQ==",
+      "path": "cosmos.kernel.hal.interfaces/3.0.68",
+      "hashPath": "cosmos.kernel.hal.interfaces.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.SourceGenerators/3.0.58": {
+    "Cosmos.Kernel.HAL.X64/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-nxCaeMgDvKBm9BuzzspAS+8NrMy7xYhhOuvlOLoHOp0mIuzTGyWCMrZPfUtQAzCcVX0sG/fokwBNkOwC+eb1/w==",
-      "path": "cosmos.kernel.sourcegenerators/3.0.58",
-      "hashPath": "cosmos.kernel.sourcegenerators.3.0.58.nupkg.sha512"
+      "sha512": "sha512-3S/dssBde4sni01csO584q9gpng0qZKJh86hOZPTHSCUtaoxQkh1mZroTvXqWn3iWrxE1XfxwZQKYjBzYNmx5Q==",
+      "path": "cosmos.kernel.hal.x64/3.0.68",
+      "hashPath": "cosmos.kernel.hal.x64.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.System/3.0.58": {
+    "Cosmos.Kernel.Plugs/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-pHnccDSJY1JuuT7kyIc+VvRSHhTQz++HMVdTiBj04AUr/+CvDAkO6cMRpM0pvkkpSAGpc2A5x1ow9kxfirkMXw==",
-      "path": "cosmos.kernel.system/3.0.58",
-      "hashPath": "cosmos.kernel.system.3.0.58.nupkg.sha512"
+      "sha512": "sha512-zJbeIeNEGi3+tYrRpKctvdScWdCmzZzo2Kx/xWL/lOJ5y7kj1i4JayqF4PGgfmee/HKHgPBn49Kfumxzknv2ww==",
+      "path": "cosmos.kernel.plugs/3.0.68",
+      "hashPath": "cosmos.kernel.plugs.3.0.68.nupkg.sha512"
     },
-    "Cosmos.Kernel.System.Core/3.0.58": {
+    "Cosmos.Kernel.SourceGenerators/3.0.68": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-KkRH+3FLJFhCXgxiVnzj1XhkFIU3IPKuOft+BFQ/cLR4N51UPh0v8uJxpdFhYpDSjH/pkZtlalcSUi1vr8IKfA==",
-      "path": "cosmos.kernel.system.core/3.0.58",
-      "hashPath": "cosmos.kernel.system.core.3.0.58.nupkg.sha512"
+      "sha512": "sha512-rst84+pFRJnF8hVdhUypcG2K8Ul71sdXFOcVodyCoOBJ2X2QmwFB74us47vghQBLImOvkJw1vqvkrxcZIhOc9A==",
+      "path": "cosmos.kernel.sourcegenerators/3.0.68",
+      "hashPath": "cosmos.kernel.sourcegenerators.3.0.68.nupkg.sha512"
+    },
+    "Cosmos.Kernel.System/3.0.68": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-aRRRl6kEIOCzatkJ3BxyEPpo19pMPNf9b/XeXlJ633rNiVJAqth4DkT9eKkh04F0nLGKI1G7b9DQ1GXz0fY3cQ==",
+      "path": "cosmos.kernel.system/3.0.68",
+      "hashPath": "cosmos.kernel.system.3.0.68.nupkg.sha512"
+    },
+    "Cosmos.Kernel.System.Core/3.0.68": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-g4BdxIuYUfJJIckUR3F4KutHztRYKrLZx3nKL104jo6ndxFT2ut51tSY5Ks6xtR5OI6M+Og9zVoAOMe/ufB2uw==",
+      "path": "cosmos.kernel.system.core/3.0.68",
+      "hashPath": "cosmos.kernel.system.core.3.0.68.nupkg.sha512"
+    },
+    "Humanizer.Core/2.14.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-lQKvtaTDOXnoVJ20ibTuSIOf2i0uO0MPbDhd1jm238I+U/2ZnRENj0cktKZhtchBMtCUSRQ5v4xBCUbKNmyVMw==",
+      "path": "humanizer.core/2.14.1",
+      "hashPath": "humanizer.core.2.14.1.nupkg.sha512"
     },
     "Microsoft.CodeAnalysis.Common/4.14.0": {
       "type": "package",
@@ -1155,6 +1380,20 @@
       "path": "microsoft.codeanalysis.csharp/4.14.0",
       "hashPath": "microsoft.codeanalysis.csharp.4.14.0.nupkg.sha512"
     },
+    "Microsoft.CodeAnalysis.CSharp.Workspaces/4.14.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-QkgCEM4qJo6gdtblXtNgHqtykS61fxW+820hx5JN6n9DD4mQtqNB+6fPeJ3GQWg6jkkGz6oG9yZq7H3Gf0zwYw==",
+      "path": "microsoft.codeanalysis.csharp.workspaces/4.14.0",
+      "hashPath": "microsoft.codeanalysis.csharp.workspaces.4.14.0.nupkg.sha512"
+    },
+    "Microsoft.CodeAnalysis.Workspaces.Common/4.14.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-wNVK9JrqjqDC/WgBUFV6henDfrW87NPfo98nzah/+M/G1D6sBOPtXwqce3UQNn+6AjTnmkHYN1WV9XmTlPemTw==",
+      "path": "microsoft.codeanalysis.workspaces.common/4.14.0",
+      "hashPath": "microsoft.codeanalysis.workspaces.common.4.14.0.nupkg.sha512"
+    },
     "Mono.Cecil/0.11.6": {
       "type": "package",
       "serviceable": true,
@@ -1162,12 +1401,54 @@
       "path": "mono.cecil/0.11.6",
       "hashPath": "mono.cecil.0.11.6.nupkg.sha512"
     },
-    "_Cosmos.Build.Analyzer.Patcher/3.0.58": {
+    "System.Composition/9.0.0": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-/5/TrzF+YTctLp+j30eP+nU6Nj+ZVZaGknDb5mBGb2jjpG/y9Nh9zmy1KtHL9fZxkAdSZ1Bs4HJm2foxHmY6Lw==",
-      "path": "_cosmos.build.analyzer.patcher/3.0.58",
-      "hashPath": "_cosmos.build.analyzer.patcher.3.0.58.nupkg.sha512"
+      "sha512": "sha512-3Djj70fFTraOarSKmRnmRy/zm4YurICm+kiCtI0dYRqGJnLX6nJ+G3WYuFJ173cAPax/gh96REcbNiVqcrypFQ==",
+      "path": "system.composition/9.0.0",
+      "hashPath": "system.composition.9.0.0.nupkg.sha512"
+    },
+    "System.Composition.AttributedModel/9.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-iri00l/zIX9g4lHMY+Nz0qV1n40+jFYAmgsaiNn16xvt2RDwlqByNG4wgblagnDYxm3YSQQ0jLlC/7Xlk9CzyA==",
+      "path": "system.composition.attributedmodel/9.0.0",
+      "hashPath": "system.composition.attributedmodel.9.0.0.nupkg.sha512"
+    },
+    "System.Composition.Convention/9.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-+vuqVP6xpi582XIjJi6OCsIxuoTZfR0M7WWufk3uGDeCl3wGW6KnpylUJ3iiXdPByPE0vR5TjJgR6hDLez4FQg==",
+      "path": "system.composition.convention/9.0.0",
+      "hashPath": "system.composition.convention.9.0.0.nupkg.sha512"
+    },
+    "System.Composition.Hosting/9.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-OFqSeFeJYr7kHxDfaViGM1ymk7d4JxK//VSoNF9Ux0gpqkLsauDZpu89kTHHNdCWfSljbFcvAafGyBoY094btQ==",
+      "path": "system.composition.hosting/9.0.0",
+      "hashPath": "system.composition.hosting.9.0.0.nupkg.sha512"
+    },
+    "System.Composition.Runtime/9.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-w1HOlQY1zsOWYussjFGZCEYF2UZXgvoYnS94NIu2CBnAGMbXFAX8PY8c92KwUItPmowal68jnVLBCzdrWLeEKA==",
+      "path": "system.composition.runtime/9.0.0",
+      "hashPath": "system.composition.runtime.9.0.0.nupkg.sha512"
+    },
+    "System.Composition.TypedParts/9.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-aRZlojCCGEHDKqh43jaDgaVpYETsgd7Nx4g1zwLKMtv4iTo0627715ajEFNpEEBTgLmvZuv8K0EVxc3sM4NWJA==",
+      "path": "system.composition.typedparts/9.0.0",
+      "hashPath": "system.composition.typedparts.9.0.0.nupkg.sha512"
+    },
+    "_Cosmos.Build.Analyzer.Patcher/3.0.68": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-5anYLrK7mwYAN0KQl9IF+MF0bi7lYEptT/yZqWpSzlFDJkcbQ2e9ymRyyPKcCAD3VBcq3uKSjJ3+ahAK2yNfPA==",
+      "path": "_cosmos.build.analyzer.patcher/3.0.68",
+      "hashPath": "_cosmos.build.analyzer.patcher.3.0.68.nupkg.sha512"
     }
   },
   "runtimes": {

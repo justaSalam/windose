@@ -9,7 +9,6 @@ using Cosmos.Kernel.System.Graphics;
 /// </summary>
 public abstract class SingleThreadedProcess : Process
 {
-    private GCHandle processHandle;
     private bool handleAllocated;
 
     public SingleThreadedProcess(string name, ProcessType processType)
@@ -35,7 +34,6 @@ public abstract class SingleThreadedProcess : Process
             Running = true;
             Initialized = true;
             startTime = DateTime.Now.ToString("HH:mm:ss");
-            processHandle = GCHandle.Alloc(this);
             handleAllocated = true;
         }
         catch (Exception ex)
@@ -77,7 +75,6 @@ public abstract class SingleThreadedProcess : Process
         Running = false;
         Initialized = false;
         if (!handleAllocated) return;
-        processHandle.Free();
         handleAllocated = false;
     }
 }

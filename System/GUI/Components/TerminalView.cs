@@ -129,7 +129,8 @@ public sealed class CommandLineInput : Component
 
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
-        if (KeyboardManager.ControlPressed)
+        bool isControlPressed = IsControlPressed(keyEvent);
+        if (isControlPressed)
         {
             if (keyEvent.Key == ConsoleKeyEx.C) WindoseClipboard.SetText(text ?? "");
             else if (keyEvent.Key == ConsoleKeyEx.V && WindoseClipboard.HasText) text += WindoseClipboard.Text.Replace("\r", "").Replace("\n", " ");
@@ -176,9 +177,10 @@ public sealed class CommandLineInput : Component
                 return;
 
             default:
-                if (keyEvent.KeyChar != '\0')
+                char printable = GetPrintableCharacter(keyEvent);
+                if (printable != '\0')
                 {
-                    text += keyEvent.KeyChar;
+                    text += printable;
                     MarkDirty();
                 }
                 return;

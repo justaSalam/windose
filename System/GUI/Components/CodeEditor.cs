@@ -362,8 +362,10 @@ public class CodeEditor : Component
 
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
-        bool shiftPressed = KeyboardManager.ShiftPressed;
-        if (KeyboardManager.ControlPressed)
+        bool isControlPressed = IsControlPressed(keyEvent);
+        bool shiftPressed = IsShiftPressed(keyEvent);
+        char printable = GetPrintableCharacter(keyEvent);
+        if (isControlPressed)
         {
             if (keyEvent.Key == ConsoleKeyEx.Z) { Undo(); return; }
             if (keyEvent.Key == ConsoleKeyEx.Y) { Redo(); return; }
@@ -425,12 +427,12 @@ public class CodeEditor : Component
 
         bool navigationKey = IsNavigationKey(keyEvent.Key);
         bool editingKey = keyEvent.Key == ConsoleKeyEx.Backspace || keyEvent.Key == ConsoleKeyEx.Delete
-            || keyEvent.Key == ConsoleKeyEx.Enter || keyEvent.Key == ConsoleKeyEx.Tab || keyEvent.KeyChar != '\0';
+            || keyEvent.Key == ConsoleKeyEx.Enter || keyEvent.Key == ConsoleKeyEx.Tab || printable != '\0';
         if (editingKey)
         {
             string editKind = keyEvent.Key == ConsoleKeyEx.Backspace || keyEvent.Key == ConsoleKeyEx.Delete
                 ? "delete"
-                : keyEvent.KeyChar != '\0' ? "typing" : "structure";
+                : printable != '\0' ? "typing" : "structure";
             RecordUndo(editKind, editKind == "typing" || editKind == "delete");
         }
         if (navigationKey && shiftPressed && !hasSelection)
@@ -506,11 +508,11 @@ public class CodeEditor : Component
                 modified = true;
                 break;
             default:
-                if (keyEvent.KeyChar != '\0')
+                if (printable != '\0')
                 {
                     lineStructureChanged = SelectionSpansLines();
                     if (hasSelection) DeleteSelection();
-                    InsertText(keyEvent.KeyChar.ToString());
+                    InsertText(printable.ToString());
                     modified = true;
                 }
                 break;

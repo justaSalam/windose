@@ -3,7 +3,9 @@
 --root:Cosmos.Kernel.HAL.X64
 c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patched.dll
 -o:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\native\Windose.o
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Build.Analyzer.Patcher.CodeFixes.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Build.Analyzer.Patcher.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Build.Analyzer.Patcher.Package.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Build.API.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Kernel.Boot.Limine.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Kernel.Core.dll
@@ -17,7 +19,9 @@ c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patc
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Kernel.SourceGenerators.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Kernel.System.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CodeAnalysis.CSharp.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CodeAnalysis.CSharp.Workspaces.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CodeAnalysis.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CodeAnalysis.Workspaces.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CSharp.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.VisualBasic.Core.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.VisualBasic.dll
@@ -42,6 +46,11 @@ c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patc
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.ComponentModel.EventBasedAsync.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.ComponentModel.Primitives.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.ComponentModel.TypeConverter.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Composition.AttributedModel.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Composition.Convention.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Composition.Hosting.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Composition.Runtime.dll
+-r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Composition.TypedParts.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Configuration.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Console.dll
 -r:c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\System.Core.dll
@@ -204,6 +213,8 @@ c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patc
 --feature:Cosmos.Kernel.System.Input.Keyboard.Enabled=true
 --feature:Cosmos.Kernel.System.Input.Mouse.Enabled=true
 --feature:Cosmos.Kernel.System.Network.Enabled=true
+--feature:Cosmos.Kernel.System.Storage.Enabled=true
+--feature:Cosmos.Kernel.System.Filesystems.Fat.Enabled=true
 --feature:Cosmos.Kernel.System.Graphics.Enabled=true
 --feature:Cosmos.Kernel.Core.Scheduler.Enabled=true
 --feature:Microsoft.Extensions.DependencyInjection.VerifyOpenGenericServiceTrimmability=true
@@ -236,9 +247,10 @@ c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patc
 --runtimeknob:Cosmos.Kernel.System.Input.Keyboard.Enabled=true
 --runtimeknob:Cosmos.Kernel.System.Input.Mouse.Enabled=true
 --runtimeknob:Cosmos.Kernel.System.Network.Enabled=true
+--runtimeknob:Cosmos.Kernel.System.Storage.Enabled=true
+--runtimeknob:Cosmos.Kernel.System.Filesystems.Fat.Enabled=true
 --runtimeknob:Cosmos.Kernel.System.Graphics.Enabled=true
 --runtimeknob:Cosmos.Kernel.Core.Scheduler.Enabled=true
---runtimeknob:Cosmos.Kernel.System.Graphics.Fonts.CustomFont=Cosmos.Kernel.System.Graphics.Fonts.CustomFont.psf
 --runtimeknob:Microsoft.Extensions.DependencyInjection.VerifyOpenGenericServiceTrimmability=true
 --runtimeknob:System.ComponentModel.DefaultValueAttribute.IsSupported=false
 --runtimeknob:System.ComponentModel.Design.IDesignerHost.IsSupported=false
@@ -276,7 +288,7 @@ c:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patc
 --initassembly:System.Private.Reflection.Execution
 --initassembly:System.Private.StackTraceMetadata
 --systemmodule:System.Private.CoreLib
---directpinvokelist:"C:\Users\salam\.nuget\packages\cosmos.kernel.system.core\3.0.58\build\\InteropAPI.txt"
+--directpinvokelist:"C:\Users\salam\.nuget\packages\cosmos.kernel.system.core\3.0.66\build\\InteropAPI.txt"
 --splitinit
 --nativelib
 --noinlinetls

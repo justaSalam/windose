@@ -1,4 +1,5 @@
 using System.Drawing;
+using Cosmos.Kernel.System.Graphics.Fonts;
 using Windose;
 
 public class Button : Component
@@ -63,8 +64,8 @@ public class Button : Component
             }
             else
             {
-                Color face = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.18f);
-                Color highlight = GUIFeatures.Blend(Palette.ControlHighlight, Palette.HighlightText, hoverBlend * 0.12f);
+                Color face = Palette.ControlFace;
+                Color highlight = Palette.ControlHighlight;
                 Color shadow = Palette.ControlShadow;
                 Color darkShadow = Palette.ControlBlack;
 
@@ -78,6 +79,7 @@ public class Button : Component
             int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
 
             DrawString(text, textColor, 2, textY, effectiveFontSize);
+            //DrawString(text, SystemFonts.sansSerif, textColor, 2, 16);
         }
     }
 

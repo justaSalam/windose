@@ -35,6 +35,17 @@ public class DockPanel : Component
         int right = Width - Padding.right;
         int bottom = Height - Padding.bottom;
 
+        // Pass 1: Count how many visible components are set to Fill
+        int fillCount = 0;
+        for (int i = 0; i < dockChildren.Count; i++)
+        {
+            if (dockChildren[i].Visible && docks[i] == Dock.Fill)
+            {
+                fillCount++;
+            }
+        }
+
+        // Pass 2: Layout the components
         for (int i = 0; i < dockChildren.Count; i++)
         {
             Component child = dockChildren[i];
@@ -71,9 +82,21 @@ public class DockPanel : Component
                     break;
 
                 case Dock.Fill:
+                    // Calculate total height left for all filling elements
+                    int totalRemainingHeight = Math.Max(1, bottom - top);
+
+                    // Divide the remaining height by the number of remaining fill components
+                    int currentFillHeight = totalRemainingHeight / fillCount;
+
                     child.X = left;
                     child.Y = top;
-                    child.Resize(Math.Max(1, right - left), Math.Max(1, bottom - top));
+                    child.Resize(Math.Max(1, right - left), currentFillHeight);
+
+                    // Advance the top boundary down for the next Fill component
+                    top += currentFillHeight;
+
+                    // Decrement the count since this one is allocated
+                    fillCount--;
                     break;
             }
 

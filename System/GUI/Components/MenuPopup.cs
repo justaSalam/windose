@@ -122,7 +122,7 @@ public class MenuPopup : Component
     {
         if (Palette.FlatControls)
         {
-            DrawFilledRectangle(Palette.MenuBackground, 0, 0, Width, Height);
+            DrawFilledRectangle(Palette.MenuGlass, 0, 0, Width, Height);
             DrawRectangle(Palette.WindowBorder, 0, 0, Width, Height);
         }
         else

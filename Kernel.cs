@@ -1,13 +1,6 @@
-using System;
 using System.Drawing;
-using System.Runtime.InteropServices;
-using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
-using Cosmos.Kernel.Core.Memory.Heap;
-using Cosmos.Kernel.Core.Runtime;
-using Cosmos.Kernel.HAL;
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Graphics.Fonts;
 using Windose.Drivers;
 using Sys = Cosmos.Kernel.System;
 
@@ -23,7 +16,6 @@ public class Kernel : Sys.Kernel
     public static Color Gray = Color.FromArgb(123, 126, 121);
     public static Color Blue = Color.FromArgb(0, 0, 128);
 
-    private const int gcrate = 1800;
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
     public static Canvas canvas = null!;
@@ -39,6 +31,7 @@ public class Kernel : Sys.Kernel
         KernelPanic.Install();
         try
         {
+            SystemFonts.Init();
             InitializeKernel();
         }
         catch (Exception exception)
@@ -49,13 +42,15 @@ public class Kernel : Sys.Kernel
 
     private void InitializeKernel()
     {
-        Console.WriteLine("Booting Windose");
-
         Instance = this;
         GarbageCollector.Initialize();
-        FileSystemManager.InitializeTemporary();
+        FileSystemManager.Initialize();
+
+
         SystemRegistry.Initialize();
         Palette.Initialize();
+
+
 
 
         displayDriver = new CosmosDisplayDriver();
@@ -83,7 +78,6 @@ public class Kernel : Sys.Kernel
 
         ProcessManger.Start(explorer);
         ProcessManger.Start(windowManager);
-        BreezeHost.RunScheduledFile(@"0:\System\Services\startup.breeze");
 
 
     }
@@ -105,14 +99,10 @@ public class Kernel : Sys.Kernel
             ProcessManger.Update();
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
-            displayDriver.Present(mainBuffer, (int)mouseDriver.X, (int)mouseDriver.Y);
-
-            SystemPowerManager.ExecutePending();
-
-            if (tick > 0 && tick % gcrate == 0) GarbageCollector.Collect();
-
+            displayDriver.Present(mainBuffer, mouseDriver.X, mouseDriver.Y);
 
             tick++;
+
         }
         catch (Exception ex)
         {

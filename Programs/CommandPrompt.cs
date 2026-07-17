@@ -1,4 +1,5 @@
 using Cosmos.Kernel.System.Keyboard;
+using Cosmos.Kernel.System.Vfs;
 
 public sealed class CommandPrompt : Window
 {
@@ -36,11 +37,10 @@ public sealed class CommandPrompt : Window
             Margin = new Thickness(0),
         };
 
-        context = new CommandContext(
-            output.WriteLine,
-            output.Clear,
-            () => WindowManager.PostClose(this));
-
+        context = new CommandContext(output.WriteLine, output.Clear, () => WindowManager.PostClose(this))
+        {
+            CurrentDirectory = "/mnt"
+        };
         input.prompt = () => context.CurrentDirectory + ">";
         input.submitted = Execute;
 

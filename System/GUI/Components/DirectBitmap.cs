@@ -3,7 +3,7 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 
-public unsafe class DirectBitmap
+public class DirectBitmap : IDisposable
 {
     protected Bitmap buffer;
     public int Width { get; private set; }
@@ -282,6 +282,7 @@ public unsafe class DirectBitmap
             cursorX += scaledWidth;
         }
     }
+
 
     public virtual void DrawChar(char c, Font font, Color color, int x, int y, int width, int height)
     {
@@ -1151,5 +1152,23 @@ public unsafe class DirectBitmap
         byte green = (byte)(to.G * alpha + from.G * (255 - alpha) >> 8);
         byte blue = (byte)(to.B * alpha + from.B * (255 - alpha) >> 8);
         return Color.FromArgb(red, green, blue);
+    }
+
+
+    private bool disposed;
+
+    public void Dispose()
+    {
+        if (disposed)
+            return;
+
+
+
+        disposed = true;
+
+        if (buffer is IDisposable disposable)
+            disposable.Dispose();
+
+        buffer = null!;
     }
 }

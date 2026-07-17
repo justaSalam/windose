@@ -12,6 +12,8 @@ public static class DriverManager
 
     public static void Register(IWindoseDriver driver)
     {
+        Console.WriteLine($"[DM] Register {driver.Name}");
+
         if (driver == null) return;
         drivers.Add(driver);
     }
@@ -40,13 +42,15 @@ public static class DriverManager
 
         try
         {
+            Console.WriteLine($"[DM] Starting {driver.Name}");
+
             driver.Start();
             Serial.WriteString("Driver started: " + driver.Name + "\n");
         }
         catch (Exception exception)
         {
             Serial.WriteString("Driver failed: " + driver.Name + " - " + exception.Message + "\n");
-            global::KernelPanic.Show("DRIVER_START_FAILURE", exception);
+            KernelPanic.Show("DRIVER_START_FAILURE", exception);
         }
     }
 

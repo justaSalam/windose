@@ -1,3 +1,6 @@
+using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.Core.Memory.GarbageCollector;
+using Cosmos.Kernel.Core.Memory.Heap;
 
 public static class ProcessManger
 {
@@ -23,6 +26,14 @@ public static class ProcessManger
     private static int processId;
     private static bool isUpdating;
 
+    // GC scheduling
+    private static int totalAllocationsSinceLastGC;
+    private static int gcAllocationThreshold = 1024 * 1024; // 1MB
+    private static int gcFrameCounter;
+    private static int gcMinFramesBetweenCollections = 300;
+    private static int gcMaxFramesBetweenCollections = 300;
+
+
     public static SingleThreadedProcess Start(SingleThreadedProcess process)
     {
         if (process == null) return null;
@@ -38,6 +49,8 @@ public static class ProcessManger
     private static SingleThreadedProcess StartNow(SingleThreadedProcess process)
     {
         process.id = processId++;
+        process.CrashCount = 0;
+        process.LastCrashReason = "";
 
         processes.Add(process);
         process.Start();
@@ -60,6 +73,8 @@ public static class ProcessManger
     private static ScheduledProcess StartNow(ScheduledProcess process)
     {
         process.id = processId++;
+        process.CrashCount = 0;
+        process.LastCrashReason = "";
         scheduledProcesses.Add(process);
         process.Start();
         return process;
@@ -71,12 +86,33 @@ public static class ProcessManger
         try
         {
             ApplyPendingRequests();
+
+            // Process priority-based update scheduling
             for (int i = 0; i < processes.Count; i++)
             {
                 SingleThreadedProcess process = processes[i];
                 if (!process.Running) continue;
+
+                // Skip based on priority
+                if (ShouldSkipUpdate(process)) continue;
+
                 long started = DateTime.UtcNow.Ticks;
-                process.Main();
+                try
+                {
+                    process.Main();
+                    process.CrashCount = 0; // Reset crash count on successful update
+                }
+                catch (Exception exception)
+                {
+                    process.CrashCount++;
+                    process.LastCrashReason = exception.Message;
+
+                    if (process.IsCrashed)
+                    {
+                        process.Running = false;
+                        continue;
+                    }
+                }
 
                 double elapsedMs = (DateTime.UtcNow.Ticks - started) / 10000.0;
                 process.lastUpdateMs = elapsedMs;
@@ -86,6 +122,9 @@ public static class ProcessManger
 
                 if (elapsedMs > process.peakUpdateMs)
                     process.peakUpdateMs = elapsedMs;
+
+                // Track allocations for GC scheduling
+                totalAllocationsSinceLastGC += (int)(elapsedMs * 10);
             }
 
             for (int i = processes.Count - 1; i >= 0; i--)
@@ -106,11 +145,48 @@ public static class ProcessManger
 
             StartPendingRestarts();
             ApplyPendingRequests();
+
+            // Smart GC scheduling
+            ScheduleGarbageCollection();
         }
         finally
         {
             isUpdating = false;
         }
+    }
+
+    private static bool ShouldSkipUpdate(Process process)
+    {
+        if (process.UpdateSkipThreshold <= 0) return false;
+
+        process.UpdateSkipCounter++;
+        if (process.UpdateSkipCounter >= process.UpdateSkipThreshold)
+        {
+            process.UpdateSkipCounter = 0;
+            return false;
+        }
+        return true;
+    }
+
+    private static void ScheduleGarbageCollection()
+    {
+        gcFrameCounter++;
+
+        if (gcFrameCounter >= gcMaxFramesBetweenCollections)
+        {
+
+            ExecuteSafeCollection();
+        }
+
+    }
+    private static void ExecuteSafeCollection()
+    {
+
+        Heap.Collect();
+
+        totalAllocationsSinceLastGC = 0;
+        gcFrameCounter = 0;
+
     }
 
     public static void QueueStart(Process process)
@@ -130,28 +206,39 @@ public static class ProcessManger
         if (process == null) return;
         lock (pendingLock) pendingRestartRequests.Add(new PendingRestartRequest { Process = process, Force = force });
     }
-
+    private static readonly List<Process> startBuffer = new();
+    private static readonly List<Process> stopBuffer = new();
+    private static readonly List<PendingRestartRequest> restartBuffer = new();
     private static void ApplyPendingRequests()
     {
-        List<Process> starts;
-        List<Process> stops;
-        List<PendingRestartRequest> restarts;
+
         lock (pendingLock)
         {
-            starts = new List<Process>(pendingStarts);
-            stops = new List<Process>(pendingStops);
-            restarts = new List<PendingRestartRequest>(pendingRestartRequests);
+            startBuffer.Clear();
+            stopBuffer.Clear();
+            restartBuffer.Clear();
+
+            startBuffer.AddRange(pendingStarts);
+            stopBuffer.AddRange(pendingStops);
+            restartBuffer.AddRange(pendingRestartRequests);
+
             pendingStarts.Clear();
             pendingStops.Clear();
             pendingRestartRequests.Clear();
         }
 
-        for (int i = 0; i < stops.Count; i++) Stop(stops[i]);
-        for (int i = 0; i < restarts.Count; i++) RestartInternal(restarts[i].Process, restarts[i].Force);
-        for (int i = 0; i < starts.Count; i++)
+        foreach (Process proc in stopBuffer) Stop(proc);
+
+
+        foreach (PendingRestartRequest restartRequest in restartBuffer) RestartInternal(restartRequest.Process, restartRequest.Force);
+
+
+        foreach (Process proc in startBuffer)
         {
-            if (starts[i] is ScheduledProcess scheduled) StartNow(scheduled);
-            else if (starts[i] is SingleThreadedProcess singleThreaded) StartNow(singleThreaded);
+            if (proc is ScheduledProcess s)
+                StartNow(s);
+            else
+                StartNow((SingleThreadedProcess)proc);
         }
     }
 
@@ -203,12 +290,7 @@ public static class ProcessManger
             pendingRestarts.RemoveAt(i);
 
             Process replacement = null;
-            try { replacement = pending.Factory?.Invoke(); }
-            catch (Exception exception)
-            {
-                Cosmos.Kernel.Core.IO.Serial.WriteString(
-                    "Could not restart " + pending.Original.name + ": " + exception.Message + "\n");
-            }
+            replacement = pending.Factory?.Invoke();
 
             if (replacement is ScheduledProcess scheduled) StartNow(scheduled);
             else if (replacement is SingleThreadedProcess singleThreaded) StartNow(singleThreaded);
