@@ -257,6 +257,7 @@ public class WindowManager : SingleThreadedProcess
 
     private void DispatchMessage(UiMessage message)
     {
+        Serial.WriteString("WindowManager.DispatchMessage: Type=" + message.Type + " Command=" + (message.Command ?? "") + "\n");
         switch (message.Type)
         {
             case UiMessageType.Command:

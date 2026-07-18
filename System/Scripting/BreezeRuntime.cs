@@ -1302,6 +1302,7 @@ public sealed class BreezeRuntime
 
     public void UpdateProcess()
     {
+        Serial.WriteString("BreezeRuntime.UpdateProcess: owner=" + (OwnerProcess?.startInfo?.Name ?? processHandle.name) + "\n");
         if (terminated) return;
         int delivered = 0;
         int eventLimit = backgroundMode ? MaxBackgroundEventsPerUpdate : MaxEventsPerUpdate;
@@ -1339,6 +1340,7 @@ public sealed class BreezeRuntime
             ExecuteDeferredBody(processMessageBody);
             if (terminated) return;
         }
+        Serial.WriteString("BreezeRuntime.UpdateProcess: delivered=" + delivered + "\n");
     }
 
     public int GetRecommendedUpdateIntervalMs()
@@ -1366,6 +1368,7 @@ public sealed class BreezeRuntime
 
     private void ExecuteDeferredBody(List<BreezeStatement> body)
     {
+        Serial.WriteString("BreezeRuntime.ExecuteDeferredBody: entering\n");
         if (terminated) return;
         LastError = null;
         operationCount = 0;
@@ -1376,6 +1379,7 @@ public sealed class BreezeRuntime
         }
         catch (Exception exception)
         {
+            Serial.WriteString("BreezeRuntime.ExecuteDeferredBody: exception - " + exception.Message + "\n");
             Fail(exception.Message);
         }
         if (LastError == null) return;

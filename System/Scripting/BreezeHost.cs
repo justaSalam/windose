@@ -9,7 +9,9 @@ public static class BreezeHost
         {
             BreezeApplicationProcess process = new BreezeApplicationProcess(source, executablePath, arguments);
             runtime = process.Runtime;
+            Serial.WriteString("BreezeHost.RunSource: starting process for " + (executablePath ?? "<source>") + "\n");
             ProcessManger.Start(process);
+            Serial.WriteString("BreezeHost.RunSource: Start returned for " + (executablePath ?? "<source>") + "\n");
             if (runtime.LastError != null)
             {
                 runtime.TerminateApplication();
@@ -30,12 +32,15 @@ public static class BreezeHost
     {
         try
         {
+            Serial.WriteString("BreezeHost.RunFile: loading " + path + "\n");
             if (File.ReadAllText(path) == string.Empty)
             {
                 QueueError("Could not load " + path);
                 return null;
             }
-            return RunSource(File.ReadAllText(path), path);
+            string content = File.ReadAllText(path);
+            Serial.WriteString("BreezeHost.RunFile: loaded " + path + " (" + content.Length + " bytes)\n");
+            return RunSource(content, path);
         }
         catch (Exception exception)
         {

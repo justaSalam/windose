@@ -37,9 +37,11 @@ public static class ProcessManger
     public static SingleThreadedProcess Start(SingleThreadedProcess process)
     {
         if (process == null) return null;
+        Serial.WriteString("ProcessManger.Start called for: " + (process?.name ?? "null") + "\n");
         if (isUpdating)
         {
             QueueStart(process);
+            Serial.WriteString("ProcessManger.Start queued: " + (process?.name ?? "null") + "\n");
             return process;
         }
 
@@ -53,7 +55,9 @@ public static class ProcessManger
         process.LastCrashReason = "";
 
         processes.Add(process);
+        Serial.WriteString("ProcessManger.StartNow: starting process: " + (process?.name ?? "null") + "\n");
         process.Start();
+        Serial.WriteString("ProcessManger.StartNow: started process: " + (process?.name ?? "null") + "\n");
         return process;
 
     }
@@ -61,9 +65,11 @@ public static class ProcessManger
     public static ScheduledProcess Start(ScheduledProcess process)
     {
         if (process == null) return null;
+        Serial.WriteString("ProcessManger.Start (scheduled) called for: " + (process?.name ?? "null") + "\n");
         if (isUpdating)
         {
             QueueStart(process);
+            Serial.WriteString("ProcessManger.Start (scheduled) queued: " + (process?.name ?? "null") + "\n");
             return process;
         }
 
@@ -76,7 +82,9 @@ public static class ProcessManger
         process.CrashCount = 0;
         process.LastCrashReason = "";
         scheduledProcesses.Add(process);
+        Serial.WriteString("ProcessManger.StartNow (scheduled): starting process: " + (process?.name ?? "null") + "\n");
         process.Start();
+        Serial.WriteString("ProcessManger.StartNow (scheduled): started process: " + (process?.name ?? "null") + "\n");
         return process;
     }
 
@@ -192,6 +200,7 @@ public static class ProcessManger
     public static void QueueStart(Process process)
     {
         if (process == null) return;
+        Serial.WriteString("ProcessManger.QueueStart: " + (process?.name ?? "null") + "\n");
         lock (pendingLock) pendingStarts.Add(process);
     }
 
@@ -235,6 +244,7 @@ public static class ProcessManger
 
         foreach (Process proc in startBuffer)
         {
+            Serial.WriteString("ProcessManger.ApplyPendingRequests: starting queued process: " + (proc?.name ?? "null") + "\n");
             if (proc is ScheduledProcess s)
                 StartNow(s);
             else
