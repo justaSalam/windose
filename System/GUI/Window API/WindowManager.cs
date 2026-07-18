@@ -62,6 +62,7 @@ public class WindowManager : SingleThreadedProcess
         DispatchMessages();
 
         //Sort Components based on zLayer
+
         components.Sort((component1, component2) =>
         {
             int zLayer = component1.zLayer.CompareTo(component2.zLayer);
@@ -452,7 +453,7 @@ public class WindowManager : SingleThreadedProcess
 
     private static void DrawPreviewRect()
     {
-        if (!hasPreviewRect) return;
+        if (!hasPreviewRect || focusedWindow == null) return;
 
         Kernel.mainBuffer.DrawDottedRectangle(Color.White, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
     }
@@ -515,7 +516,7 @@ public class WindowManager : SingleThreadedProcess
 
     public static void Minimize(Window window)
     {
-        window.Visible = false;
+        MinimizeImmediate(window);
     }
 
     internal static void MinimizeImmediate(Window window)
@@ -539,11 +540,15 @@ public class WindowManager : SingleThreadedProcess
 
         if (window.IsMinimized)
         {
-            window.Visible = false;
-            window.MarkDirty();
+            window.RestoreFromTaskbar();
+            window.SetFocused(true);
+            window.zIndex = nextZIndex++;
+            Invalidate(window.bounds);
         }
         else
+        {
             Activate(window);
+        }
     }
 
     public static Rectangle GetTaskbarButtonBounds(Window window)
@@ -680,22 +685,15 @@ public class WindowManager : SingleThreadedProcess
         {
             Button taskbarButton = taskbarButtons[window];
             taskbarButtons.Remove(window);
-            try { Explorer.taskbar.windows.Remove(taskbarButton); }
-            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
-            try { Explorer.taskbar.bar.RemoveStackChild(taskbarButton); }
-            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
-            try { taskbarButton.Dispose(); }
-            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
-            try
-            {
-                Explorer.taskbar.bar.ForceDirty();
-                Explorer.taskbar.ForceDirty();
-                Invalidate(Explorer.taskbar.AbsoluteRectangle);
-            }
-            catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+            Explorer.taskbar.windows.Remove(taskbarButton);
+            Explorer.taskbar.bar.RemoveStackChild(taskbarButton);
+            Explorer.taskbar.bar.ForceDirty();
+            Explorer.taskbar.ForceDirty();
+            Invalidate(Explorer.taskbar.AbsoluteRectangle);
+
         }
 
-        try { window.Stop(); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
+        window.Stop();
         windows.Remove(window);
         failedWindows.Remove(window);
 
@@ -756,11 +754,7 @@ public class WindowManager : SingleThreadedProcess
         window.zIndex = nextZIndex++;
         Invalidate(window);
     }
-    public override void Dispose()
-    {
-        windows = null;
-        base.Dispose();
-    }
+
 
     private readonly struct ApplicationFailure
     {
