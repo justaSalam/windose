@@ -31,16 +31,14 @@ public class DirectBitmap : IDisposable
 
     public DirectBitmap(int width, int height)
     {
-        Width = width;
-        Height = height;
+        Width = Math.Max(1, width);
+        Height = Math.Max(1, height);
         buffer = new Bitmap((uint)Width, (uint)Height, ColorDepth.ColorDepth32);
-
 
         Stride = 32 / 8;
         Pitch = Width * Stride;
         clipBounds = new Rectangle(0, 0, Width, Height);
     }
-
     public bool HasVisibleClip => clipBounds.Width > 0 && clipBounds.Height > 0;
 
     public void ResetContext(Rectangle clip)
@@ -132,9 +130,10 @@ public class DirectBitmap : IDisposable
     }
     public virtual void DrawPoint(Color color, int x, int y)
     {
+
         x += originX;
         y += originY;
-        if (buffer == null || !ContainsClipped(x, y))
+        if (buffer == null || buffer.RawData == null || !ContainsClipped(x, y))
         {
             return;
         }
@@ -238,6 +237,9 @@ public class DirectBitmap : IDisposable
     }
     public void DrawImageStretchAlpha(Bitmap image, Rectangle sourceRect, Rectangle destRect)
     {
+        if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
+            return;
+
         float scaleX = (float)sourceRect.Width / destRect.Width;
         float scaleY = (float)sourceRect.Height / destRect.Height;
 
@@ -250,6 +252,9 @@ public class DirectBitmap : IDisposable
 
                 srcX = Math.Min(srcX, sourceRect.Right - 1);
                 srcY = Math.Min(srcY, sourceRect.Bottom - 1);
+
+                if (srcX < 0 || srcY < 0 || srcX >= image.Width || srcY >= image.Height)
+                    continue;
 
                 int color = image.RawData[srcX + srcY * image.Width];
                 SetPixelAlpha(destRect.Left + xi, destRect.Top + yi, color);
@@ -486,6 +491,15 @@ public class DirectBitmap : IDisposable
         if (sourceY + height > sourceHeight)
             height = sourceHeight - sourceY;
 
+        if (destinationX < 0 || destinationY < 0 || destinationX >= Width || destinationY >= Height)
+            return;
+
+        if (width > Width - destinationX)
+            width = Width - destinationX;
+
+        if (height > Height - destinationY)
+            height = Height - destinationY;
+
         if (width <= 0 || height <= 0) return;
 
         for (int j = 0; j < height; j++)
@@ -575,6 +589,15 @@ public class DirectBitmap : IDisposable
 
         if (sourceY + height > sourceHeight)
             height = sourceHeight - sourceY;
+
+        if (destinationX < 0 || destinationY < 0 || destinationX >= Width || destinationY >= Height)
+            return;
+
+        if (width > Width - destinationX)
+            width = Width - destinationX;
+
+        if (height > Height - destinationY)
+            height = Height - destinationY;
 
         if (width <= 0 || height <= 0) return;
 
@@ -1140,21 +1163,18 @@ public class DirectBitmap : IDisposable
         return Color.FromArgb(red, green, blue);
     }
 
+   private bool disposed;
 
-    private bool disposed;
+   public void Dispose()
+   {
+       if (disposed)
+           return;
 
-    public void Dispose()
-    {
-        if (disposed)
-            return;
+       disposed = true;
 
+       if (buffer is IDisposable disposable)
+           disposable.Dispose();
 
-
-        disposed = true;
-
-        if (buffer is IDisposable disposable)
-            disposable.Dispose();
-
-        buffer = null!;
-    }
+       buffer = null!;
+   }
 }

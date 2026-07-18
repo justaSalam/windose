@@ -464,8 +464,8 @@ public class Component : IDisposable
             0,
             AbsoluteX,
             AbsoluteY,
-            Width,
-            Height);
+            Math.Min(Width, buffer.Width),
+            Math.Min(Height, buffer.Height));
     }
 
     public void DrawToScreen(Rectangle dirtyRect)
@@ -481,8 +481,8 @@ public class Component : IDisposable
             clipped.Y - AbsoluteY,
             clipped.X,
             clipped.Y,
-            clipped.Width,
-            clipped.Height);
+            Math.Min(clipped.Width, buffer.Width - (clipped.X - AbsoluteX)),
+            Math.Min(clipped.Height, buffer.Height - (clipped.Y - AbsoluteY)));
     }
 
     public virtual void Draw(Component component)
@@ -1035,8 +1035,6 @@ public class Component : IDisposable
             children[i].BindRenderSurface(surface);
     }
 
-
-
     public virtual void Dispose()
     {
         if (disposed)
@@ -1067,10 +1065,7 @@ public class Component : IDisposable
 
         components.Remove(this);
     }
-
-
 }
-
 public enum State
 {
     Normal, Highlighted, Pressed
