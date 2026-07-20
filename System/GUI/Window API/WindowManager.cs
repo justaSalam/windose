@@ -33,6 +33,7 @@ public class WindowManager : SingleThreadedProcess
     public WindowManager() : base("Desktop Window Manager", ProcessType.Kernel)
     {
         components = Component.components;
+        canTerminate = false;
     }
 
     private List<Component> components;
@@ -127,8 +128,16 @@ public class WindowManager : SingleThreadedProcess
         HandleKeyboardInput();
 
         bool menuHandled = false;
-        try { menuHandled = MenuPopup.HandleOpenMenuInput(mx, my, mouseState); }
-        catch (Exception exception) { FailApplication(focusedWindow, "handling menu input", exception); }
+
+        try
+        {
+            menuHandled = MenuPopup.HandleOpenMenuInput(mx, my, mouseState);
+        }
+        catch (Exception exception)
+        {
+            FailApplication(focusedWindow, "handling menu input", exception);
+        }
+
         if (menuHandled)
         {
             DispatchMessages();
@@ -512,6 +521,7 @@ public class WindowManager : SingleThreadedProcess
     public static void Close(Window window)
     {
         PostClose(window);
+        PostInvalidate(window);
     }
 
     public static void Minimize(Window window)
@@ -739,15 +749,6 @@ public class WindowManager : SingleThreadedProcess
         Invalidate(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
     }
 
-    public static void RefreshThemeStyles()
-    {
-        for (int i = 0; i < windows.Count; i++)
-            windows[i]?.ApplyThemeStyle();
-
-        Explorer.taskbar?.ApplyThemeStyle();
-        Explorer.startMenu?.ApplyThemeStyle();
-        Explorer.desktop?.ForceDirty();
-    }
 
     public void BringToFront(Window window)
     {

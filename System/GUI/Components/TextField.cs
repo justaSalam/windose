@@ -53,7 +53,7 @@ public class TextField : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
-        return true;
+        return base.HandleInput(mouseX, mouseY, mouse);
     }
 
     public override void HandleKeyboard(KeyEvent keyEvent)

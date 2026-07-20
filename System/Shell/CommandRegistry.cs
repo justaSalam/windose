@@ -1,5 +1,7 @@
 using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.System.Network;
+using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
 
@@ -137,6 +139,8 @@ public static class CommandRegistry
         Register("ps", "Lists running processes.", "ps", ListProcesses);
         RegisterAlias("processes", "ps");
         Register("theme", "Shows or changes the active UI theme.", "theme [classic|modern]", Theme);
+
+        Register("ipconfig", "System Network Configuration", "ipconfig [command]", DisplayNetInfo);
 
         Register("run", "Runs a Breeze application file.", "run <file.breeze>", RunBreeze);
         Register("service", "Starts a Breeze file in background mode.", "service <file.breeze>", RunService);
@@ -355,12 +359,37 @@ public static class CommandRegistry
         context.WriteLine(BreezeHost.RunScheduledFile(path) != null ? "Started service " + path : "Could not start " + path);
     }
 
+
+    private static void DisplayNetInfo(CommandContext context, string[] args)
+    {
+        for (int i = 0; i < NetworkManager.DeviceCount; i++)
+        {
+            INetworkDevice? device = NetworkManager.GetDevice(i);
+            if (device == null) return;
+
+            IPConfig? config = NetworkConfigManager.Get(device);
+            if (device == null) return;
+
+
+            context.WriteLine($"Device:     {device.Name}:");
+            context.WriteLine($"    MAC. . . . . . . : {NetworkManager.PrimaryDevice.MacAddress}");
+            context.WriteLine($"    IP address . . . : {config.IPAddress}");
+            context.WriteLine($"    Subnet Mask. . . : {config.SubnetMask}");
+            context.WriteLine($"    Gateway. . . . . : {config.DefaultGateway}");
+
+        }
+
+    }
+
     private static bool RequireArguments(CommandContext context, string[] args, int count, string usage)
     {
         if (args.Length >= count) return true;
         context.WriteLine("Usage: " + usage);
         return false;
     }
+
+
+
 
     private static string Join(string[] values)
     {

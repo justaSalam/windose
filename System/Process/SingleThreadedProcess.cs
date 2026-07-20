@@ -4,12 +4,8 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 
 
-/// <summary>
-/// Meant for processes updated by the ProcessManager in the main thread
-/// </summary>
 public abstract class SingleThreadedProcess : Process
 {
-    private bool handleAllocated;
 
     public SingleThreadedProcess(string name, ProcessType processType)
     {
@@ -22,9 +18,6 @@ public abstract class SingleThreadedProcess : Process
         canTerminate = true;
     }
 
-    /// <summary>
-    /// Process init called by process manager at the start of the process' life
-    /// </summary>
     public override void Start()
     {
         try
@@ -34,7 +27,6 @@ public abstract class SingleThreadedProcess : Process
             Running = true;
             Initialized = true;
             startTime = DateTime.Now.ToString("HH:mm:ss");
-            handleAllocated = true;
         }
         catch (Exception ex)
         {
@@ -44,9 +36,6 @@ public abstract class SingleThreadedProcess : Process
             Serial.WriteString(ex.Message);
         }
     }
-    /// <summary>
-    /// Ran only by process manager, do not call manually
-    /// </summary>
     public override void Main()
     {
         try
@@ -62,20 +51,12 @@ public abstract class SingleThreadedProcess : Process
         }
     }
 
-    /// <summary>
-    /// Process main method
-    /// </summary>
     public abstract void Update();
 
-    /// <summary>
-    /// Call base.Dispose() last, GC collection might cause an exception
-    /// </summary>
     public override void Dispose()
     {
         Running = false;
         Initialized = false;
-        if (!handleAllocated) return;
-        handleAllocated = false;
     }
 }
 

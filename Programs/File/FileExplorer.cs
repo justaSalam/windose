@@ -109,7 +109,7 @@ public class FileExplorer : Window
         explorerBody.AddDockChild(fileScroll, Dock.Fill);
 
         MenuPage fileMenu = menuBar.AddMenuPage("File");
-        fileMenu.AddItem("Properties", () => ShowSelectedProperties());
+        fileMenu.AddItem("Properties", ShowSelectedProperties);
         fileMenu.AddSeparator();
         fileMenu.AddItem("Close", () => WindowManager.PostClose(this));
 
@@ -149,10 +149,7 @@ public class FileExplorer : Window
 
         toolbar.AddSeparator();
         toolbar.AddButton("Delete");
-        toolbar.AddButton("Properties", () =>
-        {
-            ShowSelectedProperties();
-        });//
+        toolbar.AddButton("Properties", ShowSelectedProperties);
 
         toolbar.AddSeparator();
         toolbar.AddButton("Icons", () => files.SetViewMode(ListViewMode.LargeIcon), 48);
@@ -164,15 +161,9 @@ public class FileExplorer : Window
 
         BuildTree();
 
-        tree.selectedChanged = item =>
-        {
-            OpenLocation(item);
-        };
+        tree.selectedChanged = OpenLocation;
 
-        tree.itemDoubleClick = item =>
-        {
-            OpenLocation(item);
-        };
+        tree.itemDoubleClick = OpenLocation;
 
 
 
@@ -197,11 +188,13 @@ public class FileExplorer : Window
 
         AddChild(root);
         files.SetViewMode(ListViewMode.Details);
+
+
     }
 
     private void BuildTree()///TODO
     {
-
+        PopulateFilesystemLocation("/mnt");
     }
 
     private void OpenLocation(TreeViewItem item)
@@ -327,15 +320,17 @@ public class FileExplorer : Window
         }
 
         string[] directories = Directory.GetDirectories(location);
-        for (int i = 0; i < directories.Length; i++)
-            AddFolder(FileSystemManager.GetName(directories[i]), directories[i]);
+        foreach (string dir in directories)
+        {
+            AddFolder(Path.GetDirectoryName(dir), dir);
+        }
 
         string[] filePaths = Directory.GetFiles(location);
-        for (int i = 0; i < filePaths.Length; i++)
+
+        foreach (string filePath in filePaths)
         {
-            string filePath = filePaths[i];
             long size = 0;
-            FileEntry entry = new FileEntry(FileSystemManager.GetName(filePath), FileType.File, filePath, size);
+            FileEntry entry = new FileEntry(Path.GetFileName(filePath), FileType.File, filePath, size);
             ListViewItem item = files.AddItem(entry);
             item.type = string.Equals(FileSystemManager.GetExtension(filePath), ".breeze", StringComparison.OrdinalIgnoreCase)
                 ? "Breeze Script"
@@ -345,7 +340,7 @@ public class FileExplorer : Window
 
     private void PopulateControlPanel()
     {
-        const string appletDirectory = @"0:\System\ControlPanel";
+        const string appletDirectory = @"/mnt/System/ControlPanel";
         if (!Directory.Exists(appletDirectory)) return;
 
         string[] appletPaths = Directory.GetFiles(appletDirectory);

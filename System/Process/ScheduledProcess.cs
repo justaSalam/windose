@@ -8,8 +8,6 @@ using Cosmos.Kernel.Core.IO;
 /// </summary>
 public abstract class ScheduledProcess : Process
 {
-    private GCHandle processHandle;
-    private bool handleAllocated;
     private Thread workerThread;
     private volatile bool stopRequested;
     private volatile bool workerExited = true;
@@ -34,11 +32,13 @@ public abstract class ScheduledProcess : Process
         {
             stopRequested = false;
             workerExited = false;
+
             Running = true;
+
             Initialized = true;
+
             startTime = DateTime.Now.ToString("HH:mm:ss");
-            processHandle = GCHandle.Alloc(this);
-            handleAllocated = true;
+
             workerThread = new Thread(WorkerLoop);
             workerThread.Start();
         }
@@ -46,8 +46,9 @@ public abstract class ScheduledProcess : Process
         {
             Running = false;
             Initialized = false;
+
             workerExited = true;
-            ReleaseHandle();
+
             Serial.WriteString("Scheduled process " + name + " failed to start\n");
             Serial.WriteString(exception.Message + "\n");
         }
@@ -63,19 +64,26 @@ public abstract class ScheduledProcess : Process
             while (!stopRequested && Running)
             {
                 long started = DateTime.UtcNow.Ticks;
+
                 Update();
+
                 long elapsedTicks = DateTime.UtcNow.Ticks - started;
                 double elapsedMs = elapsedTicks / 10000.0;
+
                 lastUpdateMs = elapsedMs;
+
                 averageUpdateMs = averageUpdateMs == 0
                     ? elapsedMs
                     : averageUpdateMs * 0.9 + elapsedMs * 0.1;
+
                 if (elapsedMs > peakUpdateMs) peakUpdateMs = elapsedMs;
 
-                int elapsedWholeMs = (int)((elapsedTicks + TimeSpan.TicksPerMillisecond - 1)
-                    / TimeSpan.TicksPerMillisecond);
+                int elapsedWholeMs = (int)((elapsedTicks + TimeSpan.TicksPerMillisecond - 1) / TimeSpan.TicksPerMillisecond);
+
                 int targetIntervalMs = Math.Max(10, GetNextUpdateIntervalMs());
+
                 int sleepMs = targetIntervalMs - elapsedWholeMs;
+
                 Thread.Sleep(sleepMs > 10 ? sleepMs : 10);
             }
         }
@@ -109,13 +117,6 @@ public abstract class ScheduledProcess : Process
         RequestStop();
         Initialized = false;
         workerThread = null;
-        ReleaseHandle();
-    }
-
-    private void ReleaseHandle()
-    {
-        if (!handleAllocated) return;
-        processHandle.Free();
-        handleAllocated = false;
     }
 }
+

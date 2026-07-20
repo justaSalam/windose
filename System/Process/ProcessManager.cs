@@ -26,12 +26,9 @@ public static class ProcessManger
     private static int processId;
     private static bool isUpdating;
 
-    // GC scheduling
-    private static int totalAllocationsSinceLastGC;
-    private static int gcAllocationThreshold = 1024 * 1024; // 1MB
+
     private static int gcFrameCounter;
-    private static int gcMinFramesBetweenCollections = 300;
-    private static int gcMaxFramesBetweenCollections = 300;
+    private static int gcMaxFramesBetweenCollections = 1500;
 
 
     public static SingleThreadedProcess Start(SingleThreadedProcess process)
@@ -87,13 +84,11 @@ public static class ProcessManger
         {
             ApplyPendingRequests();
 
-            // Process priority-based update scheduling
             for (int i = 0; i < processes.Count; i++)
             {
                 SingleThreadedProcess process = processes[i];
                 if (!process.Running) continue;
 
-                // Skip based on priority
                 if (ShouldSkipUpdate(process)) continue;
 
                 long started = DateTime.UtcNow.Ticks;
@@ -123,8 +118,6 @@ public static class ProcessManger
                 if (elapsedMs > process.peakUpdateMs)
                     process.peakUpdateMs = elapsedMs;
 
-                // Track allocations for GC scheduling
-                totalAllocationsSinceLastGC += (int)(elapsedMs * 10);
             }
 
             for (int i = processes.Count - 1; i >= 0; i--)
@@ -174,19 +167,9 @@ public static class ProcessManger
 
         if (gcFrameCounter >= gcMaxFramesBetweenCollections)
         {
-
-            ExecuteSafeCollection();
+            gcFrameCounter = 0;
+            GarbageCollector.Collect();
         }
-
-    }
-    private static void ExecuteSafeCollection()
-    {
-
-        Heap.Collect();
-
-        totalAllocationsSinceLastGC = 0;
-        gcFrameCounter = 0;
-
     }
 
     public static void QueueStart(Process process)

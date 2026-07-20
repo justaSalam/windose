@@ -177,9 +177,7 @@ public static class SystemRegistry
                     .Append(entry.RequiresRestart ? "true" : "false").Append('\n');
             }
         }
-        Console.WriteLine("reg save");
 
-        Console.WriteLine(Directory.Exists("/mnt/System"));
         File.WriteAllText(StoragePath, output.ToString());
 
         return true;

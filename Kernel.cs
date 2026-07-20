@@ -1,6 +1,9 @@
 using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Network;
+using Cosmos.Kernel.System.Network.Config;
+using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
 using Windose.Drivers;
 using Sys = Cosmos.Kernel.System;
 
@@ -79,6 +82,22 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(explorer);
         ProcessManger.Start(windowManager);
 
+
+
+        NetworkStack.Initialize();
+        DHCPClient dhcpClient = new DHCPClient();
+
+        if (dhcpClient.SendDiscoverPacket() != -1)
+        {
+            IPConfig? config = NetworkConfigManager.Get(NetworkManager.PrimaryDevice);
+            Console.WriteLine("IP address: " + config.IPAddress.ToString());
+            Console.WriteLine("Subnet:     " + config.SubnetMask.ToString());
+            Console.WriteLine("Gateway:    " + config.DefaultGateway.ToString());
+        }
+        else
+        {
+            Console.WriteLine("DHCP timed out");
+        }
 
     }
 

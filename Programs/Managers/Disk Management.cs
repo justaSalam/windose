@@ -217,9 +217,6 @@ public sealed class DiskManagement : Window
     private void RefreshDriveVisuals()
     {
         deviceListView.MarkDirty(false);
-
-        // Explorer contains several cached layout buffers. Redraw the owning
-        // window after interaction so those updated buffers reach the screen.
         ForceDirty();
     }
 
@@ -228,16 +225,4 @@ public sealed class DiskManagement : Window
 
     }
 
-    public override void Dispose()
-    {
-        base.Dispose();
-        partitionListView.itemRightClick = null;
-        partitionListView.Clear();
-
-        deviceListView.itemRightClick = null;
-        partitionListView.Clear();
-
-        contextItem = null;
-
-    }
 }

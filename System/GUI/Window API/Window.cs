@@ -165,12 +165,6 @@ public class Window : Component
 
     }
 
-    public void ApplyThemeStyle()
-    {
-        ApplyTitlebarTheme();
-        MarkDirty();
-    }
-
     private void ApplyTitlebarTheme()
     {
         if (!hasTitleBar || titlebar == null) return;

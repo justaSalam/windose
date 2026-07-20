@@ -113,17 +113,7 @@ public static class Palette
 
     private static void OnRegistryChanged(RegistryChange change)
     {
-        if (!change.Key.Equals(ThemeRegistryKey, StringComparison.OrdinalIgnoreCase)) return;
 
-        string requested = SystemRegistry.GetString(ThemeRegistryKey, "classic");
-        if (!requested.Equals(ThemeName, StringComparison.OrdinalIgnoreCase))
-
-
-            WindowManager.PostCommand("theme.changed", () =>
-            {
-                WindowManager.RefreshThemeStyles();
-                WindowManager.InvalidateAll();
-            });
     }
 
     private static void ApplyTheme(UiTheme theme)

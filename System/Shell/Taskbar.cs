@@ -70,12 +70,13 @@ public class Taskbar : Component
         };
         bar.AddStackChild(startButton);
 
-        timeLabel = new Label(0, 0, 50, Height)
+        timeLabel = new Label(0, 0, 75, Height)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
-            text = DateTime.Now.ToString("H:mm:ss"),
-            Margin = new Thickness(0, 0, 0, 4),
+            text = DateTime.Now.ToString("HH:mm:ss"),
+            Margin = new Thickness(0, 0, 20, 0),
+
         };
         AddChild(timeLabel);
 
@@ -86,6 +87,7 @@ public class Taskbar : Component
     public override void Update()
     {
         base.Update();
+        timeLabel.text = DateTime.Now.ToString("HH:mm:ss");
         timeLabel.MarkDirty();
     }
 

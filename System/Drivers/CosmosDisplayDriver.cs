@@ -18,6 +18,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
     public void Start()
     {
         Canvas = Canvas.GetFullScreen();
+
         BackBuffer = new DirectBitmap(Canvas.Width, Canvas.Height);
         PerformanceOverlay = new DirectBitmap(Math.Max(1, Math.Min(800, Canvas.Width - 20)), 52);
         State = WindoseDriverState.Started;

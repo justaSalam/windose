@@ -11,14 +11,12 @@ public class DiskmgrNewVolume : Window
     private readonly DockPanel driveSizePage;
     private readonly DockPanel driveLetterPage;
     private readonly DockPanel formatDrivePage;
+    private readonly DockPanel finalPage;
 
-    private readonly GroupBox wizardGroup;
-    private readonly GroupBox driveGroup;
-    private readonly GroupBox letterGroup;
-    private readonly GroupBox formatGroup;
-
-    private DockPanel bottomRow;
     private int selectedPage;
+
+    public int pages { get; private set; }
+
 
     public DiskmgrNewVolume(int x, int y, IBlockDevice device, int width = 720, int height = 560) : base(x, y, width, height, "New Simple Volume Wizard", true)
     {
@@ -35,6 +33,7 @@ public class DiskmgrNewVolume : Window
         StackPanel tabs = new StackPanel(Palette.ControlFace, 0, 0, Width, 28)
         {
             orientation = StackOrientation.Horizontal,
+            horizontalAlignment = HorizontalAlignment.Right,
             clampSize = false,
             useBackground = true,
             Padding = new Thickness(0),
@@ -42,88 +41,100 @@ public class DiskmgrNewVolume : Window
             spacing = 2,
         };
 
-        wizardGroup = new GroupBox(0, 0, Width, Height)
-        {
-            text = "New Volume Wizard",
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            useBackground = true,
-            Margin = new Thickness(10, 35, 10, 10),
-        };
-
-        driveGroup = new GroupBox(0, 0, Width, Height)
-        {
-            text = "Specify Volume Size",
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            useBackground = true,
-            Margin = new Thickness(10, 35, 10, 10),
-        };
-        letterGroup = new GroupBox(0, 0, Width, Height)
-        {
-            text = "Assign Drive Letter",
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            useBackground = true,
-            Margin = new Thickness(10, 35, 10, 10),
-        };
-        formatGroup = new GroupBox(0, 0, Width, Height)
-        {
-            text = "Format partition",
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            useBackground = true,
-            Margin = new Thickness(10, 35, 10, 10),
-        };
 
 
-        tabs.AddStackChild(CreateTab("< Back", 112, () => ShowPage(0)));
-        tabs.AddStackChild(CreateTab("Next >", 112, () =>
-        {
-            selectedPage++;
-            ShowPage(selectedPage);
-        }));
-        tabs.AddStackChild(CreateTab("Cancel", 112, null));
+
+        tabs.AddStackChild(CreateTab("< Back", 112, PreviousPage));
+        tabs.AddStackChild(CreateTab("Next >", 112, NextPage));
+        tabs.AddStackChild(CreateTab("Cancel", 112, () => WindowManager.PostClose(this)));
 
 
         wizardPage = CreatePage();
         driveSizePage = CreatePage();
         driveLetterPage = CreatePage();
         formatDrivePage = CreatePage();
+        finalPage = CreatePage();
 
-        wizardGroup.AddGroupChild(new Label(0, 0, width, 30)
+        wizardPage.AddDockChild(new Label(0, 0, 0, 0)
         {
-            text = "New Volume Wizard",
+            text = "This wizard helps you create a volume on a disk.",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
             fontSize = 16
-        });
-
-        wizardGroup.AddGroupChild(new Label(0, 0, width, height)
+        }, Dock.Fill);
+        wizardPage.AddDockChild(new Label(0, 0, 0, 0)
         {
-            text = "A volume can only be on a single disk\nTo continue click next",
-            fontSize = 12
+            text = "A volume can only be on a single disk.",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
 
-        });
+        driveSizePage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Drive size page",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
 
-        wizardPage.AddDockChild(wizardGroup, Dock.Fill);
-        driveSizePage.AddDockChild(driveGroup, Dock.Fill);
-        driveLetterPage.AddDockChild(letterGroup, Dock.Fill);
-        formatDrivePage.AddDockChild(formatGroup, Dock.Fill);
+        driveLetterPage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Drive Letter Page",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
 
-        wizardGroup.AddGroupChild(wizardPage);
-        driveGroup.AddGroupChild(driveSizePage);
-        letterGroup.AddGroupChild(driveLetterPage);
-        formatGroup.AddGroupChild(formatDrivePage);
+        formatDrivePage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Format page",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
+
+        finalPage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Final page",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
 
 
-        root.AddDockChild(tabs, Dock.Top);
+        root.AddDockChild(tabs, Dock.Bottom);
+
+        root.AddDockChild(wizardPage, Dock.Fill);
         root.AddDockChild(driveSizePage, Dock.Fill);
-        root.AddDockChild(driveGroup, Dock.Fill);
         root.AddDockChild(driveLetterPage, Dock.Fill);
         root.AddDockChild(formatDrivePage, Dock.Fill);
+        root.AddDockChild(finalPage, Dock.Fill);
+
 
         AddChild(root);
         ShowPage(0);
     }
+
+    private void NextPage()
+    {
+        if (selectedPage < pages) selectedPage++;
+
+        ShowPage(selectedPage);
+    }
+
+    private void PreviousPage()
+    {
+        if (selectedPage > 0) selectedPage--;
+        ShowPage(selectedPage);
+    }
+
 
     private static DockPanel CreatePage()
     {
@@ -152,11 +163,13 @@ public class DiskmgrNewVolume : Window
 
     private void ShowPage(int page)
     {
+        pages++;
         selectedPage = page;
         wizardPage.Visible = page == 0;
         driveSizePage.Visible = page == 1;
         driveLetterPage.Visible = page == 2;
         formatDrivePage.Visible = page == 3;
+        finalPage.Visible = page == 4;
         root.ResolveDockLayout();
         root.MarkDirty();
     }
