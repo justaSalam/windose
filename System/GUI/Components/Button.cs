@@ -65,7 +65,8 @@ public class Button : Component
             int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
             int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
 
-            DrawString(text, textColor, 2, textY, effectiveFontSize);
+            //DrawString(text, textColor, 2, textY, effectiveFontSize);
+            DrawString(text, textColor, 2, textY, 16);
             //DrawString(text, SystemFonts.sansSerif, textColor, 2, 16);
         }
     }

@@ -146,6 +146,19 @@ public static class CommandRegistry
         Register("service", "Starts a Breeze file in background mode.", "service <file.breeze>", RunService);
 
         Register("exit", "Closes Command Prompt.", "exit", (context, args) => context.Close());
+        Register("exit", "Closes Command Prompt.", "exit", (context, args) => context.Close());
+
+
+        Register("test", "temp font data read", "test", (context, args) =>
+        {
+            context.WriteLine($"Data length read from font: {SystemFonts.sansSerif.Data.Length}");
+            context.WriteLine($"Data length read from span: {SystemFonts.resourceSpan.Length}");
+            context.WriteLine($"FONT DATA: Heigth: {SystemFonts.sansSerif.Height}");
+            context.WriteLine($"FONT DATA: Width:  {SystemFonts.sansSerif.Width}");
+            context.WriteLine($"FONT DATA: SizePx: {SystemFonts.sansSerif.SizePx}");
+
+
+        });
 
 
 

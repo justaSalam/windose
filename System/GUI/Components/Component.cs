@@ -14,8 +14,7 @@ using Windose;
 public class Component : IDisposable
 {
 
-    public Bitmap GetBuffer() => buffer.GetBufferBitmap;
-    public int[] GetRawBuffer() => buffer.GetBufferBitmap.RawData;
+    public int[] GetBuffer() => buffer.GetBufferBitmap;
     public virtual string GetName() => "UNASSIGNED COMPONENT";
 
     public int Width
@@ -134,7 +133,7 @@ public class Component : IDisposable
         return null;
     }
 
-    public string text = "";
+    public string text = string.Empty;
 
 
     protected DirectBitmap buffer;
@@ -485,34 +484,6 @@ public class Component : IDisposable
             Math.Min(clipped.Height, buffer.Height - (clipped.Y - AbsoluteY)));
     }
 
-    public virtual void Draw(Component component)
-    {
-        Draw();
-        component.buffer.DrawImageAlpha(GetBuffer(), X, Y);
-    }
-
-    public void DrawInParent()
-    {
-        if (!isRoot)
-        {
-            parent.buffer.DrawImageAlpha(GetBuffer(), X, Y);
-        }
-    }
-
-
-    public void SaveCacheBuffer()
-    {
-        if (cacheBuffer == null || cacheBuffer.Width < Width || cacheBuffer.Height < Height)
-            cacheBuffer = new DirectBitmap(buffer.Width, buffer.Height);
-
-        cacheBuffer.DrawImage(buffer.GetBufferBitmap, 0, 0);
-    }
-
-    public void DrawCacheBuffer()
-    {
-        if (cacheBuffer == null) return;
-        buffer.DrawImage(cacheBuffer.GetBufferBitmap, 0, 0);
-    }
 
     /// <summary>
     /// Screen space coordinates
@@ -729,15 +700,13 @@ public class Component : IDisposable
         buffer.Clear(Color.LightGray);
     }
 
-    public void DrawString(string str, Color color, int x, int y)
-    {
-        buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
-    }
 
     public void DrawString(string str, Color color, int x, int y, int fontSize)
     {
-        buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y, fontSize);
+        //buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
+        buffer.DrawString(str, SystemFonts.sansSerif, color, x, y);
     }
+
 
     public int MeasureStringWidth(string str, int fontSize)
     {
@@ -749,10 +718,6 @@ public class Component : IDisposable
         return fontSize;
     }
 
-    public void DrawString(string str, Font font, Color color, int x, int y)
-    {
-        buffer.DrawString(str, font, color, x, y);
-    }
 
     public void DrawChar(char c, Font font, Color color, int x, int y)
     {
@@ -802,9 +767,6 @@ public class Component : IDisposable
     {
         buffer.DrawEtchedRect(x, y, width, height, shadow, highlight);
     }
-
-
-
 
     public void DrawLine(Color color, int xStart, int yStart, int width, int height)
     {
@@ -989,7 +951,7 @@ public class Component : IDisposable
         if (child.IsOpaqueForCopy())
         {
             buffer.DrawArrayClipped(
-                child.GetRawBuffer(),
+                child.GetBuffer(),
                 child.buffer.Width,
                 sourceX,
                 sourceY,
@@ -1001,7 +963,7 @@ public class Component : IDisposable
         }
 
         buffer.DrawArrayAlphaClipped(
-            child.GetRawBuffer(),
+            child.GetBuffer(),
             child.buffer.Width,
             sourceX,
             sourceY,

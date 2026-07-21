@@ -3,9 +3,9 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 
-public class DirectBitmap : IDisposable
+public class DirectBitmap : Canvas
 {
-    protected Bitmap buffer;
+
     public int Width { get; private set; }
     public int Height { get; private set; }
 
@@ -21,11 +21,11 @@ public class DirectBitmap : IDisposable
     private int originY;
     private Rectangle clipBounds;
 
-    public Bitmap GetBufferBitmap
+    public int[] GetBufferBitmap
     {
         get
         {
-            return buffer;
+            return Buffer;
         }
     }
 
@@ -33,7 +33,7 @@ public class DirectBitmap : IDisposable
     {
         Width = Math.Max(1, width);
         Height = Math.Max(1, height);
-        buffer = new Bitmap((uint)Width, (uint)Height, ColorDepth.ColorDepth32);
+        Buffer = new int[width * height];
 
         Stride = 32 / 8;
         Pitch = Width * Stride;
@@ -91,13 +91,6 @@ public class DirectBitmap : IDisposable
         clipBounds = clipStack[contextDepth];
     }
 
-    public void SetPixel(int x, int y, Color color)
-    {
-        x += originX;
-        y += originY;
-        if (!ContainsClipped(x, y)) return;
-        buffer.RawData[x + y * Width] = color.ToArgb();
-    }
 
     public void SetPixelAlpha(int x, int y, int colour)
     {
@@ -106,34 +99,36 @@ public class DirectBitmap : IDisposable
         if (!ContainsClipped(x, y)) return;
         int index = x + y * Width;
 
-        if (index >= 0 && index < buffer.RawData.Length)
+        if (index >= 0 && index < Buffer.Length)
         {
             if ((colour >> 24) == 0xFF)
             {
-                buffer.RawData[index] = colour;
+                Buffer[index] = colour;
                 return;
             }
 
-            int bgColour = buffer.RawData[index];
+            int bgColour = Buffer[index];
             int alpha = (colour >> 24) & 0xff;
             int invAlpha = 255 - alpha;
             int newRed = (((colour >> 16) & 0xff) * alpha + ((bgColour >> 16) & 0xff) * invAlpha) >> 8;
             int newGreen = (((colour >> 8) & 0xff) * alpha + ((bgColour >> 8) & 0xff) * invAlpha) >> 8;
             int newBlue = ((colour & 0xff) * alpha + (bgColour & 0xff) * invAlpha) >> 8;
 
-            buffer.RawData[index] = (alpha << 24) | (newRed << 16) | (newGreen << 8) | newBlue;
+            Buffer[index] = (alpha << 24) | (newRed << 16) | (newGreen << 8) | newBlue;
         }
     }
-    public void Clear(Color color)
+    public override void Clear(Color color)
     {
-        Array.Fill(buffer.RawData, color.ToArgb());
+        Array.Fill(Buffer, color.ToArgb());
     }
-    public virtual void DrawPoint(Color color, int x, int y)
+    public override void DrawPoint(Color color, int x, int y)
     {
+        base.DrawPoint(color, x, y);
+        return;
 
         x += originX;
         y += originY;
-        if (buffer == null || buffer.RawData == null || !ContainsClipped(x, y))
+        if (Buffer == null || Buffer == null || !ContainsClipped(x, y))
         {
             return;
         }
@@ -145,30 +140,30 @@ public class DirectBitmap : IDisposable
                 return;
             }
 
-            color = AlphaBlend(color, Color.FromArgb(buffer.RawData[y * Width + x]), color.A);
+            color = AlphaBlend(color, Color.FromArgb(Buffer[y * Width + x]), color.A);
         }
 
-        buffer.RawData[y * Width + x] = color.ToArgb();
+        Buffer[y * Width + x] = color.ToArgb();
     }
 
-    public virtual void DrawPoint(int color, int x, int y)
+    /*public override void DrawPoint(int color, int x, int y) a potentionally faster draw point, maybe replace it with this in the future
     {
         x += originX;
         y += originY;
-        if (buffer == null || !ContainsClipped(x, y))
+        if (Buffer == null || !ContainsClipped(x, y))
         {
             return;
         }
-        buffer.RawData[y * Width + x] = color;
-    }
+        Buffer[y * Width + x] = color;
+    }*/
 
-    public virtual void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
+    public override void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
         DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y,
             (int)image.Width, (int)image.Height);
     }
 
-    public virtual Bitmap GetImage(int x, int y, int width, int height)
+    public override Bitmap GetImage(int x, int y, int width, int height)
     {
         Bitmap bitmap = new Bitmap((uint)width, (uint)height, ColorDepth.ColorDepth32);
         for (int i = 0; i < height; i++)
@@ -182,12 +177,12 @@ public class DirectBitmap : IDisposable
         return bitmap;
     }
 
-    public virtual void DrawImage(Image image, int x, int y, int w, int h, bool preventOffBoundPixels = true)
+    public override void DrawImage(Image image, int x, int y, int w, int h, bool preventOffBoundPixels = true)
     {
         DrawScaledImageAlpha(image, x, y, w, h);
     }
 
-    public virtual void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
+    public override void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
     {
         int num = Math.Min((int)image.Width, maxWidth);
         int num2 = Math.Min((int)image.Height, maxHeight);
@@ -262,93 +257,9 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawString(string str, Font font, Color color, int x, int y)
+    public override Color GetPointColor(int x, int y)
     {
-        int length = str.Length;
-        byte width = font.Width;
-        for (int i = 0; i < length; i++)
-        {
-            DrawChar(str[i], font, color, x, y);
-            x += width;
-        }
-    }
-
-    public virtual void DrawString(string str, Font font, Color color, int x, int y, int fontSize)
-    {
-        int nativeHeight = font.Height;
-        if (fontSize <= 0) return;
-
-        int scaledWidth = Math.Max(1, font.Width * fontSize / nativeHeight);
-        int cursorX = x;
-
-        for (int i = 0; i < str.Length; i++)
-        {
-            DrawChar(str[i], font, color, cursorX, y, scaledWidth, fontSize);
-            cursorX += scaledWidth;
-        }
-    }
-
-
-    public virtual void DrawChar(char c, Font font, Color color, int x, int y, int width, int height)
-    {
-        if (width <= 0 || height <= 0) return;
-
-        for (int destY = 0; destY < height; destY++)
-        {
-            int sourceY = destY * font.Height / height;
-            int runStart = -1;
-
-            for (int destX = 0; destX < width; destX++)
-            {
-                int sourceX = destX * font.Width / width;
-
-                if (FontPixelSet(c, font, sourceX, sourceY))
-                {
-                    if (runStart < 0) runStart = destX;
-                }
-                else if (runStart >= 0)
-                {
-                    DrawHorizontalSpan(color, x + runStart, y + destY, destX - runStart);
-                    runStart = -1;
-                }
-            }
-
-            if (runStart >= 0)
-                DrawHorizontalSpan(color, x + runStart, y + destY, width - runStart);
-        }
-    }
-
-    public virtual void DrawChar(char c, Font font, Color color, int x, int y)
-    {
-        byte height = font.Height;
-        byte width = font.Width;
-        byte[] data = font.Data;
-        int num = (width + 7) / 8;
-        int num2 = height * num * (byte)c;
-        for (int i = 0; i < height; i++)
-        {
-            int runStart = -1;
-            for (byte b = 0; b < width; b++)
-            {
-                byte byteToConvert = data[num2 + i * num + b / 8];
-                if (font.ConvertByteToBitAddress(byteToConvert, b % 8 + 1))
-                {
-                    if (runStart < 0) runStart = b;
-                }
-                else if (runStart >= 0)
-                {
-                    DrawHorizontalSpan(color, x + runStart, y + i, b - runStart);
-                    runStart = -1;
-                }
-            }
-
-            if (runStart >= 0)
-                DrawHorizontalSpan(color, x + runStart, y + i, width - runStart);
-        }
-    }
-    public virtual Color GetPointColor(int x, int y)
-    {
-        if (buffer == null)
+        if (Buffer == null)
         {
             return Color.Black;
         }
@@ -360,11 +271,11 @@ public class DirectBitmap : IDisposable
             return Color.Black;
         }
 
-        return Color.FromArgb(buffer.RawData[y * Width + x]);
+        return Color.FromArgb(Buffer[y * Width + x]);
     }
-    public virtual int GetRawPointColor(int x, int y)
+    public override int GetRawPointColor(int x, int y)
     {
-        if (buffer == null)
+        if (Buffer == null)
         {
             return 0;
         }
@@ -376,12 +287,12 @@ public class DirectBitmap : IDisposable
             return 0;
         }
 
-        return buffer.RawData[y * Width + x];
+        return Buffer[y * Width + x];
     }
 
     public int[]? GetBuffer()
     {
-        return buffer.RawData;
+        return Buffer;
     }
 
     internal int GetPointOffset(int x, int y)
@@ -389,7 +300,7 @@ public class DirectBitmap : IDisposable
         return x * Stride + y * Pitch;
     }
 
-    public virtual void DrawArray(Color[] colors, int x, int y, int width, int height)
+    public override void DrawArray(Color[] colors, int x, int y, int width, int height)
     {
         for (int i = 0; i < width; i++)
         {
@@ -399,7 +310,7 @@ public class DirectBitmap : IDisposable
             }
         }
     }
-    public virtual void DrawArray(int[] colors, int x, int y, int width, int height)
+    public override void DrawArray(int[] colors, int x, int y, int width, int height)
     {
         DrawArrayClipped(colors, width, 0, 0, x, y, width, height);
     }
@@ -507,7 +418,7 @@ public class DirectBitmap : IDisposable
             int sourceIndex = (sourceY + j) * sourceWidth + sourceX;
             int destinationIndex = (destinationY + j) * Width + destinationX;
 
-            Array.Copy(colors, sourceIndex, buffer.RawData, destinationIndex, width);
+            Array.Copy(colors, sourceIndex, Buffer, destinationIndex, width);
         }
     }
 
@@ -619,17 +530,17 @@ public class DirectBitmap : IDisposable
 
                 if (alpha == 0xff)
                 {
-                    buffer.RawData[destinationIndex + x] = color;
+                    Buffer[destinationIndex + x] = color;
                     continue;
                 }
 
-                int bgColor = buffer.RawData[destinationIndex + x];
+                int bgColor = Buffer[destinationIndex + x];
                 int invAlpha = 255 - alpha;
                 int red = (((color >> 16) & 0xff) * alpha + ((bgColor >> 16) & 0xff) * invAlpha) >> 8;
                 int green = (((color >> 8) & 0xff) * alpha + ((bgColor >> 8) & 0xff) * invAlpha) >> 8;
                 int blue = ((color & 0xff) * alpha + (bgColor & 0xff) * invAlpha) >> 8;
 
-                buffer.RawData[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+                Buffer[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
             }
         }
     }
@@ -659,7 +570,7 @@ public class DirectBitmap : IDisposable
         for (int y = top; y < bottom; y++)
         {
             if (color.A == byte.MaxValue)
-                buffer.RawData[y * Width + targetX] = argb;
+                Buffer[y * Width + targetX] = argb;
             else
                 BlendTargetPixel(targetX, y, argb);
         }
@@ -683,7 +594,7 @@ public class DirectBitmap : IDisposable
         int index = targetY * Width + left;
         if (color.A == byte.MaxValue)
         {
-            Array.Fill(buffer.RawData, argb, index, right - left);
+            Array.Fill(Buffer, argb, index, right - left);
             return;
         }
 
@@ -733,7 +644,7 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawLine(Color color, int x1, int y1, int x2, int y2)
+    public override void DrawLine(Color color, int x1, int y1, int x2, int y2)
     {
         int num = x2 - x1;
         int num2 = y2 - y1;
@@ -783,7 +694,7 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawCircle(Color color, int xCenter, int yCenter, int radius)
+    public override void DrawCircle(Color color, int xCenter, int yCenter, int radius)
     {
         int num = radius;
         int num2 = 0;
@@ -812,7 +723,7 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawFilledCircle(Color color, int x0, int y0, int radius)
+    public override void DrawFilledCircle(Color color, int x0, int y0, int radius)
     {
         int num = radius;
         int num2 = 0;
@@ -845,7 +756,7 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawEllipse(Color color, int xCenter, int yCenter, int xR, int yR)
+    public override void DrawEllipse(Color color, int xCenter, int yCenter, int xR, int yR)
     {
         int num = 2 * xR;
         int num2 = 2 * yR;
@@ -878,7 +789,7 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawFilledEllipse(Color color, int xCenter, int yCenter, int yR, int xR)
+    public override void DrawFilledEllipse(Color color, int xCenter, int yCenter, int yR, int xR)
     {
         for (int i = -yR; i <= yR; i++)
         {
@@ -892,7 +803,7 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawArc(int x, int y, int width, int height, Color color, int startAngle = 0, int endAngle = 360)
+    public override void DrawArc(int x, int y, int width, int height, Color color, int startAngle = 0, int endAngle = 360)
     {
         if (width != 0 && height != 0)
         {
@@ -906,7 +817,7 @@ public class DirectBitmap : IDisposable
         }
     }
 
-    public virtual void DrawPolygon(Color color, params Point[] points)
+    public override void DrawPolygon(Color color, params Point[] points)
     {
         if (points == null || points.Length < 3) return;
 
@@ -922,12 +833,12 @@ public class DirectBitmap : IDisposable
         DrawLine(color, point3.X, point3.Y, point4.X, point4.Y);
     }
 
-    public virtual void DrawSquare(Color color, int x, int y, int size)
+    public override void DrawSquare(Color color, int x, int y, int size)
     {
         DrawRectangle(color, x, y, size, size);
     }
 
-    public virtual void DrawRectangle(Color color, int x, int y, int width, int height)
+    public override void DrawRectangle(Color color, int x, int y, int width, int height)
     {
         DrawLine(color, x, y, x + width, y);
         DrawLine(color, x, y, x, y + height);
@@ -1007,7 +918,7 @@ public class DirectBitmap : IDisposable
         DrawLine(highlight, right, y + 1, right, bottom);
     }
 
-    public virtual void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
+    public override void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
     {
         if (height == -1)
         {
@@ -1023,7 +934,7 @@ public class DirectBitmap : IDisposable
         if (color.A == byte.MaxValue)
         {
             for (int y = target.Top; y < target.Bottom; y++)
-                Array.Fill(buffer.RawData, argb, y * Width + target.Left, target.Width);
+                Array.Fill(Buffer, argb, y * Width + target.Left, target.Width);
             return;
         }
 
@@ -1032,7 +943,7 @@ public class DirectBitmap : IDisposable
                 BlendTargetPixel(x, y, argb);
     }
 
-    public virtual void DrawTriangle(Color color, int v1x, int v1y, int v2x, int v2y, int v3x, int v3y)
+    public override void DrawTriangle(Color color, int v1x, int v1y, int v2x, int v2y, int v3x, int v3y)
     {
         DrawLine(color, v1x, v1y, v2x, v2y);
         DrawLine(color, v1x, v1y, v3x, v3y);
@@ -1060,16 +971,16 @@ public class DirectBitmap : IDisposable
         if (alpha == 0) return;
         if (alpha == 0xff)
         {
-            buffer.RawData[index] = color;
+            Buffer[index] = color;
             return;
         }
 
-        int background = buffer.RawData[index];
+        int background = Buffer[index];
         int inverse = 255 - alpha;
         int red = (((color >> 16) & 0xff) * alpha + ((background >> 16) & 0xff) * inverse) >> 8;
         int green = (((color >> 8) & 0xff) * alpha + ((background >> 8) & 0xff) * inverse) >> 8;
         int blue = ((color & 0xff) * alpha + (background & 0xff) * inverse) >> 8;
-        buffer.RawData[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+        Buffer[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
     }
 
     protected void TrimLine(ref int x1, ref int y1, ref int x2, ref int y2)
@@ -1155,7 +1066,7 @@ public class DirectBitmap : IDisposable
         y2 = (int)num4;
     }
 
-    public virtual Color AlphaBlend(Color to, Color from, byte alpha)
+    public new Color AlphaBlend(Color to, Color from, byte alpha)
     {
         byte red = (byte)(to.R * alpha + from.R * (255 - alpha) >> 8);
         byte green = (byte)(to.G * alpha + from.G * (255 - alpha) >> 8);
@@ -1163,18 +1074,14 @@ public class DirectBitmap : IDisposable
         return Color.FromArgb(red, green, blue);
     }
 
-   private bool disposed;
+    private bool disposed;
 
-   public void Dispose()
-   {
-       if (disposed)
-           return;
+    public void Dispose()
+    {
+        if (disposed)
+            return;
 
-       disposed = true;
-
-       if (buffer is IDisposable disposable)
-           disposable.Dispose();
-
-       buffer = null!;
-   }
+        disposed = true;
+        Buffer = null!;
+    }
 }
