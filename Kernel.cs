@@ -50,7 +50,7 @@ public class Kernel : Sys.Kernel
         FileSystemManager.Initialize();
 
 
-        SystemRegistry.Initialize();
+
         Palette.Initialize();
 
 
@@ -83,20 +83,23 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(windowManager);
 
 
-
-        NetworkStack.Initialize();
-        DHCPClient dhcpClient = new DHCPClient();
-
-        if (dhcpClient.SendDiscoverPacket() != -1)
+        if (NetworkManager.PrimaryDevice != null)
         {
-            IPConfig? config = NetworkConfigManager.Get(NetworkManager.PrimaryDevice);
-            Console.WriteLine("IP address: " + config.IPAddress.ToString());
-            Console.WriteLine("Subnet:     " + config.SubnetMask.ToString());
-            Console.WriteLine("Gateway:    " + config.DefaultGateway.ToString());
-        }
-        else
-        {
-            Console.WriteLine("DHCP timed out");
+            NetworkStack.Initialize();
+            DHCPClient dhcpClient = new DHCPClient();
+
+            if (dhcpClient.SendDiscoverPacket() != -1)
+            {
+                IPConfig? config = NetworkConfigManager.Get(NetworkManager.PrimaryDevice);
+                Console.WriteLine("IP address: " + config.IPAddress.ToString());
+                Console.WriteLine("Subnet:     " + config.SubnetMask.ToString());
+                Console.WriteLine("Gateway:    " + config.DefaultGateway.ToString());
+            }
+            else
+            {
+                Console.WriteLine("DHCP timed out");
+            }
+
         }
 
     }

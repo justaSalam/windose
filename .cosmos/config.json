@@ -10,17 +10,12 @@
     "mouse": "virtio-mouse-pci",
     "enableNetwork": false,
     "networkPorts": "5555",
-    "extraArgs": "",
+    "extraArgs": "-device vmware-svga",
     "disks": [
       {
         "path": "disk.img",
         "type": "ahci",
-        "size": "256M"
-      },
-      {
-        "path": "disk2.img",
-        "type": "ahci",
-        "size": "16M"
+        "size": "32"
       }
     ]
   }

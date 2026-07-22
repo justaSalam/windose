@@ -18,15 +18,6 @@ public static class FileSystemManager
 
         VfsManager.RegisterFilesystem("fat", fat);
 
-        DriveUtils.CreateMBR(StorageManager.PrimaryDevice);
-        DriveUtils.CreateMbrPartition(StorageManager.PrimaryDevice);
-        DriveUtils.FAT32FormatDrive("fat", "0", new FatFormatOptions()
-        {
-            Type = FatType.Fat32,
-            VolumeLabel = "SYSTEM"
-        });
-
-
         if (VfsManager.TryMount("fat", "0", MountFlags.None, "/mnt", out VfsManager.VfsMount? mount))
         {
             Serial.WriteString($"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}\n");
@@ -40,7 +31,8 @@ public static class FileSystemManager
 
 
 
-        CreateSystemDirectories();
+        //CreateSystemDirectories();
+        //SystemRegistry.Initialize();
 
         //StorageManager.Initialize();
         //

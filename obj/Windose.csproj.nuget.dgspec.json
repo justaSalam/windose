@@ -1,20 +1,20 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj": {}
+    "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj": {}
   },
   "projects": {
-    "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj": {
+    "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
+        "projectUniqueName": "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
         "projectName": "Windose",
-        "projectPath": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
+        "projectPath": "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
         "packagesPath": "C:\\Users\\salam\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\salam\\Desktop\\windose\\obj\\",
+        "outputPath": "c:\\Users\\salam\\Desktop\\windose\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
-          "C:\\Users\\salam\\Desktop\\windose\\NuGet.Config",
+          "c:\\Users\\salam\\Desktop\\windose\\NuGet.Config",
           "C:\\Users\\salam\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
@@ -123,7 +123,11 @@
           "warn": true,
           "downloadDependencies": [
             {
-              "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
+              "name": "Microsoft.AspNetCore.App.Runtime.linux-x64",
+              "version": "[10.0.9, 10.0.9]"
+            },
+            {
+              "name": "Microsoft.NETCore.App.Host.linux-x64",
               "version": "[10.0.9, 10.0.9]"
             },
             {
@@ -131,15 +135,11 @@
               "version": "[10.0.9, 10.0.9]"
             },
             {
-              "name": "Microsoft.NETCore.App.Runtime.NativeAOT.win-x64",
+              "name": "Microsoft.NETCore.App.Runtime.linux-x64",
               "version": "[10.0.9, 10.0.9]"
             },
             {
-              "name": "Microsoft.NETCore.App.Runtime.win-x64",
-              "version": "[10.0.9, 10.0.9]"
-            },
-            {
-              "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
+              "name": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64",
               "version": "[10.0.9, 10.0.9]"
             },
             {
@@ -430,7 +430,7 @@
         }
       },
       "runtimes": {
-        "win-x64": {
+        "linux-x64": {
           "#import": []
         }
       }

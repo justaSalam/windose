@@ -703,8 +703,8 @@ public class Component : IDisposable
 
     public void DrawString(string str, Color color, int x, int y, int fontSize)
     {
-        //buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
-        buffer.DrawString(str, SystemFonts.sansSerif, color, x, y);
+        buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
+        //buffer.DrawString(str, SystemFonts.sansSerif, color, x, y);
     }
 
 

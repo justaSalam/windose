@@ -15,6 +15,7 @@
 
     <ItemGroup>
     <EmbeddedResource Include=".\Resources\Fonts\ARIAL.TTF" />
+    <EmbeddedResource Include=".\Resources\Cursors\arrow.png" />
   </ItemGroup>
 
 </Project>
