@@ -3,6 +3,7 @@ using System.Globalization;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Mouse;
+using Windose;
 
 public class Desktop : Component
 {
@@ -64,9 +65,11 @@ public class Desktop : Component
     {
         // The desktop is a background layer; the compositor handles redraw dependencies.
     }
+
     public override void DrawLocal()
     {
-        DrawFilledRectangle(backgroundColor, 0, 0, Width, Height);
+        DrawImageStretchAlpha(Wallpapers.Lithium, new Rectangle(0, 0, (int)Wallpapers.Lithium.Width, (int)Wallpapers.Lithium.Height), new Rectangle(0, 0, Width, Height));
+        //DrawFilledRectangle(backgroundColor, 0, 0, Width, Height);
     }
 
     private void OnRegistryChanged(RegistryChange change)

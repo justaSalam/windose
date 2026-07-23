@@ -394,7 +394,7 @@
           }
         }
       },
-      "Microsoft.NET.ILLink.Tasks/10.0.9": {
+      "Microsoft.NET.ILLink.Tasks/10.0.10": {
         "type": "package",
         "build": {
           "build/Microsoft.NET.ILLink.Tasks.props": {}
@@ -807,7 +807,7 @@
           }
         }
       },
-      "Microsoft.NET.ILLink.Tasks/10.0.9": {
+      "Microsoft.NET.ILLink.Tasks/10.0.10": {
         "type": "package",
         "build": {
           "build/Microsoft.NET.ILLink.Tasks.props": {}
@@ -2074,10 +2074,10 @@
         "microsoft.codeanalysis.csharp.nuspec"
       ]
     },
-    "Microsoft.NET.ILLink.Tasks/10.0.9": {
-      "sha512": "4Iw41e2h7I4t70SJcX2GCmbyKJIlA273Cfm9RJMM050/3VBejGAG1KcthP5Z2L6SQcbfbf6BhNWO26+ZG+GzMg==",
+    "Microsoft.NET.ILLink.Tasks/10.0.10": {
+      "sha512": "f5VCIE7AJpd5YvzNTeMGVzQIgyE9tX+AreTYwQF+REbu+DZo/2Ae+jNSwhPEYrVz6RRkd7y8ubXjk6Nn6Ka+Cg==",
       "type": "package",
-      "path": "microsoft.net.illink.tasks/10.0.9",
+      "path": "microsoft.net.illink.tasks/10.0.10",
       "hasTools": true,
       "files": [
         ".nupkg.metadata",
@@ -2090,7 +2090,7 @@
         "build/Microsoft.NET.ILLink.Analyzers.props",
         "build/Microsoft.NET.ILLink.Tasks.props",
         "build/Microsoft.NET.ILLink.targets",
-        "microsoft.net.illink.tasks.10.0.9.nupkg.sha512",
+        "microsoft.net.illink.tasks.10.0.10.nupkg.sha512",
         "microsoft.net.illink.tasks.nuspec",
         "tools/net/ILLink.Tasks.deps.json",
         "tools/net/ILLink.Tasks.dll",
@@ -2181,7 +2181,7 @@
       "Cosmos.Kernel.Native.X64 >= 3.0.77",
       "Cosmos.Kernel.SourceGenerators >= 3.0.77",
       "Cosmos.Kernel.System >= 3.0.77",
-      "Microsoft.NET.ILLink.Tasks >= 10.0.9"
+      "Microsoft.NET.ILLink.Tasks >= 10.0.10"
     ]
   },
   "packageFolders": {
@@ -2190,14 +2190,14 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
+      "projectUniqueName": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
       "projectName": "Windose",
-      "projectPath": "c:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
+      "projectPath": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
       "packagesPath": "C:\\Users\\salam\\.nuget\\packages\\",
-      "outputPath": "c:\\Users\\salam\\Desktop\\windose\\obj\\",
+      "outputPath": "C:\\Users\\salam\\Desktop\\windose\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "c:\\Users\\salam\\Desktop\\windose\\NuGet.Config",
+        "C:\\Users\\salam\\Desktop\\windose\\NuGet.Config",
         "C:\\Users\\salam\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -2289,7 +2289,7 @@
           "Microsoft.NET.ILLink.Tasks": {
             "suppressParent": "All",
             "target": "Package",
-            "version": "[10.0.9, )",
+            "version": "[10.0.10, )",
             "autoReferenced": true
           }
         },
@@ -2307,27 +2307,27 @@
         "downloadDependencies": [
           {
             "name": "Microsoft.AspNetCore.App.Runtime.linux-x64",
-            "version": "[10.0.9, 10.0.9]"
+            "version": "[10.0.10, 10.0.10]"
           },
           {
             "name": "Microsoft.NETCore.App.Host.linux-x64",
-            "version": "[10.0.9, 10.0.9]"
+            "version": "[10.0.10, 10.0.10]"
           },
           {
             "name": "Microsoft.NETCore.App.Ref",
-            "version": "[10.0.9, 10.0.9]"
+            "version": "[10.0.10, 10.0.10]"
           },
           {
             "name": "Microsoft.NETCore.App.Runtime.linux-x64",
-            "version": "[10.0.9, 10.0.9]"
+            "version": "[10.0.10, 10.0.10]"
           },
           {
             "name": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64",
-            "version": "[10.0.9, 10.0.9]"
+            "version": "[10.0.10, 10.0.10]"
           },
           {
             "name": "runtime.win-x64.Microsoft.DotNet.ILCompiler",
-            "version": "[10.0.9, 10.0.9]"
+            "version": "[10.0.10, 10.0.10]"
           }
         ],
         "frameworkReferences": {
@@ -2335,7 +2335,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.302/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.CSharp": "(,4.7.32767]",
           "Microsoft.VisualBasic": "(,10.4.32767]",

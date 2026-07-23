@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using Cosmos.Kernel;
 using Cosmos.Kernel.HAL.Devices.Graphic.SVGAII;
 using Cosmos.Kernel.HAL.Pci;
 using Cosmos.Kernel.HAL.Pci.Enums;
@@ -20,14 +21,21 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
     public void Start()
     {
-        Canvas = new SVGAII3DCanvas(PciManager.GetDevice(VendorId.VmWare, DeviceId.SvgaiiAdapter), new Mode(1920, 1080, ColorDepth.ColorDepth32));
+        PciDevice ?device = PciManager.GetDevice(VendorId.VmWare, DeviceId.SvgaiiAdapter);
+
+        if(device == null)
+        {
+            Console.WriteLine("PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.");
+            Panic.Halt("PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.");
+        }
+
+        Canvas = new SVGAII3DCanvas(device, new Mode(1920, 1080, ColorDepth.ColorDepth32));
 
         if (Canvas.HasHardwareCursor)
         {
             try
             {
-                Canvas.CreateCursor();
-                //Canvas.DefineAlphaCursor(0, 0, (int)Cursors.arrow.Width, (int)Cursors.arrow.Height, Cursors.arrow.RawData);
+                Canvas.DefineAlphaCursor(0, 0, (int)Cursors.arrow.Width, (int)Cursors.arrow.Height, Cursors.arrow.RawData);
             }
             catch (Exception ex)
             {
@@ -44,9 +52,11 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
     public void Present(DirectBitmap frame, int cursorX, int cursorY)
     {
         if (State != WindoseDriverState.Started || Canvas == null || frame == null) return;
+        Canvas.Clear(Color.Black);
 
         long uploadStartedAt = PerformanceMetrics.Now;
         Canvas.DrawArray(frame.GetBuffer(), 0, 0, Canvas.Width, Canvas.Height);
+
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 
         long overlayStartedAt = PerformanceMetrics.Now;
@@ -67,7 +77,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
     private void DrawCursor(int x, int y)
     {
-
+        //Canvas.DrawFilledCircle(Color.Red, x, y, 3);
         Canvas.SetCursor(true, x, y);
 
     }

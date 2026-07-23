@@ -704,9 +704,11 @@ public class Component : IDisposable
     public void DrawString(string str, Color color, int x, int y, int fontSize)
     {
         buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
-        //buffer.DrawString(str, SystemFonts.sansSerif, color, x, y);
     }
-
+    public void DrawString(string str, Font font, Color color, int x, int y, int fontSize)
+    {
+        buffer.DrawString(str, font, color, x, y);
+    }
 
     public int MeasureStringWidth(string str, int fontSize)
     {
@@ -773,10 +775,25 @@ public class Component : IDisposable
         buffer.DrawLine(color, xStart, yStart, width, height);
     }
 
-    public void DrawImage(Bitmap image, int x, int y)
+    public void DrawImage(Image image, int x, int y)
     {
         buffer.DrawImageAlpha(image, x, y);
     }
+
+    public void DrawImageStretchAlpha(Image image, Rectangle sourceRect, Rectangle destRect)
+    {
+        buffer.DrawImageStretchAlpha(image, sourceRect, destRect);
+    }
+
+
+    //TODO: Override the DrawImage method to draw into component buffer instead of the main screen buffer
+    //Drawing into main buffer will get overwritten by the component buffer when the component it's drawn
+    public void DrawImage(Image image, int x, int y, int w, int h, bool preventOffBoundPixels = true)
+    {
+        buffer.DrawImage(image, x, y, w, h, preventOffBoundPixels);
+    }
+
+
 
     public void DrawFilledCircle(Color color, int x, int y, int radius)
     {

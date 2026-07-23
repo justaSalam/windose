@@ -7,6 +7,11 @@
     
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="Resources\Wallpapers\Lithium.jpg" />
+    <None Remove="Resources\Wallpapers\Lithium.png" />
+  </ItemGroup>
+
   <!-- Core kernel packages -->
   <ItemGroup>
     <PackageReference Include="Cosmos.Kernel" Version="3.0.77" />
@@ -16,6 +21,7 @@
     <ItemGroup>
     <EmbeddedResource Include=".\Resources\Fonts\ARIAL.TTF" />
     <EmbeddedResource Include=".\Resources\Cursors\arrow.png" />
+    <EmbeddedResource Include="Resources\Wallpapers\Lithium.png" />
   </ItemGroup>
 
 </Project>

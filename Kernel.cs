@@ -22,6 +22,9 @@ public class Kernel : Sys.Kernel
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
     public static Canvas canvas = null!;
+    
+    
+    
 
     private WindowManager windowManager = null!;
     private CosmosDisplayDriver displayDriver = null!;
@@ -34,7 +37,6 @@ public class Kernel : Sys.Kernel
         KernelPanic.Install();
         try
         {
-            SystemFonts.Init();
             InitializeKernel();
         }
         catch (Exception exception)
@@ -46,6 +48,8 @@ public class Kernel : Sys.Kernel
     private void InitializeKernel()
     {
         Instance = this;
+
+
         GarbageCollector.Initialize();
         FileSystemManager.Initialize();
 

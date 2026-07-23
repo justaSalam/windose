@@ -1,7 +1,10 @@
-using System.Drawing;
 using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.HAL.Pci;
+using Cosmos.Kernel.HAL.Pci.Enums;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
+using System.Drawing;
+
 
 public class DirectBitmap : Canvas
 {
@@ -123,9 +126,6 @@ public class DirectBitmap : Canvas
     }
     public override void DrawPoint(Color color, int x, int y)
     {
-        base.DrawPoint(color, x, y);
-        return;
-
         x += originX;
         y += originY;
         if (Buffer == null || Buffer == null || !ContainsClipped(x, y))
@@ -146,22 +146,13 @@ public class DirectBitmap : Canvas
         Buffer[y * Width + x] = color.ToArgb();
     }
 
-    /*public override void DrawPoint(int color, int x, int y) a potentionally faster draw point, maybe replace it with this in the future
-    {
-        x += originX;
-        y += originY;
-        if (Buffer == null || !ContainsClipped(x, y))
-        {
-            return;
-        }
-        Buffer[y * Width + x] = color;
-    }*/
 
     public override void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
         DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y,
             (int)image.Width, (int)image.Height);
     }
+
 
     public override Bitmap GetImage(int x, int y, int width, int height)
     {
@@ -177,10 +168,6 @@ public class DirectBitmap : Canvas
         return bitmap;
     }
 
-    public override void DrawImage(Image image, int x, int y, int w, int h, bool preventOffBoundPixels = true)
-    {
-        DrawScaledImageAlpha(image, x, y, w, h);
-    }
 
     public override void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
     {
@@ -189,36 +176,9 @@ public class DirectBitmap : Canvas
         DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, num, num2);
     }
 
-    private void DrawScaledImageAlpha(Image image, int x, int y, int width, int height)
-    {
-        if (width <= 0 || height <= 0 || image.Width == 0 || image.Height == 0) return;
+    
 
-        int targetX = originX + x;
-        int targetY = originY + y;
-        int left = Math.Max(Math.Max(targetX, clipBounds.Left), 0);
-        int top = Math.Max(Math.Max(targetY, clipBounds.Top), 0);
-        int right = Math.Min(Math.Min(targetX + width, clipBounds.Right), Width);
-        int bottom = Math.Min(Math.Min(targetY + height, clipBounds.Bottom), Height);
-        if (left >= right || top >= bottom) return;
-
-        int sourceWidth = (int)image.Width;
-        int sourceHeight = (int)image.Height;
-        int[] source = image.RawData;
-
-        for (int targetRow = top; targetRow < bottom; targetRow++)
-        {
-            int sourceY = (targetRow - targetY) * sourceHeight / height;
-            int sourceRow = sourceY * sourceWidth;
-
-            for (int targetColumn = left; targetColumn < right; targetColumn++)
-            {
-                int sourceX = (targetColumn - targetX) * sourceWidth / width;
-                BlendTargetPixel(targetColumn, targetRow, source[sourceRow + sourceX]);
-            }
-        }
-    }
-
-    public void DrawImageAlpha(Image image, int x, int y, bool preventOffBoundPixels = true)
+    public new void DrawImageAlpha(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
         DrawArrayAlphaClipped(
             image.RawData,
@@ -230,7 +190,7 @@ public class DirectBitmap : Canvas
             (int)image.Width,
             (int)image.Height);
     }
-    public void DrawImageStretchAlpha(Bitmap image, Rectangle sourceRect, Rectangle destRect)
+    public void DrawImageStretchAlpha(Image image, Rectangle sourceRect, Rectangle destRect)
     {
         if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
             return;
