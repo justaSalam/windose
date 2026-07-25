@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\Fonts\spleen-12x24.psfu" />
+    <None Remove="Resources\Fonts\spleen-16x32.psfu" />
+    <None Remove="Resources\Fonts\spleen-32x64.psfu" />
+    <None Remove="Resources\Fonts\spleen-5x8.psfu" />
+    <None Remove="Resources\Fonts\spleen-6x12.psfu" />
+    <None Remove="Resources\Fonts\spleen-8x16.psfu" />
     <None Remove="Resources\Wallpapers\Lithium.jpg" />
     <None Remove="Resources\Wallpapers\Lithium.png" />
   </ItemGroup>
@@ -21,6 +27,12 @@
     <ItemGroup>
     <EmbeddedResource Include=".\Resources\Fonts\ARIAL.TTF" />
     <EmbeddedResource Include=".\Resources\Cursors\arrow.png" />
+    <EmbeddedResource Include=".\Resources\Fonts\spleen-12x24.psfu" />
+    <EmbeddedResource Include=".\Resources\Fonts\spleen-16x32.psfu" />
+    <EmbeddedResource Include=".\Resources\Fonts\spleen-32x64.psfu" />
+    <EmbeddedResource Include=".\Resources\Fonts\spleen-5x8.psfu" />
+    <EmbeddedResource Include=".\Resources\Fonts\spleen-6x12.psfu" />
+    <EmbeddedResource Include=".\Resources\Fonts\spleen-8x16.psfu" />
     <EmbeddedResource Include="Resources\Wallpapers\Lithium.png" />
   </ItemGroup>
 

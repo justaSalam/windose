@@ -304,7 +304,7 @@ public class Component : IDisposable
 
         if (IsInsideAbsolute(mouseX, mouseY) && mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
 
-        return false;
+        return true;
     }
 
     public virtual void HandleKeyboard(KeyEvent keyEvent)
@@ -700,12 +700,19 @@ public class Component : IDisposable
         buffer.Clear(Color.LightGray);
     }
 
+    public void DrawString(string str, Color color, int x, int y)
+    {
+        buffer.DrawString(str, SystemFonts.spleen8x16, color, x, y);
+    }
 
+    //Legacy method used with fontSize parameter, which is not used in the current implementation
+    //Implement TTF font rendering in the future to support different font sizes + FIX THIS IMPLEMENTATION OH MY FUCKING GOD
     public void DrawString(string str, Color color, int x, int y, int fontSize)
     {
-        buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
+        buffer.DrawString(str, SystemFonts.spleen8x16, color, x, y);
     }
-    public void DrawString(string str, Font font, Color color, int x, int y, int fontSize)
+
+    public void DrawString(string str, Font font, Color color, int x, int y)
     {
         buffer.DrawString(str, font, color, x, y);
     }
@@ -715,20 +722,14 @@ public class Component : IDisposable
         return str.Length * Math.Max(1, PCScreenFont.DefaultFont.Width * fontSize / PCScreenFont.DefaultFont.Height);
     }
 
+    public int MeasureStringWidth(string str, Font font)
+    {
+        return str.Length * font.Width;
+    }
+
     public int MeasureStringHeight(int fontSize)
     {
         return fontSize;
-    }
-
-
-    public void DrawChar(char c, Font font, Color color, int x, int y)
-    {
-        buffer.DrawChar(c, font, color, x, y);
-    }
-
-    public void DrawString(string str, int x, int y)
-    {
-        buffer.DrawString(str, PCScreenFont.DefaultFont, Color.Black, x, y);
     }
 
     public void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height)

@@ -1,10 +1,11 @@
-using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
+using System.Drawing;
 using Windose.Drivers;
+using Windose.System.System_Calls;
 using Sys = Cosmos.Kernel.System;
 
 
@@ -34,6 +35,7 @@ public class Kernel : Sys.Kernel
 
     protected override void BeforeRun()
     {
+        KernelConsole.Default.Font = SystemFonts.spleen12x24;
         KernelPanic.Install();
         try
         {
@@ -48,10 +50,10 @@ public class Kernel : Sys.Kernel
     private void InitializeKernel()
     {
         Instance = this;
+        FileSystemManager.Initialize();
 
 
         GarbageCollector.Initialize();
-        FileSystemManager.Initialize();
 
 
 
@@ -76,7 +78,8 @@ public class Kernel : Sys.Kernel
         SystemRegistry.SetRuntimeValue("System/Display/CurrentWidth", (long)displayDriver.Width);
         SystemRegistry.SetRuntimeValue("System/Display/CurrentHeight", (long)displayDriver.Height);
 
-        Console.WriteLine("Windose booted successfully");
+        ConsoleMessage.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
+
 
         Explorer explorer = new Explorer(canvas);
         windowManager = new WindowManager();
@@ -95,13 +98,17 @@ public class Kernel : Sys.Kernel
             if (dhcpClient.SendDiscoverPacket() != -1)
             {
                 IPConfig? config = NetworkConfigManager.Get(NetworkManager.PrimaryDevice);
-                Console.WriteLine("IP address: " + config.IPAddress.ToString());
-                Console.WriteLine("Subnet:     " + config.SubnetMask.ToString());
-                Console.WriteLine("Gateway:    " + config.DefaultGateway.ToString());
+
+                ConsoleMessage.WriteLine("Network", "DHCP configuration obtained successfully", ConsoleMessageType.Log);
+
+                ConsoleMessage.WriteLine("Network", $"IP address: {config.IPAddress}", ConsoleMessageType.Log);
+                ConsoleMessage.WriteLine("Network", $"Subnet: {config.SubnetMask}", ConsoleMessageType.Log);
+                ConsoleMessage.WriteLine("Network", $"Gateway: {config.DefaultGateway}", ConsoleMessageType.Log);
+             
             }
             else
             {
-                Console.WriteLine("DHCP timed out");
+                ConsoleMessage.WriteLine("Network", "DHCP timed out", ConsoleMessageType.Warning);
             }
 
         }

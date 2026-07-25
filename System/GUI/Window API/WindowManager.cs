@@ -8,22 +8,32 @@ using Windose;
 public class WindowManager : SingleThreadedProcess
 {
     public static List<Window> windows = new List<Window>();
+
     private static Dictionary<Window, Button> taskbarButtons = new Dictionary<Window, Button>();
+
     private static List<Rectangle> dirtyRects = new List<Rectangle>();
     private static List<UiMessage> messageQueue = new List<UiMessage>();
+
     private static readonly object messageQueueLock = new object();
+
     private readonly HashSet<Window> failedWindows = new HashSet<Window>();
     private readonly HashSet<Component> renderedComponents = new HashSet<Component>();
+
     private readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
+
     private static bool hasPreviewRect;
+
     private static Rectangle previewRect;
+
     private Window? capturedWindow;
     private Component? capturedComponent;
     public static Window? focusedWindow;
+
     private MouseState mouseState;
+
     private static int nextZIndex = 1;
 
-    private static readonly System.Comparison<Window> zIndexCompare = (a, b) =>
+    private static readonly Comparison<Window> zIndexCompare = (a, b) =>
     {
         int layer = a.zLayer.CompareTo(b.zLayer);
         return layer != 0 ? layer : a.zIndex.CompareTo(b.zIndex);

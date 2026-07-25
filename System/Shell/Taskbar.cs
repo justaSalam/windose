@@ -93,8 +93,7 @@ public class Taskbar : Component
 
     public override void Draw()
     {
-        DrawLocal();
-        DrawToScreen();
+        base.Draw();
         timeLabel.MarkDirty();
 
     }
@@ -104,8 +103,6 @@ public class Taskbar : Component
 
         DrawRaisedRectangle(0, 0, Width, Height);
 
-
-        if (text != "") DrawString(text, 0, 0);
 
         foreach (Component child in children)
         {

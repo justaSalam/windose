@@ -22,29 +22,6 @@ public class Button : Component
     {
     }
 
-    public override void Update()
-    {
-        base.Update();
-
-        float target = state == State.Highlighted || isPressed ? 1f : 0f;
-        if (Math.Abs(hoverBlend - target) < 0.01f)
-        {
-            hoverBlend = target;
-            return;
-        }
-
-        float step = (float)Math.Clamp(Kernel.DeltaTimeMs / 120.0, 0.02, 0.35);
-        hoverBlend += target > hoverBlend ? step : -step;
-        hoverBlend = Math.Clamp(hoverBlend, 0f, 1f);
-        MarkDirty();
-    }
-
-
-
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     Color face = Palette.ControlFace;
     Color highlight = Palette.ControlHighlight;
@@ -67,7 +44,7 @@ public class Button : Component
 
             //DrawString(text, textColor, 2, textY, effectiveFontSize);
             //DrawString(text, textColor, 2, textY, 16);
-            DrawString(text, PCScreenFont.DefaultFont, textColor, 2, textY, effectiveFontSize);
+            DrawString(text, SystemFonts.spleen8x16, textColor, 2, textY);
         }
     }
 

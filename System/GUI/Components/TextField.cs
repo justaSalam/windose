@@ -48,7 +48,7 @@ public class TextField : Component
         }
 
         if (!readOnly)
-            DrawString("_", MeasureStringWidth(visibleText, effectiveFontSize), textY);
+            DrawString("_", SystemFonts.spleen8x16,Color.Black,MeasureStringWidth(visibleText, effectiveFontSize), textY);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)

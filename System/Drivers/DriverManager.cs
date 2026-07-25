@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Cosmos.Kernel.Core.IO;
+using Windose.System.System_Calls;
 
 namespace Windose.Drivers;
 
@@ -12,7 +13,7 @@ public static class DriverManager
 
     public static void Register(IWindoseDriver driver)
     {
-        Console.WriteLine($"[DM] Register {driver.Name}");
+        ConsoleMessage.WriteLine("DM", "Registered driver: " + driver.Name, ConsoleMessageType.Log);
 
         if (driver == null) return;
         drivers.Add(driver);
@@ -42,14 +43,15 @@ public static class DriverManager
 
         try
         {
-            Console.WriteLine($"[DM] Starting {driver.Name}");
+            ConsoleMessage.WriteLine("DM", "Starting driver: " + driver.Name, ConsoleMessageType.Log);
+
 
             driver.Start();
-            Serial.WriteString("Driver started: " + driver.Name + "\n");
         }
         catch (Exception exception)
         {
-            Serial.WriteString("Driver failed: " + driver.Name + " - " + exception.Message + "\n");
+            ConsoleMessage.WriteLine("DM", "Failed to start driver: " + driver.Name, ConsoleMessageType.Log);
+
             KernelPanic.Show("DRIVER_START_FAILURE", exception);
         }
     }

@@ -323,7 +323,7 @@ public class Window : Component
     {
         if (isAnimatingBounds)
         {
-            ApplyAnimatedBounds(new Rectangle(x, y, Width, Height));
+            ApplyBounds(new Rectangle(x, y, Width, Height));
             return;
         }
 
@@ -346,7 +346,7 @@ public class Window : Component
     {
         if (isAnimatingBounds)
         {
-            ApplyAnimatedBounds(new Rectangle(x, y, width, height));
+            ApplyBounds(new Rectangle(x, y, width, height));
             return;
         }
 
@@ -367,7 +367,7 @@ public class Window : Component
         MarkDirty();
     }
 
-    internal void ApplyAnimatedBounds(Rectangle rect)
+    internal void ApplyBounds(Rectangle rect)
     {
         Rectangle oldBounds = bounds;
 
@@ -401,24 +401,6 @@ public class Window : Component
         return bounds;
     }
 
-    internal void BeginRestoreAnimation(Rectangle startBounds)
-    {
-        isMinimized = false;
-        Visible = true;
-        isAnimatingBounds = true;
-        ApplyAnimatedBounds(startBounds);
-    }
-
-    internal void EndBoundsAnimation()
-    {
-        isAnimatingBounds = false;
-    }
-
-    internal void FinishMinimize()
-    {
-        isAnimatingBounds = false;
-        MinimizeWindow();
-    }
 
     internal void MinimizeWindow()
     {

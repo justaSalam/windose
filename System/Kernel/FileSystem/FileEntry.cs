@@ -52,5 +52,5 @@ public struct FileEntry
 
 public enum FileType
 {
-    File, Directory
+    File, Directory, Executable, Link, Unknown
 }

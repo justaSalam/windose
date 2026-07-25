@@ -5,6 +5,7 @@ using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Filesystems.Fat;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
+using Windose.System.System_Calls;
 
 public static class FileSystemManager
 {
@@ -20,12 +21,12 @@ public static class FileSystemManager
 
         if (VfsManager.TryMount("fat", "0", MountFlags.None, "/mnt", out VfsManager.VfsMount? mount))
         {
-            Serial.WriteString($"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}\n");
-            Console.WriteLine($"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}");
+            ConsoleMessage.WriteLine("FileSystemManager", $"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}");
         }
         else
         {
-            Serial.WriteString($"FAILED TO MOUNT\n");
+            ConsoleMessage.WriteLine("FileSystemManager", "Failed to mount filesystem", ConsoleMessageType.Error);
+
             return;
         }
 

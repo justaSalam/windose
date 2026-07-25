@@ -4,12 +4,15 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
+using Windose.System.Shell;
 
 public class Desktop : Component
 {
     private Color backgroundColor;
 
     private MenuPopup contextMenu;
+
+    public static List<DesktopIcon> Icons = new List<DesktopIcon>();
 
     public Desktop(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -58,6 +61,9 @@ public class Desktop : Component
         contextMenu.AddItem("Display Settings");
         contextMenu.AddItem("Personalise");
 
+        AddIcon(
+            new DesktopIcon(10, 10, 
+            new FileEntry("New File", FileType.Directory, "/mnt/desktop/new file", long.MaxValue)));
     }
 
 
@@ -66,10 +72,33 @@ public class Desktop : Component
         // The desktop is a background layer; the compositor handles redraw dependencies.
     }
 
+    public void AddIcon(DesktopIcon icon)
+    {
+        if(!Icons.Contains(icon))
+        {
+            AddChild(icon);
+            Icons.Add(icon);
+            icon.MarkDirty();
+           
+        }
+    }
+
+    public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
+    {
+
+        return base.HandleInput(mouseX, mouseY, mouse);
+    }
+
     public override void DrawLocal()
     {
         DrawImageStretchAlpha(Wallpapers.Lithium, new Rectangle(0, 0, (int)Wallpapers.Lithium.Width, (int)Wallpapers.Lithium.Height), new Rectangle(0, 0, Width, Height));
-        //DrawFilledRectangle(backgroundColor, 0, 0, Width, Height);
+
+        foreach(DesktopIcon icon in Icons)
+        {
+            if (!icon.Visible) continue;
+            DrawChild(icon);
+        }
+
     }
 
     private void OnRegistryChanged(RegistryChange change)
