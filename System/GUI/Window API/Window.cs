@@ -1,4 +1,5 @@
 using System.Drawing;
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Windose;
 
@@ -40,10 +41,13 @@ public class Window : Component
     private bool hasTitleBar;
     private bool windowFocused;
 
+    private Png? Icon;
 
-    public Window(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height)
+
+    public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png ?icon = null) : base(x, y, width, height)
     {
         text = title;
+        Icon = icon;
         bounds = new Rectangle(x, y, width, height);
         zLayer = DrawLayer.Window;
 
@@ -70,6 +74,8 @@ public class Window : Component
         base.Draw();
     }
 
+    Rectangle cachedSourceRect = new(0, 0, 32, 32);
+    Rectangle cachedDestRect = new(0, 0, 25, 25);
     /// <summary>
     /// Component rendering, coordinates relative to the window
     /// </summary>
@@ -84,6 +90,11 @@ public class Window : Component
             if (!child.Visible) continue;
 
             DrawChild(child);
+        }
+
+        if (Icon != null)
+        {
+            DrawImageStretchAlpha(Icon, cachedSourceRect, cachedDestRect);
         }
     }
 
@@ -104,6 +115,9 @@ public class Window : Component
                 horizontalAlignment = HorizontalAlignment.Stretch,
                 Margin = new Thickness(border, border, border, border)
             };
+
+            if (Icon != null) titlebar.textOffsetX = 25;
+
             AddChild(titlebar);
             hasTitleBar = true;
 

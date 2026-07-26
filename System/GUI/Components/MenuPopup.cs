@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 
 public class MenuPopup : Component
@@ -7,14 +8,16 @@ public class MenuPopup : Component
     public StackPanel items;
     public int itemWidth;
     public int itemHeight;
+    public Png? Icon;
 
-    public MenuPopup(int width, int height) : base(0, 0, width, height)
+    public MenuPopup(int width, int height, Png? icon) : base(0, 0, width, height)
     {
         zLayer = DrawLayer.Popup;
         clampSize = false;
         Visible = false;
         itemWidth = width;
         itemHeight = 24;
+        Icon = icon;
 
         items = new StackPanel(Palette.ControlFace, 2, 2, width - 4, height - 4)
         {
@@ -120,7 +123,7 @@ public class MenuPopup : Component
 
     public override void DrawLocal()
     {
-
+        //TODO: finish icons
         DrawRaisedRectangle(0, 0, Width, Height);
 
 

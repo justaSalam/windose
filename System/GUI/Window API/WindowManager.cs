@@ -350,6 +350,19 @@ public class WindowManager : SingleThreadedProcess
             Window target = focusedWindow;
             try { target.HandleKeyboard(keyEvent); }
             catch (Exception exception) { FailApplication(target, "handling keyboard input", exception); }
+            return;
+        }
+
+        for (int i = components.Count - 1; i >= 0; i--)
+        {
+            Component component = components[i];
+            if (component == null || !component.Visible) continue;
+            if (component is Window) continue;
+            if (!component.isRoot) continue;
+
+            try { component.HandleKeyboard(keyEvent); }
+            catch (Exception exception) { FailApplication(component.GetOwningWindow(), "handling keyboard input", exception); }
+            return;
         }
 
     }
@@ -393,7 +406,7 @@ public class WindowManager : SingleThreadedProcess
         focusedWindow.SetFocused(true);
     }
 
-    private void ClearFocusedWindow()
+    public static void ClearFocusedWindow()
     {
         if (focusedWindow == null) return;
 

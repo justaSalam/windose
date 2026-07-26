@@ -22,7 +22,7 @@ public class Kernel : Sys.Kernel
 
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
-    public static Canvas canvas = null!;
+    public static SVGAII3DCanvas canvas = null!;
     
     
     

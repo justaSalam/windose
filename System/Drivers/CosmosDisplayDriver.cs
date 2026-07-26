@@ -29,7 +29,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
             Panic.Halt("PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.");
         }
 
-        Canvas = new SVGAII3DCanvas(device, new Mode(1920, 1080, ColorDepth.ColorDepth32));
+        Canvas = new SVGAII3DCanvas(device, new Mode(1920,1080, ColorDepth.ColorDepth32));
 
         if (Canvas.HasHardwareCursor)
         {

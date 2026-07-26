@@ -1,9 +1,16 @@
+using Cosmos.Kernel.Core.Runtime;
+using Cosmos.Kernel.Core.Scheduler;
+using Cosmos.Kernel.Core.X64.Cpu;
 using Cosmos.Kernel.HAL.Interfaces.Devices;
+using Cosmos.Kernel.HAL.Pci;
+using Cosmos.Kernel.HAL.Pci.Enums;
 using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
+using Windose;
 
 public delegate void CommandHandler(CommandContext context, string[] arguments);
 
@@ -150,39 +157,68 @@ public static class CommandRegistry
 
 
 
-        Register("diskmgr", "Disk Management Utility", "diskmgr", (context, agrs) =>
+        Register("diskmgr", "Disk Management Utility", "diskmgr", DiskManager);
+        Register("svga", "Display Adapter Information", "svga [command]", DisplayProperties);
+        Register("sys", "System Information", "sys", SystemProperties);
+
+    }
+
+    private static void DisplayProperties(CommandContext context, string[] arguments)
+    {
+        if (arguments[0] == "halt") Kernel.canvas.Disable();
+
+        PciDevice? device = PciManager.GetDevice(VendorId.VmWare, DeviceId.SvgaiiAdapter);
+        context.WriteLine($"Vendor: {device.VendorId} ({device.DeviceId})");
+
+        context.WriteLine($"Resolution: {Kernel.canvas.Height}x{Kernel.canvas.Width}");
+        context.WriteLine($"Refresh Rate: {Kernel.canvas.RefreshRate} Hz");
+
+
+        context.WriteLine($"3D Hardware Version: {Kernel.canvas.Driver3D.HW3DVer}");
+        context.WriteLine($"3D Enabled: {Kernel.canvas.Driver3D.Is3DEnabled}");
+        context.WriteLine($"VRAM Size: {Kernel.canvas.Driver.VideoMemory.Size / 1024 / 1024} MB");
+        context.WriteLine($"Capabilities: {Kernel.canvas.Driver.Capabilities}");
+    }
+
+    private static void SystemProperties(CommandContext context, string[] arguments)
+    {
+        context.WriteLine($"CPU Count: {SchedulerManager.CpuCount}");
+        context.WriteLine($"CPU Clock Speed: {Cpu.RhpGetTickCount64() / 1000000000} GHz");
+        context.WriteLine($"Thread Count: {SchedulerManager.ThreadCount}");
+    }
+
+
+
+
+    private static void DiskManager(CommandContext context, string[] arguments)
+    {
+
+        context.WriteLine($"Devices: {StorageManager.DeviceCount}");
+        context.WriteLine($"Primary Device: {StorageManager.PrimaryDevice?.Name}");
+        context.WriteLine($"Partitions: {StorageManager.Partitions.Count}");
+
+
+        context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
+        foreach (Partition partition in StorageManager.Partitions)
         {
-            context.WriteLine($"Devices: {StorageManager.DeviceCount}");
-            context.WriteLine($"Primary Device: {StorageManager.PrimaryDevice?.Name}");
-            context.WriteLine($"Partitions: {StorageManager.Partitions.Count}");
 
+            context.WriteLine($"    {partition.Name} | {partition.BlockSize}B | {partition.BlockCount}");
+        }
 
-            context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
-            foreach (Partition partition in StorageManager.Partitions)
-            {
+        context.WriteLine($"\nDevices: (Name | Block size | Block count)");
+        for (int i = 0; i < StorageManager.DeviceCount; i++)
+        {
+            IBlockDevice? device = StorageManager.GetDevice(i);
+            context.WriteLine($"    {device.Name} | {device.BlockSize}B | {device.BlockCount}");
 
-                context.WriteLine($"    {partition.Name} | {partition.BlockSize}B | {partition.BlockCount}");
-            }
+        }
 
-            context.WriteLine($"\nDevices: (Name | Block size | Block count)");
-            for (int i = 0; i < StorageManager.DeviceCount; i++)
-            {
-                IBlockDevice? device = StorageManager.GetDevice(i);
-                context.WriteLine($"    {device.Name} | {device.BlockSize}B | {device.BlockCount}");
+        context.WriteLine($"\nMounted Devices: (Name | Mount point | Source)");
+        foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
+        {
 
-            }
-
-            context.WriteLine($"\nMounted Devices: (Name | Mount point | Source)");
-            foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
-            {
-
-                context.WriteLine($"    {mount.Name} | {mount.MountPoint} | {mount.Source}");
-            }
-
-
-
-        });
-
+            context.WriteLine($"    {mount.Name} | {mount.MountPoint} | {mount.Source}");
+        }
     }
 
     private static void Help(CommandContext context, string[] args)

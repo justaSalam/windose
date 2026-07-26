@@ -12,6 +12,7 @@ public class Panel : Component
     public Color borderColor = Color.White;
     public string text = "";
     public int fontSize = 0;
+    public int textOffsetX = 0;
     public Color textColor = Color.Black;
 
     public Panel(Color color1, Color color2, int x, int y, int width, int height) : base(x, y, width, height)
@@ -54,7 +55,7 @@ public class Panel : Component
             int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
             int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
 
-            DrawString(text, textColor, 2, textY, effectiveFontSize);
+            DrawString(text, textColor, 2 + textOffsetX, textY, effectiveFontSize);
         }
 
         foreach (Component child in children)

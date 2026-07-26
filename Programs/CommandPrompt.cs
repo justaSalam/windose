@@ -1,5 +1,7 @@
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Vfs;
+using Windose.System.Kernel;
 
 public sealed class CommandPrompt : Window
 {
@@ -8,7 +10,7 @@ public sealed class CommandPrompt : Window
     private readonly CommandContext context;
 
     public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460)
-        : base(x, y, width, height, "Command Prompt", true)
+        : base(x, y, width, height, "Command Prompt", true, new Png(ResourceLoader.FromStream("Windose.Resources.Icons.console_prompt.png")))
     {
         CommandRegistry.EnsureBuiltIns();
 

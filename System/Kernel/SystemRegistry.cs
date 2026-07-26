@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Vfs;
 using System.Globalization;
 using System.Text;
 
@@ -56,6 +57,12 @@ public static class SystemRegistry
             DefineNoLock("System/Desktop/BackgroundColor", "theme", "Desktop background color in #RRGGBB format, or theme to use the active theme background.", false, true);
             DefineNoLock("System/Desktop/Wallpaper", "", "Wallpaper path. Reserved until bitmap-backed storage is available.", false, true);
             DefineNoLock("System/Desktop/WallpaperMode", "center", "Wallpaper layout: center, tile, or stretch.", false, true);
+            DefineNoLock("System/Desktop/IconGridEnabled", true, "Snap desktop icons to the icon grid.", false, true);
+            DefineNoLock("System/Desktop/IconGridVisible", false, "Show desktop icon grid points.", false, true);
+            DefineNoLock("System/Desktop/IconGridWidth", 80L, "Desktop icon grid cell width.", false, true);
+            DefineNoLock("System/Desktop/IconGridHeight", 80L, "Desktop icon grid cell height.", false, true);
+            DefineNoLock("System/Desktop/IconGridOffsetX", 8L, "Desktop icon grid horizontal offset.", false, true);
+            DefineNoLock("System/Desktop/IconGridOffsetY", 8L, "Desktop icon grid vertical offset.", false, true);
             DefineNoLock("System/Display/Width", 1920L, "Requested boot framebuffer width.", true, true);
             DefineNoLock("System/Display/Height", 1080L, "Requested boot framebuffer height.", true, true);
             DefineNoLock("System/Display/BitsPerPixel", 32L, "Requested boot framebuffer color depth.", true, true);
@@ -177,7 +184,7 @@ public static class SystemRegistry
                     .Append(entry.RequiresRestart ? "true" : "false").Append('\n');
             }
         }
-
+        
         File.WriteAllText(StoragePath, output.ToString());
 
         return true;
@@ -185,8 +192,6 @@ public static class SystemRegistry
 
     public static void Load()
     {
-
-        Console.WriteLine("reg loading");
         string[] lines = File.ReadAllText(StoragePath).Replace("\r\n", "\n").Split('\n');
         for (int i = 0; i < lines.Length; i++)
         {

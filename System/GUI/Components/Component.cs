@@ -781,6 +781,11 @@ public class Component : IDisposable
         buffer.DrawImageAlpha(image, x, y);
     }
 
+    public void DrawImageAlpha(Image image, int x, int y)
+    {
+        buffer.DrawImageAlpha(image, x, y);
+    }
+
     public void DrawImageStretchAlpha(Image image, Rectangle sourceRect, Rectangle destRect)
     {
         buffer.DrawImageStretchAlpha(image, sourceRect, destRect);

@@ -22,10 +22,12 @@ public static class FileSystemManager
         if (VfsManager.TryMount("fat", "0", MountFlags.None, "/mnt", out VfsManager.VfsMount? mount))
         {
             ConsoleMessage.WriteLine("FileSystemManager", $"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}");
+            Serial.WriteString($"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}\n");
         }
         else
         {
             ConsoleMessage.WriteLine("FileSystemManager", "Failed to mount filesystem", ConsoleMessageType.Error);
+            Serial.WriteString($"Failed to mount filesystem\n");
 
             return;
         }
