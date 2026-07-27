@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Threading;
 using Cosmos.Kernel.Core.IO;
 
 /// <summary>
@@ -9,16 +7,18 @@ using Cosmos.Kernel.Core.IO;
 public abstract class ScheduledProcess : Process
 {
     private Thread workerThread;
-    private volatile bool stopRequested;
-    private volatile bool workerExited = true;
+    private volatile bool stopRequested = false;
+    private volatile bool workerExited = false;
     private readonly int updateIntervalMs;
 
     protected ScheduledProcess(string name, ProcessType processType, int updateIntervalMs = 100)
     {
+        startInfo.Name = name;
+
         this.name = name;
         this.processType = processType;
-        startInfo.Name = name;
         this.updateIntervalMs = Math.Max(1, updateIntervalMs);
+
         Running = false;
         Initialized = false;
         canTerminate = true;
@@ -30,9 +30,6 @@ public abstract class ScheduledProcess : Process
 
         try
         {
-            stopRequested = false;
-            workerExited = false;
-
             Running = true;
 
             Initialized = true;
@@ -63,28 +60,9 @@ public abstract class ScheduledProcess : Process
         {
             while (!stopRequested && Running)
             {
-                long started = DateTime.UtcNow.Ticks;
-
                 Update();
 
-                long elapsedTicks = DateTime.UtcNow.Ticks - started;
-                double elapsedMs = elapsedTicks / 10000.0;
-
-                lastUpdateMs = elapsedMs;
-
-                averageUpdateMs = averageUpdateMs == 0
-                    ? elapsedMs
-                    : averageUpdateMs * 0.9 + elapsedMs * 0.1;
-
-                if (elapsedMs > peakUpdateMs) peakUpdateMs = elapsedMs;
-
-                int elapsedWholeMs = (int)((elapsedTicks + TimeSpan.TicksPerMillisecond - 1) / TimeSpan.TicksPerMillisecond);
-
-                int targetIntervalMs = Math.Max(10, GetNextUpdateIntervalMs());
-
-                int sleepMs = targetIntervalMs - elapsedWholeMs;
-
-                Thread.Sleep(sleepMs > 10 ? sleepMs : 10);
+                Thread.Sleep(0);
             }
         }
         catch (Exception exception)

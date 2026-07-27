@@ -50,7 +50,7 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
-        programs.AddSubmenuItem("Accessories", () => WindowManager.Register(new EmptyWindow()));
+        programs.AddSubmenuItem("Accessories", () => new EmptyWindow());
         programs.AddSubmenuItem("File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", true)));
 
         programs.AddSubmenuItem("Disk Management", () =>

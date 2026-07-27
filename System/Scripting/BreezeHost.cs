@@ -103,10 +103,10 @@ public static class BreezeHost
         string visibleMessage = message ?? "Unknown script error";
         if (visibleMessage.Length > 90) visibleMessage = visibleMessage.Substring(0, 87) + "...";
 
-        Window error = new Window(140, 140, 640, 120, "Breeze Error", true)
+        Window error = new Window(140, 140, visibleMessage.Length * 8 + 40, 120, "Breeze Runtime Error", true)
         {
             canMaximize = false,
-            canResize = false,
+            canResize = true,
         };
 
 

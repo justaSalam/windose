@@ -10,7 +10,7 @@ public class MenuPopup : Component
     public int itemHeight;
     public Png? Icon;
 
-    public MenuPopup(int width, int height, Png? icon) : base(0, 0, width, height)
+    public MenuPopup(int width, int height, Png? icon = null) : base(0, 0, width, height)
     {
         zLayer = DrawLayer.Popup;
         clampSize = false;

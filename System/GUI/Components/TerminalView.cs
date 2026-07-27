@@ -64,7 +64,7 @@ public sealed class TerminalView : Component
         if (!IsInsideAbsolute(mouseX, mouseY)) return false;
         if (Mouse.scroll != 0)
         {
-            scrollLine = Math.Max(0, Math.Min(MaxScrollLine(), scrollLine - (int)Mouse.scroll * 3));
+            scrollLine = Math.Max(0, Math.Min(MaxScrollLine(), scrollLine + (int)Mouse.scroll * 3));
             MarkDirty();
         }
         return true;

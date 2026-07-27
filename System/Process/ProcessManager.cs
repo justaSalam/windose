@@ -139,7 +139,6 @@ public static class ProcessManger
             StartPendingRestarts();
             ApplyPendingRequests();
 
-            // Smart GC scheduling
             ScheduleGarbageCollection();
         }
         finally
@@ -295,23 +294,6 @@ public static class ProcessManger
         if (process is ScheduledProcess scheduled) return scheduledProcesses.Contains(scheduled);
         if (process is SingleThreadedProcess singleThreaded) return processes.Contains(singleThreaded);
         return false;
-    }
-
-    public static T? GetProcess<T>() where T : Process
-    {
-        foreach (SingleThreadedProcess process in processes)
-        {
-            if (process is T typed)
-                return typed;
-        }
-
-        foreach (ScheduledProcess process in scheduledProcesses)
-        {
-            if (process is T typed)
-                return typed;
-        }
-
-        return null;
     }
 
 }

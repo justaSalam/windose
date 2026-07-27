@@ -1,10 +1,12 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
+using Cosmos.Kernel.System.Mouse;
 using Windose;
 
 public class Window : Component
 {
+
     public Rectangle bounds; //Window viewport, relative to the screen
     public Rectangle content; //Content rect, relative to the window
     private bool isCached;
@@ -13,11 +15,9 @@ public class Window : Component
 
     private bool dragging;
     private bool resizing;
-    private bool isMinimized;
-    private bool isMaximized;
+    public bool isMinimized { get; private set; }
+    public bool isMaximized { get; private set; }
     private Rectangle restoreBounds;
-    private Rectangle savedRestoreBounds;
-    private bool isAnimatingBounds;
 
     public bool canMaximize = true;
     public bool canMinimize = true;
@@ -37,14 +37,15 @@ public class Window : Component
 
     private Component? focusedComponent;
 
+    private Png? Icon;
     private Panel titlebar;
     private bool hasTitleBar;
     private bool windowFocused;
 
-    private Png? Icon;
+    private Thread parentThread;
+    private Thread thread;
 
-
-    public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png ?icon = null) : base(x, y, width, height)
+    public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png? icon = null) : base(x, y, width, height)
     {
         text = title;
         Icon = icon;
@@ -52,17 +53,26 @@ public class Window : Component
         zLayer = DrawLayer.Window;
 
         TitlebarSetup(useTitleBar, title);
+
+        thread = new Thread(() =>
+        {
+            Start();
+            while (true)
+            {
+                Update();
+                Thread.Sleep(10);
+            }
+        });
     }
 
 
     public void Start()
     {
-
+        
     }
 
     public override void Update()
     {
-        // Window movement is handled by the compositor; hover state is for child controls.
         base.Update();
     }
 
@@ -123,60 +133,57 @@ public class Window : Component
 
             int titleButtonSize = Math.Max(20, titleHeight - 5);
             int titleButtonTop = Math.Max(2, border + 1);
-            Color chromeBorder = Palette.ControlHighlight;
 
-            AddChild(new Button(0, 0, titleButtonSize, titleButtonSize)
-            {
-                text = "X",
-                verticalAlignment = VerticalAlignment.Top,
-                horizontalAlignment = HorizontalAlignment.Right,
-                Margin = new Thickness(3, titleButtonTop, 3, 3),
-                useBorders = true,
-                borderColor = chromeBorder,
-                textColor = Palette.ControlBlack,
-                leftMouseRelease = () =>
-                {
-                    WindowManager.PostClose(this);
-                }
-            });
-
-            if (canMaximize)
-            {
-                AddChild(new Button(25, 0, titleButtonSize, titleButtonSize)
-                {
-                    text = "O",
-                    verticalAlignment = VerticalAlignment.Top,
-                    horizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(3, titleButtonTop, 3 + titleButtonSize, 3),
-                    useBorders = true,
-                    borderColor = chromeBorder,
-                    textColor = Palette.ControlBlack,
-                    leftMouseRelease = () =>
-                    {
-                        WindowManager.ToggleMaximize(this);
-                    }
-                });
-
-            }
-            if (canMinimize)
-            {
-                AddChild(new Button(50, 0, titleButtonSize, titleButtonSize)
-                {
-                    text = "_",
-                    verticalAlignment = VerticalAlignment.Top,
-                    horizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(6, titleButtonTop, 6 + titleButtonSize * 2, 3),
-                    useBorders = true,
-                    borderColor = chromeBorder,
-                    textColor = Palette.ControlBlack,
-                    leftMouseRelease = () =>
-                    {
-                        WindowManager.Minimize(this);
-                    }
-                });
-            }
+            CreateTitleControls(titleButtonSize, titleButtonTop);
         }
 
+    }
+
+    private void CreateTitleControls(int titleButtonSize, int titleButtonTop)
+    {
+        AddChild(new Button(0, 0, titleButtonSize, titleButtonSize)
+        {
+            text = "X",
+            verticalAlignment = VerticalAlignment.Top,
+            horizontalAlignment = HorizontalAlignment.Right,
+            useBorders = true,
+            borderColor = Palette.ControlHighlight,
+            textColor = Palette.ControlBlack,
+            leftMouseRelease = () =>
+            {
+                WindowManager.PostClose(this);
+            }
+        });
+
+        AddChild(new Button(25, 0, titleButtonSize, titleButtonSize)
+        {
+            text = "O",
+            verticalAlignment = VerticalAlignment.Top,
+            horizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(3, titleButtonTop, 3 + titleButtonSize, 3),
+            useBorders = true,
+            borderColor = Palette.ControlHighlight,
+            textColor = Palette.ControlBlack,
+            leftMouseRelease = () =>
+            {
+                WindowManager.ToggleMaximize(this);
+            }
+        });
+
+        AddChild(new Button(50, 0, titleButtonSize, titleButtonSize)
+        {
+            text = "_",
+            verticalAlignment = VerticalAlignment.Top,
+            horizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(6, titleButtonTop, 6 + titleButtonSize * 2, 3),
+            useBorders = true,
+            borderColor = Palette.ControlHighlight,
+            textColor = Palette.ControlBlack,
+            leftMouseRelease = () =>
+            {
+                WindowManager.Minimize(this);
+            }
+        });
     }
 
     private void ApplyTitlebarTheme()
@@ -196,6 +203,7 @@ public class Window : Component
     {
         if (Mouse.scroll != 0)
         {
+
             Component wheelTarget = GetChildAt(mouseX, mouseY);
             while (wheelTarget != null && wheelTarget != this)
             {
@@ -335,12 +343,6 @@ public class Window : Component
 
     private void Move(int x, int y)
     {
-        if (isAnimatingBounds)
-        {
-            ApplyBounds(new Rectangle(x, y, Width, Height));
-            return;
-        }
-
         Rectangle oldBounds = bounds;
 
         X = x;
@@ -358,12 +360,6 @@ public class Window : Component
 
     private void Resize(int x, int y, int width, int height)
     {
-        if (isAnimatingBounds)
-        {
-            ApplyBounds(new Rectangle(x, y, width, height));
-            return;
-        }
-
         Rectangle oldBounds = bounds;
 
         X = x;
@@ -402,20 +398,6 @@ public class Window : Component
         MarkDirty(false);
     }
 
-    internal void RememberBoundsForRestore()
-    {
-        savedRestoreBounds = bounds;
-    }
-
-    internal Rectangle GetSavedRestoreBounds()
-    {
-        if (savedRestoreBounds.Width > 0 && savedRestoreBounds.Height > 0)
-            return savedRestoreBounds;
-
-        return bounds;
-    }
-
-
     internal void MinimizeWindow()
     {
         if (isMinimized) return;
@@ -452,12 +434,11 @@ public class Window : Component
         Resize(workArea.X, workArea.Y, workArea.Width, workArea.Height);
     }
 
-    public bool IsMinimized => isMinimized;
-    public bool IsMaximized => isMaximized;
 
-    public void Stop() //TODO Dispose, GC wont collect it without proper disposal first
+    public void Stop()
     {
         Visible = false;
+        WindowManager.Invalidate(bounds);
         Dispose();
     }
 

@@ -12,7 +12,7 @@ public class Desktop : Component
     private Color backgroundColor;
 
     private MenuPopup contextMenu;
-    private DesktopIcon activeDraggedIcon;
+    private DesktopIcon ?activeDraggedIcon;
     private List<DesktopIcon> selectedIcons = new List<DesktopIcon>();
     private List<DesktopIcon> gridCollisionIgnoredIcons;
 
@@ -159,8 +159,7 @@ public class Desktop : Component
                 }
 
                 activeDraggedIcon = icon;
-                icon.HandleInput(mouseX, mouseY, mouse);
-                return true;
+                return icon.HandleInput(mouseX, mouseY, mouse);
             }
 
             ClearIconSelection();

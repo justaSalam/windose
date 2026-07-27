@@ -48,6 +48,15 @@ public class WindowManager : SingleThreadedProcess
 
     private List<Component> components;
 
+
+    private static List<Window> threadedWindows = new();
+    public static void AddThreadedWindow(Window window)
+    {
+        if (window == null) return;
+        threadedWindows.Add(window);
+
+    }
+
     public override void Update()
     {
         try { UpdateDesktop(); }
@@ -74,64 +83,15 @@ public class WindowManager : SingleThreadedProcess
 
         //Sort Components based on zLayer
 
-        components.Sort((component1, component2) =>
+        ComponentZSort();
+
+        GeneralWindowUpdate();
+
+        UpdateComponents();
+
+        bool flowControl = HandleCapturedWindow(updateStartedAt);
+        if (!flowControl)
         {
-            int zLayer = component1.zLayer.CompareTo(component2.zLayer);
-            if (zLayer != 0) return zLayer;
-
-            return component1.zIndex.CompareTo(component2.zIndex);
-        });
-        windows.Sort(zIndexCompare);
-
-        for (int i = windows.Count - 1; i >= 0; i--) //General window update, called on every window
-        {
-            Window win = windows[i];
-            if (win == null || failedWindows.Contains(win)) continue;
-            try { win.Update(); }
-            catch (Exception exception) { FailApplication(win, "updating", exception); }
-        }
-
-        for (int i = components.Count - 1; i >= 0; i--)
-        {
-            Component component = components[i];
-            if (component == null || component is Window || !component.isRoot) continue;
-            if (!component.Visible && component is not Tooltip) continue;
-            try { component.Update(); }
-            catch (Exception exception) { FailApplication(component.GetOwningWindow(), "updating component", exception); }
-        }
-
-        if (capturedWindow != null) //Handling a captured window
-        {
-            if (!failedWindows.Contains(capturedWindow))
-            {
-                try { capturedWindow.HandleInput(mx, my, mouseState); }
-                catch (Exception exception) { FailApplication(capturedWindow, "handling mouse input", exception); }
-            }
-
-            if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
-                capturedWindow = null;
-
-            HandleKeyboardInput();
-            DispatchMessages();
-            ComposeDirtyRegions();
-            DrawPreviewRect();
-            PerformanceMetrics.AddWindowManager(updateStartedAt);
-            return;
-        }
-
-        if (capturedComponent != null)
-        {
-            try { capturedComponent.HandleInput(mx, my, mouseState); }
-            catch (Exception exception) { FailApplication(capturedComponent.GetOwningWindow(), "handling mouse input", exception); }
-
-            if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
-                capturedComponent = null;
-
-            HandleKeyboardInput();
-            DispatchMessages();
-            ComposeDirtyRegions();
-            DrawPreviewRect();
-            PerformanceMetrics.AddWindowManager(updateStartedAt);
             return;
         }
 
@@ -157,6 +117,56 @@ public class WindowManager : SingleThreadedProcess
             return;
         }
 
+        HandleWindowCapture();
+
+        DispatchMessages();
+        ComposeDirtyRegions();
+        DrawPreviewRect();
+        PerformanceMetrics.AddWindowManager(updateStartedAt);
+    }
+
+    private bool HandleCapturedWindow(long updateStartedAt)
+    {
+        if (capturedWindow != null) //Handling a captured window
+        {
+            if (!failedWindows.Contains(capturedWindow))
+            {
+                try { capturedWindow.HandleInput(mx, my, mouseState); }
+                catch (Exception exception) { FailApplication(capturedWindow, "handling mouse input", exception); }
+            }
+
+            if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
+                capturedWindow = null;
+
+            HandleKeyboardInput();
+            DispatchMessages();
+            ComposeDirtyRegions();
+            DrawPreviewRect();
+            PerformanceMetrics.AddWindowManager(updateStartedAt);
+            return false;
+        }
+
+        if (capturedComponent != null)
+        {
+            try { capturedComponent.HandleInput(mx, my, mouseState); }
+            catch (Exception exception) { FailApplication(capturedComponent.GetOwningWindow(), "handling mouse input", exception); }
+
+            if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
+                capturedComponent = null;
+
+            HandleKeyboardInput();
+            DispatchMessages();
+            ComposeDirtyRegions();
+            DrawPreviewRect();
+            PerformanceMetrics.AddWindowManager(updateStartedAt);
+            return false;
+        }
+
+        return true;
+    }
+
+    private void HandleWindowCapture()
+    {
         bool hitWindow = false;
         bool hitComponent = false;
 
@@ -192,11 +202,55 @@ public class WindowManager : SingleThreadedProcess
 
         if (!hitWindow && !hitComponent && mouseState.left == MouseEvents.Press)
             ClearFocusedWindow();
+    }
 
-        DispatchMessages();
-        ComposeDirtyRegions();
-        DrawPreviewRect();
-        PerformanceMetrics.AddWindowManager(updateStartedAt);
+
+
+    private void GeneralWindowUpdate()
+    {
+        for (int i = windows.Count - 1; i >= 0; i--) //General window update, called on every window
+        {
+            Window win = windows[i];
+            if (win == null || failedWindows.Contains(win)) continue;
+            try
+            {
+                win.Update();
+            }
+            catch (Exception exception)
+            {
+                FailApplication(win, "updating", exception);
+            }
+        }
+    }
+
+    private void ComponentZSort()
+    {
+        components.Sort((component1, component2) =>
+        {
+            int zLayer = component1.zLayer.CompareTo(component2.zLayer);
+            if (zLayer != 0) return zLayer;
+
+            return component1.zIndex.CompareTo(component2.zIndex);
+        });
+        windows.Sort(zIndexCompare);
+    }
+
+    private void UpdateComponents()
+    {
+        for (int i = components.Count - 1; i >= 0; i--)
+        {
+            Component component = components[i];
+            if (component == null || component is Window || !component.isRoot) continue;
+            if (!component.Visible && component is not Tooltip) continue;
+            try
+            {
+                component.Update();
+            }
+            catch (Exception exception)
+            {
+                FailApplication(component.GetOwningWindow(), "updating component", exception);
+            }
+        }
     }
 
     public static void PostMessage(UiMessage message)
@@ -339,6 +393,7 @@ public class WindowManager : SingleThreadedProcess
 
         PostCommand(command, target: window, data: data);
     }
+
     private void HandleKeyboardInput()
     {
         if (!KeyboardManager.KeyAvailable) return;
@@ -429,8 +484,10 @@ public class WindowManager : SingleThreadedProcess
             {
                 Component component = components[componentIndex];
                 if (!component.Visible) continue;
+
                 Window owner = component.GetOwningWindow();
                 if (owner != null && failedWindows.Contains(owner)) continue;
+
                 if (!component.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
 
                 try
@@ -519,7 +576,7 @@ public class WindowManager : SingleThreadedProcess
 
             leftMouseRelease = () =>
             {
-                if (window.IsMinimized)
+                if (window.isMinimized)
                 {
                     Restore(window);
                 }
@@ -554,7 +611,7 @@ public class WindowManager : SingleThreadedProcess
 
     internal static void MinimizeImmediate(Window window)
     {
-        if (window == null || !window.canMinimize || window.IsMinimized) return;
+        if (window == null || !window.canMinimize || window.isMinimized) return;
 
         Invalidate(window.bounds);
         window.SetFocused(false);
@@ -571,7 +628,7 @@ public class WindowManager : SingleThreadedProcess
     {
         if (window == null) return;
 
-        if (window.IsMinimized)
+        if (window.isMinimized)
         {
             window.RestoreFromTaskbar();
             window.SetFocused(true);
@@ -616,7 +673,7 @@ public class WindowManager : SingleThreadedProcess
     {
         if (window == null) return;
 
-        if (window.IsMinimized)
+        if (window.isMinimized)
             window.RestoreFromTaskbar();
 
         window.zIndex = nextZIndex++;

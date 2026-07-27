@@ -9,8 +9,8 @@ public sealed class CosmosMouseDriver : IWindoseDriver
 
     public int X => MouseManager.X;
     public int Y => MouseManager.Y;
-    public float ScrollDelta => global::Mouse.scroll;
-    public global::MouseState Buttons => global::Mouse.state;
+    public float ScrollDelta => Mouse.scroll;
+    public MouseState Buttons => Mouse.state;
 
     private readonly int screenWidth;
     private readonly int screenHeight;
@@ -30,8 +30,14 @@ public sealed class CosmosMouseDriver : IWindoseDriver
 
     public void Update()
     {
-        if (State == WindoseDriverState.Started)
-            global::Mouse.Update();
+        if (State != WindoseDriverState.Started)
+        {
+            return;
+        }
+
+        Mouse.Update();
+        MouseManager.ResetScrollDelta();
+
     }
 
     public void Stop()
