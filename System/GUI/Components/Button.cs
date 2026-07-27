@@ -7,16 +7,21 @@ public class Button : Component
     public bool useBackground = true;
     public bool useBorders = false;
     public bool useCustomFace = false;
-    public Color customFaceColor = Palette.ControlFace;
     private bool isPressed = false;
+
     private float hoverBlend;
-    public Color borderColor = Palette.ControlHighlight;
+
     public int fontSize = 0;
+
+    public Color borderColor = Palette.ControlHighlight;
     public Color textColor = Palette.ControlBlack;
+    public Color customFaceColor = Palette.ControlFace;
 
     public Action leftMousePress;
     public Action leftMouseHold;
     public Action leftMouseRelease;
+
+    public Font ?font;
 
     public Button(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -44,7 +49,9 @@ public class Button : Component
 
             //DrawString(text, textColor, 2, textY, effectiveFontSize);
             //DrawString(text, textColor, 2, textY, 16);
-            DrawString(text, SystemFonts.spleen8x16, textColor, 2, textY);
+            if(font == null)DrawString(text, SystemFonts.spleen8x16, textColor, 2, textY);
+            else DrawString(text, font, textColor, 2, textY);
+
         }
     }
 

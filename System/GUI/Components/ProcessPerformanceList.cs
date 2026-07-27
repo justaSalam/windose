@@ -1,4 +1,5 @@
 using System.Drawing;
+using Cosmos.Kernel.Core.Scheduler;
 using Cosmos.Kernel.System.Keyboard;
 
 public class ProcessPerformanceList : Component
@@ -8,17 +9,13 @@ public class ProcessPerformanceList : Component
     public Color textColor = Palette.ControlBlack;
     public bool programsOnly;
     private readonly MenuPopup contextMenu;
-    private readonly MenuPopup priorityMenu;
+    private readonly MenuItem priorityMenu;
     private readonly MenuItem endTaskItem;
     private readonly MenuItem restartTaskItem;
     private readonly MenuItem openLocationItem;
     private readonly MenuItem propertiesItem;
     private readonly MenuItem setPriorityItem;
-    private readonly MenuItem setPriorityIdle;
-    private readonly MenuItem setPriorityLow;
-    private readonly MenuItem setPriorityNormal;
-    private readonly MenuItem setPriorityHigh;
-    private readonly MenuItem setPriorityCritical;
+
     private Process selectedProcess;
     private string filterText = "";
     private bool showFilter;
@@ -37,13 +34,12 @@ public class ProcessPerformanceList : Component
         openLocationItem = contextMenu.AddItem("Open File Location", OpenProcessFileLocation);
         propertiesItem = contextMenu.AddItem("Properties", OpenProcessProperties);
 
-        priorityMenu = new MenuPopup(160, 28 * 5);
-        setPriorityIdle = priorityMenu.AddItem("Idle", () => SetPriority(ProcessPriority.Idle));
-        setPriorityLow = priorityMenu.AddItem("Low", () => SetPriority(ProcessPriority.Low));
-        setPriorityNormal = priorityMenu.AddItem("Normal", () => SetPriority(ProcessPriority.Normal));
-        setPriorityHigh = priorityMenu.AddItem("High", () => SetPriority(ProcessPriority.High));
-        setPriorityCritical = priorityMenu.AddItem("Critical", () => SetPriority(ProcessPriority.Critical));
-        setPriorityItem.click = () => ShowPriorityMenu();
+        priorityMenu = new MenuItem(160, 28 * 5, 100, 20);
+        priorityMenu.AddSubmenuItem("Idle", () => SetPriority(ProcessPriority.Idle));
+        priorityMenu.AddSubmenuItem("Low", () => SetPriority(ProcessPriority.Low));
+        priorityMenu.AddSubmenuItem("Normal", () => SetPriority(ProcessPriority.Normal));
+        priorityMenu.AddSubmenuItem("High", () => SetPriority(ProcessPriority.High));
+        priorityMenu.AddSubmenuItem("Critical", () => SetPriority(ProcessPriority.Critical));
     }
 
     public override void DrawLocal()
@@ -75,11 +71,24 @@ public class ProcessPerformanceList : Component
 
         for (int i = 0; i < ProcessManger.ProcessCount; i++)
         {
+            
             Process process = ProcessManger.GetProcessAt(i);
-            if (programsOnly && process.processType != ProcessType.Program) continue;
+            if (programsOnly && process.processType != ProcessType.Program)
+            {
+                continue;
+            }
 
-            if (totalVisibleProcesses < scrollOffset) { totalVisibleProcesses++; continue; }
-            if (y + fontSize > Height) { totalVisibleProcesses++; break; }
+            if (totalVisibleProcesses < scrollOffset)
+            {
+                totalVisibleProcesses++;
+                continue;
+            }
+
+            if (y + fontSize > Height)
+            {
+                totalVisibleProcesses++;
+                break;
+            }
 
             bool selected = process == selectedProcess;
             Color rowText = selected ? Palette.HighlightText : textColor;
@@ -258,23 +267,11 @@ public class ProcessPerformanceList : Component
         MarkDirty();
     }
 
-    private void ShowPriorityMenu()
-    {
-        if (contextMenu.Visible)
-            contextMenu.Hide();
-        UpdatePriorityMenuChecks();
-        priorityMenu.ShowAt(contextMenu.X + contextMenu.Width, contextMenu.Y);
-    }
 
     private void UpdatePriorityMenuChecks()
     {
         if (selectedProcess == null) return;
         ProcessPriority current = selectedProcess.Priority;
-        setPriorityIdle.text = (current == ProcessPriority.Idle ? "> " : "   ") + "Idle";
-        setPriorityLow.text = (current == ProcessPriority.Low ? "> " : "   ") + "Low";
-        setPriorityNormal.text = (current == ProcessPriority.Normal ? "> " : "   ") + "Normal";
-        setPriorityHigh.text = (current == ProcessPriority.High ? "> " : "   ") + "High";
-        setPriorityCritical.text = (current == ProcessPriority.Critical ? "> " : "   ") + "Critical";
     }
 
     private void OpenProcessFileLocation()
@@ -325,7 +322,6 @@ public class ProcessPerformanceList : Component
         }
         if (priorityMenu != null)
         {
-            priorityMenu.Hide();
             priorityMenu.Dispose();
         }
         base.Dispose();

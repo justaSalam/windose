@@ -45,7 +45,7 @@ public class Taskbar : Component
         };
         contextMenu.AddItem("Task Manager", () =>
         {
-            WindowManager.Register(new PerformanceMonitor(180, 120));
+            new PerformanceMonitor(180, 120);
         });
         contextMenu.AddSeparator();
         contextMenu.AddItem("Minimize All Windows");
@@ -75,13 +75,10 @@ public class Taskbar : Component
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
             text = DateTime.Now.ToString("HH:mm:ss"),
-            Margin = new Thickness(0, 0, 20, 0),
+            Margin = new Thickness(0),
 
         };
         AddChild(timeLabel);
-
-        ApplyThemeStyle();
-        Palette.ThemeChanged += ApplyThemeStyle;
     }
 
     public override void Update()
@@ -114,21 +111,6 @@ public class Taskbar : Component
         timeLabel.MarkDirty();
     }
 
-    public void ApplyThemeStyle()
-    {
-
-        startButton.useCustomFace = false;
-        startButton.textColor = Color.White;
-        startButton.borderColor = Palette.ControlHighlight;
-        timeLabel.textColor = Palette.ControlBlack;
-        bar.color1 = Palette.ControlFace;
-
-
-        startButton.MarkDirty();
-        timeLabel.MarkDirty();
-        MarkDirty();
-    }
-
     private void ShowContextMenu()
     {
         int x = Math.Min(MouseManager.X, Math.Max(0, Global.screenWidth - contextMenu.Width));
@@ -140,7 +122,6 @@ public class Taskbar : Component
 
     public override void Dispose()
     {
-        Palette.ThemeChanged -= ApplyThemeStyle;
         base.Dispose();
     }
 

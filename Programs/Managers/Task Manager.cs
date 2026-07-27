@@ -8,13 +8,16 @@ public class PerformanceMonitor : Window
     private readonly DockPanel applicationsPage;
     private readonly DockPanel processesPage;
     private readonly DockPanel performancePage;
+
     private readonly Panel summary;
     private readonly Panel memorySummary;
+
     private readonly PerformanceGraph frameGraph;
-    private readonly PerformanceGraph pipelineGraph;
     private readonly PerformanceGraph memoryGraph;
+
     private readonly ProcessPerformanceList applicationsList;
     private readonly ProcessPerformanceList processList;
+
     private int selectedPage;
     private int lastSampleTick;
     private float memoryGraphMaximum = 16;
@@ -82,17 +85,6 @@ public class PerformanceMonitor : Window
         frameGraph.SetSeries(0, "Frame ms", Color.Lime);
         frameGraph.SetSeries(1, "16.7 target", Color.Yellow);
 
-        pipelineGraph = new PerformanceGraph(0, 0, Width, 115)
-        {
-            maximum = 20,
-            clampSize = false,
-            Margin = new Thickness(0),
-        };
-        pipelineGraph.SetSeries(0, "Upload", Color.Cyan);
-        pipelineGraph.SetSeries(1, "Display", Color.Lime);
-        pipelineGraph.SetSeries(2, "Overlay", Color.Yellow);
-        pipelineGraph.SetSeries(3, "UI", Color.Magenta);
-        pipelineGraph.SetSeries(4, "Paint", Color.White);
 
         memorySummary = new Panel(Palette.ControlFace, 0, 0, Width, 24)
         {
@@ -115,7 +107,6 @@ public class PerformanceMonitor : Window
 
         performancePage.AddDockChild(summary, Dock.Top);
         performancePage.AddDockChild(frameGraph, Dock.Top);
-        performancePage.AddDockChild(pipelineGraph, Dock.Top);
         performancePage.AddDockChild(memorySummary, Dock.Top);
         performancePage.AddDockChild(memoryGraph, Dock.Fill);
 
@@ -179,15 +170,9 @@ public class PerformanceMonitor : Window
             return;
         }
 
-        summary.text = $"FPS {Kernel.Fps}    Frame {Kernel.DeltaTimeMs:0.0} ms    UI {PerformanceMetrics.ProcessMs:0.0} ms    Present {PerformanceMetrics.PresentMs:0.0} ms";
+        summary.text = $"FPS {Kernel.Fps}    Frame {Kernel.DeltaTimeMs:0.0} ms";
         summary.MarkDirty();
         frameGraph.AddSample((float)Kernel.DeltaTimeMs, 16.7f);
-        pipelineGraph.AddSample(
-            (float)PerformanceMetrics.UploadMs,
-            (float)PerformanceMetrics.DisplayMs,
-            (float)PerformanceMetrics.OverlayMs,
-            (float)PerformanceMetrics.ProcessMs,
-            (float)PerformanceMetrics.ComposeMs);
 
         GarbageCollector.GetStats(out int collections, out int freed);
         float heapMb = BytesToMb(GarbageCollector.GetHeapSizeBytes());
@@ -203,7 +188,7 @@ public class PerformanceMonitor : Window
             memoryGraph.maximum = memoryGraphMaximum;
         }
 
-        memorySummary.text = $"Heap {heapMb:0.0}M  Commit {committedMb:0.0}M  Frag {fragmentedMb:0.0}M  GC {gcPercent}%  Runs {collections}  Freed {freed}  Pinned {pinnedObjects}";
+        memorySummary.text = $"Heap {heapMb:0.00}M  Commit {committedMb:0.00}M  Frag {fragmentedMb:0.00}M  GC {gcPercent}%  Runs {collections}  Freed {freed}  Pinned {pinnedObjects}";
         memorySummary.MarkDirty();
         memoryGraph.AddSample(heapMb, committedMb, fragmentedMb);
     }

@@ -55,13 +55,11 @@ public class StartMenu : Window
 
         programs.AddSubmenuItem("Disk Management", () =>
         {
-            WindowManager.Register(new DiskManagement(100, 100, 600, 350));
+            new DiskManagement(100, 100, 600, 350);
 
         });
-        programs.AddSubmenuItem("Task Manager", () =>
-        {
-            WindowManager.Register(new PerformanceMonitor(180, 120));
-        });
+        programs.AddSubmenuItem("Task Manager", () => new PerformanceMonitor(180, 120));
+
         MenuItem breeze = programs.AddSubmenuItem("Breeze");
         breeze.AddSubmenuItem("Breeze Editor", () =>
         {
@@ -80,15 +78,15 @@ public class StartMenu : Window
 
         apps.AddSubmenuItem("Run main.breeze", () =>
         {
-            BreezeHost.RunFile(@"0:\Apps\main.breeze");
+            BreezeHost.RunFile("mnt/Apps/main.breeze");
         });
         apps.AddSubmenuItem("Control Test", () =>
         {
-            BreezeHost.RunFile(@"0:\Programs\ControlTest.breeze");
+            BreezeHost.RunFile("mnt/Programs/ControlTest.breeze");
         });
         apps.AddSubmenuItem("ControlTest.breeze", () =>
         {
-            BreezeHost.RunFile(@"0:\Programs\ControlTest.breeze");
+            BreezeHost.RunFile("mnt/Programs/ControlTest.breeze");
         });
 
         programs.AddSubmenuItem("Command Prompt", () =>

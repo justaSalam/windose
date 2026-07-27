@@ -227,8 +227,10 @@ public class Component : IDisposable
                 contextWindow.Visible = !contextWindow.Visible;
             };
         }
-
     }
+
+
+
     public virtual void Update()
     {
         bool isInside = IsInsideAbsolute(MouseManager.X, MouseManager.Y);
@@ -258,6 +260,7 @@ public class Component : IDisposable
         }
     }
 
+
     public void UpdateFrame()
     {
         switch (state)
@@ -273,6 +276,7 @@ public class Component : IDisposable
                 break;
         }
     }
+
     /// <summary>
     /// -- Call last --
     /// Copies the component buffer into the main screen buffer

@@ -143,9 +143,8 @@ public static class CommandRegistry
         Register("rmdir", "Deletes a directory.", "rmdir <path> [/s]", DeleteDirectory);
         Register("copy", "Copies a file.", "copy <source> <destination> [/y]", CopyFile);
         Register("move", "Moves a file.", "move <source> <destination> [/y]", MoveFile);
-        Register("ps", "Lists running processes.", "ps", ListProcesses);
-        RegisterAlias("processes", "ps");
-        Register("theme", "Shows or changes the active UI theme.", "theme [classic|modern]", Theme);
+        Register("ps", "Lists running threads.", "ps", ListProcesses);
+        RegisterAlias("threads", "ps");
 
         Register("ipconfig", "System Network Configuration", "ipconfig [command]", DisplayNetInfo);
 
@@ -351,36 +350,18 @@ public static class CommandRegistry
 
     private static void ListProcesses(CommandContext context, string[] args)
     {
-        context.WriteLine(" PID  NAME");
-        for (int i = 0; i < ProcessManger.ProcessCount; i++)
+        context.WriteLine("Thread ID  State  CPU ID");
+
+        for (int i = 0; i < SchedulerManager.ThreadCount; i++)
         {
-            Process process = ProcessManger.GetProcessAt(i);
-            if (process != null) context.WriteLine(process.id.ToString().PadLeft(4) + "  " + process.name);
+            Cosmos.Kernel.Core.Scheduler.Thread ?thread = SchedulerManager.Threads[i];
+            if(thread == null) continue;
+
+            context.WriteLine($"{thread.Id} {thread.State} {thread.CpuId}");
         }
+
     }
 
-    private static void Theme(CommandContext context, string[] args)
-    {
-        if (args.Length == 0)
-        {
-            context.WriteLine("Current theme: " + Palette.ThemeDisplayName + " (" + Palette.ThemeName + ")");
-            context.WriteLine("Available themes: classic, modern");
-            return;
-        }
-
-        string requested = args[0].Trim().ToLowerInvariant();
-        if (!Palette.IsKnownTheme(requested))
-        {
-            context.WriteLine("Unknown theme: " + args[0]);
-            context.WriteLine("Available themes: classic, modern");
-            return;
-        }
-
-        if (Palette.Apply(requested))
-            context.WriteLine("Theme changed to " + Palette.ThemeDisplayName);
-        else
-            context.WriteLine("Could not change theme.");
-    }
 
     private static void RunBreeze(CommandContext context, string[] args)
     {

@@ -49,13 +49,6 @@ public class WindowManager : SingleThreadedProcess
     private List<Component> components;
 
 
-    private static List<Window> threadedWindows = new();
-    public static void AddThreadedWindow(Window window)
-    {
-        if (window == null) return;
-        threadedWindows.Add(window);
-
-    }
 
     public override void Update()
     {
@@ -214,7 +207,8 @@ public class WindowManager : SingleThreadedProcess
             if (win == null || failedWindows.Contains(win)) continue;
             try
             {
-                win.Update();
+                //Window update is called by the scheduler :)
+                //win.Update();
             }
             catch (Exception exception)
             {
@@ -402,9 +396,8 @@ public class WindowManager : SingleThreadedProcess
 
         if (focusedWindow != null && !failedWindows.Contains(focusedWindow))
         {
-            Window target = focusedWindow;
-            try { target.HandleKeyboard(keyEvent); }
-            catch (Exception exception) { FailApplication(target, "handling keyboard input", exception); }
+            focusedWindow.HandleKeyboard(keyEvent);
+
             return;
         }
 
@@ -415,8 +408,9 @@ public class WindowManager : SingleThreadedProcess
             if (component is Window) continue;
             if (!component.isRoot) continue;
 
-            try { component.HandleKeyboard(keyEvent); }
-            catch (Exception exception) { FailApplication(component.GetOwningWindow(), "handling keyboard input", exception); }
+
+            component.HandleKeyboard(keyEvent);
+
             return;
         }
 
@@ -434,12 +428,7 @@ public class WindowManager : SingleThreadedProcess
             if (!component.IsInsideAbsolute(mx, my)) continue;
 
             bool handled;
-            try { handled = component.HandleInput(mx, my, mouseState); }
-            catch (Exception exception)
-            {
-                FailApplication(component.GetOwningWindow(), "handling mouse input", exception);
-                return true;
-            }
+            handled = component.HandleInput(mx, my, mouseState);
 
             if (handled && mouseState.left == MouseEvents.Press)
                 capturedComponent = component;
@@ -554,48 +543,55 @@ public class WindowManager : SingleThreadedProcess
 
     private static void RegisterNow(Window window)
     {
-        window.zIndex = nextZIndex;
-        window.Start();
-        windows.Add(window);
-        nextZIndex++;
-        SetFocusedWindow(window);
-
-        // A newly registered window has no previous dirty rectangle to drive its
-        // first composition pass. Explicitly schedule that first paint.
-        window.ForceDirty();
-        Invalidate(window.bounds);
-
-        if (!window.showInTaskbar || Explorer.taskbar == null) return;
-
-        Button taskbarButton = new Button(0, 0, 75, 25)
+        lock (windows)
         {
-            text = window.text,
-            fontSize = 14,
-            verticalAlignment = VerticalAlignment.Center,
-            useBorders = true,
+            if (windows.Contains(window)) return;
 
-            leftMouseRelease = () =>
+            window.zIndex = nextZIndex;
+            window.Start();
+            windows.Add(window);
+            nextZIndex++;
+            SetFocusedWindow(window);
+
+            // A newly registered window has no previous dirty rectangle to drive its
+            // first composition pass. Explicitly schedule that first paint.
+            window.ForceDirty();
+            Invalidate(window.bounds);
+
+            if (!window.showInTaskbar || Explorer.taskbar == null) return;
+
+            Button taskbarButton = new Button(0, 0, 75, 25)
             {
-                if (window.isMinimized)
-                {
-                    Restore(window);
-                }
-                else if (focusedWindow == window)
-                {
-                    Minimize(window);
-                }
-                else
-                {
-                    Activate(window);
-                }
-            }
-        };
+                text = window.text,
+                font = SystemFonts.spleen6x12,
+                fontSize = 14,
+                verticalAlignment = VerticalAlignment.Center,
+                useBorders = true,
 
-        taskbarButtons[window] = taskbarButton;
-        Explorer.taskbar.windows.Add(taskbarButton);
-        Explorer.taskbar.bar.AddStackChild(taskbarButton);
-        Explorer.taskbar.ForceDirty();
-        Invalidate(Explorer.taskbar.AbsoluteRectangle);
+                leftMouseRelease = () =>
+                {
+                    if (window.isMinimized)
+                    {
+                        Restore(window);
+                    }
+                    else if (focusedWindow == window)
+                    {
+                        Minimize(window);
+                    }
+                    else
+                    {
+                        Activate(window);
+                    }
+                }
+            };
+
+            taskbarButtons[window] = taskbarButton;
+            Explorer.taskbar.windows.Add(taskbarButton);
+            Explorer.taskbar.bar.AddStackChild(taskbarButton);
+            Explorer.taskbar.ForceDirty();
+            Invalidate(Explorer.taskbar.AbsoluteRectangle);
+        }
+
     }
 
     public static void Close(Window window)
@@ -757,38 +753,46 @@ public class WindowManager : SingleThreadedProcess
 
     private void CloseNow(Window window)
     {
-        if (window == null || !windows.Contains(window)) return;
-        BreezeRuntime.NotifyWindowClosed(window);
-        try { Invalidate(window.bounds); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
-        try { ClearPreviewRect(); } catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
-
-        if (focusedWindow == window)
-            focusedWindow = null;
-
-        if (capturedWindow == window)
-            capturedWindow = null;
-
-        if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
-            capturedComponent = null;
-
-        if (taskbarButtons.ContainsKey(window))
+        lock (windows)
         {
-            Button taskbarButton = taskbarButtons[window];
-            taskbarButtons.Remove(window);
-            Explorer.taskbar.windows.Remove(taskbarButton);
-            Explorer.taskbar.bar.RemoveStackChild(taskbarButton);
-            Explorer.taskbar.bar.ForceDirty();
-            Explorer.taskbar.ForceDirty();
-            Invalidate(Explorer.taskbar.AbsoluteRectangle);
 
+            if (window == null || !windows.Contains(window)) return;
+
+            BreezeRuntime.NotifyWindowClosed(window);
+
+            Invalidate(window.bounds);
+            ClearPreviewRect();
+
+            if (focusedWindow == window)
+                focusedWindow = null;
+
+            if (capturedWindow == window)
+                capturedWindow = null;
+
+            if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
+                capturedComponent = null;
+
+            if (taskbarButtons.ContainsKey(window))
+            {
+                Button taskbarButton = taskbarButtons[window];
+
+                taskbarButtons.Remove(window);
+
+                Explorer.taskbar.windows.Remove(taskbarButton);
+                Explorer.taskbar.bar.RemoveStackChild(taskbarButton);
+                Explorer.taskbar.bar.ForceDirty();
+                Explorer.taskbar.ForceDirty();
+
+                Invalidate(Explorer.taskbar.AbsoluteRectangle);
+
+            }
+
+            windows.Remove(window);
+            failedWindows.Remove(window);
+
+            FocusTopVisibleWindow(window);
+            window.Stop();
         }
-
-        window.Stop();
-        windows.Remove(window);
-        failedWindows.Remove(window);
-
-        try { FocusTopVisibleWindow(window); }
-        catch (Exception exception) { Serial.WriteString(exception.Message + "\n"); }
     }
 
     public static void Invalidate(Component dirty)
