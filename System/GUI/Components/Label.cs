@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Graphics.Fonts;
 using System.Drawing;
 
 public class Label : Component
@@ -6,6 +7,8 @@ public class Label : Component
     public bool useBackground = true;
     public int fontSize = 0;
     public Color textColor = Palette.ControlBlack;
+
+    public Font ?font;
 
     public Label(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -36,7 +39,8 @@ public class Label : Component
 
             foreach (string line in formatted)
             {
-                DrawString(text, textColor, 2, textY + currentOffset, effectiveFontSize);
+                if (font != null) DrawString(text, font, textColor, 2, textY + currentOffset);
+                else DrawString(text, textColor, 2, textY + currentOffset, effectiveFontSize);
                 currentOffset += effectiveFontSize + 2;
             }
         }

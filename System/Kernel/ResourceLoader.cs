@@ -15,7 +15,16 @@ namespace Windose.System.Kernel
         /// <returns></returns>
         public static byte[]? FromStream(string path)
         {
-            return ResourceManager.GetResourceAsSpan(path).ToArray();
+            try
+            {
+                return ResourceManager.GetResourceAsSpan(path).ToArray();
+
+            }
+            catch (Exception e)
+            {
+                SystemLogger.WriteLine("Resource Loader", $"Failed to load resource: {path}. Exception: {e.Message}", ConsoleMessageType.Error);
+                return null;
+            }
         }
 
 
@@ -26,17 +35,51 @@ namespace Windose.System.Kernel
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static byte[]? FromStorage(string path)
+        public static async Task<byte[]?> LoadStorageAsync(string path)
         {
             try
             {
-                return File.ReadAllBytes(path);
-
+                return await File.ReadAllBytesAsync(path);
             }
-            catch(Exception e) 
+            catch (OperationCanceledException e)
             {
-                ConsoleMessage.WriteLine("Resource Loader", $"Failed to load resource from storage: {path}. Exception: {e.Message}", ConsoleMessageType.Error);
+                SystemLogger.WriteLine("Resource Loader", $"Failed to load resource from storage: {path}. Exception: {e.Message}", ConsoleMessageType.Error);
                 return null;
+            }
+        }
+
+        public static async Task<bool> WriteStorageAsync(string path, string resource)
+        {
+            try
+            {
+                byte[]? data = FromStream(resource);
+                if (data == null)
+                {
+                    return false;
+                }
+
+                Console.WriteLine($"Writing: {path}");
+                await File.WriteAllBytesAsync(path, data);
+                return true;
+            }
+            catch (OperationCanceledException e)
+            {
+                SystemLogger.WriteLine("Resource Loader", $"Failed to write to storage: {path}. Exception: {e.Message}", ConsoleMessageType.Error);
+                return false;
+            }
+        }
+
+        public static async Task<bool> WriteStorageAsync(string path, byte[] data)
+        {
+            try
+            {
+                await File.WriteAllBytesAsync(path, data);
+                return true;
+            }
+            catch (OperationCanceledException e)
+            {
+                SystemLogger.WriteLine("Resource Loader", $"Failed to write resource to storage: {path}. Exception: {e.Message}", ConsoleMessageType.Error);
+                return false;
             }
         }
     }

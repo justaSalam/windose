@@ -44,8 +44,6 @@ public static class SystemRegistry
 
     public static void Initialize()
     {
-        Console.WriteLine("[Registry] Init");
-
         Directory.CreateDirectory("/mnt/System");
         if (!File.Exists(StoragePath)) File.Create(StoragePath);
 

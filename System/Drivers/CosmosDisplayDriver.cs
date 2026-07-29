@@ -5,6 +5,7 @@ using Cosmos.Kernel.HAL.Devices.Graphic.SVGAII;
 using Cosmos.Kernel.HAL.Pci;
 using Cosmos.Kernel.HAL.Pci.Enums;
 using Cosmos.Kernel.System.Graphics;
+using Windose.System.System_Calls;
 
 namespace Windose.Drivers;
 
@@ -25,8 +26,8 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
         if(device == null)
         {
-            Console.WriteLine("PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.");
-            Panic.Halt("PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.");
+            SystemLogger.WriteLine("Display Driver", "PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.", ConsoleMessageType.Error);
+            
         }
 
         Canvas = new SVGAII3DCanvas(device, new Mode(1920,1080, ColorDepth.ColorDepth32));

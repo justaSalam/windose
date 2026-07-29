@@ -1,5 +1,7 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
+using Mono.Cecil;
+using Windose.System.Kernel;
 
 public class ListView : Component
 {
@@ -39,10 +41,18 @@ public class ListView : Component
     private int lastClickTick;
     public int doubleClickInterval = 1200;
 
+    private Png itemIcon;
+    private Png folderIcon;
+    private Rectangle sourceRect;
+    private Rectangle destRect;
+
+
 
     public ListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        itemIcon = new Png(ResourceLoader.FromStream("Windose.Resources.Icons.message_file.png"));
+        folderIcon = new Png(ResourceLoader.FromStream("Windose.Resources.Icons.directory_closed.png"));
     }
 
     public ListViewItem AddItem(string text, Bitmap icon = null, object tag = null)
@@ -217,6 +227,8 @@ public class ListView : Component
         //DrawString(modifiedHeader, Palette.ControlBlack, modifiedX + 4, 2, fontSize);
     }
 
+
+
     private void DrawDetailsRow(ListViewItem item, int y)
     {
         bool selected = item == selectedItem || item.selected;
@@ -226,7 +238,12 @@ public class ListView : Component
 
         Color color = selected ? Palette.HighlightText : textColor;
 
-        DrawItemIcon(item, 4, y + 2, smallIconSize);
+        //DrawItemIcon(item, 4, y + 2, smallIconSize);
+
+        destRect = new Rectangle(4, y, 32, 32);
+        destRect = new Rectangle(4, y, smallIconSize, smallIconSize);
+
+        DrawImageAlpha(itemIcon, 4, y + 2);//TODO Fix image resizing + Add smaller icons ig 
         DrawString(item.text, color, 24, y + 2, fontSize);
 
         //int sizeX = nameColumnWidth;
@@ -276,23 +293,28 @@ public class ListView : Component
 
     private void DrawFolderIcon(int x, int y, int size)
     {
-        int tabHeight = Math.Max(3, size / 4);
+        DrawImage(folderIcon, x, y);
+
+
+        /*int tabHeight = Math.Max(3, size / 4);
         int bodyY = y + tabHeight;
 
         DrawFilledRectangle(Color.FromArgb(255, 224, 64), x + 2, y + 2, size / 2, tabHeight);
         DrawRectangle(Palette.ControlShadow, x + 2, y + 2, size / 2, tabHeight);
         DrawFilledRectangle(Color.FromArgb(255, 240, 96), x, bodyY, size, size - tabHeight);
-        DrawRectangle(Palette.ControlShadow, x, bodyY, size, size - tabHeight);
+        DrawRectangle(Palette.ControlShadow, x, bodyY, size, size - tabHeight);*/
     }
 
     private void DrawFileIcon(int x, int y, int size)
     {
+        DrawImage(itemIcon, x, y);
+        /*
         DrawFilledRectangle(Palette.ControlWhite, x + 4, y, size - 7, size);
         DrawRectangle(Palette.ControlShadow, x + 4, y, size - 7, size);
         DrawLine(Palette.ControlShadow, x + size - 7, y, x + size - 2, y + 5);
         DrawLine(Palette.ControlShadow, x + size - 2, y + 5, x + size - 2, y + size - 1);
         DrawLine(Palette.ControlShadow, x + 8, y + 9, x + size - 5, y + 9);
-        DrawLine(Palette.ControlShadow, x + 8, y + 13, x + size - 5, y + 13);
+        DrawLine(Palette.ControlShadow, x + 8, y + 13, x + size - 5, y + 13);*/
     }
 
     private void DrawCenteredText(string value, Color color, int x, int y, int width, int size)

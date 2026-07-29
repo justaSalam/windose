@@ -21,21 +21,28 @@ public static class FileSystemManager
 
         if (VfsManager.TryMount("fat", "0", MountFlags.None, "/mnt", out VfsManager.VfsMount? mount))
         {
-            ConsoleMessage.WriteLine("FileSystemManager", $"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}");
+            SystemLogger.WriteLine("FileSystemManager", $"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}");
             Serial.WriteString($"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}\n");
         }
         else
         {
-            ConsoleMessage.WriteLine("FileSystemManager", "Failed to mount filesystem", ConsoleMessageType.Error);
+            SystemLogger.WriteLine("FileSystemManager", "Failed to mount filesystem", ConsoleMessageType.Error);
             Serial.WriteString($"Failed to mount filesystem\n");
 
             return;
         }
 
+        //No null check needed, without a primary device the setup wouldn't get here
+        if (StorageManager.Partitions.Count == 0)
+        {
+            DriveUtils.CreateMBR(StorageManager.PrimaryDevice);
+            DriveUtils.CreateMbrPartition(StorageManager.PrimaryDevice);
+        }
 
 
-        //CreateSystemDirectories();
-        //SystemRegistry.Initialize();
+
+        CreateSystemDirectories();
+        SystemRegistry.Initialize();
 
         //StorageManager.Initialize();
         //
@@ -74,12 +81,9 @@ public static class FileSystemManager
 
     private static void CreateSystemDirectories()
     {
-        Serial.WriteString("sysdir\n");
         Directory.CreateDirectory("/mnt/System");
         Directory.CreateDirectory("/mnt/System/Services");
         Directory.CreateDirectory("/mnt/User");
-        Console.WriteLine("done");
-
     }
 
     public static string NormalizePath(string path)

@@ -3,11 +3,11 @@
 namespace Windose.System.System_Calls
 {
 
-    public static class ConsoleMessage
+    public static class SystemLogger
     {
-        public static StringBuilder logBuilder = new StringBuilder();
+        private static StringBuilder logBuilder = new StringBuilder();
 
-        static ConsoleMessage()
+        static SystemLogger()
         {
             logBuilder.AppendLine($"<System Log Started at {DateTime.Now.ToString("HH:mm:ss")}>");
         }
@@ -37,7 +37,7 @@ namespace Windose.System.System_Calls
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.Write($"[");
 
-                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
                     Console.Write(source);
 
                     Console.ForegroundColor = ConsoleColor.White;

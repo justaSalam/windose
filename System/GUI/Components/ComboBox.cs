@@ -3,7 +3,7 @@ using Windose;
 
 public class ComboBox : Component
 {
-    private readonly List<object> items = new List<object>();
+    public readonly List<object> items = new List<object>();
     private int selectedIndex = -1;
     private bool isDroppedDown;
     private float hoverBlend;

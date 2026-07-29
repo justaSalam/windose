@@ -14,12 +14,14 @@ public class DockPanel : Component
         Margin = new Thickness(28, 2, 2, 2);  //Default Panel spanning the window leaving space for the title bar 
     }
 
-    public void AddDockChild(Component child, Dock dock)
+    public Component AddDockChild(Component child, Dock dock)
     {
         dockChildren.Add(child);
         docks.Add(dock);
         AddChild(child);
         ResolveDockLayout();
+
+        return child;
     }
 
     public override void Resize(int width, int height)

@@ -3,6 +3,7 @@ using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
+using Windose.System.System_Calls;
 
 public class Window : Component
 {
@@ -80,7 +81,16 @@ public class Window : Component
 
     public override void Update()
     {
-        base.Update();
+        try
+        {
+            base.Update();
+
+        }
+        catch (Exception ex) 
+        {
+            SystemLogger.WriteLine("Thread", ex.Message, ConsoleMessageType.Error);
+           
+        }
     }
 
     /// <summary>

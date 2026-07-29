@@ -39,16 +39,16 @@ public class Checkbox : Component
     {
 
 
-        if (isPressed) DrawRaisedRectangle(0, 0, Width, Height);
-        else DrawSunkenRectangle(0, 0, Width, Height);
+        if (isPressed) DrawSunkenRectangle(0, 0, Width, Height);
+        else DrawRaisedRectangle(0, 0, Width, Height);
 
-        if (text != "")
-        {
-            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
-            int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
+        if (string.IsNullOrEmpty(text)) return;
 
-            DrawString(text, textColor, 2 + Width, textY, effectiveFontSize);
-        }
+        int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
+        int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
+
+        DrawString(text, textColor, 2 + Width, textY, effectiveFontSize);
+
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)

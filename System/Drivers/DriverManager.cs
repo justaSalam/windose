@@ -13,7 +13,7 @@ public static class DriverManager
 
     public static void Register(IWindoseDriver driver)
     {
-        ConsoleMessage.WriteLine("DM", "Registered driver: " + driver.Name, ConsoleMessageType.Log);
+        SystemLogger.WriteLine("DM", "Registered driver: " + driver.Name, ConsoleMessageType.Log);
 
         if (driver == null) return;
         drivers.Add(driver);
@@ -43,14 +43,14 @@ public static class DriverManager
 
         try
         {
-            ConsoleMessage.WriteLine("DM", "Starting driver: " + driver.Name, ConsoleMessageType.Log);
+            SystemLogger.WriteLine("DM", "Starting driver: " + driver.Name, ConsoleMessageType.Log);
 
 
             driver.Start();
         }
         catch (Exception exception)
         {
-            ConsoleMessage.WriteLine("DM", "Failed to start driver: " + driver.Name, ConsoleMessageType.Log);
+            SystemLogger.WriteLine("DM", "Failed to start driver: " + driver.Name, ConsoleMessageType.Log);
 
             KernelPanic.Show("DRIVER_START_FAILURE", exception);
         }

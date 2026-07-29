@@ -13,6 +13,7 @@ public class DiskmgrNewVolume : Window
     private readonly DockPanel formatDrivePage;
     private readonly DockPanel finalPage;
 
+    private readonly char[] letters = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I' };
     private int selectedPage;
 
     public int pages { get; private set; }
@@ -55,6 +56,133 @@ public class DiskmgrNewVolume : Window
         formatDrivePage = CreatePage();
         finalPage = CreatePage();
 
+        InitPage();
+        DriveSizePage();
+        DriveLetterPage();
+        FormatDrivePage();
+
+        FinalizePage();
+
+        root.AddDockChild(tabs, Dock.Bottom);
+
+        root.AddDockChild(wizardPage, Dock.Fill);
+        root.AddDockChild(driveSizePage, Dock.Fill);
+        root.AddDockChild(driveLetterPage, Dock.Fill);
+        root.AddDockChild(formatDrivePage, Dock.Fill);
+        root.AddDockChild(finalPage, Dock.Fill);
+
+
+        AddChild(root);
+        ShowPage(0);
+    }
+
+    private void FinalizePage()
+    {
+        finalPage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Final page",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
+    }
+
+    private void FormatDrivePage()
+    {
+        formatDrivePage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Format Partition",
+            useBackground = false,
+            fontSize = 16
+        }, Dock.Top);
+
+
+        formatDrivePage.AddDockChild(new Label(0, 40, 0, 0)
+        {
+            text = "Do not Format this volume",
+            useBackground = false,
+            fontSize = 16
+        }, Dock.Top);
+        formatDrivePage.AddDockChild(new RadioButton(200, 40), Dock.Top);
+
+        formatDrivePage.AddDockChild(new Label(0, 80, 0, 0)
+        {
+            text = "Format volume using the following settings: ",
+            useBackground = false,
+            fontSize = 16
+        }, Dock.Top);
+        formatDrivePage.AddDockChild(new RadioButton(330, 80), Dock.Top);
+
+        ComboBox fsDropdown = (ComboBox)formatDrivePage.AddDockChild(new ComboBox(75, 120, 200)
+        {
+            text = "Select a File System",
+            fontSize = 16,
+            
+        }, Dock.Top);
+
+        fsDropdown.AddItem("FAT32");
+        fsDropdown.AddItem("exFAT");
+
+        ComboBox AllocationUnitDropdown = (ComboBox)formatDrivePage.AddDockChild(new ComboBox(75, 160, 200)
+        {
+            text = "Allocation Unit Size", 
+            fontSize = 16,
+
+        }, Dock.Top);
+
+        AllocationUnitDropdown.AddItem("Default");
+
+
+        formatDrivePage.AddDockChild(new Label(0, 200, 0, 0)
+        {
+            text = "Perform a quick format",
+            useBackground = false,
+            fontSize = 16
+        }, Dock.Top);
+        formatDrivePage.AddDockChild(new Checkbox(75, 200), Dock.Top);
+
+    }
+
+    private void DriveLetterPage()
+    {
+        driveLetterPage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Drive Letter Page",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
+
+        ComboBox letterDropdown = (ComboBox)driveLetterPage.AddDockChild(new ComboBox(0, 0, 50)
+        {
+            text = "Assign a drive letter",
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Fill);
+
+        foreach (char letter in letters)
+        {
+            letterDropdown.AddItem(letter);
+        }
+    }
+
+    private void DriveSizePage()
+    {
+        driveSizePage.AddDockChild(new Label(0, 0, 0, 0)
+        {
+            text = "Specify Volume Size",
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            fontSize = 16
+        }, Dock.Top);
+    }
+
+    private void InitPage()
+    {
         wizardPage.AddDockChild(new Label(0, 0, 0, 0)
         {
             text = "This wizard helps you create a volume on a disk.",
@@ -71,55 +199,6 @@ public class DiskmgrNewVolume : Window
             verticalAlignment = VerticalAlignment.Top,
             fontSize = 16
         }, Dock.Fill);
-
-        driveSizePage.AddDockChild(new Label(0, 0, 0, 0)
-        {
-            text = "Drive size page",
-            useBackground = false,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
-            fontSize = 16
-        }, Dock.Fill);
-
-        driveLetterPage.AddDockChild(new Label(0, 0, 0, 0)
-        {
-            text = "Drive Letter Page",
-            useBackground = false,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
-            fontSize = 16
-        }, Dock.Fill);
-
-        formatDrivePage.AddDockChild(new Label(0, 0, 0, 0)
-        {
-            text = "Format page",
-            useBackground = false,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
-            fontSize = 16
-        }, Dock.Fill);
-
-        finalPage.AddDockChild(new Label(0, 0, 0, 0)
-        {
-            text = "Final page",
-            useBackground = false,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
-            fontSize = 16
-        }, Dock.Fill);
-
-
-        root.AddDockChild(tabs, Dock.Bottom);
-
-        root.AddDockChild(wizardPage, Dock.Fill);
-        root.AddDockChild(driveSizePage, Dock.Fill);
-        root.AddDockChild(driveLetterPage, Dock.Fill);
-        root.AddDockChild(formatDrivePage, Dock.Fill);
-        root.AddDockChild(finalPage, Dock.Fill);
-
-
-        AddChild(root);
-        ShowPage(0);
     }
 
     private void NextPage()
