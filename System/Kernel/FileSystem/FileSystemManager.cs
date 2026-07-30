@@ -20,8 +20,12 @@ public static class FileSystemManager
 
         VfsManager.RegisterFilesystem("fat", fat);
 
-        IBlockDevice storageDevice = StorageManager.PrimaryDevice;
-
+        IBlockDevice ?storageDevice = StorageManager.PrimaryDevice;
+        if(storageDevice == null)
+        {
+            SystemLogger.WriteLine("FileSystemManager", "Storage device not found", ConsoleMessageType.Error);
+            return;
+        }
 
         //Mbr partition didn't work on vmware
         if (!Gpt.IsGpt(storageDevice))
@@ -59,62 +63,49 @@ public static class FileSystemManager
         CreateSystemDirectories();
         SystemRegistry.Initialize();
 
-        //StorageManager.Initialize();
-        //
-        //VfsManager.RegisterFilesystem("fat", new FatFilesystemType());
-        //
-        //
-        //// Scan partitions
-        //if (StorageManager.PrimaryDevice != null)
-        //{
-        //    StorageManager.RescanPartitions(StorageManager.PrimaryDevice);
-        //
-        //    if (StorageManager.Partitions.Count == 0)
-        //    {
-        //        Mbr.Create(StorageManager.PrimaryDevice);
-        //
-        //        PartitionManager.Create(StorageManager.PrimaryDevice, 2048, 100000, 0x0C, Guid.Empty);
-        //
-        //
-        //        StorageManager.RescanPartitions(StorageManager.PrimaryDevice);
-        //    }
-        //}
-        //
-        //VfsManager.TryFormat("fat", "0", null);
-        //
-        //
-        //VfsManager.TryMount("fat", "0", MountFlags.None, "/mnt", out mount);
 
 
         //fs.WriteAllText(@"C:\Apps\main.breeze", StarterProgram);
-
-        //fs.CreateDirectory(@"C:\System\ControlPanel");
-        //fs.CreateDirectory(@"C:\System\Services");
         //fs.WriteAllText(@"C:\System\ControlPanel\About Windose.breeze", AboutControlPanelApplet);
         //fs.WriteAllText(@"C:\System\Services\startup.breeze", StartupService);
+    }
+
+    public static string GetUniquePath(string directory, string baseName, string extension = "")
+    {
+        string path = Path.Combine(directory, $"{baseName}.{ extension}");
+
+        if (!File.Exists(path) && !Directory.Exists(path))
+            return path;
+
+        int i = 2;
+        while (true)
+        {
+            path = Path.Combine(directory, $"{baseName} ({i}).{extension}");
+
+            if (!File.Exists(path) && !Directory.Exists(path))
+                return path;
+
+            i++;
+        }
     }
 
     private static void CreateSystemDirectories()
     {
         Directory.CreateDirectory("/mnt/System");
         Directory.CreateDirectory("/mnt/System/Services");
-        Directory.CreateDirectory("/mnt/User");
+        Directory.CreateDirectory("/mnt/System/Breeze/");
+        Directory.CreateDirectory("/mnt/user");
+        Directory.CreateDirectory("/mnt/user/Desktop");
     }
 
     public static string NormalizePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path)) return @"0:\";
-        string value = path.Trim().Replace('/', '\\');
-        if (value == "0:") return @"0:\";
-        if (!value.Contains(":")) value = @"0:\" + value.TrimStart('\\');
+        path = path.Replace('\\', '/');
 
-        string prefix = value.Length >= 2 && value[1] == ':' ? value.Substring(0, 2) : "0:";
-        string rest = value.Length > 2 ? value.Substring(2) : "";
-        while (rest.Contains("\\\\")) rest = rest.Replace("\\\\", "\\");
-        rest = rest.TrimStart('\\');
-        value = prefix + "\\" + rest;
-        if (value.Length > 3) value = value.TrimEnd('\\');
-        return value;
+        while (path.Contains("//"))
+            path = path.Replace("//", "/");
+
+        return path;
     }
 
     public static string Combine(string directory, string name)

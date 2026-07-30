@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using Windose.System.Kernel;
+﻿using Windose.System.Kernel;
 
 namespace Windose.Installer
 {
@@ -213,20 +210,15 @@ namespace Windose.Installer
 
         public static void Run(string[]? args = null)
         {
-            if (SystemRegistry.GetBoolean("isSetup"))
+            string path = "/mnt/.setup";
+            if (File.Exists(path))
             {
                 return;
             }
 
-            Console.WriteLine("System setup will run now");
-            Console.WriteLine("Press any key to continue.");
-
-            Console.Read();
-
-
             InstallIconPack();
 
-            SystemRegistry.Define("isSetup", true, string.Empty, true);
+            File.Create(path).Dispose();
         }
 
         private static void InstallIconPack()
@@ -237,7 +229,7 @@ namespace Windose.Installer
             }
             foreach (string path in Predefined)
             {
-                Console.WriteLine($"copying {path}");
+                
                 ResourceLoader.WriteStorageAsync($"/mnt/System/Icons/{path.Substring("Windose.Resources.Icons.".Length)}", path);
             }
         }

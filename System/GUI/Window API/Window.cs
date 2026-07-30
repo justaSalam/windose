@@ -216,14 +216,23 @@ public class Window : Component
             inFocus = HitTest(mouseX, mouseY);
 
 
-            focusedComponent = GetChildAt(mouseX, mouseY);
+            if (TitleHitTest(mouseX, mouseY))
+            {
+                focusedComponent = null;
+            }
+            else
+            {
+                focusedComponent = GetChildAt(mouseX, mouseY);
+            }
         }
+
+
+        DragWindow(mouseState, mouseX, mouseY);
+        ResizeWindow(mouseState, mouseX, mouseY);
 
         if (focusedComponent != null && focusedComponent.HandleInput(mouseX, mouseY, mouseState))
             return true;
 
-        DragWindow(mouseState, mouseX, mouseY);
-        ResizeWindow(mouseState, mouseX, mouseY);
 
         return HitTest(mouseX, mouseY);
     }
@@ -350,6 +359,9 @@ public class Window : Component
         bounds.Y = Y;
         bounds.Width = Width;
         bounds.Height = Height;
+
+        ComputeAbsoluteCoordinates();
+
 
         WindowManager.Invalidate(oldBounds);
         WindowManager.Invalidate(bounds);

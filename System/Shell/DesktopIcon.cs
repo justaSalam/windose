@@ -6,6 +6,7 @@ using System.Drawing;
 using System.Numerics;
 using System.Text;
 using Windose.Resources.Icons;
+using Windose.System.Kernel;
 
 namespace Windose.System.Shell
 {
@@ -45,19 +46,19 @@ namespace Windose.System.Shell
             }
             else
             {
+                //TODO file associations
                 switch(fileEntry.FileType)
                 {
                     case FileType.Directory:
-                        this.icon = SystemIcons.directory_closed;
+                        this.icon = new Png("/mnt/System/Icons/directory_closed.png");
                         break;
 
                     case FileType.File:
-
-                        this.icon = SystemIcons.file_windows;
+                        this.icon = new Png("/mnt/System/Icons/file_lines.png");
                         break;
 
                     default:
-                        this.icon = SystemIcons.file_windows;
+                        this.icon = new Png("/mnt/System/Icons/file_question.png");
                         break;
                 }
             }

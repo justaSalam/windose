@@ -1,11 +1,12 @@
-using System.Drawing;
-using System.Globalization;
-using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
+using System.Drawing;
+using System.Globalization;
 using Windose;
 using Windose.System.Shell;
+using static Cosmos.Kernel.System.Graphics.Fonts.PCScreenFont;
 
 public class Desktop : Component
 {
@@ -80,21 +81,84 @@ public class Desktop : Component
         contextMenu.AddSeparator();
         contextMenu.AddItem("Display Settings");
         contextMenu.AddItem("Personalise");
-
-        AddIcon(new DesktopIcon(10, 10, new FileEntry("New File", FileType.File, "/mnt/desktop/new file", long.MaxValue)));
-
-        AddIcon(new DesktopIcon(40, 10, new FileEntry("New Directory", FileType.Directory, "/mnt/desktop/new directory", long.MinValue)));
     }
 
     private void DesktopNewDirectory()
     {
-        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry("New Directory", FileType.Directory, "/mnt/desktop/new directory", 0)));
+        string path = FileSystemManager.GetUniquePath("/mnt/user/desktop/", "New Directory");
+
+        Directory.CreateDirectory(path);
+        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(Path.GetDirectoryName(path), FileType.Directory, path, 0)));
     }
 
 
     private void DesktopNewFile(string extension)
     {
-        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry($"New File.{extension}", FileType.File, $"/mnt/desktop/new file.{extension}", 0)));
+        string path = FileSystemManager.GetUniquePath("/mnt/user/desktop/", "New File", extension);
+
+        File.Create(path);
+        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(Path.GetFileName(path), FileType.File, path, 0)));
+    }
+
+    private Dictionary<string, DesktopLayoutEntry> LoadLayout()
+    {
+        var layout = new Dictionary<string, DesktopLayoutEntry>();
+
+        const string layoutFile = "/mnt/user/desktop/.desktop.layout";
+
+        if (!File.Exists(layoutFile))
+            return layout;
+
+        foreach (string line in File.ReadAllLines(layoutFile))
+        {
+            string[] parts = line.Split('|');
+
+            if (parts.Length != 3)
+                continue;
+
+            layout[parts[0]] = new DesktopLayoutEntry
+            {
+                Path = parts[0],
+                X = int.Parse(parts[1]),
+                Y = int.Parse(parts[2])
+            };
+        }
+
+        return layout;
+    }
+
+    private void LoadIcons()
+    {
+        Dictionary<string, DesktopLayoutEntry> layout = LoadLayout();
+
+        foreach (string path in Directory.GetFileSystemEntries("/mnt/user/desktop"))
+        {
+            if (Path.GetFileName(path) == ".desktop.layout")
+                continue;
+
+            int x = 0;
+            int y = 0;
+
+            if (layout.TryGetValue(path, out var entry))
+            {
+                x = entry.X;
+                y = entry.Y;
+            }
+
+            //AddIcon(new DesktopIcon(x, y, new FileEntry(path)));
+        }
+    }
+
+    private void SaveLayout()
+    {
+        List<string> lines = new();
+
+        foreach (DesktopIcon icon in Icons)
+        {
+            lines.Add($"{icon.fileEntry.AbsoluteLocation}|{icon.X}|{icon.Y}");
+        }
+
+        File.WriteAllLines("/mnt/user/desktop/.desktop.layout", lines);
     }
 
     public override void Update()
@@ -442,4 +506,10 @@ public class Desktop : Component
         base.Dispose();
     }
 
+}
+public class DesktopLayoutEntry
+{
+    public string Path { get; set; } = "";
+    public int X { get; set; }
+    public int Y { get; set; }
 }

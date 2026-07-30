@@ -78,8 +78,6 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
     private void DrawCursor(int x, int y)
     {
-        //Canvas.DrawFilledCircle(Color.Red, x, y, 3);
         Canvas.SetCursor(true, x, y);
-
     }
 }

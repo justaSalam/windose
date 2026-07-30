@@ -5,6 +5,7 @@ using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.HAL.Pci;
 using Cosmos.Kernel.HAL.Pci.Enums;
 using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.System.Filesystems.Fat;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
@@ -191,30 +192,60 @@ public static class CommandRegistry
 
     private static void DiskManager(CommandContext context, string[] arguments)
     {
+        if (!RequireArguments(context, arguments, 1, "diskmgr [command]")) return;
 
-        context.WriteLine($"Primary Device: {StorageManager.PrimaryDevice?.Name}");
-        context.WriteLine($"Devices: {StorageManager.DeviceCount}");
-        context.WriteLine($"Partitions: {StorageManager.Partitions.Count}");
-
-
-        context.WriteLine($"\nDevices: (Name | Block size | Block count)");
-        for (int i = 0; i < StorageManager.DeviceCount; i++)
+        switch (arguments[0])
         {
-            IBlockDevice? device = StorageManager.GetDevice(i);
-            context.WriteLine($"    {device.Name} | {device.BlockSize}B | {device.BlockCount}");
+            case "info":
+                {
+                    context.WriteLine($"Primary Device: {StorageManager.PrimaryDevice?.Name}");
+                    context.WriteLine($"Devices: {StorageManager.DeviceCount}");
+                    context.WriteLine($"Partitions: {StorageManager.Partitions.Count}");
+
+
+                    context.WriteLine($"\nDevices: (Name | Block size | Block count)");
+                    for (int i = 0; i < StorageManager.DeviceCount; i++)
+                    {
+                        IBlockDevice? device = StorageManager.GetDevice(i);
+                        context.WriteLine($"    {device.Name} | {device.BlockSize}B | {device.BlockCount}");
+                    }
+
+                    context.WriteLine($"\nMounted Devices: (Name | Mount point | Source)");
+                    foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
+                    {
+                        context.WriteLine($"    {mount.Name} | {mount.MountPoint} | {mount.Source}");
+                    }
+
+                    context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
+                    foreach (Partition partition in StorageManager.Partitions)
+                    {
+                        context.WriteLine($"    {partition.Name} | {partition.BlockSize}B | {partition.BlockCount}");
+                    }
+
+                    break;
+                }
+
+            case "format":
+
+                if(!VfsManager.TryUnmount("/mnt"))
+                {
+                    context.WriteLine("Failed to unmount");
+                    return;
+                }
+
+                if (VfsManager.TryFormat("fat", "0", new FatFormatOptions()
+                {
+                    VolumeLabel = "SYSTEM VOLUME",
+                    Type = FatType.Fat32
+                }))
+                {
+                    context.WriteLine("Drive formatted");
+                    context.WriteLine("Reboot to apply changes");
+                }
+                break;
         }
 
-        context.WriteLine($"\nMounted Devices: (Name | Mount point | Source)");
-        foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
-        {
-            context.WriteLine($"    {mount.Name} | {mount.MountPoint} | {mount.Source}");
-        }
 
-        context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
-        foreach (Partition partition in StorageManager.Partitions)
-        {
-            context.WriteLine($"    {partition.Name} | {partition.BlockSize}B | {partition.BlockCount}");
-        }
 
     }
 

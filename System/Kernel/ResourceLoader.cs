@@ -4,7 +4,7 @@ using Windose.System.System_Calls;
 
 namespace Windose.System.Kernel
 {
-    internal static class ResourceLoader
+    public static class ResourceLoader
     {
 
         /// <summary>
