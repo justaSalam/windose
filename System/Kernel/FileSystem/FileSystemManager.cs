@@ -1,5 +1,6 @@
 
 using Cosmos.Kernel.Core.IO;
+using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Filesystems.Fat;
@@ -19,6 +20,29 @@ public static class FileSystemManager
 
         VfsManager.RegisterFilesystem("fat", fat);
 
+        IBlockDevice storageDevice = StorageManager.PrimaryDevice;
+
+
+        //Mbr partition didn't work on vmware
+        if (!Gpt.IsGpt(storageDevice))
+        {
+            Gpt.Create(storageDevice);
+
+            DriveUtils.CreateGptPartition(storageDevice);
+
+            StorageManager.RescanPartitions(storageDevice);
+
+            VfsManager.TryFormat("fat", "0", new FatFormatOptions()
+            {
+                VolumeLabel = "SYSTEM",
+                Type = FatType.Fat32
+            });
+
+            Power.Reboot();
+        }
+
+
+
         if (VfsManager.TryMount("fat", "0", MountFlags.None, "/mnt", out VfsManager.VfsMount? mount))
         {
             SystemLogger.WriteLine("FileSystemManager", $"Mounted -> {mount.Name} partition {mount.Source} - at -> {mount.MountPoint}");
@@ -31,15 +55,6 @@ public static class FileSystemManager
 
             return;
         }
-
-        //No null check needed, without a primary device the setup wouldn't get here
-        if (StorageManager.Partitions.Count == 0)
-        {
-            DriveUtils.CreateMBR(StorageManager.PrimaryDevice);
-            DriveUtils.CreateMbrPartition(StorageManager.PrimaryDevice);
-        }
-
-
 
         CreateSystemDirectories();
         SystemRegistry.Initialize();

@@ -18,7 +18,6 @@ namespace Windose.System.Kernel
             try
             {
                 return ResourceManager.GetResourceAsSpan(path).ToArray();
-
             }
             catch (Exception e)
             {
@@ -48,7 +47,7 @@ namespace Windose.System.Kernel
             }
         }
 
-        public static async Task<bool> WriteStorageAsync(string path, string resource)
+        public static bool WriteStorageAsync(string path, string resource)
         {
             try
             {
@@ -57,9 +56,12 @@ namespace Windose.System.Kernel
                 {
                     return false;
                 }
+                if (File.Exists(path))
+                {
+                    return false;
+                }
 
-                Console.WriteLine($"Writing: {path}");
-                await File.WriteAllBytesAsync(path, data);
+                File.WriteAllBytes(path, data);
                 return true;
             }
             catch (OperationCanceledException e)
@@ -69,11 +71,11 @@ namespace Windose.System.Kernel
             }
         }
 
-        public static async Task<bool> WriteStorageAsync(string path, byte[] data)
+        public static bool WriteStorageAsync(string path, byte[] data)
         {
             try
             {
-                await File.WriteAllBytesAsync(path, data);
+                File.WriteAllBytes(path, data);
                 return true;
             }
             catch (OperationCanceledException e)

@@ -67,7 +67,7 @@ public class Kernel : Sys.Kernel
         //TODO: 
         //An acutall setup should run before getting to the main os
         //main partition, copy files, general setup
-        //await Setup.InstallIconPack(); //comment out until drive is mounted, will result in a permanent reboot cycle
+        Setup.Run(); //comment out until drive is mounted, will result in a permanent reboot cycle
 
 
 

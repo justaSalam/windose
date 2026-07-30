@@ -279,7 +279,7 @@ C:\Users\salam\Desktop\windose\obj\Debug\net10.0\linux-x64\cosmos\Windose_patche
 --initassembly:System.Private.Reflection.Execution
 --initassembly:System.Private.StackTraceMetadata
 --systemmodule:System.Private.CoreLib
---directpinvokelist:"C:\Users\salam\.nuget\packages\cosmos.kernel.system.core\3.0.77\build\\InteropAPI.txt"
+--directpinvokelist:"C:\Users\salam\.nuget\packages\cosmos.kernel.system.core\3.0.78\build\\InteropAPI.txt"
 --splitinit
 --nativelib
 --noinlinetls

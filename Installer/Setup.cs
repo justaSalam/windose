@@ -211,12 +211,34 @@ namespace Windose.Installer
 "Windose.Resources.Icons.write_wordpad.png",
 "Windose.Resources.Icons.xml_gear.png" };
 
-        public static async Task InstallIconPack()
+        public static void Run(string[]? args = null)
         {
-            Directory.CreateDirectory("/mnt/System/Icons");
-            foreach(string path in Predefined)
+            if (SystemRegistry.GetBoolean("isSetup"))
             {
-                await ResourceLoader.WriteStorageAsync($"/mnt/System/Icons/{path.Substring("Windose.Resources.Icons.".Length)}", path);
+                return;
+            }
+
+            Console.WriteLine("System setup will run now");
+            Console.WriteLine("Press any key to continue.");
+
+            Console.Read();
+
+
+            InstallIconPack();
+
+            SystemRegistry.Define("isSetup", true, string.Empty, true);
+        }
+
+        private static void InstallIconPack()
+        {
+            if (!Directory.Exists("/mnt/System/Icons"))
+            {
+                Directory.CreateDirectory("/mnt/System/Icons");
+            }
+            foreach (string path in Predefined)
+            {
+                Console.WriteLine($"copying {path}");
+                ResourceLoader.WriteStorageAsync($"/mnt/System/Icons/{path.Substring("Windose.Resources.Icons.".Length)}", path);
             }
         }
     }

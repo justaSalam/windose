@@ -50,6 +50,42 @@ public static class DriveUtils
         }
         return PartitionManager.Create(device, startBlock, blockCount, mbrSystemId, Guid.Empty);
     }
+
+    public static bool CreateGptPartition(IBlockDevice device, ulong startBlock = 0, ulong blockCount = 0, byte mbrSystemId = 0x0C)
+    {
+        // Default start block, aligned to 1MB
+        if (startBlock == 0)
+        {
+            startBlock = 1048576UL / device.BlockSize;
+        }
+
+        //Fill the remaining disk space
+        if (blockCount == 0)
+        {
+            if (device.BlockCount > startBlock)
+            {
+                blockCount = device.BlockCount - startBlock;
+            }
+            else
+            {
+                return false; // The device is too small to fit the 1 MiB alignment offset
+            }
+        }
+
+        // MBR Boundary Safety Check
+        // The absolute highest block address or block count an MBR table can hold is 4,294,967,295
+        if (startBlock > uint.MaxValue)
+        {
+            return false;
+            // Start address is physically out of bounds for an MBR table
+        }
+
+        if (blockCount > uint.MaxValue)
+        {
+            blockCount = uint.MaxValue;// Clamp the partition size to the maximum structural limit allowed by MBR
+        }
+        return PartitionManager.Create(device, startBlock, blockCount, mbrSystemId, Gpt.BasicDataPartitionType);
+    }
     public static void RescanParitions(IBlockDevice device)
     {
         StorageManager.RescanPartitions(device);

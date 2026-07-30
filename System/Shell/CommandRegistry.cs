@@ -36,7 +36,7 @@ public sealed class CommandContext
     private readonly Action clear;
     private readonly Action close;
 
-    public string CurrentDirectory { get; set; } = VfsManager.CurrentDirectory;
+    public string CurrentDirectory { get; set; } = "/mnt";
 
     public CommandContext(Action<string> writeLine, Action clear, Action close)
     {
@@ -192,32 +192,30 @@ public static class CommandRegistry
     private static void DiskManager(CommandContext context, string[] arguments)
     {
 
-        context.WriteLine($"Devices: {StorageManager.DeviceCount}");
         context.WriteLine($"Primary Device: {StorageManager.PrimaryDevice?.Name}");
+        context.WriteLine($"Devices: {StorageManager.DeviceCount}");
         context.WriteLine($"Partitions: {StorageManager.Partitions.Count}");
 
-
-        context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
-        foreach (Partition partition in StorageManager.Partitions)
-        {
-
-            context.WriteLine($"    {partition.Name} | {partition.BlockSize}B | {partition.BlockCount}");
-        }
 
         context.WriteLine($"\nDevices: (Name | Block size | Block count)");
         for (int i = 0; i < StorageManager.DeviceCount; i++)
         {
             IBlockDevice? device = StorageManager.GetDevice(i);
             context.WriteLine($"    {device.Name} | {device.BlockSize}B | {device.BlockCount}");
-
         }
 
         context.WriteLine($"\nMounted Devices: (Name | Mount point | Source)");
         foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
         {
-
             context.WriteLine($"    {mount.Name} | {mount.MountPoint} | {mount.Source}");
         }
+
+        context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
+        foreach (Partition partition in StorageManager.Partitions)
+        {
+            context.WriteLine($"    {partition.Name} | {partition.BlockSize}B | {partition.BlockCount}");
+        }
+
     }
 
     private static void Help(CommandContext context, string[] args)
@@ -242,12 +240,17 @@ public static class CommandRegistry
 
     private static void ChangeDirectory(CommandContext context, string[] args)
     {
-        if (args.Length == 0) { context.WriteLine(context.CurrentDirectory); return; }
-        string path = context.ResolvePath(args[0]);
-        if (path == "") path = @"/mnt";
-        if (!VfsManager.TryOpenDirectory(path, out IVfsDirectoryHandle? directory))
+        if (args.Length == 0)
         {
+            context.WriteLine(context.CurrentDirectory);
+            return;
 
+        }
+        string path = context.ResolvePath(args[0]);
+
+        if (string.IsNullOrEmpty(path)) path = "/mnt";
+        if (!Directory.Exists(path))
+        {
             context.WriteLine("Directory not found: " + path);
             return;
         }
@@ -255,16 +258,10 @@ public static class CommandRegistry
     }
     public static string NormalizeDrive(string path)
     {
-        if (string.IsNullOrEmpty(path))
-            return @"C:\";
+        path = path.Replace('\\', '/');
 
-        path = path.Replace("/", "\\");
-
-        if (path.StartsWith("\\"))
-            path = path.Substring(1);
-
-        if (path.Length == 2 && path[1] == ':')
-            path += "\\";
+        while (path.Contains("//"))
+            path = path.Replace("//", "/");
 
         return path;
     }
@@ -274,7 +271,7 @@ public static class CommandRegistry
         string path = context.ResolvePath(args.Length == 0 ? "" : args[0]);
 
 
-        if (!VfsManager.TryOpenDirectory(path, out IVfsDirectoryHandle? handle))
+        if (!Directory.Exists(path))
         {
             context.WriteLine("Directory not found: " + path);
             return;
@@ -286,18 +283,23 @@ public static class CommandRegistry
         string[] files = Directory.GetFiles(path);
 
         for (int i = 0; i < directories.Length; i++)
-            context.WriteLine("<DIR>          " + FileSystemManager.GetName(directories[i]));
+        {
+            context.WriteLine($"<DIR>       {directories[i]}");
+        }
 
         for (int i = 0; i < files.Length; i++)
-            //context.WriteLine(VfsManager.G.GetFileSize(files[i]).ToString().PadLeft(12) + "   " + FileSystemManager.GetName(files[i]));
+        {
+            context.WriteLine(Path.GetFileName(files[i]));
+        }
 
 
-            context.WriteLine("        " + files.Length + " file(s), " + directories.Length + " dir(s)");
+        context.WriteLine($"        {files.Length} file(s), {directories.Length} dir(s)");
     }
 
     private static void TypeFile(CommandContext context, string[] args)
     {
         if (!RequireArguments(context, args, 1, "type <file>")) return;
+
         string path = context.ResolvePath(args[0]);
         context.WriteLine(File.ReadAllText(path));
 
@@ -306,9 +308,9 @@ public static class CommandRegistry
     private static void MakeDirectory(CommandContext context, string[] args)
     {
         if (!RequireArguments(context, args, 1, "mkdir <path>")) return;
+
         string path = context.ResolvePath(args[0]);
-        context.WriteLine(VfsManager.TryCreateDirectory(path, ModeEnum.Directory)
-            ? "Directory created: " + path : "Could not create directory: " + path);
+        Directory.CreateDirectory(path);
     }
 
     private static void DeleteFile(CommandContext context, string[] args)
@@ -354,8 +356,8 @@ public static class CommandRegistry
 
         for (int i = 0; i < SchedulerManager.ThreadCount; i++)
         {
-            Cosmos.Kernel.Core.Scheduler.Thread ?thread = SchedulerManager.Threads[i];
-            if(thread == null) continue;
+            Cosmos.Kernel.Core.Scheduler.Thread? thread = SchedulerManager.Threads[i];
+            if (thread == null) continue;
 
             context.WriteLine($"{thread.Id} {thread.State} {thread.CpuId}");
         }
