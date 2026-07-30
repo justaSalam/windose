@@ -34,12 +34,11 @@ public class ProcessPerformanceList : Component
         openLocationItem = contextMenu.AddItem("Open File Location", OpenProcessFileLocation);
         propertiesItem = contextMenu.AddItem("Properties", OpenProcessProperties);
 
-        priorityMenu = new MenuItem(160, 28 * 5, 100, 20);
-        priorityMenu.AddSubmenuItem("Idle", () => SetPriority(ProcessPriority.Idle));
-        priorityMenu.AddSubmenuItem("Low", () => SetPriority(ProcessPriority.Low));
-        priorityMenu.AddSubmenuItem("Normal", () => SetPriority(ProcessPriority.Normal));
-        priorityMenu.AddSubmenuItem("High", () => SetPriority(ProcessPriority.High));
-        priorityMenu.AddSubmenuItem("Critical", () => SetPriority(ProcessPriority.Critical));
+        setPriorityItem.AddSubmenuItem("Idle", () => SetPriority(ProcessPriority.Idle));
+        setPriorityItem.AddSubmenuItem("Low", () => SetPriority(ProcessPriority.Low));
+        setPriorityItem.AddSubmenuItem("Normal", () => SetPriority(ProcessPriority.Normal));
+        setPriorityItem.AddSubmenuItem("High", () => SetPriority(ProcessPriority.High));
+        setPriorityItem.AddSubmenuItem("Critical", () => SetPriority(ProcessPriority.Critical));
     }
 
     public override void DrawLocal()
@@ -248,7 +247,16 @@ public class ProcessPerformanceList : Component
 
     private void SetPriority(ProcessPriority priority)
     {
-        if (selectedProcess == null || !ProcessManger.Contains(selectedProcess)) return;
+        if (selectedProcess == null || !ProcessManger.Contains(selectedProcess))
+        {
+            return;
+        }
+
+        if (!selectedProcess.canOverridePriority)
+        {
+            return;
+        }
+
         selectedProcess.Priority = priority;
 
         switch (priority)

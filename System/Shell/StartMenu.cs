@@ -50,25 +50,18 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
-        programs.AddSubmenuItem("Accessories", () => new EmptyWindow());
+        programs.AddSubmenuItem("Accessories", () => WindowManager.Register(new EmptyWindow()));
         programs.AddSubmenuItem("File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", true)));
 
-        programs.AddSubmenuItem("Disk Management", () =>
-        {
-            new DiskManagement(100, 100, 600, 350);
-
-        });
-        programs.AddSubmenuItem("Task Manager", () => new PerformanceMonitor(180, 120));
+            
+        programs.AddSubmenuItem("Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
+        programs.AddSubmenuItem("Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
 
         MenuItem breeze = programs.AddSubmenuItem("Breeze");
-        breeze.AddSubmenuItem("Breeze Editor", () =>
-        {
-            WindowManager.Register(new BreezeEditor());
-        });
-        breeze.AddSubmenuItem("Breeze API", () =>
-        {
-            WindowManager.Register(new BreezeApiBrowser());
-        });
+        breeze.AddSubmenuItem("Breeze Editor", () => WindowManager.Register(new BreezeEditor()));
+        breeze.AddSubmenuItem("Breeze API", () => WindowManager.Register(new BreezeApiBrowser()));
+
+
         breeze.AddSubmenuItem("Breeze Demo", () =>
         {
             BreezeDemo.Run();

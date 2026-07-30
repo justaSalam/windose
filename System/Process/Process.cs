@@ -12,7 +12,9 @@ public abstract class Process : IDisposable
     public string name = "undefined process";
     public int id;
     public string startTime = DateTime.Now.ToString();
+    
 
+    public bool canOverridePriority = true;
     public ProcessPriority Priority = ProcessPriority.Normal;
     public ProcessType processType = ProcessType.Undefined;
 

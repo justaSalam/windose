@@ -44,6 +44,7 @@ public class WindowManager : SingleThreadedProcess
     {
         components = Component.components;
         canTerminate = false;
+        canOverridePriority = false;
     }
 
     private List<Component> components;
@@ -207,8 +208,8 @@ public class WindowManager : SingleThreadedProcess
             if (win == null || failedWindows.Contains(win)) continue;
             try
             {
-                //Window update is called by the scheduler :)
-                //win.Update();
+                //TODO: Windows should be updated by the scheduler instead, wait for parallel threads
+                win.Update();
             }
             catch (Exception exception)
             {

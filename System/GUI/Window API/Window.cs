@@ -43,10 +43,6 @@ public class Window : Component
     private bool hasTitleBar;
     private bool windowFocused;
 
-    private Thread thread;
-    CancellationTokenSource tokenSource;
-    CancellationToken token;
-
 
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png? icon = null) : base(x, y, width, height)
     {
@@ -56,21 +52,6 @@ public class Window : Component
         zLayer = DrawLayer.Window;
 
         TitlebarSetup(useTitleBar, title);
-
-
-        tokenSource = new CancellationTokenSource();
-        token = tokenSource.Token;
-
-        thread = new Thread(() =>
-        {
-            Start();
-            while (true)
-            {
-                Update();
-            }
-        });
-
-        thread.Start();
     }
 
 
@@ -456,10 +437,6 @@ public class Window : Component
     {
         Visible = false;
         WindowManager.Invalidate(bounds);
-        tokenSource.Cancel();
-
-
-
         Dispose();
     }
 

@@ -43,10 +43,7 @@ public class Taskbar : Component
         {
             itemHeight = 18
         };
-        contextMenu.AddItem("Task Manager", () =>
-        {
-            new PerformanceMonitor(180, 120);
-        });
+        contextMenu.AddItem("Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
         contextMenu.AddSeparator();
         contextMenu.AddItem("Minimize All Windows");
         contextMenu.AddItem("Properties");
