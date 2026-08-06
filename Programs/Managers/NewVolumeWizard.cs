@@ -7,11 +7,11 @@ public class DiskmgrNewVolume : Window
 {
     private readonly DockPanel root;
 
-    private readonly DockPanel wizardPage;
-    private readonly DockPanel driveSizePage;
-    private readonly DockPanel driveLetterPage;
-    private readonly DockPanel formatDrivePage;
-    private readonly DockPanel finalPage;
+    private readonly GroupBox wizardPage;
+    private readonly GroupBox driveSizePage;
+    private readonly GroupBox driveLetterPage;
+    private readonly GroupBox formatDrivePage;
+    private readonly GroupBox finalPage;
 
     private readonly char[] letters = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I' };
     private int selectedPage;
@@ -78,127 +78,111 @@ public class DiskmgrNewVolume : Window
 
     private void FinalizePage()
     {
-        finalPage.AddDockChild(new Label(0, 0, 0, 0)
+        finalPage.AddGroupChild(new Label(0, 0, 0, 0)
         {
             text = "Final page",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
             verticalAlignment = VerticalAlignment.Top,
             fontSize = 16
-        }, Dock.Fill);
+        });
     }
 
     private void FormatDrivePage()
     {
-        formatDrivePage.AddDockChild(new Label(0, 0, 0, 0)
+        formatDrivePage.AddGroupChild(new Label(0, 0, 0, 0)
         {
             text = "Format Partition",
             useBackground = false,
             fontSize = 16
-        }, Dock.Top);
+        });
 
 
-        formatDrivePage.AddDockChild(new Label(0, 40, 0, 0)
+
+        formatDrivePage.AddGroupChild(new RadioButton(200, 40)
         {
             text = "Do not Format this volume",
-            useBackground = false,
-            fontSize = 16
-        }, Dock.Top);
-        formatDrivePage.AddDockChild(new RadioButton(200, 40), Dock.Top);
+        });
 
-        formatDrivePage.AddDockChild(new Label(0, 80, 0, 0)
+        formatDrivePage.AddGroupChild(new RadioButton(330, 80)
         {
-            text = "Format volume using the following settings: ",
-            useBackground = false,
-            fontSize = 16
-        }, Dock.Top);
-        formatDrivePage.AddDockChild(new RadioButton(330, 80), Dock.Top);
+            text = "Format this volume with the following settings",
+        });
 
-        ComboBox fsDropdown = (ComboBox)formatDrivePage.AddDockChild(new ComboBox(75, 120, 200)
+        formatDrivePage.AddGroupChild(new ComboBox(75, 120, 200)
         {
             text = "Select a File System",
             fontSize = 16,
             
-        }, Dock.Top);
+        });
 
-        fsDropdown.AddItem("FAT32");
-        fsDropdown.AddItem("exFAT");
-
-        ComboBox AllocationUnitDropdown = (ComboBox)formatDrivePage.AddDockChild(new ComboBox(75, 160, 200)
+        formatDrivePage.AddGroupChild(new ComboBox(75, 160, 200)
         {
             text = "Allocation Unit Size", 
             fontSize = 16,
 
-        }, Dock.Top);
-
-        AllocationUnitDropdown.AddItem("Default");
+        });
 
 
-        formatDrivePage.AddDockChild(new Label(0, 200, 0, 0)
+
+
+        formatDrivePage.AddGroupChild(new Label(0, 200, 0, 0)
         {
             text = "Perform a quick format",
             useBackground = false,
             fontSize = 16
-        }, Dock.Top);
-        formatDrivePage.AddDockChild(new Checkbox(75, 200), Dock.Top);
+        });
+        formatDrivePage.AddGroupChild(new Checkbox(75, 200));
 
     }
 
     private void DriveLetterPage()
     {
-        driveLetterPage.AddDockChild(new Label(0, 0, 0, 0)
+        driveLetterPage.AddGroupChild(new Label(0, 0, 0, 0)
         {
             text = "Drive Letter Page",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
             fontSize = 16
-        }, Dock.Fill);
+        });
 
-        ComboBox letterDropdown = (ComboBox)driveLetterPage.AddDockChild(new ComboBox(0, 0, 50)
+        driveLetterPage.AddGroupChild(new ComboBox(0, 0, 50)
         {
             text = "Assign a drive letter",
             horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
-            fontSize = 16
-        }, Dock.Fill);
+            fontSize = 16,
+            items = new List<object> { "C:", "D:", "E:", "F:" , "G:"}
+        });
 
-        foreach (char letter in letters)
-        {
-            letterDropdown.AddItem(letter);
-        }
+
     }
 
     private void DriveSizePage()
     {
-        driveSizePage.AddDockChild(new Label(0, 0, 0, 0)
+        driveSizePage.AddGroupChild(new Label(0, 0, 0, 0)
         {
             text = "Specify Volume Size",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
             verticalAlignment = VerticalAlignment.Top,
             fontSize = 16
-        }, Dock.Top);
+        });
     }
 
     private void InitPage()
     {
-        wizardPage.AddDockChild(new Label(0, 0, 0, 0)
+        wizardPage.AddGroupChild(new Label(0, 0, 0, 0)
         {
             text = "This wizard helps you create a volume on a disk.",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
-            fontSize = 16
-        }, Dock.Fill);
-        wizardPage.AddDockChild(new Label(0, 0, 0, 0)
+        });
+        wizardPage.AddGroupChild(new Label(0, 0, 0, 0)
         {
             text = "A volume can only be on a single disk.",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Top,
-            fontSize = 16
-        }, Dock.Fill);
+        });
     }
 
     private void NextPage()
@@ -215,13 +199,17 @@ public class DiskmgrNewVolume : Window
     }
 
 
-    private static DockPanel CreatePage()
+    private static GroupBox CreatePage()
     {
-        return new DockPanel(0, 0, 100, 100)
+        return new GroupBox(0, 0, 100, 100)
         {
             clampSize = false,
             Margin = new Thickness(0),
             Padding = new Thickness(0),
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Stretch,
+            stackOrientation = StackOrientation.Vertical,
+
             useBackground = true,
             backgroundColor = Palette.ControlFace,
         };

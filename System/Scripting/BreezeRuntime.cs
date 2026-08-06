@@ -1846,7 +1846,7 @@ public sealed class BreezeRuntime
 
         string path = requestedPath != null && requestedPath.Contains(":")
             ? FileSystemManager.NormalizePath(requestedPath)
-            : FileSystemManager.Combine(currentModuleDirectory == "" ? @"0:\" : currentModuleDirectory, requestedPath);
+            : FileSystemManager.Combine(currentModuleDirectory == "" ? @"/mnt" : currentModuleDirectory, requestedPath);
         if (importedModules.Contains(path))
         {
             importDepth--;

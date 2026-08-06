@@ -6,7 +6,7 @@ public class GroupBox : Component
     public Color textColor = Palette.ControlBlack;
     public Color backgroundColor = Palette.ControlFace;
     public bool useBackground = false;
-    public StackOrientation orientation = StackOrientation.Vertical;
+    public StackOrientation stackOrientation = StackOrientation.Vertical;
 
     private readonly StackPanel contentPanel;
 
@@ -19,7 +19,7 @@ public class GroupBox : Component
             useBackground = false,
             useBorders = false,
             clampSize = false,
-            orientation = orientation,
+            orientation = stackOrientation,
             horizontalAlignment = HorizontalAlignment.Left,
             verticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(0),
@@ -31,7 +31,7 @@ public class GroupBox : Component
 
     public void AddGroupChild(Component child)
     {
-        contentPanel.orientation = orientation;
+        contentPanel.orientation = stackOrientation;
         contentPanel.AddStackChild(child);
         MarkDirty();
     }
@@ -70,7 +70,7 @@ public class GroupBox : Component
 
     private void ResolveGroupLayout()
     {
-        contentPanel.orientation = orientation;
+        contentPanel.orientation = stackOrientation;
         contentPanel.X = 8;
         contentPanel.Y = fontSize + 8;
         contentPanel.Resize(Math.Max(1, Width - 16), Math.Max(1, Height - fontSize - 16));

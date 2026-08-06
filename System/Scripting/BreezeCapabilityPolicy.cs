@@ -9,7 +9,7 @@ public static class BreezeCapabilityPolicy
     public static bool IsAllowed(string executablePath, string capability)
     {
         string path = FileSystemManager.NormalizePath(executablePath);
-        if (path.StartsWith(@"0:\System\Services\", StringComparison.OrdinalIgnoreCase)) return true;
+        if (path.StartsWith(@"/mnt/System/Services/", StringComparison.OrdinalIgnoreCase)) return true;
 
         lock (sync)
         {

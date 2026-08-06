@@ -216,13 +216,13 @@ public class Window : Component
             inFocus = HitTest(mouseX, mouseY);
 
 
-            if (TitleHitTest(mouseX, mouseY))
+            if (!TitleHitTest(mouseX, mouseY))
             {
-                focusedComponent = null;
+                focusedComponent = GetChildAt(mouseX, mouseY);
             }
             else
             {
-                focusedComponent = GetChildAt(mouseX, mouseY);
+                focusedComponent = null;
             }
         }
 

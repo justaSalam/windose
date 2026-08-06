@@ -15,7 +15,7 @@ public class ListView : Component
     public int detailsRowHeight = 20;
     public int headerHeight = 20;
     public int iconSize = 32;
-    public int smallIconSize = 16;
+    public int smallIconSize = 12;
     public int fontSize = 16;
     public bool useBackground = true;
     public Color backgroundColor = Palette.ControlWhite;
@@ -240,10 +240,10 @@ public class ListView : Component
 
         //DrawItemIcon(item, 4, y + 2, smallIconSize);
 
-        destRect = new Rectangle(4, y, 32, 32);
-        destRect = new Rectangle(4, y, smallIconSize, smallIconSize);
+        
+        destRect = new Rectangle(4, y + 2, smallIconSize, smallIconSize);
 
-        DrawImageAlpha(itemIcon, 4, y + 2);//TODO Fix image resizing + Add smaller icons ig 
+        DrawImageStretchAlpha(itemIcon, new Rectangle(4, y + 2, 32, 32), destRect);//TODO Fix image resizing + Add smaller icons ig 
         DrawString(item.text, color, 24, y + 2, fontSize);
 
         //int sizeX = nameColumnWidth;

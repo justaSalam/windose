@@ -1,7 +1,12 @@
-using System.Drawing;
 using Cosmos.Kernel.Core;
 using Cosmos.Kernel.System;
+using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Network;
+using Cosmos.Kernel.System.Network.Config;
+using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
+using System.Drawing;
 using Windose;
+using Windose.System.System_Calls;
 
 public class StartMenu : Window
 {
@@ -33,7 +38,7 @@ public class StartMenu : Window
         {
             verticalAlignment = VerticalAlignment.Top,
             horizontalAlignment = HorizontalAlignment.Stretch,
-            text = $"Windose NativeAOT {Cosmos.Kernel.System.Kernel.VersionString}.",
+            text = $"Windose NativeAOT {Cosmos.Kernel.System.Kernel.VersionString}",
             useBackground = false,
 
             fontSize = 16,
@@ -50,37 +55,60 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
-        programs.AddSubmenuItem("Accessories", () => WindowManager.Register(new EmptyWindow()));
+        programs.AddSubmenuItem("VMWare SVGA Test", () => WindowManager.Register(new GraphicsEngine()));
         programs.AddSubmenuItem("File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", true)));
 
             
         programs.AddSubmenuItem("Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
         programs.AddSubmenuItem("Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
+        programs.AddSubmenuSeparator();
+        programs.AddSubmenuItem("Network Configuration", () => 
+        {
+            if (NetworkManager.PrimaryDevice != null)
+            {
+                NetworkStack.Initialize();
+                DHCPClient dhcpClient = new DHCPClient();
+
+                if (dhcpClient.SendDiscoverPacket() != -1)
+                {
+                    IPConfig? config = NetworkConfigManager.Get(NetworkManager.PrimaryDevice);
+
+                    SystemLogger.WriteLine("Network", "DHCP configuration obtained successfully", ConsoleMessageType.Log);
+
+                    SystemLogger.WriteLine("Network", $"IP address: {config.IPAddress}", ConsoleMessageType.Log);
+                    SystemLogger.WriteLine("Network", $"Subnet: {config.SubnetMask}", ConsoleMessageType.Log);
+                    SystemLogger.WriteLine("Network", $"Gateway: {config.DefaultGateway}", ConsoleMessageType.Log);
+                }
+                else
+                {
+                    SystemLogger.WriteLine("Network", "DHCP timed out", ConsoleMessageType.Warning);
+                }
+
+            }
+        });
+
+        programs.AddSubmenuSeparator();
+        programs.AddSubmenuItem("SYSDUMP", SystemLogger.Dump);
+
 
         MenuItem breeze = programs.AddSubmenuItem("Breeze");
         breeze.AddSubmenuItem("Breeze Editor", () => WindowManager.Register(new BreezeEditor()));
         breeze.AddSubmenuItem("Breeze API", () => WindowManager.Register(new BreezeApiBrowser()));
 
 
-        breeze.AddSubmenuItem("Breeze Demo", () =>
-        {
-            BreezeDemo.Run();
-        });
+        breeze.AddSubmenuItem("Breeze Demo", BreezeDemo.Run);
 
         MenuItem apps = breeze.AddSubmenuItem("Applications");
 
-        apps.AddSubmenuItem("Run main.breeze", () =>
+        apps.AddSubmenuItem("Run Main", () =>
         {
-            BreezeHost.RunFile("mnt/Apps/main.breeze");
+            BreezeHost.RunFile("/mnt/Programs/main.breeze");
         });
         apps.AddSubmenuItem("Control Test", () =>
         {
-            BreezeHost.RunFile("mnt/Programs/ControlTest.breeze");
+            BreezeHost.RunFile("/mnt/Programs/ControlTest.breeze");
         });
-        apps.AddSubmenuItem("ControlTest.breeze", () =>
-        {
-            BreezeHost.RunFile("mnt/Programs/ControlTest.breeze");
-        });
+
 
         programs.AddSubmenuItem("Command Prompt", () =>
         {

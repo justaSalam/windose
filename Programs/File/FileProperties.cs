@@ -56,38 +56,42 @@ public class FileProperties : Window
 
         group.AddGroupChild(new Separator(0, 0, Width, 1) { orientation = LayoutOrientation.Horizontal });
 
-        group.AddGroupChild(new Label(0, 0, 200, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 30)
         {
             text = $"Type: {fileEntry.FileType}",
+
             useBackground = false,
-            fontSize = 17
+            horizontalAlignment = HorizontalAlignment.Stretch
         });
 
-        group.AddGroupChild(new Label(0, 0, 200, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 30)
         {
             text = $"Location: {fileEntry.AbsoluteLocation}",
             useBackground = false,
-            fontSize = 17
+            horizontalAlignment = HorizontalAlignment.Stretch
         });
-        group.AddGroupChild(new Label(0, 0, 200, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 30)
         {
-            text = $"Size: {fileEntry.SizeBytes / 1024} kB",
+            text = $"Size: {fileEntry.SizeBytes} Bytes",
             useBackground = false,
-            fontSize = 17
+            horizontalAlignment = HorizontalAlignment.Stretch
         });
-        group.AddGroupChild(new Label(0, 0, 200, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 30)
         {
             text = $"Contains: {fileEntry.Contains}",
             useBackground = false,
-            fontSize = 17
+            horizontalAlignment = HorizontalAlignment.Stretch
         });
-        group.AddGroupChild(new Separator(0, 0, Width, 1) { orientation = LayoutOrientation.Horizontal });
+        group.AddGroupChild(new Separator(0, 0, Width, 1) 
+        { 
+            orientation = LayoutOrientation.Horizontal 
+        });
 
-        group.AddGroupChild(new Label(0, 0, 200, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 30)
         {
             text = $"Created {fileEntry.CreatedAt}",
             useBackground = false,
-            fontSize = 17
+            horizontalAlignment = HorizontalAlignment.Stretch
         });
 
         buttons.AddStackChild(new Button(0, 0, 70, 24)
@@ -108,10 +112,7 @@ public class FileProperties : Window
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = () =>
-            {
-                Close();
-            }
+            leftMouseRelease = Close
         });
 
         buttons.AddStackChild(new Button(0, 0, 70, 24)
@@ -120,18 +121,16 @@ public class FileProperties : Window
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = () =>
-            {
-                Apply();
-            }
+            leftMouseRelease = Apply
         });
 
 
         root.AddDockChild(menuBar, Dock.Top);
 
+        root.AddDockChild(buttons, Dock.Bottom);
         root.AddDockChild(group, Dock.Fill);
 
-        root.AddDockChild(buttons, Dock.Bottom);
+        //group.AddGroupChild(buttons);
         AddChild(root);
     }
 

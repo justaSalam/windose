@@ -133,6 +133,7 @@ namespace Windose.System.Shell
             {
                 fileEntry.FileName = newName;
                 fileEntry.AbsoluteLocation = ReplacePathName(fileEntry.AbsoluteLocation, newName);
+                File.Move(renameOriginalText, newName);
             }
 
             renameText = "";

@@ -41,7 +41,7 @@ show(main);
     private readonly ScrollView projectScroll;
     private readonly IWindoseFileSystem subscribedFileSystem;
     private int activeDocumentIndex = -1;
-    private string projectRoot = @"0:\Apps";
+    private string projectRoot = @"/mnt/Apps";
     private bool diagnosticsPending;
     private long diagnosticsDueAt;
     private const long DiagnosticDelayTicks = 1500000;
@@ -172,7 +172,7 @@ show(main);
         projectTree.itemDoubleClick = OpenProjectItem;
 
         if (!string.IsNullOrEmpty(initialPath)) OpenPath(initialPath, true);
-        else CreateDocument(@"0:\Apps\main.breeze", DefaultSource, false, true);
+        else CreateDocument(@"/mnt/Apps/main.breeze", DefaultSource, false, true);
         RefreshProjectExplorer();
         ValidateDocument();
     }
@@ -200,7 +200,7 @@ show(main);
         {
             Mode = mode,
             Title = title,
-            InitialPath = ActiveDocument?.Path ?? @"0:\Apps\main.breeze",
+            InitialPath = ActiveDocument?.Path ?? @"/mnt/Apps/main.breeze",
             FilterExtension = ".breeze",
             FilterDescription = "Breeze scripts (*.breeze)",
             DefaultExtension = ".breeze",
@@ -281,7 +281,7 @@ show(main);
         documents.RemoveAt(closing);
         activeDocumentIndex = -1;
         if (documents.Count == 0)
-            CreateDocument(@"0:\Apps\untitled.breeze", DefaultSource, true, true);
+            CreateDocument(@"/mnt/Apps/untitled.breeze", DefaultSource, true, true);
         else
             SwitchDocument(Math.Min(closing, documents.Count - 1));
         RebuildTabs();

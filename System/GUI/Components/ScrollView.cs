@@ -144,7 +144,7 @@ public class ScrollView : Component
 
         if (Mouse.scroll != 0)
         {
-            ScrollBy(0, -(int)Mouse.scroll * wheelStep);
+            ScrollBy(0, (int)Mouse.scroll * wheelStep);
             return true;
         }
 

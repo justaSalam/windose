@@ -187,13 +187,13 @@ These tutorials are small programs you can run and modify. They cover windowed a
 
 - Run Script starts a normal windowed or headless process.
 - Run Background starts a managed service.
-- Save applications under 0:\Apps and services under 0:\System\Services.
+- Save applications under /mnt/Apps and services under /mnt/System/Services.
 
 The current in-memory filesystem is cleared when Windose restarts.");
 
         AddPage("tutorial-window", "Tutorial: Windowed Process", @"
 ## Create a small application
-Save as 0:\Apps\hello.breeze and choose Run Script.
+Save as /mnt/Apps/hello.breeze and choose Run Script.
 
 $ let app = process(""Hello App"");
 $ let main = window(""Hello"", 140, 100, 480, 260);
@@ -225,10 +225,10 @@ The process remains alive without a window, while the timer schedules one log en
 
         AddPage("tutorial-service", "Tutorial: Managed Service", @"
 ## Watch a directory
-Save as 0:\System\Services\indexer.breeze and choose Run Background.
+Save as /mnt/System/Services/indexer.breeze and choose Run Background.
 
 $ let indexer = service(""Document Indexer"", true, false);
-$ watchPath(""0:\\Documents"", true);
+$ watchPath(""/mnt/Documents"", true);
 $ on indexer.message {
 $     if (value(event, ""name"") == ""filesystem.changed"") {
 $         let change = value(event, ""data"");
@@ -259,7 +259,7 @@ $ dock(root, status, ""top"");
 $ on scan.click {
 $     let indexer = tryFindProcess(""Document Indexer"");
 $     if (indexer != null) {
-$         request(indexer, ""scan"", ""0:\\Documents"");
+$         request(indexer, ""scan"", ""/mnt/Documents"");
 $     } else {
 $         set status.text = ""Service is not running"";
 $     }
@@ -275,7 +275,7 @@ Use send when no response is needed. request and reply preserve a correlation ID
 
         AddPage("tutorial-storage", "Tutorial: Store Settings", @"
 ## Read a setting without crashing
-$ let path = ""0:\\Documents\\settings.txt"";
+$ let path = ""/mnt/Documents/settings.txt"";
 $ if (!fileExists(path)) {
 $     writeFile(path, ""automatic"", false);
 $ }
@@ -290,13 +290,13 @@ tryReadFile returns ok, value, and error. Filesystem mutations return booleans f
 
         AddPage("tutorial-module", "Tutorial: Import a Module", @"
 ## Reuse a function
-Save this as 0:\Apps\lib\format.breeze:
+Save this as /mnt/Apps/lib/format.breeze:
 
 $ function formatCount(value) {
 $     return ""Items: "" + value;
 $ }
 
-Import it from 0:\Apps\main.breeze:
+Import it from /mnt/Apps/main.breeze:
 
 $ import ""lib/format.breeze"";
 $ log(formatCount(12));
@@ -308,7 +308,7 @@ Relative imports resolve beside the importing file. Each normalized module execu
 Capabilities are granted by native Windose code before the script starts:
 
 $ BreezeCapabilityPolicy.Grant(
-$     @""0:\Apps\service-manager.breeze"",
+$     @""/mnt/Apps/service-manager.breeze"",
 $     ""service.control"");
 
 The Breeze script can verify access with hasCapability(""service.control"") and then use startService, stopService, or restartService. Grant only the narrow capability the program needs.");
@@ -519,8 +519,8 @@ Adds and returns a root item.
 $ treeChild(parentItem, text, tag)
 Adds and returns a nested item.
 
-$ let drive = treeRoot(tree, ""Drive C"", ""0:\\"");
-$ treeChild(drive, ""System"", ""0:\\System"");
+$ let drive = treeRoot(tree, ""Drive C"", ""/mnt/DriveC"");
+$ treeChild(drive, ""System"", ""/mnt/DriveC/System"");
 
 The tag is returned as the path property during events.");
 
@@ -578,16 +578,16 @@ Native APIs are grouped into ui, filesystem.read, filesystem.write, ipc, logging
 $ loadDirectory(list, path)
 Clears a ListView and fills it with directories and files from Windose storage.
 
-$ loadDirectory(files, ""0:\\"");
+$ loadDirectory(files, ""/mnt/Documents"");
 
 The path must exist. Directory items expose isFolder as true and their full path through value(event, ""path"").
 
 ## File operations
-$ writeFile(""0:\\Documents\\status.txt"", ""ready"", true);
-$ let text = readFile(""0:\\Documents\\status.txt"");
-$ copyFile(""0:\\Documents\\status.txt"", ""0:\\Documents\\status.bak"", true);
-$ moveFile(""0:\\Documents\\status.bak"", ""0:\\Apps\\status.bak"", true);
-$ deleteFile(""0:\\Apps\\status.bak"");
+$ writeFile(""/mnt/Documents/status.txt"", ""ready"", true);
+$ let text = readFile(""/mnt/Documents/status.txt"");
+$ copyFile(""/mnt/Documents/status.txt"", ""/mnt/Documents/status.bak"", true);
+$ moveFile(""/mnt/Documents/status.bak"", ""/mnt/Apps/status.bak"", true);
+$ deleteFile(""/mnt/Apps/status.bak"");
 
 Also available: fileExists, directoryExists, createDirectory, deleteDirectory, copyDirectory, moveDirectory, renamePath, and fileInfo. Mutating calls return true or false. fileInfo exposes name, path, isDirectory, size, childCount, created, and modified through value.
 
@@ -595,7 +595,7 @@ tryReadFile(path) returns an object with ok, value, and error instead of stoppin
 
 ## watchPath
 $ watchPath(path, recursive) -> boolean
-Subscribes the current process to filesystem changes. path is normalized under 0:\. false matches only that exact path; true also matches every descendant. It returns false only when no filesystem backend is active.
+Subscribes the current process to filesystem changes. path is normalized under /mnt/. false matches only that exact path; true also matches every descendant. It returns false only when no filesystem backend is active.
 
 Matching changes arrive in the process message event with the name filesystem.changed and sender filesystem. event.data exposes:
 - type: Created, Modified, Deleted, or Moved
@@ -603,7 +603,7 @@ Matching changes arrive in the process message event with the name filesystem.ch
 - previousPath: old path for a move, otherwise empty
 
 $ let watcher = process(""Document Watcher"");
-$ watchPath(""0:\\Documents"", true);
+$ watchPath(""/mnt/Documents"", true);
 $ on watcher.message {
 $     if (value(event, ""name"") == ""filesystem.changed"") {
 $         let change = value(event, ""data"");
@@ -616,10 +616,10 @@ $ clearWatches() -> boolean
 Removes every watch owned by the current process. It does not affect other processes or delete files. It always returns true. Windose also clears watches automatically when the process terminates.
 
 ## Loading script files
-$ BreezeHost.RunFile(@""0:\Apps\main.breeze"");
+$ BreezeHost.RunFile(@""/mnt/Apps/main.breeze"");
 RunFile is called from native C# and executes an edited script without rebuilding Windose.
 
-Windose currently uses a temporary in-memory disk at 0:\. Its files survive while the system is running but are cleared at reboot. Native code talks to IWindoseFileSystem through FileSystemManager.Current, so a persistent Cosmos adapter can replace the temporary backend without changing Breeze or its programs.");
+Windose currently uses a temporary in-memory disk at /mnt/. Its files survive while the system is running but are cleared at reboot. Native code talks to IWindoseFileSystem through FileSystemManager.Current, so a persistent Cosmos adapter can replace the temporary backend without changing Breeze or its programs.");
 
         AddPage("application", "Application Lifecycle", @"
 ## Headless process
@@ -651,7 +651,7 @@ $ }
 
 Another application can send to it without keeping a reference:
 $ let target = findProcess(""File Indexer"");
-$ send(target, ""scan"", ""0:\\Documents"");
+$ send(target, ""scan"", ""/mnt/Documents"");
 
 Messages are queued in order. Delivery is bounded per scheduler update so one sender cannot consume an entire frame.
 
@@ -668,11 +668,11 @@ $ }
 
 service(name, restartOnFailure, protected) declares the current scheduled program as a service. A startup program uses startService(path), stopService(name), restartService(name), and serviceState(name). dependenciesReady() checks registered dependencies. Failed services restart at most three times, preventing an endless crash loop.
 
-Windose automatically runs 0:\System\Services\startup.breeze during boot. It launches every other Breeze file in that directory.
+Windose automatically runs /mnt/System\Services\startup.breeze during boot. It launches every other Breeze file in that directory.
 
 ## Background programs
 $ let worker = scheduledProcess(""File Indexer"");
-$ let files = getFiles(""0:\\Documents"");
+$ let files = getFiles(""/mnt/Documents"");
 $ let index = 0;
 $ while (index < listCount(files)) {
 $     print(fileName(listGet(files, index)));
@@ -701,7 +701,7 @@ $ stopService(name) -> boolean
 $ restartService(name) -> boolean
 $ serviceState(name) -> running, stopped, or missing
 
-service is valid in scheduled programs. Failed opted-in services restart at most three times. Protected services reject normal stop requests. At boot, startup.breeze launches every other script under 0:\System\Services. Service properties: name, state, running, protected, restartOnFailure, dependenciesReady. Events: update, message.
+service is valid in scheduled programs. Failed opted-in services restart at most three times. Protected services reject normal stop requests. At boot, startup.breeze launches every other script under /mnt/System\Services. Service properties: name, state, running, protected, restartOnFailure, dependenciesReady. Events: update, message.
 
 ## IPC
 $ findProcess(name) -> process or runtime error

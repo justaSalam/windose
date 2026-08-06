@@ -5,6 +5,7 @@ using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.HAL.Pci;
 using Cosmos.Kernel.HAL.Pci.Enums;
 using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Filesystems.Fat;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Network;
@@ -153,7 +154,7 @@ public static class CommandRegistry
         Register("service", "Starts a Breeze file in background mode.", "service <file.breeze>", RunService);
 
         Register("exit", "Closes Command Prompt.", "exit", (context, args) => context.Close());
-        Register("exit", "Closes Command Prompt.", "exit", (context, args) => context.Close());
+        Register("reboot", "Reboots the system.", "reboot", (context, args) => Power.Reboot());
 
 
 
@@ -165,19 +166,19 @@ public static class CommandRegistry
 
     private static void DisplayProperties(CommandContext context, string[] arguments)
     {
-        if (arguments[0] == "halt") Kernel.canvas.Disable();
+        SVGAII3DCanvas canvas = Windose.Kernel.canvas;
 
         PciDevice? device = PciManager.GetDevice(VendorId.VmWare, DeviceId.SvgaiiAdapter);
         context.WriteLine($"Vendor: {device.VendorId} ({device.DeviceId})");
 
-        context.WriteLine($"Resolution: {Kernel.canvas.Height}x{Kernel.canvas.Width}");
-        context.WriteLine($"Refresh Rate: {Kernel.canvas.RefreshRate} Hz");
+        context.WriteLine($"Resolution: {canvas.Height}x{canvas.Width}");
+        context.WriteLine($"Refresh Rate: {canvas.RefreshRate} Hz");
 
 
-        context.WriteLine($"3D Hardware Version: {Kernel.canvas.Driver3D.HW3DVer}");
-        context.WriteLine($"3D Enabled: {Kernel.canvas.Driver3D.Is3DEnabled}");
-        context.WriteLine($"VRAM Size: {Kernel.canvas.Driver.VideoMemory.Size / 1024 / 1024} MB");
-        context.WriteLine($"Capabilities: {Kernel.canvas.Driver.Capabilities}");
+        context.WriteLine($"3D Hardware Version: {canvas.Driver3D.HW3DVer}");
+        context.WriteLine($"3D Enabled: {canvas.Driver3D.Is3DEnabled}");
+        context.WriteLine($"VRAM Size: {canvas.Driver.VideoMemory.Size / 1024 / 1024} MB");
+        context.WriteLine($"Capabilities: {canvas.Driver.Capabilities}");
     }
 
     private static void SystemProperties(CommandContext context, string[] arguments)
@@ -230,6 +231,7 @@ public static class CommandRegistry
                 if(!VfsManager.TryUnmount("/mnt"))
                 {
                     context.WriteLine("Failed to unmount");
+                    context.WriteLine("Check if a device is mounted");
                     return;
                 }
 

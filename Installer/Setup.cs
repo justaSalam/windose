@@ -4,7 +4,17 @@ namespace Windose.Installer
 {
     public static class Setup
     {
-        private static string[] Predefined = {
+        private static readonly (string Name, Action Action)[] Stages =
+{
+    ("Creating Partitions", CreatePartitions),
+    ("Installing Icons", InstallIcons),
+    ("Finalizing", () => { Console.WriteLine("Finalizing installation..."); }),
+    //("Installing System Resources", CreateUserFolders),
+};
+
+
+
+        private static string[] PredefinedIcons = {
 "Windose.Resources.Icons.accessibility.png",
 "Windose.Resources.Icons.ac_plug.png",
 "Windose.Resources.Icons.amplify.png",
@@ -207,31 +217,183 @@ namespace Windose.Installer
 "Windose.Resources.Icons.write_red.png",
 "Windose.Resources.Icons.write_wordpad.png",
 "Windose.Resources.Icons.xml_gear.png" };
+        private static string[] PredefinedWallpapers =
+            {
+            "Windose.Resources.Wallpapers.Lithium.png",
+            "Windose.Resources.Wallpapers.WRAMW.png"};
+        private const string path = "/mnt/.setup";
 
         public static void Run(string[]? args = null)
         {
-            string path = "/mnt/.setup";
+
+            // Set up the static header once at the top of the screen
+            Console.BackgroundColor = ConsoleColor.Blue;
+            Console.ForegroundColor = ConsoleColor.White;
+
+            Console.Clear();
+            Console.SetCursorPosition(0, 0);
+            Console.Write("Windose Setup");
+            Console.CursorVisible = false;
+
+            for (int i = 0; i < Stages.Length; i++)
+            {
+                RunStage(i);
+            }
+
+            File.Create(path).Dispose(); //signals an already set up system
+        }
+
+        private static void RunStage(int index)
+        {
+            var stage = Stages[index];
+
+            DrawStage(stage.Name, index + 1, Stages.Length);
+
+            stage.Action();
+        }
+
+        private static void DrawStage(string name, int current, int total)
+        {
+            const int barWidth = 20;
+
+            int percent = current * 100 / total;
+            int filled = current * barWidth / total;
+
+            string bar =
+                new string((char)219, filled) +
+                new string(' ', barWidth - filled);
+
+            Console.SetCursorPosition(0, 2);
+            Console.Write(new string(' ', Console.WindowWidth));
+            Console.SetCursorPosition(0, 2);
+            Console.Write($"Stage {current}/{total}: {name}");
+
+            Console.SetCursorPosition(0, 3);
+            Console.Write(new string(' ', Console.WindowWidth));
+            Console.SetCursorPosition(0, 3);
+            Console.Write($"[{bar}] {percent}%");
+        }
+
+
+        private static void InstallIcons()
+        {
             if (File.Exists(path))
             {
                 return;
             }
 
-            InstallIconPack();
-
-            File.Create(path).Dispose();
-        }
-
-        private static void InstallIconPack()
-        {
             if (!Directory.Exists("/mnt/System/Icons"))
             {
                 Directory.CreateDirectory("/mnt/System/Icons");
             }
-            foreach (string path in Predefined)
+
+            int totalFiles = PredefinedIcons.Length;
+            int barWidth = 20;
+
+            for (int i = 0; i < totalFiles; i++)
             {
-                
-                ResourceLoader.WriteStorageAsync($"/mnt/System/Icons/{path.Substring("Windose.Resources.Icons.".Length)}", path);
+                string path = PredefinedIcons[i];
+                string fileName = path.Substring("Windose.Resources.Icons.".Length);
+
+                int currentCount = i + 1;
+                int percentage = currentCount * 100 / totalFiles;
+                int filledBlocks = currentCount * barWidth / totalFiles;
+
+                string bar = new string((char)0xDB, filledBlocks) + new string(' ', barWidth - filledBlocks);
+
+
+                // Calculate dynamic rows based on current window height bounds
+                int lastRow = Console.WindowHeight - 1;
+                int secondToLastRow = Console.WindowHeight - 2;
+                int maxTextWidth = Console.WindowWidth - 1;
+
+                //Update Currently Copied Text
+                Console.SetCursorPosition(0, secondToLastRow);
+                Console.Write(new string(' ', maxTextWidth));
+                Console.SetCursorPosition(0, secondToLastRow);
+
+                // Truncate filename
+
+                string displayFile = $"Setup is Copying: {fileName}";
+
+                if (displayFile.Length > maxTextWidth)
+                {
+                    displayFile = displayFile.Substring(0, maxTextWidth - 3) + "...";
+                }
+                Console.Write(displayFile);
+
+                //Update Progress Bar
+                Console.SetCursorPosition(0, lastRow);
+                Console.Write(new string(' ', maxTextWidth));
+                Console.SetCursorPosition(0, lastRow);
+                Console.Write($"[{bar}] {percentage}%");
+                ResourceLoader.WriteStorage($"/mnt/System/Icons/{fileName}", path);
             }
         }
+        private static void CreateUserFolders()
+        {
+            if (File.Exists(path))
+            {
+                return;
+            }
+
+            if (!Directory.Exists("/mnt/System/Wallpapers"))
+            {
+                Directory.CreateDirectory("/mnt/System/Wallpapers");
+            }
+
+            int totalFiles = PredefinedWallpapers.Length;
+            int barWidth = 20;
+
+            for (int i = 0; i < totalFiles; i++)
+            {
+                string path = PredefinedWallpapers[i];
+                string fileName = path.Substring("Windose.Resources.Wallpapers.".Length);
+
+                int currentCount = i + 1;
+                int percentage = currentCount * 100 / totalFiles;
+                int filledBlocks = currentCount * barWidth / totalFiles;
+
+                string bar = new string((char)0xDB, filledBlocks) + new string(' ', barWidth - filledBlocks);
+
+
+                // Calculate dynamic rows based on current window height bounds
+                int lastRow = Console.WindowHeight - 1;
+                int secondToLastRow = Console.WindowHeight - 2;
+                int maxTextWidth = Console.WindowWidth - 1;
+
+                //Update Currently Copied Text
+                Console.SetCursorPosition(0, secondToLastRow);
+                Console.Write(new string(' ', maxTextWidth));
+                Console.SetCursorPosition(0, secondToLastRow);
+
+                // Truncate filename
+
+                string displayFile = $"Setup is Copying: {fileName}";
+
+                if (displayFile.Length > maxTextWidth)
+                {
+                    displayFile = displayFile.Substring(0, maxTextWidth - 3) + "...";
+                }
+                Console.Write(displayFile);
+
+                //Update Progress Bar
+                Console.SetCursorPosition(0, lastRow);
+                Console.Write(new string(' ', maxTextWidth));
+                Console.SetCursorPosition(0, lastRow);
+                Console.Write($"[{bar}] {percentage}%");
+                ResourceLoader.WriteStorage($"/mnt/System/Wallpapers/{fileName}", path);
+            }
+        }
+
+
+        private static void CreatePartitions()
+        {
+            FileSystemManager.Setup();
+
+        }
+
+
+
     }
 }

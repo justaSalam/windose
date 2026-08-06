@@ -13,15 +13,15 @@ public static class FileSystemManager
     public static VfsManager.VfsMount? mount;
 
 
-    public static void Initialize()
+    public static void Setup()
     {
         FatFilesystemType fat = new FatFilesystemType();
 
 
         VfsManager.RegisterFilesystem("fat", fat);
 
-        IBlockDevice ?storageDevice = StorageManager.PrimaryDevice;
-        if(storageDevice == null)
+        IBlockDevice? storageDevice = StorageManager.PrimaryDevice;
+        if (storageDevice == null)
         {
             SystemLogger.WriteLine("FileSystemManager", "Storage device not found", ConsoleMessageType.Error);
             return;
@@ -63,16 +63,16 @@ public static class FileSystemManager
         CreateSystemDirectories();
         SystemRegistry.Initialize();
 
+        File.WriteAllText("mnt/System/Breeze/startup.breeze", StartupService);
 
+        File.WriteAllText("mnt/System/Breeze/main.breeze", StarterProgram);
+        File.WriteAllText("mnt/System/Breeze/About Windose.breeze", AboutControlPanelApplet);
 
-        //fs.WriteAllText(@"C:\Apps\main.breeze", StarterProgram);
-        //fs.WriteAllText(@"C:\System\ControlPanel\About Windose.breeze", AboutControlPanelApplet);
-        //fs.WriteAllText(@"C:\System\Services\startup.breeze", StartupService);
     }
 
     public static string GetUniquePath(string directory, string baseName, string extension = "")
     {
-        string path = Path.Combine(directory, $"{baseName}.{ extension}");
+        string path = Path.Combine(directory, $"{baseName}.{extension}");
 
         if (!File.Exists(path) && !Directory.Exists(path))
             return path;
@@ -167,7 +167,7 @@ show(main);
 ";
 
     private const string StartupService = @"// Windose one-shot service launcher
-let serviceFiles = getFiles(""0:\\System\\Services"");
+let serviceFiles = getFiles(""/mnt/System/Services"");
 let index = 0;
 while (index < listCount(serviceFiles)) {
     let path = listGet(serviceFiles, index);

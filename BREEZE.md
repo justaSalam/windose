@@ -4,7 +4,7 @@ Breeze is Windose's interpreted GUI application language. Windose only
 needs to be rebuilt when the runtime or native GUI controls change. Script
 applications can be edited and relaunched without recompiling the kernel.
 
-Place the main script at `0:\Apps\main.breeze`, then select **Run main.breeze** in
+Place the main script at `/mnt/Apps/main.breeze`, then select **Run main.breeze** in
 the Start menu. The Cosmos VFS must be mounted before loading a script file.
 
 ## Complete example
@@ -384,7 +384,7 @@ usually a filesystem path.
 
 ```text
 let folders = treeView();
-let computer = treeRoot(folders, "My Computer", "0:\\");
+let computer = treeRoot(folders, "My Computer", "/mnt");    
 ```
 
 ### `treeChild(parentItem, text, tag)`
@@ -392,8 +392,8 @@ let computer = treeRoot(folders, "My Computer", "0:\\");
 Adds a child below an existing tree item and returns the new child.
 
 ```text
-let system = treeChild(computer, "System", "0:\\System");
-treeChild(system, "Drivers", "0:\\System\\Drivers");
+let system = treeChild(computer, "System", "/mnt/System");
+treeChild(system, "Drivers", "/mnt/System/Drivers");
 ```
 
 Tree events expose these item properties through `value(event, property)`:
@@ -421,8 +421,8 @@ Adds an item and returns it. `tag` normally contains its path. `isFolder`
 controls whether the item uses folder behavior and appearance.
 
 ```text
-listItem(files, "System", "0:\\System", true);
-listItem(files, "notes.txt", "0:\\notes.txt", false);
+listItem(files, "System", "/mnt/System", true);
+listItem(files, "notes.txt", "/mnt/notes.txt", false);
 ```
 
 ### `listClear(list)`
@@ -470,7 +470,7 @@ Clears a `ListView`, reads the specified directory through `System.IO`, and adds
 its directories and files. The Cosmos VFS must be mounted and `path` must exist.
 
 ```text
-loadDirectory(files, "0:\\");
+loadDirectory(files, "  \\");
 ```
 
 An invalid path produces a Breeze error window instead of stopping the

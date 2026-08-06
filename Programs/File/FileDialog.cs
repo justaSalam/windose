@@ -8,7 +8,7 @@ public sealed class FileDialogOptions
 {
     public FileDialogMode Mode = FileDialogMode.Open;
     public string Title = "";
-    public string InitialPath = @"0:\";
+    public string InitialPath = "/mnt";
     public string FilterExtension = "";
     public string FilterDescription = "All files (*.*)";
     public string DefaultExtension = "";
@@ -151,10 +151,10 @@ public sealed class FileDialog : Window
 
     private void OpenItem(ListViewItem item)
     {
-        if (item == null) return;
+        if (item == null || item.tag == null) return;
         if (item.isFolder)
         {
-            NavigateTo(item.tag as string);
+            NavigateTo((string)item.tag);
             return;
         }
 
@@ -189,7 +189,7 @@ public sealed class FileDialog : Window
         for (int i = 0; i < directories.Length; i++)
         {
             string directory = directories[i];
-            ListViewItem item = files.AddFolder(FileSystemManager.GetName(directory), tag: directory);
+            ListViewItem item = files.AddFolder(directory, tag: directory);
             item.type = "File Folder";
         }
 
@@ -198,7 +198,7 @@ public sealed class FileDialog : Window
         {
             string file = paths[i];
             if (!MatchesFilter(file)) continue;
-            ListViewItem item = files.AddItem(FileSystemManager.GetName(file), tag: file);
+            ListViewItem item = files.AddItem(Path.GetFileName(file), tag: file);
             item.type = options.FilterDescription;
         }
 
@@ -251,7 +251,7 @@ public sealed class FileDialog : Window
         if (path != null && path != "" && Directory.Exists(path)) return FileSystemManager.NormalizePath(path);
         string directory = FileSystemManager.GetParent(path ?? "");
         if (directory != null && directory != "" && Directory.Exists(directory)) return directory;
-        return @"0:\";
+        return "/mnt";
     }
 
     private static string GetInitialFileName(string path, string defaultName)

@@ -5,6 +5,7 @@ using Cosmos.Kernel.System.Mouse;
 using System.Drawing;
 using System.Globalization;
 using Windose;
+using Windose.System.Features;
 using Windose.System.Shell;
 using static Cosmos.Kernel.System.Graphics.Fonts.PCScreenFont;
 
@@ -13,7 +14,7 @@ public class Desktop : Component
     private Color backgroundColor;
 
     private MenuPopup contextMenu;
-    private DesktopIcon ?activeDraggedIcon;
+    private DesktopIcon? activeDraggedIcon;
     private List<DesktopIcon> selectedIcons = new List<DesktopIcon>();
     private List<DesktopIcon> gridCollisionIgnoredIcons;
 
@@ -49,7 +50,11 @@ public class Desktop : Component
             MarkDirty();
         };
 
+        CreateDesktopContextMenu();
+    }
 
+    private void CreateDesktopContextMenu()
+    {
         contextMenu.AddItem("Refresh");
 
         MenuItem viewItem = contextMenu.AddItem("View");
@@ -88,7 +93,9 @@ public class Desktop : Component
         string path = FileSystemManager.GetUniquePath("/mnt/user/desktop/", "New Directory");
 
         Directory.CreateDirectory(path);
-        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(Path.GetDirectoryName(path), FileType.Directory, path, 0)));
+        DirectoryInfo directoryInfo = new DirectoryInfo(path);
+        //TODO Calculate directory size by recursively summing the sizes of all files and subdirectories within it
+        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(directoryInfo.Name, FileType.Directory, path, 0)));
     }
 
 
@@ -97,7 +104,9 @@ public class Desktop : Component
         string path = FileSystemManager.GetUniquePath("/mnt/user/desktop/", "New File", extension);
 
         File.Create(path);
-        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(Path.GetFileName(path), FileType.File, path, 0)));
+        FileInfo fileInfo = new FileInfo(path);
+
+        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(fileInfo.Name, FileType.File, path, fileInfo.Length)));
     }
 
     private Dictionary<string, DesktopLayoutEntry> LoadLayout()
@@ -232,9 +241,18 @@ public class Desktop : Component
         return base.HandleInput(mouseX, mouseY, mouse);
     }
 
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        base.HandleKeyboard(keyEvent);
+        if (activeDraggedIcon != null)
+        {
+            activeDraggedIcon.HandleKeyboard(keyEvent);
+        }
+    }
+
     public override void DrawLocal()
     {
-        DrawImageStretchAlpha(Wallpapers.Lithium, new Rectangle(0, 0, (int)Wallpapers.Lithium.Width, (int)Wallpapers.Lithium.Height), new Rectangle(0, 0, Width, Height));
+        DrawImageStretchAlpha(Background.Current, new Rectangle(0, 0, (int)Background.Current.Width, (int)Background.Current.Height), new Rectangle(0, 0, Width, Height));
 
         if (ShowIconGrid)
             DrawIconGrid();

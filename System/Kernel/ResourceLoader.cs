@@ -47,7 +47,7 @@ namespace Windose.System.Kernel
             }
         }
 
-        public static bool WriteStorageAsync(string path, string resource)
+        public static bool WriteStorage(string path, string resource)
         {
             try
             {
@@ -71,7 +71,7 @@ namespace Windose.System.Kernel
             }
         }
 
-        public static bool WriteStorageAsync(string path, byte[] data)
+        public static bool WriteStorage(string path, byte[] data)
         {
             try
             {
