@@ -121,7 +121,7 @@ public class Window : Component
                 text = title,
                 fontSize = 16,
                 horizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(border, border, border, border)
+                Margin = new Thickness(border)
             };
 
             if (Icon != null) titlebar.textOffsetX = 25;
@@ -129,7 +129,7 @@ public class Window : Component
             AddChild(titlebar);
             hasTitleBar = true;
 
-            int titleButtonSize = Math.Max(20, titleHeight - 5);
+            int titleButtonSize = Math.Max(20, titleHeight - 6);
             int titleButtonTop = Math.Max(2, border + 1);
 
             CreateTitleControls(titleButtonSize, titleButtonTop);
@@ -139,7 +139,8 @@ public class Window : Component
 
     private void CreateTitleControls(int titleButtonSize, int titleButtonTop)
     {
-        AddChild(new Button(0, 0, titleButtonSize, titleButtonSize)
+        int buttonHeight = titleButtonSize - 5;
+        AddChild(new Button(0, 2, titleButtonSize, buttonHeight)
         {
             text = "X",
             verticalAlignment = VerticalAlignment.Top,
@@ -153,12 +154,12 @@ public class Window : Component
             }
         });
 
-        AddChild(new Button(25, 0, titleButtonSize, titleButtonSize)
+        AddChild(new Button(25, 2, titleButtonSize, buttonHeight)
         {
             text = "O",
             verticalAlignment = VerticalAlignment.Top,
             horizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(3, titleButtonTop, 3 + titleButtonSize, 3),
+            Margin = new Thickness(6, 0, 6 + titleButtonSize, 3),
             useBorders = true,
             borderColor = Palette.ControlHighlight,
             textColor = Palette.ControlBlack,
@@ -168,12 +169,12 @@ public class Window : Component
             }
         });
 
-        AddChild(new Button(50, 0, titleButtonSize, titleButtonSize)
+        AddChild(new Button(50, 2, titleButtonSize, buttonHeight)
         {
             text = "_",
             verticalAlignment = VerticalAlignment.Top,
             horizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(6, titleButtonTop, 6 + titleButtonSize * 2, 3),
+            Margin = new Thickness(6, 0, 9 + titleButtonSize * 2, 3),
             useBorders = true,
             borderColor = Palette.ControlHighlight,
             textColor = Palette.ControlBlack,
@@ -215,16 +216,9 @@ public class Window : Component
         {
             inFocus = HitTest(mouseX, mouseY);
 
-
-            if (!TitleHitTest(mouseX, mouseY))
-            {
-                focusedComponent = GetChildAt(mouseX, mouseY);
-            }
-            else
-            {
-                focusedComponent = null;
-            }
-        }
+            Component hit = GetChildAt(mouseX, mouseY);
+            focusedComponent = (hit != this && hit != titlebar) ? hit : null;
+        }   
 
 
         DragWindow(mouseState, mouseX, mouseY);
@@ -274,6 +268,7 @@ public class Window : Component
             previewBounds = bounds;
             WindowManager.ShowPreviewRect(previewBounds);
         }
+
         else if (mouse.left == MouseEvents.Release && dragging)
         {
             dragging = false;

@@ -261,7 +261,29 @@ public class FileExplorer : Window
         string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : (string)item.tag;
         if (string.IsNullOrEmpty(path)) return;
 
-        BreezeHost.RunFile(path);
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        switch (ext)
+        {
+            case ".txt":
+                WindowManager.Register(new BreezeEditor(X + 40, Y + 40, 900, 620, path));
+                break;
+
+            case ".log":
+                WindowManager.Register(new BreezeEditor(X + 40, Y + 40, 900, 620, path));
+                break;
+
+            case ".breeze":
+                BreezeHost.RunFile(path);
+                break;
+
+            case ".png":
+                WindowManager.Register(new ImageViewer(path, X + 40, Y + 40, 900, 620));
+                break;
+
+            default:
+                BreezeHost.RunFile(path);
+                break;
+        }
 
     }
 

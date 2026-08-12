@@ -10,6 +10,7 @@ public class Button : Component
     private bool isPressed = false;
 
     private float hoverBlend;
+    public bool ellipsize = false;
 
     public int fontSize = 0;
 
@@ -25,6 +26,8 @@ public class Button : Component
 
     public Button(int x, int y, int width, int height) : base(x, y, width, height)
     {
+        if(font == null) font = SystemFonts.spleen8x16;
+        fontSize = font.Width;
     }
 
 
@@ -46,11 +49,22 @@ public class Button : Component
         {
             int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
             int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
-
-            //DrawString(text, textColor, 2, textY, effectiveFontSize);
-            //DrawString(text, textColor, 2, textY, 16);
-            if(font == null)DrawString(text, SystemFonts.spleen8x16, textColor, 2, textY);
-            else DrawString(text, font, textColor, 2, textY);
+            if(MeasureStringWidth(text, font) > Width && ellipsize)
+            {
+                int maxWidth = Width - 4; // Leave padding
+                string ellipsizedText = text;
+                while (MeasureStringWidth(ellipsizedText + "...", font) > maxWidth && ellipsizedText.Length > 0)
+                {
+                    ellipsizedText = ellipsizedText.Substring(0, ellipsizedText.Length - 1);
+                }
+                ellipsizedText += "...";
+                DrawString(ellipsizedText, font, textColor, 2, textY);
+            }
+            else
+            {
+                DrawString(text, font, textColor, 2, textY);
+            }
+            
 
         }
     }

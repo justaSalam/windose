@@ -53,55 +53,55 @@
           "dependencies": {
             "Cosmos.Build.Analyzer.Patcher": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Build.Asm": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Build.CC": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Build.Common": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Build.Ilc": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Build.Patcher": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Kernel": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Kernel.Core.X64": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Kernel.HAL.X64": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Kernel.Native.MultiArch": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Kernel.Native.X64": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Kernel.SourceGenerators": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Cosmos.Kernel.System": {
               "target": "Package",
-              "version": "[3.0.81, )"
+              "version": "[3.0.82, )"
             },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",

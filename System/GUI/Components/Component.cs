@@ -794,7 +794,10 @@ public class Component : IDisposable
     {
         buffer.DrawImageStretchAlpha(image, sourceRect, destRect);
     }
-
+    public void DrawImageStretch(Image image, Rectangle sourceRect, Rectangle destRect)
+    {
+        buffer.DrawImageStretch(image, sourceRect, destRect);
+    }
 
     //TODO: Override the DrawImage method to draw into component buffer instead of the main screen buffer
     //Drawing into main buffer will get overwritten by the component buffer when the component it's drawn

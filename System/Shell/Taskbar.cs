@@ -73,7 +73,8 @@ public class Taskbar : Component
             horizontalAlignment = HorizontalAlignment.Right,
             text = DateTime.Now.ToString("HH:mm:ss"),
             Margin = new Thickness(0),
-
+            useBackground = false,
+            useForeground = true
         };
         AddChild(timeLabel);
     }

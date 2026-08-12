@@ -1,4 +1,5 @@
-﻿using Windose.System.Kernel;
+﻿using Cosmos.Kernel.System;
+using Windose.System.Kernel;
 
 namespace Windose.Installer
 {
@@ -6,8 +7,16 @@ namespace Windose.Installer
     {
         private static readonly (string Name, Action Action)[] Stages =
 {
-    ("Creating Partitions", CreatePartitions),
-    ("Installing Icons", InstallIcons),
+    
+    ("Creating Partitions", CreatePartitions), 
+    ("System Setup Check", () =>
+    {
+        if(File.Exists("/mnt/.setup"))
+        {
+            return;
+        }
+    }),
+    ("Installing", InstallIcons),
     ("Finalizing", () => { Console.WriteLine("Finalizing installation..."); }),
     //("Installing System Resources", CreateUserFolders),
 };

@@ -40,22 +40,23 @@ public class ListView : Component
     private int lastClickIndex = -1;
     private int lastClickTick;
     public int doubleClickInterval = 1200;
-
     private Png itemIcon;
+
     private Png folderIcon;
     private Rectangle sourceRect;
     private Rectangle destRect;
 
+   
 
 
     public ListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
-        itemIcon = new Png(ResourceLoader.FromStream("Windose.Resources.Icons.message_file.png"));
-        folderIcon = new Png(ResourceLoader.FromStream("Windose.Resources.Icons.directory_closed.png"));
+        itemIcon = new Png("/mnt/System/Icons/file_lines.png");
+        folderIcon = new Png("/mnt/System/Icons/directory_closed.png");
     }
 
-    public ListViewItem AddItem(string text, Bitmap icon = null, object tag = null)
+    public ListViewItem AddItem(string text, Image icon = null, object tag = null)
     {
         ListViewItem item = new ListViewItem(text, icon, tag);
         items.Add(item);
@@ -63,7 +64,7 @@ public class ListView : Component
         return item;
     }
 
-    public ListViewItem AddItem(FileEntry fileEntry, Bitmap icon = null)
+    public ListViewItem AddItem(FileEntry fileEntry, Image icon = null)
     {
         ListViewItem item = new ListViewItem(fileEntry, icon);
         items.Add(item);
@@ -243,7 +244,10 @@ public class ListView : Component
         
         destRect = new Rectangle(4, y + 2, smallIconSize, smallIconSize);
 
-        DrawImageStretchAlpha(itemIcon, new Rectangle(4, y + 2, 32, 32), destRect);//TODO Fix image resizing + Add smaller icons ig 
+        string ext = Path.GetExtension(item.fileEntry.AbsoluteLocation);
+        
+
+        DrawImageStretchAlpha(new Png(IconRegistry.Get(ext)), new Rectangle(4, y + 2, 32, 32), destRect);//TODO Fix image resizing + Add smaller icons ig 
         DrawString(item.text, color, 24, y + 2, fontSize);
 
         //int sizeX = nameColumnWidth;
@@ -303,6 +307,11 @@ public class ListView : Component
         DrawRectangle(Palette.ControlShadow, x + 2, y + 2, size / 2, tabHeight);
         DrawFilledRectangle(Color.FromArgb(255, 240, 96), x, bodyY, size, size - tabHeight);
         DrawRectangle(Palette.ControlShadow, x, bodyY, size, size - tabHeight);*/
+    }
+
+    public override void MarkDirty(bool invalidate = true)
+    {
+        base.MarkDirty(invalidate);
     }
 
     private void DrawFileIcon(int x, int y, int size)

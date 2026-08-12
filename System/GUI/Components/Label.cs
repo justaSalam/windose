@@ -5,6 +5,7 @@ public class Label : Component
 {
 
     public bool useBackground = true;
+    public bool useForeground = false;
     public int fontSize = 0;
     public Color textColor = Palette.ControlBlack;
 
@@ -27,6 +28,10 @@ public class Label : Component
         if (useBackground)
         {
             DrawSunkenRectangle(0, 0, Width, Height);
+        }
+        else if (useForeground)
+        {
+            DrawRaisedRectangle(0, 0, Width, Height);
         }
 
         int currentOffset = 0;

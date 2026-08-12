@@ -170,7 +170,7 @@ public static class Palette
             WindowGlass = Color.FromArgb(192, 192, 192),
             MenuGlass = Color.FromArgb(192, 192, 192),
             TitleBarGlass = Color.FromArgb(0, 0, 128),
-            TitleBarHeight = 25,
+            TitleBarHeight = 20,
             BorderSize = 2,
             FlatControls = false,
         };

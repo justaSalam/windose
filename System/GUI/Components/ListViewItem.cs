@@ -3,7 +3,7 @@ using Cosmos.Kernel.System.Graphics;
 public class ListViewItem
 {
     public string text;
-    public Bitmap icon;
+    public Image icon;
     public object tag;
     public FileEntry fileEntry;
     public bool hasFileEntry;
@@ -15,7 +15,7 @@ public class ListViewItem
     public bool isFolder;
 
 
-    public ListViewItem(string text, Bitmap icon = null, object tag = null)
+    public ListViewItem(string text, Image icon = null, object tag = null)
     {
         this.text = text;
         this.icon = icon;
@@ -28,16 +28,19 @@ public class ListViewItem
         this.tag = tag;
     }
 
-    public ListViewItem(FileEntry fileEntry, Bitmap icon = null)
+    public ListViewItem(FileEntry fileEntry, Image icon = null)
     {
         this.fileEntry = fileEntry;
-        hasFileEntry = true;
-        text = fileEntry.FileName;
         this.icon = icon;
+        hasFileEntry = true;
+
+        text = fileEntry.FileName;
         tag = fileEntry.AbsoluteLocation;
         isFolder = fileEntry.FileType == FileType.Directory;
+
         size = isFolder ? "" : FormatSize(fileEntry.SizeBytes);
         type = isFolder ? "File Folder" : fileEntry.FileType.ToString();
+
         modified = fileEntry.CreatedAt;
     }
 

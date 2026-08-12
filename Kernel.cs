@@ -33,7 +33,6 @@ public class Kernel : Sys.Kernel
     private WindowManager windowManager = null!;
     public CosmosDisplayDriver displayDriver = null!;
     private CosmosMouseDriver mouseDriver = null!;
-    int tick;
 
 
     protected override void BeforeRun()
@@ -59,7 +58,6 @@ public class Kernel : Sys.Kernel
 
 
         //TODO: 
-        //An acutall setup should run before getting to the main os
         //main partition, copy files, general setup
         Setup.Run();
 
@@ -94,7 +92,17 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(windowManager);
 
         Directory.CreateDirectory("/mnt/Programs");
+        Directory.CreateDirectory("/mnt/Apps");
         File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
+
+        BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze","service.control");
+
+        IconRegistry.Register(".txt", "/mnt/System/Icons/file_lines.png");
+        IconRegistry.Register(".png", "/mnt/System/Icons/paint_file.png");
+        IconRegistry.Register(".breeze", "/mnt/System/Icons/script_file_blue.png");
+        IconRegistry.Register(".log", "/mnt/System/Icons/file_windows.png");
+        IconRegistry.Register(".db", "/mnt/System/Icons/regedit_file.png");
+
 
     }
 

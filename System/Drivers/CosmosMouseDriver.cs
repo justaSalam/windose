@@ -36,7 +36,6 @@ public sealed class CosmosMouseDriver : IWindoseDriver
         }
 
         Mouse.Update();
-        MouseManager.ResetScrollDelta();
 
     }
 

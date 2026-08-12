@@ -2,7 +2,7 @@
   "version": 4,
   "targets": {
     "net10.0": {
-      "Cosmos.Build.API/3.0.81": {
+      "Cosmos.Build.API/3.0.82": {
         "type": "package",
         "compile": {
           "lib/netstandard2.0/Cosmos.Build.API.dll": {
@@ -15,28 +15,28 @@
           }
         }
       },
-      "Cosmos.Build.Asm/3.0.81": {
+      "Cosmos.Build.Asm/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.Asm.props": {},
           "build/Cosmos.Build.Asm.targets": {}
         }
       },
-      "Cosmos.Build.CC/3.0.81": {
+      "Cosmos.Build.CC/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.CC.props": {},
           "build/Cosmos.Build.CC.targets": {}
         }
       },
-      "Cosmos.Build.Common/3.0.81": {
+      "Cosmos.Build.Common/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.Common.props": {},
           "build/Cosmos.Build.Common.targets": {}
         }
       },
-      "Cosmos.Build.Ilc/3.0.81": {
+      "Cosmos.Build.Ilc/3.0.82": {
         "type": "package",
         "dependencies": {
           "Mono.Cecil": "0.11.6"
@@ -46,22 +46,22 @@
           "build/Cosmos.Build.Ilc.targets": {}
         }
       },
-      "Cosmos.Build.Patcher/3.0.81": {
+      "Cosmos.Build.Patcher/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.Patcher.props": {},
           "build/Cosmos.Build.Patcher.targets": {}
         }
       },
-      "Cosmos.Kernel/3.0.81": {
+      "Cosmos.Kernel/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.HAL": "3.0.81",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.81",
-          "Cosmos.Kernel.Plugs": "3.0.81",
-          "Cosmos.Kernel.System": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.HAL": "3.0.82",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.82",
+          "Cosmos.Kernel.Plugs": "3.0.82",
+          "Cosmos.Kernel.System": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "build": {
           "build/Cosmos.Kernel.props": {}
@@ -77,7 +77,7 @@
           }
         }
       },
-      "Cosmos.Kernel.Boot.Limine/3.0.81": {
+      "Cosmos.Kernel.Boot.Limine/3.0.82": {
         "type": "package",
         "compile": {
           "lib/net10.0/Cosmos.Kernel.Boot.Limine.dll": {
@@ -90,10 +90,10 @@
           }
         }
       },
-      "Cosmos.Kernel.Core.X64/3.0.81": {
+      "Cosmos.Kernel.Core.X64/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "compile": {
           "lib/net10.0/Cosmos.Kernel.Core.X64.dll": {
@@ -106,7 +106,7 @@
           }
         }
       },
-      "Cosmos.Kernel.Debug/3.0.81": {
+      "Cosmos.Kernel.Debug/3.0.82": {
         "type": "package",
         "compile": {
           "lib/net10.0/Cosmos.Kernel.Debug.dll": {
@@ -119,14 +119,14 @@
           }
         }
       },
-      "Cosmos.Kernel.HAL/3.0.81": {
+      "Cosmos.Kernel.HAL/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Build.Common": "3.0.81",
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Build.Common": "3.0.82",
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "build": {
           "build/Cosmos.Kernel.HAL.props": {}
@@ -142,11 +142,11 @@
           }
         }
       },
-      "Cosmos.Kernel.HAL.Interfaces/3.0.81": {
+      "Cosmos.Kernel.HAL.Interfaces/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "compile": {
           "lib/net10.0/Cosmos.Kernel.HAL.Interfaces.dll": {
@@ -159,14 +159,14 @@
           }
         }
       },
-      "Cosmos.Kernel.HAL.X64/3.0.81": {
+      "Cosmos.Kernel.HAL.X64/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.Core.X64": "3.0.81",
-          "Cosmos.Kernel.HAL": "3.0.81",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.Core.X64": "3.0.82",
+          "Cosmos.Kernel.HAL": "3.0.82",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "compile": {
           "lib/net10.0/Cosmos.Kernel.HAL.X64.dll": {
@@ -179,25 +179,25 @@
           }
         }
       },
-      "Cosmos.Kernel.Native.MultiArch/3.0.81": {
+      "Cosmos.Kernel.Native.MultiArch/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Kernel.Native.MultiArch.props": {}
         }
       },
-      "Cosmos.Kernel.Native.X64/3.0.81": {
+      "Cosmos.Kernel.Native.X64/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Kernel.Native.X64.props": {}
         }
       },
-      "Cosmos.Kernel.Plugs/3.0.81": {
+      "Cosmos.Kernel.Plugs/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Kernel.HAL.X64": "3.0.81",
-          "Cosmos.Kernel.System": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Kernel.HAL.X64": "3.0.82",
+          "Cosmos.Kernel.System": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "build": {
           "build/Cosmos.Kernel.Plugs.props": {}
@@ -213,7 +213,7 @@
           }
         }
       },
-      "Cosmos.Kernel.SourceGenerators/3.0.81": {
+      "Cosmos.Kernel.SourceGenerators/3.0.82": {
         "type": "package",
         "compile": {
           "lib/netstandard2.0/Cosmos.Kernel.SourceGenerators.dll": {
@@ -230,11 +230,11 @@
           "build/Cosmos.Kernel.SourceGenerators.targets": {}
         }
       },
-      "Cosmos.Kernel.System/3.0.81": {
+      "Cosmos.Kernel.System/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.HAL": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.HAL": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "build": {
           "build/Cosmos.Kernel.System.props": {}
@@ -250,12 +250,12 @@
           }
         }
       },
-      "Cosmos.Kernel.System.Core/3.0.81": {
+      "Cosmos.Kernel.System.Core/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.Debug": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.Debug": "3.0.82"
         },
         "build": {
           "build/Cosmos.Kernel.System.Core.props": {},
@@ -431,10 +431,10 @@
           }
         }
       },
-      "_Cosmos.Build.Analyzer.Patcher/3.0.81": {
+      "_Cosmos.Build.Analyzer.Patcher/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
+          "Cosmos.Build.API": "3.0.82",
           "Microsoft.CodeAnalysis.CSharp": "4.14.0"
         },
         "compile": {
@@ -450,7 +450,7 @@
       }
     },
     "net10.0/linux-x64": {
-      "Cosmos.Build.API/3.0.81": {
+      "Cosmos.Build.API/3.0.82": {
         "type": "package",
         "compile": {
           "lib/netstandard2.0/Cosmos.Build.API.dll": {
@@ -463,28 +463,28 @@
           }
         }
       },
-      "Cosmos.Build.Asm/3.0.81": {
+      "Cosmos.Build.Asm/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.Asm.props": {},
           "build/Cosmos.Build.Asm.targets": {}
         }
       },
-      "Cosmos.Build.CC/3.0.81": {
+      "Cosmos.Build.CC/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.CC.props": {},
           "build/Cosmos.Build.CC.targets": {}
         }
       },
-      "Cosmos.Build.Common/3.0.81": {
+      "Cosmos.Build.Common/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.Common.props": {},
           "build/Cosmos.Build.Common.targets": {}
         }
       },
-      "Cosmos.Build.Ilc/3.0.81": {
+      "Cosmos.Build.Ilc/3.0.82": {
         "type": "package",
         "dependencies": {
           "Mono.Cecil": "0.11.6"
@@ -494,22 +494,22 @@
           "build/Cosmos.Build.Ilc.targets": {}
         }
       },
-      "Cosmos.Build.Patcher/3.0.81": {
+      "Cosmos.Build.Patcher/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Build.Patcher.props": {},
           "build/Cosmos.Build.Patcher.targets": {}
         }
       },
-      "Cosmos.Kernel/3.0.81": {
+      "Cosmos.Kernel/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.HAL": "3.0.81",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.81",
-          "Cosmos.Kernel.Plugs": "3.0.81",
-          "Cosmos.Kernel.System": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.HAL": "3.0.82",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.82",
+          "Cosmos.Kernel.Plugs": "3.0.82",
+          "Cosmos.Kernel.System": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.dll": {}
@@ -518,7 +518,7 @@
           "build/Cosmos.Kernel.props": {}
         }
       },
-      "Cosmos.Kernel.Boot.Limine/3.0.81": {
+      "Cosmos.Kernel.Boot.Limine/3.0.82": {
         "type": "package",
         "compile": {
           "lib/net10.0/Cosmos.Kernel.Boot.Limine.dll": {
@@ -531,10 +531,10 @@
           }
         }
       },
-      "Cosmos.Kernel.Core.X64/3.0.81": {
+      "Cosmos.Kernel.Core.X64/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "compile": {
           "lib/net10.0/Cosmos.Kernel.Core.X64.dll": {
@@ -547,7 +547,7 @@
           }
         }
       },
-      "Cosmos.Kernel.Debug/3.0.81": {
+      "Cosmos.Kernel.Debug/3.0.82": {
         "type": "package",
         "compile": {
           "lib/net10.0/Cosmos.Kernel.Debug.dll": {
@@ -560,14 +560,14 @@
           }
         }
       },
-      "Cosmos.Kernel.HAL/3.0.81": {
+      "Cosmos.Kernel.HAL/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Build.Common": "3.0.81",
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Build.Common": "3.0.82",
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.HAL.dll": {}
@@ -576,11 +576,11 @@
           "build/Cosmos.Kernel.HAL.props": {}
         }
       },
-      "Cosmos.Kernel.HAL.Interfaces/3.0.81": {
+      "Cosmos.Kernel.HAL.Interfaces/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "compile": {
           "lib/net10.0/Cosmos.Kernel.HAL.Interfaces.dll": {
@@ -593,14 +593,14 @@
           }
         }
       },
-      "Cosmos.Kernel.HAL.X64/3.0.81": {
+      "Cosmos.Kernel.HAL.X64/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.Core.X64": "3.0.81",
-          "Cosmos.Kernel.HAL": "3.0.81",
-          "Cosmos.Kernel.HAL.Interfaces": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.Core.X64": "3.0.82",
+          "Cosmos.Kernel.HAL": "3.0.82",
+          "Cosmos.Kernel.HAL.Interfaces": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "compile": {
           "lib/net10.0/Cosmos.Kernel.HAL.X64.dll": {
@@ -613,25 +613,25 @@
           }
         }
       },
-      "Cosmos.Kernel.Native.MultiArch/3.0.81": {
+      "Cosmos.Kernel.Native.MultiArch/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Kernel.Native.MultiArch.props": {}
         }
       },
-      "Cosmos.Kernel.Native.X64/3.0.81": {
+      "Cosmos.Kernel.Native.X64/3.0.82": {
         "type": "package",
         "build": {
           "build/Cosmos.Kernel.Native.X64.props": {}
         }
       },
-      "Cosmos.Kernel.Plugs/3.0.81": {
+      "Cosmos.Kernel.Plugs/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Kernel.HAL.X64": "3.0.81",
-          "Cosmos.Kernel.System": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Kernel.HAL.X64": "3.0.82",
+          "Cosmos.Kernel.System": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Plugs.dll": {}
@@ -640,7 +640,7 @@
           "build/Cosmos.Kernel.Plugs.props": {}
         }
       },
-      "Cosmos.Kernel.SourceGenerators/3.0.81": {
+      "Cosmos.Kernel.SourceGenerators/3.0.82": {
         "type": "package",
         "compile": {
           "lib/netstandard2.0/Cosmos.Kernel.SourceGenerators.dll": {
@@ -657,11 +657,11 @@
           "build/Cosmos.Kernel.SourceGenerators.targets": {}
         }
       },
-      "Cosmos.Kernel.System/3.0.81": {
+      "Cosmos.Kernel.System/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Kernel.HAL": "3.0.81",
-          "Cosmos.Kernel.System.Core": "3.0.81"
+          "Cosmos.Kernel.HAL": "3.0.82",
+          "Cosmos.Kernel.System.Core": "3.0.82"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.System.dll": {}
@@ -670,12 +670,12 @@
           "build/Cosmos.Kernel.System.props": {}
         }
       },
-      "Cosmos.Kernel.System.Core/3.0.81": {
+      "Cosmos.Kernel.System.Core/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
-          "Cosmos.Kernel.Boot.Limine": "3.0.81",
-          "Cosmos.Kernel.Debug": "3.0.81"
+          "Cosmos.Build.API": "3.0.82",
+          "Cosmos.Kernel.Boot.Limine": "3.0.82",
+          "Cosmos.Kernel.Debug": "3.0.82"
         },
         "runtime": {
           "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Core.dll": {}
@@ -844,10 +844,10 @@
           }
         }
       },
-      "_Cosmos.Build.Analyzer.Patcher/3.0.81": {
+      "_Cosmos.Build.Analyzer.Patcher/3.0.82": {
         "type": "package",
         "dependencies": {
-          "Cosmos.Build.API": "3.0.81",
+          "Cosmos.Build.API": "3.0.82",
           "Microsoft.CodeAnalysis.CSharp": "4.14.0"
         },
         "compile": {
@@ -864,57 +864,57 @@
     }
   },
   "libraries": {
-    "Cosmos.Build.API/3.0.81": {
-      "sha512": "QQZJrP6pPETYuh+tYu+py11oGUrAZ0cL9q6bbD10GYNhQbKfljbN526b+dYnc2AOKAwCZ3mX7UJP/61WCdYJqQ==",
+    "Cosmos.Build.API/3.0.82": {
+      "sha512": "Y6QXMCguAVFBdtgmIwVv5Cq2pS6jtYIzjpwUAH+bPFjmKvrht6hBU9H/kWqQnS1CTtOO0htc+zhyaTdYbLUpag==",
       "type": "package",
-      "path": "cosmos.build.api/3.0.81",
+      "path": "cosmos.build.api/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "cosmos.build.api.3.0.81.nupkg.sha512",
+        "cosmos.build.api.3.0.82.nupkg.sha512",
         "cosmos.build.api.nuspec",
         "lib/netstandard2.0/Cosmos.Build.API.dll",
         "lib/netstandard2.0/Cosmos.Build.API.xml"
       ]
     },
-    "Cosmos.Build.Asm/3.0.81": {
-      "sha512": "X5iIlGRw6UxLGtKSuJrLVnkZQ3/IY4sv9CewvFLpGX1hCoZIKLiE7+vIZKTYal4nKvMbjPD4W8yYJMxtOlRBmA==",
+    "Cosmos.Build.Asm/3.0.82": {
+      "sha512": "PUyF9WS8qKPLA/TkC47fXOjuRG/r8TEInNrWJJHW4vddYyHTzNf+RdmBWnAbaQos285AS5ihEklqXO/esEjkWA==",
       "type": "package",
-      "path": "cosmos.build.asm/3.0.81",
+      "path": "cosmos.build.asm/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "build/Asm.Build.targets",
         "build/Cosmos.Build.Asm.props",
         "build/Cosmos.Build.Asm.targets",
-        "cosmos.build.asm.3.0.81.nupkg.sha512",
+        "cosmos.build.asm.3.0.82.nupkg.sha512",
         "cosmos.build.asm.nuspec",
         "tasks/netstandard2.0/Cosmos.Build.Asm.deps.json",
         "tasks/netstandard2.0/Cosmos.Build.Asm.dll",
         "tasks/netstandard2.0/Cosmos.Build.Asm.xml"
       ]
     },
-    "Cosmos.Build.CC/3.0.81": {
-      "sha512": "p9IVSCL2Pkuq5yhbejjtFtMMNTlNf+erx4c2T/q4vCEk+izgp7pvDINB+9N+rZAxrPAwKOn8BgS0G0DbBnCxng==",
+    "Cosmos.Build.CC/3.0.82": {
+      "sha512": "vlzAE8T9QOgX8/1cwctCvUbgJJlnS3M6j5QAMb4929W/AaCj7YPmd0Gj/VjSQ4Ym6ExoBAvbvxqvV0+FM78ZIQ==",
       "type": "package",
-      "path": "cosmos.build.cc/3.0.81",
+      "path": "cosmos.build.cc/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "build/CC.Build.targets",
         "build/Cosmos.Build.CC.props",
         "build/Cosmos.Build.CC.targets",
-        "cosmos.build.cc.3.0.81.nupkg.sha512",
+        "cosmos.build.cc.3.0.82.nupkg.sha512",
         "cosmos.build.cc.nuspec",
         "tasks/netstandard2.0/Cosmos.Build.CC.deps.json",
         "tasks/netstandard2.0/Cosmos.Build.CC.dll",
         "tasks/netstandard2.0/Cosmos.Build.CC.xml"
       ]
     },
-    "Cosmos.Build.Common/3.0.81": {
-      "sha512": "2Z7w9TCV0mLS1c1AuI/6VsbQ/NnfVOMIyG4wfaKP0STZXyjkNpB2CfUyK7aAxA11kY0hUWDGvWrtBMydgrHqmg==",
+    "Cosmos.Build.Common/3.0.82": {
+      "sha512": "6Lva9dHJTSlYWISdAsyyujVtH6WM4eiUpdw8bxEBeMDfFE9kUjgivM6mLfVsBsG0g/g/rkjo6poIR8DhGIE7tQ==",
       "type": "package",
-      "path": "cosmos.build.common/3.0.81",
+      "path": "cosmos.build.common/3.0.82",
       "hasTools": true,
       "files": [
         ".nupkg.metadata",
@@ -927,7 +927,7 @@
         "build/Linker/linker.arm64.ld",
         "build/Linker/linker.ld",
         "build/Linker/linker.x64.ld",
-        "cosmos.build.common.3.0.81.nupkg.sha512",
+        "cosmos.build.common.3.0.82.nupkg.sha512",
         "cosmos.build.common.nuspec",
         "tasks/netstandard2.0/Cosmos.Build.Common.dll",
         "tasks/netstandard2.0/Cosmos.Build.Common.xml",
@@ -947,16 +947,16 @@
         "tools/Limine/limine.exe"
       ]
     },
-    "Cosmos.Build.Ilc/3.0.81": {
-      "sha512": "Y8/N1OwVu80JJTErPpqSwPkSC72xhmsS7oN3VEbTXXQmEI2xLK3Hd/5EcEnz2A3206iIxDSvx6xZI9BKSBnI1Q==",
+    "Cosmos.Build.Ilc/3.0.82": {
+      "sha512": "qCS+oCyPoa29FubfB97n4mJMLRTuhaeBz18zOhI72gkak0Uuprfd0SSf9xYshMHIlyqj+JbM20BXneycMl7mtQ==",
       "type": "package",
-      "path": "cosmos.build.ilc/3.0.81",
+      "path": "cosmos.build.ilc/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "build/Cosmos.Build.Ilc.props",
         "build/Cosmos.Build.Ilc.targets",
-        "cosmos.build.ilc.3.0.81.nupkg.sha512",
+        "cosmos.build.ilc.3.0.82.nupkg.sha512",
         "cosmos.build.ilc.nuspec",
         "tasks/netstandard2.0/Cosmos.Build.Ilc.deps.json",
         "tasks/netstandard2.0/Cosmos.Build.Ilc.dll",
@@ -967,10 +967,10 @@
         "tasks/netstandard2.0/Mono.Cecil.dll"
       ]
     },
-    "Cosmos.Build.Patcher/3.0.81": {
-      "sha512": "A/jk+nCGpyhvqPr1KMfUJaReWhNuuCfdbFswQGjyEr2oT7zaA3u98yZiQoFOjCsgOFEPILrpJ+wX5M9O45xDlw==",
+    "Cosmos.Build.Patcher/3.0.82": {
+      "sha512": "KxPI+2gOoVjuaRtstvTZsEomqC/Qs8GvBXCW8CYqhGJnPSIaLR34lhQOoIuXHWNZ+SvW5+O3B7RjNaWj/5g6hA==",
       "type": "package",
-      "path": "cosmos.build.patcher/3.0.81",
+      "path": "cosmos.build.patcher/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -978,7 +978,7 @@
         "build/Cosmos.Build.Patcher.targets",
         "build/Patcher.Build.Unix.targets",
         "build/Patcher.Build.Windows.targets",
-        "cosmos.build.patcher.3.0.81.nupkg.sha512",
+        "cosmos.build.patcher.3.0.82.nupkg.sha512",
         "cosmos.build.patcher.nuspec",
         "tasks/net10.0/Cosmos.Build.API.dll",
         "tasks/net10.0/Cosmos.Build.Patcher.deps.json",
@@ -1006,10 +1006,10 @@
         "tasks/net10.0/zh-Hans/Spectre.Console.Cli.resources.dll"
       ]
     },
-    "Cosmos.Kernel/3.0.81": {
-      "sha512": "QLEn9sCpbEq2tD5wLgm+HrGMiY/53vVhY/3noleGYcYU2nsyaemLHAwUZZr+TQK5HPNAx8S2k9zBDPbNDxVVtg==",
+    "Cosmos.Kernel/3.0.82": {
+      "sha512": "uvaYn1QOuhvh4SXirxlE3DtGEfQgHh3gBCqEyO/zxDf8qDJ42OFxBm/hy4nGvj+80DP5w7xCK1nmGoUPE/57uQ==",
       "type": "package",
-      "path": "cosmos.kernel/3.0.81",
+      "path": "cosmos.kernel/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1018,95 +1018,95 @@
         "build/Bootstrap/kmain.h",
         "build/Bootstrap/kmain_version.h",
         "build/Cosmos.Kernel.props",
-        "cosmos.kernel.3.0.81.nupkg.sha512",
+        "cosmos.kernel.3.0.82.nupkg.sha512",
         "cosmos.kernel.nuspec",
         "runtimes/linux-arm64/lib/net10.0/Cosmos.Kernel.dll",
         "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.dll"
       ]
     },
-    "Cosmos.Kernel.Boot.Limine/3.0.81": {
-      "sha512": "4FZ++HnnGfBkaIoR0qyprqxuYaj3Os61cbfcgCc2DHOqPgZCQ9lzn5PD1FASkk01Wv9USEOZQFRFpu3sWH7ymg==",
+    "Cosmos.Kernel.Boot.Limine/3.0.82": {
+      "sha512": "dgcMvohKr1VGUtda1n5tFdjXWMrK8+wsbI/fEPungMUNBtTiin3YNC7LTsEUV8d3m2VySzSf0kTJzK7GS4WkGw==",
       "type": "package",
-      "path": "cosmos.kernel.boot.limine/3.0.81",
+      "path": "cosmos.kernel.boot.limine/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "cosmos.kernel.boot.limine.3.0.81.nupkg.sha512",
+        "cosmos.kernel.boot.limine.3.0.82.nupkg.sha512",
         "cosmos.kernel.boot.limine.nuspec",
         "lib/net10.0/Cosmos.Kernel.Boot.Limine.dll",
         "lib/net10.0/Cosmos.Kernel.Boot.Limine.xml"
       ]
     },
-    "Cosmos.Kernel.Core.X64/3.0.81": {
-      "sha512": "WwmvC3tLlvrjcuytcY2dIPWS5wZ62otHaRzp7YFwrSKdJwkzyMAa5vwhXALfrZjsDbE4k/IU/aCuQ9GeQCrJqA==",
+    "Cosmos.Kernel.Core.X64/3.0.82": {
+      "sha512": "mayP48lSJxC0htWP7iqTqi24hK42+cc5KIPv2GaMFML8g/974w+e/XkNCyscsuGKGDqssqi/vi1v5wa8g0tR7A==",
       "type": "package",
-      "path": "cosmos.kernel.core.x64/3.0.81",
+      "path": "cosmos.kernel.core.x64/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "cosmos.kernel.core.x64.3.0.81.nupkg.sha512",
+        "cosmos.kernel.core.x64.3.0.82.nupkg.sha512",
         "cosmos.kernel.core.x64.nuspec",
         "lib/net10.0/Cosmos.Kernel.Core.X64.dll",
         "lib/net10.0/Cosmos.Kernel.Core.X64.xml"
       ]
     },
-    "Cosmos.Kernel.Debug/3.0.81": {
-      "sha512": "iJeeLe3/IxND9Nk25m8SX0GinXXXFU7EJjc0CArcpojhvNLc5WpgVEUHgZokd6ohvyuVOr/VLDqNZlXNUyB+cQ==",
+    "Cosmos.Kernel.Debug/3.0.82": {
+      "sha512": "ZcGR7/JVr6gEi1gjr4AMwD+fQVv+BFELtf3EwGSi7/FlEgjUDnc6CzSKO6ACKCYJEaOkcvimyHLrgG2Y5XXiug==",
       "type": "package",
-      "path": "cosmos.kernel.debug/3.0.81",
+      "path": "cosmos.kernel.debug/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "cosmos.kernel.debug.3.0.81.nupkg.sha512",
+        "cosmos.kernel.debug.3.0.82.nupkg.sha512",
         "cosmos.kernel.debug.nuspec",
         "lib/net10.0/Cosmos.Kernel.Debug.dll",
         "lib/net10.0/Cosmos.Kernel.Debug.xml"
       ]
     },
-    "Cosmos.Kernel.HAL/3.0.81": {
-      "sha512": "3lxvqBIW4eX+/kXoLc5p3d9gcNM1ZJhLea39OQnjduSPVj5Z0SQtblB8+MGdQb38pkyMUXVdjZImvLTRXwzwVA==",
+    "Cosmos.Kernel.HAL/3.0.82": {
+      "sha512": "4bO0mwC3oFAbWoWPFBUAY10xrPxTMPOTJ8bbLEHP1VoRX19r0zxD8C75W7yLZYuyPLzDwOnqXMLQeXurXMN5Bw==",
       "type": "package",
-      "path": "cosmos.kernel.hal/3.0.81",
+      "path": "cosmos.kernel.hal/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "build/Cosmos.Kernel.HAL.props",
-        "cosmos.kernel.hal.3.0.81.nupkg.sha512",
+        "cosmos.kernel.hal.3.0.82.nupkg.sha512",
         "cosmos.kernel.hal.nuspec",
         "runtimes/linux-arm64/lib/net10.0/Cosmos.Kernel.HAL.dll",
         "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.HAL.dll"
       ]
     },
-    "Cosmos.Kernel.HAL.Interfaces/3.0.81": {
-      "sha512": "akJDhSXWyGRM4TayLjEv6Uas1bZrSSEfnfODaKz5SL8I2UOzaZsfSwHgpAplxEhEBVxX42OSQzIInE70MLu52Q==",
+    "Cosmos.Kernel.HAL.Interfaces/3.0.82": {
+      "sha512": "QTovvbYNsrmi2wI8ycZqWHSN0EeqHTplxv96BfVpCq8HsIXo9BQ2JxmThfekn+7cMaEZJerb5vDm5NYa8AIaaA==",
       "type": "package",
-      "path": "cosmos.kernel.hal.interfaces/3.0.81",
+      "path": "cosmos.kernel.hal.interfaces/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "cosmos.kernel.hal.interfaces.3.0.81.nupkg.sha512",
+        "cosmos.kernel.hal.interfaces.3.0.82.nupkg.sha512",
         "cosmos.kernel.hal.interfaces.nuspec",
         "lib/net10.0/Cosmos.Kernel.HAL.Interfaces.dll",
         "lib/net10.0/Cosmos.Kernel.HAL.Interfaces.xml"
       ]
     },
-    "Cosmos.Kernel.HAL.X64/3.0.81": {
-      "sha512": "tfB1hcrWcH0Ye/6pzAUv8SxFzzmhEL+CsbCRrSC2Eb4vWqaE7TgblVaIki7EBxqJesfJ3UWQlJ3TvadCXt14FQ==",
+    "Cosmos.Kernel.HAL.X64/3.0.82": {
+      "sha512": "u613E2DR3w+vKEzPIBesmvyGRyv8o/cqLyJ3A+7cylZHX9EnySEWa5S0IBKa3YIh4oYj/otqF8TF2D4m8KTgXA==",
       "type": "package",
-      "path": "cosmos.kernel.hal.x64/3.0.81",
+      "path": "cosmos.kernel.hal.x64/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "cosmos.kernel.hal.x64.3.0.81.nupkg.sha512",
+        "cosmos.kernel.hal.x64.3.0.82.nupkg.sha512",
         "cosmos.kernel.hal.x64.nuspec",
         "lib/net10.0/Cosmos.Kernel.HAL.X64.dll",
         "lib/net10.0/Cosmos.Kernel.HAL.X64.xml"
       ]
     },
-    "Cosmos.Kernel.Native.MultiArch/3.0.81": {
-      "sha512": "hO9D/lxjAl2Zs7ZfyTvtof68B4/QTCIpG1FO9AAVcy3lxLs9+2s9H0dbYzpnx830P65lMvcxuerTW6EIYoaW0Q==",
+    "Cosmos.Kernel.Native.MultiArch/3.0.82": {
+      "sha512": "5uXbRc2Yadu5ncRhqBB4oMc0r40YZJz+oHqe4jH/6VFhjz2+AuxMvjQ5rA2QeFrr+VlYfc6A78wwEbBHgvJq+Q==",
       "type": "package",
-      "path": "cosmos.kernel.native.multiarch/3.0.81",
+      "path": "cosmos.kernel.native.multiarch/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1162,14 +1162,14 @@
         "build/C/isfinite.c",
         "build/C/isfinitef.c",
         "build/Cosmos.Kernel.Native.MultiArch.props",
-        "cosmos.kernel.native.multiarch.3.0.81.nupkg.sha512",
+        "cosmos.kernel.native.multiarch.3.0.82.nupkg.sha512",
         "cosmos.kernel.native.multiarch.nuspec"
       ]
     },
-    "Cosmos.Kernel.Native.X64/3.0.81": {
-      "sha512": "c3Cq6xk8ZBDYlDkicgTvwjJWwIMfKpXktuWHZzdFrPrNOoQNHpexctWGiiKX5XRudLLzJkdAr0fHCwiIq2wGVg==",
+    "Cosmos.Kernel.Native.X64/3.0.82": {
+      "sha512": "WZaDfYLhRmVSOKxJExRRhDYbWhr7MzavXAph6sQxgUF7/bIKWxTkOC4rULUxpb3adMKnOpwM9xlGc2JCRpZmVw==",
       "type": "package",
-      "path": "cosmos.kernel.native.x64/3.0.81",
+      "path": "cosmos.kernel.native.x64/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1186,65 +1186,65 @@
         "build/Runtime/InterfaceDispatch.s",
         "build/Runtime/Runtime.s",
         "build/Runtime/WriteBarriers.s",
-        "cosmos.kernel.native.x64.3.0.81.nupkg.sha512",
+        "cosmos.kernel.native.x64.3.0.82.nupkg.sha512",
         "cosmos.kernel.native.x64.nuspec"
       ]
     },
-    "Cosmos.Kernel.Plugs/3.0.81": {
-      "sha512": "eaiLKfBPBScoNUww/n0xaDS8SxsWnNkoKSxzgkf5QwbsaqM7WZJU3O35+iFLkTaHv0szmt5FM/rXu+pAlW1rSw==",
+    "Cosmos.Kernel.Plugs/3.0.82": {
+      "sha512": "m1Z+ORhtEM/78KZ2yvBKv+6sbif9jLY7QCEbbCareae3XMqdTHBSCK8Ok7vfdytRm58IudWe48S3bKIpigeZDw==",
       "type": "package",
-      "path": "cosmos.kernel.plugs/3.0.81",
+      "path": "cosmos.kernel.plugs/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "build/Cosmos.Kernel.Plugs.props",
-        "cosmos.kernel.plugs.3.0.81.nupkg.sha512",
+        "cosmos.kernel.plugs.3.0.82.nupkg.sha512",
         "cosmos.kernel.plugs.nuspec",
         "runtimes/linux-arm64/lib/net10.0/Cosmos.Kernel.Plugs.dll",
         "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Plugs.dll"
       ]
     },
-    "Cosmos.Kernel.SourceGenerators/3.0.81": {
-      "sha512": "OpY38+EdC55zHNFF8GScoD/kN6+PHSMQkedRGcgYbnImV37XGb+NSPiTP/CFBw6I3+7cxTtv38ifl9KasboWSA==",
+    "Cosmos.Kernel.SourceGenerators/3.0.82": {
+      "sha512": "k4tex/Y17kMmEm7HoO1ObIzyEfxclGOnTBQl8t4+3jETT2d4ZIRkusMFkiN+cet1HzZY7pVnJ4h+TMSSDnhxmw==",
       "type": "package",
-      "path": "cosmos.kernel.sourcegenerators/3.0.81",
+      "path": "cosmos.kernel.sourcegenerators/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "analyzers/dotnet/cs/Cosmos.Kernel.SourceGenerators.dll",
         "build/Cosmos.Kernel.SourceGenerators.props",
         "build/Cosmos.Kernel.SourceGenerators.targets",
-        "cosmos.kernel.sourcegenerators.3.0.81.nupkg.sha512",
+        "cosmos.kernel.sourcegenerators.3.0.82.nupkg.sha512",
         "cosmos.kernel.sourcegenerators.nuspec",
         "lib/netstandard2.0/Cosmos.Kernel.SourceGenerators.dll",
         "lib/netstandard2.0/Cosmos.Kernel.SourceGenerators.xml"
       ]
     },
-    "Cosmos.Kernel.System/3.0.81": {
-      "sha512": "SCK7zTzpDdU7NpmJFZeINLoR3JSQyxWBJPi4yFQfwuZ6nY6ldmGcM0M5mKVzKP7SL6stdgngZcJOGlLM0QXuAQ==",
+    "Cosmos.Kernel.System/3.0.82": {
+      "sha512": "CsHxcNIWDdp2/aA5OhvhNhN6tfIyAnBeZ23SQOjWSJ+9+kzRxJVeiCJk+KRinfysgBhsQTHRQWlJ4zGMKFc3Qw==",
       "type": "package",
-      "path": "cosmos.kernel.system/3.0.81",
+      "path": "cosmos.kernel.system/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "build/Cosmos.Kernel.System.props",
-        "cosmos.kernel.system.3.0.81.nupkg.sha512",
+        "cosmos.kernel.system.3.0.82.nupkg.sha512",
         "cosmos.kernel.system.nuspec",
         "runtimes/linux-arm64/lib/net10.0/Cosmos.Kernel.System.dll",
         "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.System.dll"
       ]
     },
-    "Cosmos.Kernel.System.Core/3.0.81": {
-      "sha512": "BQnFR9xb8PQpn+iJZH8HFLOG2vD6Ytc7LHqotB3sYKf88O+IIXPgzYNWST2+pcynTx+IRDu4vuHtqC5Q+FLR/g==",
+    "Cosmos.Kernel.System.Core/3.0.82": {
+      "sha512": "t7iDfmgFf/XIaLHuON6o9LfulcSlYNGxsuW+vbgWU3zFLbwyu4In71zd4+ob9oiSJ2Bq+6rlIPW7qs/iuIVpbw==",
       "type": "package",
-      "path": "cosmos.kernel.system.core/3.0.81",
+      "path": "cosmos.kernel.system.core/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "build/Cosmos.Kernel.System.Core.props",
         "build/Cosmos.Kernel.System.Core.targets",
         "build/InteropAPI.txt",
-        "cosmos.kernel.system.core.3.0.81.nupkg.sha512",
+        "cosmos.kernel.system.core.3.0.82.nupkg.sha512",
         "cosmos.kernel.system.core.nuspec",
         "runtimes/linux-arm64/lib/net10.0/Cosmos.Kernel.Core.dll",
         "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Core.dll"
@@ -2151,14 +2151,14 @@
         "mono.cecil.nuspec"
       ]
     },
-    "_Cosmos.Build.Analyzer.Patcher/3.0.81": {
-      "sha512": "jUxTm3bUrnDn6D0Asg2hoLlfgW/9tCuHzIbY0Wl5/ORFAq+T4nkEKkEkGh8hym247GTpuui3Jyr/0fFvbzsWLA==",
+    "_Cosmos.Build.Analyzer.Patcher/3.0.82": {
+      "sha512": "BrASqfJCTgC0kGilVzHLK3tHAKA4GEXso+6+sKwGE1wI2dkZtTX9PxaElLeXVaOtpl68nvdCYM7gsE73IDr0pQ==",
       "type": "package",
-      "path": "_cosmos.build.analyzer.patcher/3.0.81",
+      "path": "_cosmos.build.analyzer.patcher/3.0.82",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
-        "_cosmos.build.analyzer.patcher.3.0.81.nupkg.sha512",
+        "_cosmos.build.analyzer.patcher.3.0.82.nupkg.sha512",
         "_cosmos.build.analyzer.patcher.nuspec",
         "analyzers/dotnet/cs/Cosmos.Build.API.dll",
         "lib/netstandard2.0/Cosmos.Build.Analyzer.Patcher.dll",
@@ -2168,19 +2168,19 @@
   },
   "projectFileDependencyGroups": {
     "net10.0": [
-      "Cosmos.Build.Analyzer.Patcher >= 3.0.81",
-      "Cosmos.Build.Asm >= 3.0.81",
-      "Cosmos.Build.CC >= 3.0.81",
-      "Cosmos.Build.Common >= 3.0.81",
-      "Cosmos.Build.Ilc >= 3.0.81",
-      "Cosmos.Build.Patcher >= 3.0.81",
-      "Cosmos.Kernel >= 3.0.81",
-      "Cosmos.Kernel.Core.X64 >= 3.0.81",
-      "Cosmos.Kernel.HAL.X64 >= 3.0.81",
-      "Cosmos.Kernel.Native.MultiArch >= 3.0.81",
-      "Cosmos.Kernel.Native.X64 >= 3.0.81",
-      "Cosmos.Kernel.SourceGenerators >= 3.0.81",
-      "Cosmos.Kernel.System >= 3.0.81",
+      "Cosmos.Build.Analyzer.Patcher >= 3.0.82",
+      "Cosmos.Build.Asm >= 3.0.82",
+      "Cosmos.Build.CC >= 3.0.82",
+      "Cosmos.Build.Common >= 3.0.82",
+      "Cosmos.Build.Ilc >= 3.0.82",
+      "Cosmos.Build.Patcher >= 3.0.82",
+      "Cosmos.Kernel >= 3.0.82",
+      "Cosmos.Kernel.Core.X64 >= 3.0.82",
+      "Cosmos.Kernel.HAL.X64 >= 3.0.82",
+      "Cosmos.Kernel.Native.MultiArch >= 3.0.82",
+      "Cosmos.Kernel.Native.X64 >= 3.0.82",
+      "Cosmos.Kernel.SourceGenerators >= 3.0.82",
+      "Cosmos.Kernel.System >= 3.0.82",
       "Microsoft.NET.ILLink.Tasks >= 10.0.10"
     ]
   },
@@ -2236,55 +2236,55 @@
         "dependencies": {
           "Cosmos.Build.Analyzer.Patcher": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Build.Asm": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Build.CC": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Build.Common": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Build.Ilc": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Build.Patcher": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Kernel": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Kernel.Core.X64": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Kernel.HAL.X64": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Kernel.Native.MultiArch": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Kernel.Native.X64": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Kernel.SourceGenerators": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Cosmos.Kernel.System": {
             "target": "Package",
-            "version": "[3.0.81, )"
+            "version": "[3.0.82, )"
           },
           "Microsoft.NET.ILLink.Tasks": {
             "suppressParent": "All",

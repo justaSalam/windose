@@ -120,6 +120,32 @@ public class DirectBitmap : Canvas
             Buffer[index] = (alpha << 24) | (newRed << 16) | (newGreen << 8) | newBlue;
         }
     }
+
+    public void SetPixel(int x, int y, int colour)
+    {
+        x += originX;
+        y += originY;
+        if (!ContainsClipped(x, y)) return;
+        int index = x + y * Width;
+
+        if (index >= 0 && index < Buffer.Length)
+        {
+            if ((colour >> 24) == 0xFF)
+            {
+                Buffer[index] = colour;
+                return;
+            }
+
+            int bgColour = Buffer[index];
+            int alpha = 255;
+            int invAlpha = 255 - alpha;
+            int newRed = (((colour >> 16) & 0xff) * alpha + ((bgColour >> 16) & 0xff) * invAlpha) >> 8;
+            int newGreen = (((colour >> 8) & 0xff) * alpha + ((bgColour >> 8) & 0xff) * invAlpha) >> 8;
+            int newBlue = ((colour & 0xff) * alpha + (bgColour & 0xff) * invAlpha) >> 8;
+
+            Buffer[index] = (alpha << 24) | (newRed << 16) | (newGreen << 8) | newBlue;
+        }
+    }
     public override void Clear(Color color)
     {
         Array.Fill(Buffer, color.ToArgb());
@@ -213,6 +239,35 @@ public class DirectBitmap : Canvas
 
                 int color = image.RawData[srcX + srcY * image.Width];
                 SetPixelAlpha(destRect.Left + xi, destRect.Top + yi, color);
+                
+            }
+        }
+    }
+
+    public void DrawImageStretch(Image image, Rectangle sourceRect, Rectangle destRect)
+    {
+        if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
+            return;
+
+        float scaleX = (float)sourceRect.Width / destRect.Width;
+        float scaleY = (float)sourceRect.Height / destRect.Height;
+
+        for (int xi = 0; xi < destRect.Width; xi++)
+        {
+            for (int yi = 0; yi < destRect.Height; yi++)
+            {
+                int srcX = (int)(xi * scaleX) + sourceRect.Left;
+                int srcY = (int)(yi * scaleY) + sourceRect.Top;
+
+                srcX = Math.Min(srcX, sourceRect.Right - 1);
+                srcY = Math.Min(srcY, sourceRect.Bottom - 1);
+
+                if (srcX < 0 || srcY < 0 || srcX >= image.Width || srcY >= image.Height)
+                    continue;
+
+                int color = image.RawData[srcX + srcY * image.Width];
+                SetPixel(destRect.Left + xi, destRect.Top + yi, color);
+
             }
         }
     }

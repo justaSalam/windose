@@ -12,6 +12,10 @@ public static class Mouse
         state.right = HandleButton(MouseManager.RightButton, state.right);
         state.middle = HandleButton(MouseManager.MiddleButton, state.middle);
         scroll = MouseManager.ScrollDelta;
+
+        scroll = Math.Clamp(scroll, -1, 1);
+        MouseManager.ResetScrollDelta();
+
     }
 
     private static MouseEvents HandleButton(bool down, MouseEvents current)
