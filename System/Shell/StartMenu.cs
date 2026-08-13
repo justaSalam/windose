@@ -146,6 +146,10 @@ public class StartMenu : Window
             explorer.NavigateToPath("control");
             WindowManager.Register(explorer);
         });
+        settings.AddSubmenuItem("Display Settings", () =>
+        {
+            WindowManager.Register(new DisplaySettings());
+        });
 
 
 

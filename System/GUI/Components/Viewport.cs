@@ -8,34 +8,60 @@ using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose.System.Kernel;
+using Windose.System.System_Calls;
 using Sys = Cosmos.Kernel.System;
 
 namespace Windose.System.GUI.Components
 {
     internal class Viewport : Component
     {
-        SVGAII3DCanvas canvas = null!;
-        uint context;
 
-        SVGA3dSurfaceImageId ColorSurface, DepthSurface;
+        private uint context;
 
-        uint vao, ebo;
+        private SVGA3dSurfaceImageId ColorSurface, DepthSurface;
 
-        Matrix4x4 proj, view;
+        private uint vao, ebo;
 
-        SVGA3dRect viewrect = new(0, 0, 1280, 720);
+        private Matrix4x4 proj, view;
 
-        SVGA3dVertexDecl[] vertexListDefinition = [];
-        SVGA3dPrimitiveRange[] batchList = [];
+        private SVGA3dRect viewrect = new(0, 0, 1280, 720);
 
-        float roty = 0;
+        private SVGA3dVertexDecl[] vertexListDefinition = [];
+        private SVGA3dPrimitiveRange[] batchList = [];
+
+        private float roty = 0;
+
+
+        private SVGAII3DCanvas canvas;
         public Viewport(int width, int height) : base(0, 0, width, height)
         {
-            Canvas tcanv = FullScreenCanvas.GetFullScreenCanvas(new(viewrect.w, viewrect.h, ColorDepth.ColorDepth32));
+            canvas = Windose.Kernel.Instance.displayDriver.Canvas;
 
 
-            Serial.WriteString("Checking driver");
-            canvas.Clear(canvas.Driver.Is3DEnabled ? Color.Green : Color.Orange);
+
+            SystemLogger.WriteLine("Viewport", "Checking driver");
+
+            if (canvas.Driver == null)
+            {
+                canvas.Clear(Color.Gray);
+                canvas.DrawString("3D driver not available. Please ensure that the SVGAII driver is loaded and the device supports 3D acceleration.", SystemFonts.spleen6x12, Color.White, 0, 0);
+                canvas.Display();
+                SystemLogger.WriteLine("Viewport", "3D driver not available. Please ensure that the SVGAII driver is loaded and the device supports 3D acceleration.", ConsoleMessageType.Fatal);
+                return;
+            }
+
+            if (!canvas.Driver.Is3DEnabled)
+            {
+                canvas.Clear(Color.Gray);
+                canvas.DrawString("3D driver is not enabled. Please ensure that the SVGAII driver is loaded and the device supports 3D acceleration.", SystemFonts.spleen6x12, Color.White, 0, 0);
+                canvas.Display();
+                SystemLogger.WriteLine("Viewport", "3D driver is not enabled. Please ensure that the SVGAII driver is loaded and the device supports 3D acceleration.", ConsoleMessageType.Fatal);
+                return;
+            }
+            canvas.Clear(canvas.Driver.Is3DEnabled ? Color.Green : Color.Gray);
+
+
+            SystemLogger.WriteLine("Viewport", "3D " + canvas.Driver.Is3DEnabled);
 
             //canvas.DrawString("3D is " + canvas.Driver.Is3DEnabled, SystemFonts.spleen6x12, Color.Black, 0, 0);
             //canvas.DrawString("3D driver is null? " + (canvas.Driver3D == null), SystemFonts.spleen6x12, Color.Black, 0, 0);
@@ -152,7 +178,7 @@ namespace Windose.System.GUI.Components
         private bool stop;
         public override void HandleKeyboard(KeyEvent keyEvent)
         {
-            if(keyEvent.Key == ConsoleKeyEx.Escape)
+            if (keyEvent.Key == ConsoleKeyEx.Escape)
             {
                 stop = true;
             }

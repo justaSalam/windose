@@ -448,11 +448,16 @@ public class Component : IDisposable
     {
         foreach (Component child in children)
         {
+            child.PrepareLayout();
             child.ResolveHorizontalAnchor();
             child.ResolveVerticalAnchor();
 
             child.MarkDirty();
         }
+    }
+
+    public virtual void PrepareLayout()
+    {
     }
 
     public void DrawToScreen()

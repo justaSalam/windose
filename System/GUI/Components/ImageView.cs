@@ -6,7 +6,9 @@ public class ImageView : Component
 
     private Rectangle sourceRect;
     private Rectangle targetRect;
+
     public int scrollMultiplier = 6;
+    public bool canResize = true;
 
     public ImageView(Image image, int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -32,7 +34,7 @@ public class ImageView : Component
             return false;
 
         float scrollDelta = Mouse.scroll;
-        if (scrollDelta != 0)
+        if (scrollDelta != 0 && canResize)
         {
             targetRect.Width -= (int)scrollDelta * scrollMultiplier;
             targetRect.Height -= (int)scrollDelta * scrollMultiplier;
@@ -41,6 +43,7 @@ public class ImageView : Component
 
             targetRect.Width = Math.Clamp(targetRect.Width, 16, Width);
             targetRect.Height = Math.Clamp(targetRect.Height, 16, Height);
+
 
             MarkDirty();
         }

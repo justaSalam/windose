@@ -1,4 +1,5 @@
 using Cosmos.Kernel.Core.IO;
+using Windose.System.System_Calls;
 
 public static class BreezeHost
 {
@@ -100,8 +101,8 @@ public static class BreezeHost
 
     private static void ShowErrorNow(string message)
     {
+        SystemLogger.WriteLine("BreezeHost", message, ConsoleMessageType.Error);
         string visibleMessage = message ?? "Unknown script error";
-        if (visibleMessage.Length > 90) visibleMessage = visibleMessage.Substring(0, 87) + "...";
 
         Window error = new Window(140, 140, visibleMessage.Length * 8 + 40, 120, "Breeze Runtime Error", true)
         {

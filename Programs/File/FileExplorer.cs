@@ -103,7 +103,7 @@ public class FileExplorer : Window
 
             fileContextMenu.AddSeparator();
             fileContextMenu.AddItem("Create Shortcut", ShowContextProperties);
-            fileContextMenu.AddItem("Delete", ShowContextProperties);
+            fileContextMenu.AddItem("Delete", DeleteFile);
             fileContextMenu.AddItem("Rename", ShowContextProperties);
 
             fileContextMenu.AddSeparator();
@@ -208,6 +208,32 @@ public class FileExplorer : Window
 
 
 
+    }
+
+    private void DeleteFile()
+    {
+        if(!IsItemValid(out ListViewItem item))
+        {
+            return;
+        }
+
+        FileEntry fileEntry = item.fileEntry;
+
+        switch(fileEntry.FileType)
+        {
+            case FileType.Directory:
+                Directory.Delete(fileEntry.AbsoluteLocation, true);
+                break;
+
+
+            default:
+                File.Delete(fileEntry.AbsoluteLocation);
+                break;
+        }
+        
+        
+        PopulateFiles(currentLocation);
+        
     }
 
     private void BuildTree()
@@ -323,13 +349,17 @@ public class FileExplorer : Window
     }
 
     private void ShowContextProperties()
-    {
-        ListViewItem item = contextItem;
-        contextItem = null;
-        if (item != null && item.hasFileEntry)
-            WindowManager.Register(new FileProperties(X + 40, Y + 40, item.fileEntry));
+    { 
+        if(!IsItemValid(out ListViewItem item)) return;
+        WindowManager.Register(new FileProperties(X + 40, Y + 40, item.fileEntry));
     }
+    private bool IsItemValid(out ListViewItem item)
+    {
+        item = contextItem;
+        contextItem = null;
 
+        return item != null && item.hasFileEntry;
+    }
     private void NavigateTo(string location, string displayName)
     {
         addressBar.Address = displayName;

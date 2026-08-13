@@ -14,7 +14,7 @@
   </ItemGroup>
   <ImportGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <Import Project="$(NuGetPackageRoot)microsoft.codeanalysis.analyzers\3.11.0\buildTransitive\Microsoft.CodeAnalysis.Analyzers.props" Condition="Exists('$(NuGetPackageRoot)microsoft.codeanalysis.analyzers\3.11.0\buildTransitive\Microsoft.CodeAnalysis.Analyzers.props')" />
-    <Import Project="$(NuGetPackageRoot)microsoft.net.illink.tasks\10.0.10\build\Microsoft.NET.ILLink.Tasks.props" Condition="Exists('$(NuGetPackageRoot)microsoft.net.illink.tasks\10.0.10\build\Microsoft.NET.ILLink.Tasks.props')" />
+    <Import Project="$(NuGetPackageRoot)microsoft.net.illink.tasks\10.0.11\build\Microsoft.NET.ILLink.Tasks.props" Condition="Exists('$(NuGetPackageRoot)microsoft.net.illink.tasks\10.0.11\build\Microsoft.NET.ILLink.Tasks.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.kernel.system.core\3.0.82\build\Cosmos.Kernel.System.Core.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel.system.core\3.0.82\build\Cosmos.Kernel.System.Core.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.build.common\3.0.82\build\Cosmos.Build.Common.props" Condition="Exists('$(NuGetPackageRoot)cosmos.build.common\3.0.82\build\Cosmos.Build.Common.props')" />
     <Import Project="$(NuGetPackageRoot)cosmos.kernel.hal\3.0.82\build\Cosmos.Kernel.HAL.props" Condition="Exists('$(NuGetPackageRoot)cosmos.kernel.hal\3.0.82\build\Cosmos.Kernel.HAL.props')" />
@@ -31,7 +31,7 @@
   </ImportGroup>
   <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <PkgMicrosoft_CodeAnalysis_Analyzers Condition=" '$(PkgMicrosoft_CodeAnalysis_Analyzers)' == '' ">C:\Users\salam\.nuget\packages\microsoft.codeanalysis.analyzers\3.11.0</PkgMicrosoft_CodeAnalysis_Analyzers>
-    <PkgMicrosoft_NET_ILLink_Tasks Condition=" '$(PkgMicrosoft_NET_ILLink_Tasks)' == '' ">C:\Users\salam\.nuget\packages\microsoft.net.illink.tasks\10.0.10</PkgMicrosoft_NET_ILLink_Tasks>
+    <PkgMicrosoft_NET_ILLink_Tasks Condition=" '$(PkgMicrosoft_NET_ILLink_Tasks)' == '' ">C:\Users\salam\.nuget\packages\microsoft.net.illink.tasks\10.0.11</PkgMicrosoft_NET_ILLink_Tasks>
     <PkgCosmos_Build_Common Condition=" '$(PkgCosmos_Build_Common)' == '' ">C:\Users\salam\.nuget\packages\cosmos.build.common\3.0.82</PkgCosmos_Build_Common>
   </PropertyGroup>
 </Project>

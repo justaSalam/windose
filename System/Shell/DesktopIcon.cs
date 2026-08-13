@@ -32,6 +32,7 @@ namespace Windose.System.Shell
         private Point offset;
         private string renameText = "";
         private string renameOriginalText = "";
+        private bool renameAllSelected;
 
         public bool IsDragging => dragging;
         public bool IsRenaming => renaming;
@@ -88,6 +89,9 @@ namespace Windose.System.Shell
 
         public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
         {
+            if (renaming)
+                return base.HandleInput(mouseX, mouseY, mouse);
+
             if (mouse.left == MouseEvents.Press)
             {
                 dragging = true;
@@ -120,6 +124,7 @@ namespace Windose.System.Shell
         {
             renameOriginalText = fileEntry.FileName ?? "";
             renameText = renameOriginalText;
+            renameAllSelected = true;
             renaming = true;
             MarkDirty();
         }
@@ -131,13 +136,36 @@ namespace Windose.System.Shell
             string newName = (renameText ?? "").Trim();
             if (newName != "")
             {
+                string oldPath = fileEntry.AbsoluteLocation;
+                string newPath = ReplacePathName(oldPath, newName);
+
+                if (newName == renameOriginalText)
+                {
+                    CancelRename();
+                    return;
+                }
+
+                if (PathExists(newPath))
+                {
+                    MarkDirty();
+                    return;
+                }
+
+                if (PathExists(oldPath))
+                {
+                    if (fileEntry.FileType == FileType.Directory)
+                        Directory.Move(oldPath, newPath);
+                    else
+                        File.Move(oldPath, newPath);
+                }
+
                 fileEntry.FileName = newName;
-                fileEntry.AbsoluteLocation = ReplacePathName(fileEntry.AbsoluteLocation, newName);
-                File.Move(renameOriginalText, newName);
+                fileEntry.AbsoluteLocation = newPath;
             }
 
             renameText = "";
             renameOriginalText = "";
+            renameAllSelected = false;
             renaming = false;
             MarkDirty();
         }
@@ -148,6 +176,7 @@ namespace Windose.System.Shell
 
             renameText = "";
             renameOriginalText = "";
+            renameAllSelected = false;
             renaming = false;
             MarkDirty();
         }
@@ -168,7 +197,13 @@ namespace Windose.System.Shell
                 switch (keyEvent.Key)
                 {
                     case ConsoleKeyEx.Backspace:
-                        if (renameText.Length > 0)
+                        if (renameAllSelected)
+                        {
+                            renameText = "";
+                            renameAllSelected = false;
+                            MarkDirty();
+                        }
+                        else if (renameText.Length > 0)
                         {
                             renameText = renameText.Substring(0, renameText.Length - 1);
                             MarkDirty();
@@ -184,9 +219,16 @@ namespace Windose.System.Shell
                         break;
 
                     default:
-                        if (keyEvent.KeyChar != '\0')
+                        char printable = GetPrintableCharacter(keyEvent);
+                        if (printable != '\0')
                         {
-                            renameText += keyEvent.KeyChar;
+                            if (renameAllSelected)
+                            {
+                                renameText = "";
+                                renameAllSelected = false;
+                            }
+
+                            renameText += printable;
                             MarkDirty();
                         }
                         break;
@@ -220,7 +262,7 @@ namespace Windose.System.Shell
 
             string[] lines = BuildLabelLines(name);
             if (renaming && lines.Length == 0)
-                lines = new[] { "" };
+                lines = [""];
 
             int labelHeight = lines.Length * LabelLineHeight;
 
@@ -344,6 +386,12 @@ namespace Windose.System.Shell
             return path.Substring(0, slash + 1) + newName;
         }
 
-        public override string GetName() => "Button";
+        private static bool PathExists(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return File.Exists(path) || Directory.Exists(path);
+        }
+
+        public override string GetName() => "DesktopIcon";
     }
 }

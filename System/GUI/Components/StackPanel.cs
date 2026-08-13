@@ -43,6 +43,8 @@ public class StackPanel : Panel
             Component child = children[i];
             if (!child.Visible) continue;
 
+            child.PrepareLayout();
+
             if (orientation == StackOrientation.Vertical)
             {
                 child.X = cursorX + child.Margin.left;

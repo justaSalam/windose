@@ -28,7 +28,10 @@ public class Slider : Component
         get => _value;
         set
         {
-            _value = Math.Clamp(value, _min, _max);
+            float clamped = Math.Clamp(value, _min, _max);
+            if (Math.Abs(_value - clamped) < 0.001f) return;
+
+            _value = clamped;
             MarkDirty();
             ValueChanged?.Invoke(_value);
         }
@@ -68,10 +71,12 @@ public class Slider : Component
 
     public Slider(int x, int y, int width) : base(x, y, width, 25)
     {
+        clampSize = false;
     }
 
     public Slider(int x, int y, int width, int height, Orientation orientation) : base(x, y, width, height)
     {
+        clampSize = false;
         Orientation = orientation;
     }
 
@@ -106,7 +111,8 @@ public class Slider : Component
         int trackHeight = 4;
         int thumbSize = Math.Min(14, Height - 4);
         int trackLeft = 4 + thumbSize / 2;
-        int trackRight = Width - 4 - thumbSize / 2;
+        int valueInset = showValue ? Math.Max(36, MeasureStringWidth(((int)_max).ToString(), fontSize > 0 ? fontSize : 12) + 10) : 0;
+        int trackRight = Width - 4 - thumbSize / 2 - valueInset;
         int trackWidth = trackRight - trackLeft;
 
         if (trackWidth <= 0) return;
@@ -117,12 +123,14 @@ public class Slider : Component
 
 
         DrawSunkenRectangle(trackLeft, trackY, trackWidth, trackHeight);
+        if (thumbX > trackLeft)
+            DrawFilledRectangle(trackActiveColor, trackLeft + 1, trackY + 1, Math.Max(1, thumbX - trackLeft), Math.Max(1, trackHeight - 2));
 
         Color thumbFace = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.15f);
         DrawRaisedRectangle(thumbX - thumbSize / 2, (Height - thumbSize) / 2, thumbSize, thumbSize);
         DrawFilledRectangle(thumbFace, thumbX - thumbSize / 2 + 1, (Height - thumbSize) / 2 + 1, thumbSize - 2, thumbSize - 2);
 
-        // Ticks
+        /* Ticks
         if (showTicks)
         {
             int tickCount = 10;
@@ -131,7 +139,7 @@ public class Slider : Component
                 int tickX = trackLeft + (trackWidth * i / tickCount);
                 DrawLine(Palette.ControlShadow, tickX, trackY + trackHeight + 2, 1, 3);
             }
-        }
+        }*/
 
 
         if (showValue)
@@ -140,7 +148,7 @@ public class Slider : Component
             int effectiveFontSize = fontSize > 0 ? fontSize : 12;
             int textX = Width - MeasureStringWidth(valueText, effectiveFontSize) - 4;
             int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
-            DrawString(valueText, textColor, textX > trackRight ? textX : 0, textY, effectiveFontSize);
+            DrawString(valueText, textColor, Math.Max(trackRight + 8, textX), textY, effectiveFontSize);
         }
     }
 
@@ -161,6 +169,8 @@ public class Slider : Component
 
 
         DrawSunkenRectangle(trackX, trackTop, trackWidth, trackHeight);
+        if (thumbY < trackBottom)
+            DrawFilledRectangle(trackActiveColor, trackX + 1, thumbY, Math.Max(1, trackWidth - 2), Math.Max(1, trackBottom - thumbY));
 
         Color thumbFace = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.15f);
         DrawRaisedRectangle((Width - thumbSize) / 2, thumbY - thumbSize / 2, thumbSize, thumbSize);
@@ -188,6 +198,18 @@ public class Slider : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (mouse.left == MouseEvents.Release || mouse.left == MouseEvents.None)
+        {
+            if (isDragging)
+            {
+                isDragging = false;
+                MarkDirty();
+                return true;
+            }
+
+            return true;
+        }
+
         if (mouse.left == MouseEvents.Press)
         {
             isDragging = true;
@@ -199,13 +221,6 @@ public class Slider : Component
         if (mouse.left == MouseEvents.Hold && isDragging)
         {
             UpdateValueFromMouse(mouseX, mouseY);
-            return true;
-        }
-
-        if (mouse.left == MouseEvents.Release && isDragging)
-        {
-            isDragging = false;
-            MarkDirty();
             return true;
         }
 
@@ -221,7 +236,8 @@ public class Slider : Component
         {
             int thumbSize = Math.Min(14, Height - 4);
             int trackLeft = 4 + thumbSize / 2;
-            int trackRight = Width - 4 - thumbSize / 2;
+            int valueInset = showValue ? Math.Max(36, MeasureStringWidth(((int)_max).ToString(), fontSize > 0 ? fontSize : 12) + 10) : 0;
+            int trackRight = Width - 4 - thumbSize / 2 - valueInset;
             int trackWidth = trackRight - trackLeft;
 
             if (trackWidth <= 0) return;

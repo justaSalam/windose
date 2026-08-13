@@ -44,6 +44,18 @@ namespace Windose.System.System_Calls
                     Console.WriteLine($"] {message}");
                     break;
 
+                case ConsoleMessageType.Fatal:
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.Write($"[");
+
+                    Console.ForegroundColor = ConsoleColor.DarkRed;
+                    Console.Write(source);
+
+                    Console.ForegroundColor = ConsoleColor.White;
+                    Console.WriteLine($"] {message}");
+                    Dump();
+                    break;
+
             }
 
             logBuilder.AppendLine($"<{DateTime.Now.ToString("HH:mm:ss")}> [{type}] [{source}] {message}");
@@ -62,6 +74,7 @@ namespace Windose.System.System_Calls
     {
         Log,
         Warning,
-        Error
+        Error,
+        Fatal
     }
 }

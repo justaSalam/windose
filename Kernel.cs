@@ -33,7 +33,7 @@ public class Kernel : Sys.Kernel
     private WindowManager windowManager = null!;
     public CosmosDisplayDriver displayDriver = null!;
     private CosmosMouseDriver mouseDriver = null!;
-
+    private int tick = 0;
 
     protected override void BeforeRun()
     {
@@ -115,12 +115,14 @@ public class Kernel : Sys.Kernel
         try
         {
             mouseDriver.Update();
-
             Tick();
 
             PerformanceMetrics.BeginFrame();
+
             long processStartedAt = PerformanceMetrics.Now;
+
             ProcessManger.Update();
+
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
             displayDriver.Present(mainBuffer, mouseDriver.X, mouseDriver.Y);

@@ -8,8 +8,8 @@ public class ComboBox : Component
     private bool isDroppedDown;
     private float hoverBlend;
     private bool isPressed;
-    private int hoveredItemIndex = -1;
     private readonly int collapsedHeight = 25;
+    private MenuPopup dropDown;
 
     public bool useBorders = true;
     public Color borderColor = Palette.ControlShadow;
@@ -26,6 +26,8 @@ public class ComboBox : Component
         set
         {
             if (value < -1 || value >= items.Count) return;
+            if (selectedIndex == value) return;
+
             selectedIndex = value;
             MarkDirty();
             SelectedIndexChanged?.Invoke(selectedIndex);
@@ -52,11 +54,23 @@ public class ComboBox : Component
 
     public ComboBox(int x, int y, int width) : base(x, y, width, 25)
     {
+        clampSize = false;
+    }
+
+    public override void Resize(int width, int height)
+    {
+        base.Resize(width, collapsedHeight);
+
+        if (dropDown == null) return;
+
+        dropDown.itemWidth = Width;
+        RebuildDropDown();
     }
 
     public void AddItem(object item)
     {
         items.Add(item);
+        RebuildDropDown();
         MarkDirty();
     }
 
@@ -64,6 +78,7 @@ public class ComboBox : Component
     {
         foreach (object item in newItems)
             items.Add(item);
+        RebuildDropDown();
         MarkDirty();
     }
 
@@ -71,13 +86,14 @@ public class ComboBox : Component
     {
         items.Clear();
         selectedIndex = -1;
-        isDroppedDown = false;
+        SetDroppedDown(false);
+        RebuildDropDown();
         MarkDirty();
     }
 
     public int ItemCount => items.Count;
 
-    private int DropDownHeight => Math.Min(items.Count * collapsedHeight, dropDownMaxHeight);
+    private int DropDownHeight => Math.Min(items.Count * collapsedHeight + 4, dropDownMaxHeight);
 
     public object GetItemAt(int index)
     {
@@ -86,6 +102,9 @@ public class ComboBox : Component
 
     public override void Update()
     {
+        if (dropDown != null && !dropDown.Visible && isDroppedDown)
+            isDroppedDown = false;
+
         base.Update();
 
         float target = state == State.Highlighted || isPressed ? 1f : 0f;
@@ -129,33 +148,6 @@ public class ComboBox : Component
             int textY = Math.Max(0, (boxHeight - MeasureStringHeight(effectiveFontSize)) / 2);
             DrawString(displayText, textColor, 4, textY, effectiveFontSize);
         }
-
-        // Dropdown list
-        if (isDroppedDown)
-        {
-            int listHeight = DropDownHeight;
-            int listY = boxHeight;
-
-
-            DrawRaisedRectangle(0, listY, Width, listHeight);
-
-
-            for (int i = 0; i < items.Count; i++)
-            {
-                int itemY = listY + i * boxHeight;
-                if (itemY + boxHeight > listY + listHeight) break;
-
-                if (i == hoveredItemIndex)
-                {
-                    DrawFilledRectangle(highlightColor, 1, itemY, Width - 2, boxHeight);
-                    DrawString(items[i].ToString(), highlightTextColor, 4, itemY + 2, fontSize > 0 ? fontSize : 14);
-                }
-                else
-                {
-                    DrawString(items[i].ToString(), textColor, 4, itemY + 2, fontSize > 0 ? fontSize : 14);
-                }
-            }
-        }
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
@@ -173,62 +165,80 @@ public class ComboBox : Component
 
             if (isDroppedDown)
             {
-                // Check if click is on an item in the dropdown
-                int listY = collapsedHeight;
-                int listHeight = DropDownHeight;
-                int localY = mouseY - AbsoluteY;
-
-                if (localY >= listY && localY < listY + listHeight)
-                {
-                    int clickedIndex = (localY - listY) / collapsedHeight;
-                    if (clickedIndex >= 0 && clickedIndex < items.Count)
-                    {
-                        selectedIndex = clickedIndex;
-                        ItemClicked?.Invoke(clickedIndex);
-                        SelectedIndexChanged?.Invoke(clickedIndex);
-                    }
-                }
-
-                isDroppedDown = false;
-                Resize(Width, collapsedHeight);
+                SetDroppedDown(false);
             }
             else
             {
-                isDroppedDown = true;
-                Resize(Width, collapsedHeight + DropDownHeight);
+                SetDroppedDown(items.Count > 0);
             }
 
             MarkDirty();
             return true;
         }
 
-        // Track hover over dropdown items
-        if (isDroppedDown)
-        {
-            int listY = collapsedHeight;
-            int listHeight = DropDownHeight;
-            int localY = mouseY - AbsoluteY;
+        return true;
+    }
 
-            if (localY >= listY && localY < listY + listHeight)
-            {
-                int newHover = (localY - listY) / collapsedHeight;
-                if (newHover != hoveredItemIndex)
-                {
-                    hoveredItemIndex = newHover;
-                    MarkDirty();
-                }
-            }
-            else
-            {
-                if (hoveredItemIndex != -1)
-                {
-                    hoveredItemIndex = -1;
-                    MarkDirty();
-                }
-            }
+    private void SetDroppedDown(bool droppedDown)
+    {
+        EnsureDropDown();
+
+        if (isDroppedDown == droppedDown && dropDown.Visible == droppedDown)
+        {
+            return;
         }
 
-        return true;
+        isDroppedDown = droppedDown;
+
+        if (droppedDown)
+            dropDown.ShowAt(AbsoluteX, AbsoluteY + collapsedHeight - 1);
+        else
+            dropDown.Hide();
+
+        MarkDirty();
+    }
+
+    private void EnsureDropDown()
+    {
+        if (dropDown != null)
+            return;
+
+        dropDown = new MenuPopup(Width, DropDownHeight)
+        {
+            itemHeight = collapsedHeight,
+        };
+        RebuildDropDown();
+    }
+
+    private void RebuildDropDown()
+    {
+        if (dropDown == null)
+            return;
+
+        bool wasVisible = dropDown.Visible;
+        dropDown.Hide();
+        for (int i = dropDown.items.children.Count - 1; i >= 0; i--)
+        {
+            Component child = dropDown.items.children[i];
+            dropDown.items.RemoveStackChild(child);
+        }
+        dropDown.Resize(Width, DropDownHeight);
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            int index = i;
+            MenuItem item = dropDown.AddItem(items[i]?.ToString() ?? "", () =>
+            {
+                SelectedIndex = index;
+                ItemClicked?.Invoke(index);
+                isDroppedDown = false;
+                MarkDirty();
+            });
+            item.fontSize = fontSize > 0 ? fontSize : 14;
+        }
+
+        if (wasVisible && items.Count > 0)
+            dropDown.ShowAt(AbsoluteX, AbsoluteY + collapsedHeight - 1);
     }
 
     private void DrawFilledTriangle(Color color, int centerX, int centerY, int size)
@@ -247,4 +257,12 @@ public class ComboBox : Component
     }
 
     public override string GetName() => "ComboBox";
+
+    public override void Dispose()
+    {
+        dropDown?.Hide();
+        dropDown?.Dispose();
+        dropDown = null;
+        base.Dispose();
+    }
 }

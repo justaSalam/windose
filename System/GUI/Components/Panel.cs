@@ -1,6 +1,4 @@
 using System.Drawing;
-using Cosmos.Kernel.Core.IO;
-
 public class Panel : Component
 {
     public Color color1;
@@ -14,6 +12,7 @@ public class Panel : Component
     public int fontSize = 0;
     public int textOffsetX = 0;
     public Color textColor = Color.Black;
+    public bool wrapText = true;
 
     public Panel(Color color1, Color color2, int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -28,11 +27,7 @@ public class Panel : Component
         color1 = color;
 
         useGradient = false;
-
-
     }
-
-
 
     public override void Draw()
     {
@@ -53,9 +48,20 @@ public class Panel : Component
         if (text != "")
         {
             int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
-            int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
+            int lineHeight = MeasureStringHeight(effectiveFontSize);
+            int availableWidth = Math.Max(1, Width - 4 - textOffsetX);
 
-            DrawString(text, textColor, 2 + textOffsetX, textY, effectiveFontSize);
+            List<string> lines = wrapText
+                ? WrapText(text, effectiveFontSize, availableWidth)
+                : new List<string> { text };
+
+            int totalTextHeight = lines.Count * lineHeight;
+            int startY = Math.Max(0, (Height - totalTextHeight) / 2);
+
+            for (int i = 0; i < lines.Count; i++)
+            {
+                DrawString(lines[i], textColor, 2 + textOffsetX, startY + i * lineHeight, effectiveFontSize);
+            }
         }
 
         foreach (Component child in children)
@@ -64,6 +70,69 @@ public class Panel : Component
 
             DrawChild(child);
         }
+    }
+
+    private List<string> WrapText(string input, int fontSize, int maxWidth)
+    {
+        List<string> lines = new List<string>();
+        string[] words = input.Split(' ');
+
+        string currentLine = "";
+
+        foreach (string word in words)
+        {
+            string candidate = currentLine.Length == 0 ? word : currentLine + " " + word;
+
+            if (MeasureStringWidth(candidate, fontSize) <= maxWidth)
+            {
+                currentLine = candidate;
+            }
+            else
+            {
+                if (currentLine.Length > 0)
+                {
+                    lines.Add(currentLine);
+                    currentLine = word;
+
+                    // Single word alone still too wide - hard break it
+                    if (MeasureStringWidth(currentLine, fontSize) > maxWidth)
+                    {
+                        currentLine = HardBreakWord(currentLine, fontSize, maxWidth, lines);
+                    }
+                }
+                else
+                {
+                    // First word on the line already too wide - hard break it
+                    currentLine = HardBreakWord(word, fontSize, maxWidth, lines);
+                }
+            }
+        }
+
+        if (currentLine.Length > 0)
+            lines.Add(currentLine);
+
+        if (lines.Count == 0)
+            lines.Add("");
+
+        return lines;
+    }
+
+    private string HardBreakWord(string word, int fontSize, int maxWidth, List<string> lines)
+    {
+        string remaining = word;
+
+        while (MeasureStringWidth(remaining, fontSize) > maxWidth && remaining.Length > 1)
+        {
+            int splitAt = remaining.Length - 1;
+
+            while (splitAt > 1 && MeasureStringWidth(remaining.Substring(0, splitAt), fontSize) > maxWidth)
+                splitAt--;
+
+            lines.Add(remaining.Substring(0, splitAt));
+            remaining = remaining.Substring(splitAt);
+        }
+
+        return remaining;
     }
 
     public override bool IsOpaqueForCopy() => useBackground;

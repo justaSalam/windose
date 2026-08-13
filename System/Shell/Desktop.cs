@@ -14,6 +14,8 @@ public class Desktop : Component
     private Color backgroundColor;
 
     private MenuPopup contextMenu;
+    private MenuItem renameMenuItem;
+    private DesktopIcon? contextIcon;
     private DesktopIcon? activeDraggedIcon;
     private List<DesktopIcon> selectedIcons = new List<DesktopIcon>();
     private List<DesktopIcon> gridCollisionIgnoredIcons;
@@ -27,6 +29,8 @@ public class Desktop : Component
     public static int IconGridOffsetY { get; private set; } = 8;
     public int contextX { get; private set; }
     public int contextY { get; private set; }
+    public bool WantsKeyboardInput => selectedIcons.Count == 1 || FindRenamingIcon() != null;
+
     public Desktop(int x, int y, int width, int height) : base(x, y, width, height)
     {
         zLayer = DrawLayer.Desktop;
@@ -43,11 +47,7 @@ public class Desktop : Component
 
         rightClickAction = () =>
         {
-            contextX = Math.Min(MouseManager.X, Math.Max(0, Global.screenWidth - contextMenu.Width));
-            contextY = Math.Min(MouseManager.Y, Math.Max(0, Global.screenHeight - contextMenu.Height));
-            contextMenu.ShowAt(contextX, contextY);
-
-            MarkDirty();
+            ShowContextMenu(MouseManager.X, MouseManager.Y, null);
         };
 
         CreateDesktopContextMenu();
@@ -84,7 +84,9 @@ public class Desktop : Component
 
 
         contextMenu.AddSeparator();
-        contextMenu.AddItem("Display Settings");
+        renameMenuItem = contextMenu.AddItem("Rename", BeginContextRename);
+        contextMenu.AddSeparator();
+        contextMenu.AddItem("Display Settings", () => WindowManager.Register(new DisplaySettings(contextX, contextY)));
         contextMenu.AddItem("Personalise");
     }
 
@@ -189,6 +191,26 @@ public class Desktop : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        DesktopIcon renamingIcon = FindRenamingIcon();
+
+        if (renamingIcon != null && mouse.left == MouseEvents.Press && !renamingIcon.IsInsideAbsolute(mouseX, mouseY))
+        {
+            renamingIcon.CommitRename();
+            ClearIconSelection();
+            return true;
+        }
+
+        if (mouse.right == MouseEvents.Release)
+        {
+            DesktopIcon icon = FindIconAt(mouseX, mouseY);
+            if (icon != null)
+            {
+                SelectOnlyIcon(icon);
+                ShowContextMenu(mouseX, mouseY, icon);
+                return true;
+            }
+        }
+
         if (activeDraggedIcon != null)
         {
             int previousX = activeDraggedIcon.X;
@@ -244,9 +266,23 @@ public class Desktop : Component
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
         base.HandleKeyboard(keyEvent);
+
+        DesktopIcon renamingIcon = FindRenamingIcon();
+        if (renamingIcon != null)
+        {
+            renamingIcon.HandleKeyboard(keyEvent);
+            return;
+        }
+
         if (activeDraggedIcon != null)
         {
             activeDraggedIcon.HandleKeyboard(keyEvent);
+            return;
+        }
+
+        if (selectedIcons.Count == 1)
+        {
+            selectedIcons[0].HandleKeyboard(keyEvent);
         }
     }
 
@@ -357,6 +393,45 @@ public class Desktop : Component
     {
         SystemRegistry.Set("System/Desktop/IconGridWidth", (long)width);
         SystemRegistry.Set("System/Desktop/IconGridHeight", (long)height);
+    }
+
+    private DesktopIcon FindIconAt(int mouseX, int mouseY)
+    {
+        for (int i = Icons.Count - 1; i >= 0; i--)
+        {
+            DesktopIcon icon = Icons[i];
+            if (icon.Visible && icon.IsInsideAbsolute(mouseX, mouseY))
+                return icon;
+        }
+
+        return null;
+    }
+
+    private DesktopIcon FindRenamingIcon()
+    {
+        for (int i = 0; i < Icons.Count; i++)
+            if (Icons[i].IsRenaming) return Icons[i];
+
+        return null;
+    }
+
+    private void ShowContextMenu(int mouseX, int mouseY, DesktopIcon icon)
+    {
+        contextIcon = icon;
+        renameMenuItem.enabled = icon != null || selectedIcons.Count == 1;
+        contextX = Math.Min(mouseX, Math.Max(0, Global.screenWidth - contextMenu.Width));
+        contextY = Math.Min(mouseY, Math.Max(0, Global.screenHeight - contextMenu.Height));
+        contextMenu.ShowAt(contextX, contextY);
+        MarkDirty();
+    }
+
+    private void BeginContextRename()
+    {
+        DesktopIcon icon = contextIcon ?? (selectedIcons.Count == 1 ? selectedIcons[0] : null);
+        if (icon == null) return;
+
+        SelectOnlyIcon(icon);
+        icon.BeginRename();
     }
 
     private void SelectOnlyIcon(DesktopIcon icon)

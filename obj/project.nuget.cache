@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "XD7UriLJ79g=",
+  "dgSpecHash": "If4gxXbBQ2M=",
   "success": true,
   "projectFilePath": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
   "expectedPackageFiles": [
@@ -26,15 +26,15 @@
     "C:\\Users\\salam\\.nuget\\packages\\microsoft.codeanalysis.analyzers\\3.11.0\\microsoft.codeanalysis.analyzers.3.11.0.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\microsoft.codeanalysis.common\\4.14.0\\microsoft.codeanalysis.common.4.14.0.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\microsoft.codeanalysis.csharp\\4.14.0\\microsoft.codeanalysis.csharp.4.14.0.nupkg.sha512",
-    "C:\\Users\\salam\\.nuget\\packages\\microsoft.net.illink.tasks\\10.0.10\\microsoft.net.illink.tasks.10.0.10.nupkg.sha512",
+    "C:\\Users\\salam\\.nuget\\packages\\microsoft.net.illink.tasks\\10.0.11\\microsoft.net.illink.tasks.10.0.11.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\mono.cecil\\0.11.6\\mono.cecil.0.11.6.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\_cosmos.build.analyzer.patcher\\3.0.82\\_cosmos.build.analyzer.patcher.3.0.82.nupkg.sha512",
-    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.runtime.nativeaot.linux-x64\\10.0.10\\microsoft.netcore.app.runtime.nativeaot.linux-x64.10.0.10.nupkg.sha512",
-    "C:\\Users\\salam\\.nuget\\packages\\runtime.win-x64.microsoft.dotnet.ilcompiler\\10.0.10\\runtime.win-x64.microsoft.dotnet.ilcompiler.10.0.10.nupkg.sha512",
-    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.ref\\10.0.10\\microsoft.netcore.app.ref.10.0.10.nupkg.sha512",
-    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.runtime.linux-x64\\10.0.10\\microsoft.netcore.app.runtime.linux-x64.10.0.10.nupkg.sha512",
-    "C:\\Users\\salam\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.linux-x64\\10.0.10\\microsoft.aspnetcore.app.runtime.linux-x64.10.0.10.nupkg.sha512",
-    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.host.linux-x64\\10.0.10\\microsoft.netcore.app.host.linux-x64.10.0.10.nupkg.sha512"
+    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.runtime.nativeaot.linux-x64\\10.0.11\\microsoft.netcore.app.runtime.nativeaot.linux-x64.10.0.11.nupkg.sha512",
+    "C:\\Users\\salam\\.nuget\\packages\\runtime.win-x64.microsoft.dotnet.ilcompiler\\10.0.11\\runtime.win-x64.microsoft.dotnet.ilcompiler.10.0.11.nupkg.sha512",
+    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.ref\\10.0.11\\microsoft.netcore.app.ref.10.0.11.nupkg.sha512",
+    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.runtime.linux-x64\\10.0.11\\microsoft.netcore.app.runtime.linux-x64.10.0.11.nupkg.sha512",
+    "C:\\Users\\salam\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.linux-x64\\10.0.11\\microsoft.aspnetcore.app.runtime.linux-x64.10.0.11.nupkg.sha512",
+    "C:\\Users\\salam\\.nuget\\packages\\microsoft.netcore.app.host.linux-x64\\10.0.11\\microsoft.netcore.app.host.linux-x64.10.0.11.nupkg.sha512"
   ],
   "logs": []
 }

@@ -4,6 +4,7 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
+using Windose.System.System_Calls;
 
 public class WindowManager : SingleThreadedProcess
 {
@@ -395,6 +396,12 @@ public class WindowManager : SingleThreadedProcess
 
         KeyEvent keyEvent = KeyboardManager.ReadKey();
 
+        if (Explorer.desktop != null && Explorer.desktop.WantsKeyboardInput)
+        {
+            Explorer.desktop.HandleKeyboard(keyEvent);
+            return;
+        }
+
         if (focusedWindow != null && !failedWindows.Contains(focusedWindow))
         {
             focusedWindow.HandleKeyboard(keyEvent);
@@ -696,21 +703,46 @@ public class WindowManager : SingleThreadedProcess
 
     private void FailApplication(Window window, string operation, Exception exception)
     {
-        if (window != null && failedWindows.Contains(window)) return;
-
+        if (window != null && failedWindows.Contains(window))
+        {
+            return;
+        }
         string applicationName = window?.text;
-        if (string.IsNullOrEmpty(applicationName)) applicationName = "Application";
-        string detail = exception?.Message;
-        if (string.IsNullOrEmpty(detail)) detail = "Unknown error";
+        if (string.IsNullOrEmpty(applicationName))
+        {
+            applicationName = "Application";
+        }
 
-        Serial.WriteString(applicationName + " failed while " + operation + ": " + detail + "\n");
+        string detail = exception?.Message;
+        if (string.IsNullOrEmpty(detail))
+        {
+            detail = "Unknown error";
+        }
+
+        SystemLogger.WriteLine(applicationName ,"failed while " + operation + ": " + detail + "\n", ConsoleMessageType.Error);
         pendingFailures.Add(new ApplicationFailure(applicationName, operation, detail));
 
-        if (window == null) return;
+        if (window == null)
+        {
+            return;
+        }
+
         failedWindows.Add(window);
-        if (focusedWindow == window) focusedWindow = null;
-        if (capturedWindow == window) capturedWindow = null;
-        if (capturedComponent != null && capturedComponent.GetOwningWindow() == window) capturedComponent = null;
+        if (focusedWindow == window)
+        {
+            focusedWindow = null;
+        }
+
+        if (capturedWindow == window)
+        {
+            capturedWindow = null;
+        }
+
+        if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
+        {
+            capturedComponent = null;
+        }
+
         PostClose(window);
     }
 
@@ -724,7 +756,7 @@ public class WindowManager : SingleThreadedProcess
             try
             {
                 string message = failure.application + " crashed while " + failure.operation + ": " + failure.detail;
-                if (message.Length > 100) message = message.Substring(0, 97) + "...";
+                
 
                 Window error = new Window(140, 140, 680, 130, "Application Error", true)
                 {
@@ -739,13 +771,14 @@ public class WindowManager : SingleThreadedProcess
                     useBackground = true,
                     horizontalAlignment = HorizontalAlignment.Stretch,
                     Margin = new Thickness(8, 34, 8, 8),
+                    
                 };
                 error.AddChild(text);
                 Register(error);
             }
             catch (Exception reportException)
             {
-                Serial.WriteString("Could not display application error: " + reportException.Message + "\n");
+                SystemLogger.WriteLine("DWM","Could not display application error: " + reportException.Message + "\n", ConsoleMessageType.Error);
             }
         }
 
