@@ -30,11 +30,12 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
             SystemLogger.WriteLine("Display Driver", "PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.", ConsoleMessageType.Error);
             return;
         }
+
         uint width = (uint)SystemRegistry.GetInteger("System/Display/Width", 1920);
         uint height = (uint)SystemRegistry.GetInteger("System/Display/Height", 1080);
         int depth = (int)SystemRegistry.GetInteger("System/Display/BitsPerPixel", 32);
 
-        Mode mode = new Mode(width, height, (ColorDepth)32);
+        Mode mode = new Mode(width, height, ColorDepth.ColorDepth32);
 
         Canvas = new SVGAII3DCanvas(device, mode);
         

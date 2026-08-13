@@ -70,26 +70,43 @@ public class FileProperties : Window
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch
         });
+
+        if (fileEntry.FileType == FileType.Directory)
+        {
+            DirectoryInfo directoryInfo = new DirectoryInfo(fileEntry.AbsoluteLocation);
+
+            foreach (FileInfo fileInfo in directoryInfo.GetFiles())
+            {
+                fileEntry.SizeBytes += fileInfo.Length;
+            }
+
+            fileEntry.directoryCount = directoryInfo.GetDirectories().Length;
+            fileEntry.fileCount = directoryInfo.GetFiles().Length;
+
+
+            group.AddGroupChild(new Label(0, 0, Width, 30)
+            {
+                text = $"Contains: {fileEntry.directoryCount} dir(s), {fileEntry.fileCount} file(s)",
+                useBackground = false,
+                horizontalAlignment = HorizontalAlignment.Stretch
+            });
+        }
+
         group.AddGroupChild(new Label(0, 0, Width, 30)
         {
-            text = $"Size: {fileEntry.SizeBytes} Bytes",
+            text = $"Size: {fileEntry.SizeBytes / 1024} kB",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch
         });
-        group.AddGroupChild(new Label(0, 0, Width, 30)
+
+        group.AddGroupChild(new Separator(0, 0, Width, 1)
         {
-            text = $"Contains: {fileEntry.Contains}",
-            useBackground = false,
-            horizontalAlignment = HorizontalAlignment.Stretch
-        });
-        group.AddGroupChild(new Separator(0, 0, Width, 1) 
-        { 
-            orientation = LayoutOrientation.Horizontal 
+            orientation = LayoutOrientation.Horizontal
         });
 
         group.AddGroupChild(new Label(0, 0, Width, 30)
         {
-            text = $"Created {fileEntry.CreatedAt}",
+            text = $"Created at: {fileEntry.CreatedAt}",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch
         });

@@ -11,6 +11,10 @@ public struct FileEntry
     /// </summary>
     public string? Contains;
 
+    public int ?directoryCount;
+    public int ?fileCount;
+
+
     public string CreatedAt; //ToString("D");
 
     /// <summary>
