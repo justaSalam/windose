@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
 using Cosmos.Kernel;
 using Cosmos.Kernel.HAL.Devices.Graphic.SVGAII;
@@ -31,8 +32,9 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         }
         uint width = (uint)SystemRegistry.GetInteger("System/Display/Width", 1920);
         uint height = (uint)SystemRegistry.GetInteger("System/Display/Height", 1080);
+        int depth = (int)SystemRegistry.GetInteger("System/Display/BitsPerPixel", 32);
 
-        Mode mode = new Mode(width, height, ColorDepth.ColorDepth32);
+        Mode mode = new Mode(width, height, (ColorDepth)32);
 
         Canvas = new SVGAII3DCanvas(device, mode);
         
@@ -77,6 +79,8 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
     }
 
+
+    //console shares the same canvas, don't disable
     public void Stop()
     {
         State = WindoseDriverState.Stopped;
@@ -86,4 +90,5 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
     {
         Canvas.SetCursor(true, x, y);
     }
+
 }

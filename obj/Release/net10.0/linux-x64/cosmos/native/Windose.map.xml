@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ObjectNodes>
-  <Metadata Name="__embedded_metadata" Length="200888" Hash="e810b7b13729dcb77059b8120e7cc76ab135e45eaaa975231b8cb9e8b3bc3479" />
+  <Metadata Name="__embedded_metadata" Length="200888" Hash="367d7921098f3776a41a034042ea155da3d827899dfb97263c607c8e64c3a152" />
   <ResourceData Name="__embedded_resourcedata" Length="2193480" Hash="240ad61da3b4843b4e5b961fb814b72d385b60bf028e412184ada835d0d24c85" />
   <ResourceIndex Name="__embedded_resourceindex" Length="23948" Hash="7f7d146fefb22eecdc8851c286a8b110b42b021faf096fcc4520dbd5e58c680a" />
   <TypeMetadataMap Name="__type_to_metadata_map" Length="10023" Hash="f559ef5d173e40f1a7235df503d1ec317fce86c47d963d20a36416b08a7e3208" />
@@ -313,7 +313,7 @@
   <UnboxingStub Name="unbox_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Dock&gt;__Dispose" Length="9" Hash="3824fd57e67dd4fd113129165d5440aaf7d249eafb14b464f92f15a29878014f" />
   <UnboxingStub Name="unbox_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Dock&gt;__MoveNext" Length="9" Hash="3824fd57e67dd4fd113129165d5440aaf7d249eafb14b464f92f15a29878014f" />
   <UnboxingStub Name="unbox_S_P_CoreLib_System_Collections_Generic_List_1_Enumerator&lt;Windose_Dock&gt;__get_Current" Length="9" Hash="3824fd57e67dd4fd113129165d5440aaf7d249eafb14b464f92f15a29878014f" />
-  <ArrayOfFrozenObjects Name="__FrozenSegmentStart" Length="370112" Hash="8e7f9394a9dc74a5753c8b0bfb2df146becfa635badc03249456d76f2fa1c983" />
+  <ArrayOfFrozenObjects Name="__FrozenSegmentStart" Length="370248" Hash="834f8c4810adeef4392c3a7c458ae5dac1ef80eed722ff13efabc36e0ecf7c20" />
   <PInvokeMethodFixup Name="__pinvoke_S_P_CoreLib__Module__libSystem_Native_2050__SystemNative_Abort" Length="28" Hash="3addfb141cd7c9c4c6543a82191a3707ac29c7a041217782e61d4d91c691aee8" />
   <PInvokeMethodFixup Name="__pinvoke_S_P_CoreLib__Module__libSystem_Native_2050__SystemNative_FreeLibrary" Length="28" Hash="3addfb141cd7c9c4c6543a82191a3707ac29c7a041217782e61d4d91c691aee8" />
   <PInvokeMethodFixup Name="__pinvoke_S_P_CoreLib__Module__libSystem_Native_2050__SystemNative_GetEGid" Length="28" Hash="3addfb141cd7c9c4c6543a82191a3707ac29c7a041217782e61d4d91c691aee8" />
@@ -7439,7 +7439,7 @@
   <MethodExceptionHandlingInfo Name="__ehinfo_Windose_Windose_Kernel__InitializeKernel_d__10__MoveNext" Length="10" Hash="60fbb5363631224e59a7bfab08cdc563b040e34b16fba5b27599590339b00e4a" />
   <MethodExceptionHandlingInfo Name="__ehinfo_Windose_Windose_System_Kernel_ResourceLoader__FromStream" Length="9" Hash="2c1f5bdb944897839ce485145402e0d3914ea6d0df8b0bf188b49cbc81703306" />
   <MethodExceptionHandlingInfo Name="__ehinfo_Windose_Windose_System_Kernel_ResourceLoader__WriteStorage" Length="9" Hash="0f0f8f3fed70db82dfef890330286b3907515dc999dcc69b1a2b65ff3b0b140c" />
-  <MethodExceptionHandlingInfo Name="__ehinfo_Windose_Windose_Drivers_CosmosDisplayDriver__Start" Length="11" Hash="31ec0f88382d4711e51feeaec235920455ed6482ff680eb441c8d0298a28f4e5" />
+  <MethodExceptionHandlingInfo Name="__ehinfo_Windose_Windose_Drivers_CosmosDisplayDriver__Start" Length="11" Hash="c5283854a767411ce757dad72dfcb550076d885826f8956b29a32b95954c9458" />
   <MethodExceptionHandlingInfo Name="__ehinfo_Windose_Windose_Drivers_DriverManager__Start" Length="10" Hash="99be4e06699a694ba42e1b75962e0010d449b48902151a31c08d2dadcd08f192" />
   <MethodExceptionHandlingInfo Name="__ehinfo_S_P_CoreLib_System_Collections_Generic_ArraySortHelper_1&lt;Cosmos_Kernel_System_LunarLabs_Fonts_Edge&gt;__Sort_0" Length="15" Hash="f5af2eb5912c9eae572fb360aa3abe202d55c95b289c1d934ab1583022b649ed" />
   <MethodExceptionHandlingInfo Name="__ehinfo_S_P_CoreLib_Internal_TypeSystem_LockFreeReaderHashtableOfPointers_2&lt;S_P_CoreLib_System_RuntimeTypeHandle__S_P_CoreLib_System_RuntimeTypeHandle&gt;__Expand" Length="6" Hash="0c6fc0c94137c29d0eb395eb6dbf101c26ad9d57c76e8fa94db04bc62f60e426" />
@@ -20760,10 +20760,10 @@
   <GCInfo Name="Windose_CommandPrompt____ctor_b__3_1" Length="10" Hash="23c9e34fd44f8458afabbb21cd706bcab23b777981379ffd013b69e713122a8d" />
   <MethodCode Name="Windose_CommandPrompt____ctor_b__3_0" Length="23" Hash="460d0b50169be69332ed90e3c7256e886a891596f8e1483809af2c1c745cb67a" />
   <GCInfo Name="Windose_CommandPrompt____ctor_b__3_0" Length="10" Hash="c7b54f96a9d387a4edf60921adc639e676ea1058b7e8878acd5a77bbfb974952" />
-  <MethodCode Name="Windose_DisplaySettings___ctor" Length="1049" Hash="0c38402b982e02f188dfb14c1d360773135922e0501c121fbee2d73eca560c66" />
-  <GCInfo Name="Windose_DisplaySettings___ctor" Length="145" Hash="7782ad8ead0dcd569a3bf17eaa8d3dc385355a3e1af3e820d39c17766aafd53b" />
-  <MethodCode Name="Windose_DisplaySettings__BuildDisplayPage" Length="1412" Hash="e25fe5440b134a88afe762b21a62da3c0773991d0ee0b0bc59f44bb4de2771b3" />
-  <GCInfo Name="Windose_DisplaySettings__BuildDisplayPage" Length="146" Hash="7ad7fa81b0fcb8c4378a83c3a86108d7ecd7becf87e2ef55042345613efd70ee" />
+  <MethodCode Name="Windose_DisplaySettings___ctor" Length="1041" Hash="0d6b5db1bcf9b64d1700de97c10a4d936f84e92979d54ee297cc962cd51d42db" />
+  <GCInfo Name="Windose_DisplaySettings___ctor" Length="142" Hash="8e4914c61089110dc53c153bb212e088c29ec727bbbbe236c70ac490765c95b2" />
+  <MethodCode Name="Windose_DisplaySettings__BuildDisplayPage" Length="1433" Hash="1f9b85ada04d685fcbc82cfe2fb4f25bcd2d756cb53648e061c57bd676af3ba1" />
+  <GCInfo Name="Windose_DisplaySettings__BuildDisplayPage" Length="149" Hash="36e799bd60b02aab799bf677ad2009ab5f345f75dbda6a3eda080a4571b7efab" />
   <MethodCode Name="Windose_DisplaySettings__BuildDesktopPage" Length="2057" Hash="08395062964887e821c5a48065c4edd418491660fd13dcd655e2b378b3434bab" />
   <GCInfo Name="Windose_DisplaySettings__BuildDesktopPage" Length="191" Hash="0280f5e6de9701e98a7e1110aecd52796f0b1f66f60a480e174279f29a2d4d3d" />
   <MethodCode Name="Windose_DisplaySettings__CreateButton" Length="109" Hash="8e55067f023a1391e3d1566216f8be3f64ea9df183f1dbf521c81c9929366d9f" />
@@ -20784,8 +20784,8 @@
   <GCInfo Name="Windose_DisplaySettings__FindDepthIndex" Length="3" Hash="9198214a65877a028ce4fcb9c1c314e44d0f8317be8571fd995d59ea6221017f" />
   <MethodCode Name="Windose_DisplaySettings__GetSelectedResolution" Length="424" Hash="603c95eed14735d1945d88266be595f354c7b17f3d9301d45c81df46f856bf57" />
   <GCInfo Name="Windose_DisplaySettings__GetSelectedResolution" Length="8" Hash="1ccdd8997ef3bf68b22b7bb2ab09e33e0376b2bd7f525c29e4e7173c2775508d" />
-  <MethodCode Name="Windose_DisplaySettings__GetSelectedDepth" Length="140" Hash="0887e751b228212e9cbd8521e3f1563d4dd24d21a2e41fbef8ff19f1342c6bfe" />
-  <GCInfo Name="Windose_DisplaySettings__GetSelectedDepth" Length="5" Hash="df7f2ea607c490a641a5a9fd169e39cf00a98c2f2b735ca8c4cf3f655f82135c" />
+  <MethodCode Name="Windose_DisplaySettings__GetSelectedDepth" Length="196" Hash="d0477449966fbccd6cdbfea37c4418b19beac5287089ff2d3f10bc6336970faf" />
+  <GCInfo Name="Windose_DisplaySettings__GetSelectedDepth" Length="5" Hash="850bd0ffe705b0531ba6c9bdd34df374b4e71efa98d43e1953cb93765773f1bc" />
   <MethodCode Name="Windose_DisplaySettings____ctor_b__13_0" Length="200" Hash="574259494836cc9f18a03d59133d4f0c5fffdff17c3e3d22dfaa0bc16e22fdaa" />
   <GCInfo Name="Windose_DisplaySettings____ctor_b__13_0" Length="12" Hash="a6c42e18c8640d2a13cd71865fe70f0567b9cfe50454b4a2bbe8c9216d883e56" />
   <MethodCode Name="Windose_DisplaySettings____ctor_b__13_1" Length="182" Hash="003afdd8a560a49132e404c965fc798c64928cbafb79d0c8388a03bcb3c4e2eb" />
@@ -22768,8 +22768,8 @@
   <GCInfo Name="Windose_Windose_Drivers_CosmosDisplayDriver__get_Width" Length="2" Hash="eec4121f2a07b61aba16414812aa9afc39ab0a136360a5ace2240dc19b0464eb" />
   <MethodCode Name="Windose_Windose_Drivers_CosmosDisplayDriver__get_Height" Length="16" Hash="379e3b8669f906b86f5d2204524aa3a01d5891a6157d73c0656f5fc89b46576d" />
   <GCInfo Name="Windose_Windose_Drivers_CosmosDisplayDriver__get_Height" Length="2" Hash="eec4121f2a07b61aba16414812aa9afc39ab0a136360a5ace2240dc19b0464eb" />
-  <MethodCode Name="Windose_Windose_Drivers_CosmosDisplayDriver__Start" Length="491" Hash="f6cc41f97c92ee760b0aa2f3b46a5f75bea808ebaedfd486bbd278d68381c461" />
-  <GCInfo Name="Windose_Windose_Drivers_CosmosDisplayDriver__Start" Length="123" Hash="0ebf311e59929b089c6aeaed16b9cd51e8e2d6bd6ee77ddd9df3815e2909ab69" />
+  <MethodCode Name="Windose_Windose_Drivers_CosmosDisplayDriver__Start" Length="508" Hash="3d7e833107f6bd28afec66917f0c1e72704d3cc694c8696540c2d0bf1db15be1" />
+  <GCInfo Name="Windose_Windose_Drivers_CosmosDisplayDriver__Start" Length="123" Hash="a7e102dfa50d1973c7a47a7b8ce0b5562e49c31a3eac36b48b65da899f291e18" />
   <MethodCode Name="Windose_Windose_Drivers_CosmosDisplayDriver__Present" Length="406" Hash="64b35a244b4bf55fc2acc2b60748964f81ece42b493e232c081f2020ba737596" />
   <GCInfo Name="Windose_Windose_Drivers_CosmosDisplayDriver__Present" Length="27" Hash="e920830c5b8545f4041f13435bf9d8acb20d12c1cdc4f56b8073d0cbe4f66259" />
   <MethodCode Name="Windose_Windose_Drivers_CosmosMouseDriver__get_Name" Length="8" Hash="42bf2fe8994233d2e2eaf9d217f425ee1530fb5e5d6924672ca17f13bdf43411" />
@@ -27825,5 +27825,5 @@
   <SealedVTable Name="__SealedVTable__ZTV116Boxed_S_P_CoreLib_System_Collections_Generic_Dictionary_2_ValueCollection_Enumerator&lt;System___Canon__System___Canon&gt;" Length="12" Hash="15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b" />
   <SealedVTable Name="__SealedVTable__ZTV109S_P_CoreLib_System_Runtime_CompilerServices_ConditionalWeakTable_2_Enumerator&lt;System___Canon__System___Canon&gt;" Length="12" Hash="15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b" />
   <SealedVTable Name="__SealedVTable__ZTV23__Array&lt;System___Canon&gt;" Length="16" Hash="374708fff7719dd5979ec875d56cd2286f6d3cf7ec317a3b25632aab28ec37bb" />
-  <ReadyToRunHeader Name="__ReadyToRunHeader" Length="808" Hash="012da88bed564bbfc48b9288a8c7d3766d8a20329d53f7d333a05f301f01c144" />
+  <ReadyToRunHeader Name="__ReadyToRunHeader" Length="808" Hash="e1b5f5814859b572f6592abb146c5c21d8609d061cc96644cf308b9461ac942b" />
 </ObjectNodes>

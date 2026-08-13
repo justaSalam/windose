@@ -1,5 +1,6 @@
 using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
+using Windose;
 using Windose.System.Kernel;
 
 public sealed class DisplaySettings : Window
@@ -20,7 +21,7 @@ public sealed class DisplaySettings : Window
     private Label gridHeightValue;
 
     public DisplaySettings(int x = 150, int y = 110)
-        : base(x, y, 520, 390, "Display Properties", true, new Png(ResourceLoader.FromStream("Windose.Resources.Icons.display_properties.png")))
+        : base(x, y, 520, 390, "Display Properties", true, new Png("/mnt/System/Icons/display_properties.png"))
     {
         canResize = false;
         canMaximize = false;
@@ -122,6 +123,7 @@ public sealed class DisplaySettings : Window
             text = "Select color depth",
             fontSize = 14,
         };
+        colorDepthCombo.AddItem("4-bit");
         colorDepthCombo.AddItem("16-bit");
         colorDepthCombo.AddItem("24-bit");
         colorDepthCombo.AddItem("32-bit");
@@ -298,6 +300,7 @@ public sealed class DisplaySettings : Window
     {
         switch (colorDepthCombo.SelectedText)
         {
+            case "4-bit": return 4;
             case "16-bit": return 16;
             case "24-bit": return 24;
             default: return 32;
