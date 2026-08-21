@@ -247,7 +247,7 @@ public class ListView : Component
         string ext = Path.GetExtension(item.fileEntry.AbsoluteLocation);
         
 
-        DrawImageStretchAlpha(new Png(IconRegistry.Get(ext)), new Rectangle(4, y + 2, 32, 32), destRect);//TODO Fix image resizing + Add smaller icons ig 
+        //DrawImageStretchAlpha(new Png(IconRegistry.Get(ext)), new Rectangle(4, y + 2, 32, 32), destRect);//TODO Fix image resizing + Add smaller icons ig 
         DrawString(item.text, color, 24, y + 2, fontSize);
 
         //int sizeX = nameColumnWidth;

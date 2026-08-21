@@ -1,15 +1,10 @@
 ﻿using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
-using System;
-using System.Collections.Generic;
 using System.Drawing;
-using System.Numerics;
-using System.Text;
-using Windose.Resources.Icons;
-using Windose.System.Kernel;
 
 namespace Windose.System.Shell
 {
+    
     public class DesktopIcon : Component
     {
         public const int DefaultWidth = 80;
@@ -47,7 +42,7 @@ namespace Windose.System.Shell
             }
             else
             {
-                //TODO file associations
+                //TODO file associations through registry
                 switch(fileEntry.FileType)
                 {
                     case FileType.Directory:

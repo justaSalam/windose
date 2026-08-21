@@ -193,7 +193,7 @@ public sealed class DiskManagement : Window
 
         foreach (Partition partition in StorageManager.Partitions)
         {
-            partitionListView.AddItem($"{partition?.Name} - {partition?.BlockSize * partition?.BlockCount / 1024} KB - {partition?.Host}").tag = partition;
+            partitionListView.AddItem($"{partition?.Name} - {partition?.BlockSize * partition?.BlockCount / 1024} KB - {partition?.Host.Name}").tag = partition;
         }
     }
 

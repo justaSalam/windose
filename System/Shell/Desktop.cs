@@ -4,10 +4,12 @@ using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using System.Drawing;
 using System.Globalization;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Xml.Serialization;
 using Windose;
 using Windose.System.Features;
 using Windose.System.Shell;
-using static Cosmos.Kernel.System.Graphics.Fonts.PCScreenFont;
+using Windose.System.System_Calls;
 
 public class Desktop : Component
 {
@@ -29,10 +31,20 @@ public class Desktop : Component
     public static int IconGridOffsetY { get; private set; } = 8;
     public int contextX { get; private set; }
     public int contextY { get; private set; }
-    public bool WantsKeyboardInput => selectedIcons.Count == 1 || FindRenamingIcon() != null;
+    public bool ConsumeKeyboardInput => selectedIcons.Count == 1 || FindRenamingIcon() != null;
+
+
+    //Mark as hidden
+    public const string layoutFilePath = "/mnt/user/desktop/.desktop.layout";
 
     public Desktop(int x, int y, int width, int height) : base(x, y, width, height)
     {
+
+        if (!File.Exists(layoutFilePath))
+        {
+            File.Create(layoutFilePath);
+        }
+
         zLayer = DrawLayer.Desktop;
 
         ApplyRegistryBackground();
@@ -51,6 +63,7 @@ public class Desktop : Component
         };
 
         CreateDesktopContextMenu();
+        LoadLayout();
     }
 
     private void CreateDesktopContextMenu()
@@ -111,66 +124,45 @@ public class Desktop : Component
         AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(fileInfo.Name, FileType.File, path, fileInfo.Length)));
     }
 
-    private Dictionary<string, DesktopLayoutEntry> LoadLayout()
+    public static void SaveLayout()
     {
-        var layout = new Dictionary<string, DesktopLayoutEntry>();
-
-        const string layoutFile = "/mnt/user/desktop/.desktop.layout";
-
-        if (!File.Exists(layoutFile))
-            return layout;
-
-        foreach (string line in File.ReadAllLines(layoutFile))
-        {
-            string[] parts = line.Split('|');
-
-            if (parts.Length != 3)
-                continue;
-
-            layout[parts[0]] = new DesktopLayoutEntry
-            {
-                Path = parts[0],
-                X = int.Parse(parts[1]),
-                Y = int.Parse(parts[2])
-            };
-        }
-
-        return layout;
-    }
-
-    private void LoadIcons()
-    {
-        Dictionary<string, DesktopLayoutEntry> layout = LoadLayout();
-
-        foreach (string path in Directory.GetFileSystemEntries("/mnt/user/desktop"))
-        {
-            if (Path.GetFileName(path) == ".desktop.layout")
-                continue;
-
-            int x = 0;
-            int y = 0;
-
-            if (layout.TryGetValue(path, out var entry))
-            {
-                x = entry.X;
-                y = entry.Y;
-            }
-
-            //AddIcon(new DesktopIcon(x, y, new FileEntry(path)));
-        }
-    }
-
-    private void SaveLayout()
-    {
-        List<string> lines = new();
+        var lines = new List<string>();
 
         foreach (DesktopIcon icon in Icons)
         {
-            lines.Add($"{icon.fileEntry.AbsoluteLocation}|{icon.X}|{icon.Y}");
+            string path = icon.fileEntry.AbsoluteLocation;
+            lines.Add($"{path}|{icon.X}|{icon.Y}");
         }
 
-        File.WriteAllLines("/mnt/user/desktop/.desktop.layout", lines);
+        File.WriteAllLines(layoutFilePath, lines);
     }
+
+    private void LoadLayout()
+    {
+
+        foreach (string line in File.ReadAllLines(layoutFilePath))
+        {
+            try
+            {
+                string[] parts = line.Split('|');
+
+
+                FileInfo fileInfo = new FileInfo(parts[0]);
+                
+                DesktopIcon icon = new DesktopIcon(int.Parse(parts[1]), int.Parse(parts[2]), new FileEntry(fileInfo));
+                AddIcon(icon);
+
+            }
+            catch (Exception ex)
+            {
+                SystemLogger.WriteLine("Desktop", $"Failed to load icon layout line: {line}. Error: {ex.Message}", ConsoleMessageType.Error);
+            }
+        }
+
+    }
+
+
+
 
     public override void Update()
     {
@@ -179,16 +171,20 @@ public class Desktop : Component
 
     public void AddIcon(DesktopIcon icon)
     {
-        if (!Icons.Contains(icon))
+        if (Icons.Contains(icon))
         {
-            AddChild(icon);
-            Icons.Add(icon);
-            PlaceIconOnGrid(icon);
-            icon.MarkDirty();
-
+            return;
         }
-    }
 
+        AddChild(icon);
+
+        Icons.Add(icon);
+        PlaceIconOnGrid(icon);
+        icon.MarkDirty();
+
+
+
+    }
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
         DesktopIcon renamingIcon = FindRenamingIcon();

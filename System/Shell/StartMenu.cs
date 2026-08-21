@@ -165,11 +165,13 @@ public class StartMenu : Window
         powerOptions.AddSubmenuItem("Log Off");
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {
-            Power.Shutdown();
+            Desktop.SaveLayout();
+
         });
 
         powerOptions.AddSubmenuItem("Reboot", () =>
         {
+            Desktop.SaveLayout();
             Power.Reboot();
         });
 

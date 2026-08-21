@@ -396,7 +396,7 @@ public class WindowManager : SingleThreadedProcess
 
         KeyEvent keyEvent = KeyboardManager.ReadKey();
 
-        if (Explorer.desktop != null && Explorer.desktop.WantsKeyboardInput)
+        if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput)
         {
             Explorer.desktop.HandleKeyboard(keyEvent);
             return;

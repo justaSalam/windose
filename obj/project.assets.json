@@ -449,7 +449,7 @@
         }
       }
     },
-    "net10.0/linux-x64": {
+    "net10.0/win-x64": {
       "Cosmos.Build.API/3.0.82": {
         "type": "package",
         "compile": {
@@ -511,9 +511,6 @@
           "Cosmos.Kernel.System": "3.0.82",
           "Cosmos.Kernel.System.Core": "3.0.82"
         },
-        "runtime": {
-          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.dll": {}
-        },
         "build": {
           "build/Cosmos.Kernel.props": {}
         }
@@ -568,9 +565,6 @@
           "Cosmos.Kernel.Boot.Limine": "3.0.82",
           "Cosmos.Kernel.HAL.Interfaces": "3.0.82",
           "Cosmos.Kernel.System.Core": "3.0.82"
-        },
-        "runtime": {
-          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.HAL.dll": {}
         },
         "build": {
           "build/Cosmos.Kernel.HAL.props": {}
@@ -633,9 +627,6 @@
           "Cosmos.Kernel.System": "3.0.82",
           "Cosmos.Kernel.System.Core": "3.0.82"
         },
-        "runtime": {
-          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Plugs.dll": {}
-        },
         "build": {
           "build/Cosmos.Kernel.Plugs.props": {}
         }
@@ -663,9 +654,6 @@
           "Cosmos.Kernel.HAL": "3.0.82",
           "Cosmos.Kernel.System.Core": "3.0.82"
         },
-        "runtime": {
-          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.System.dll": {}
-        },
         "build": {
           "build/Cosmos.Kernel.System.props": {}
         }
@@ -676,9 +664,6 @@
           "Cosmos.Build.API": "3.0.82",
           "Cosmos.Kernel.Boot.Limine": "3.0.82",
           "Cosmos.Kernel.Debug": "3.0.82"
-        },
-        "runtime": {
-          "runtimes/linux-x64/lib/net10.0/Cosmos.Kernel.Core.dll": {}
         },
         "build": {
           "build/Cosmos.Kernel.System.Core.props": {},
@@ -2306,11 +2291,7 @@
         "warn": true,
         "downloadDependencies": [
           {
-            "name": "Microsoft.AspNetCore.App.Runtime.linux-x64",
-            "version": "[10.0.11, 10.0.11]"
-          },
-          {
-            "name": "Microsoft.NETCore.App.Host.linux-x64",
+            "name": "Microsoft.AspNetCore.App.Runtime.win-x64",
             "version": "[10.0.11, 10.0.11]"
           },
           {
@@ -2318,11 +2299,15 @@
             "version": "[10.0.11, 10.0.11]"
           },
           {
-            "name": "Microsoft.NETCore.App.Runtime.linux-x64",
+            "name": "Microsoft.NETCore.App.Runtime.NativeAOT.win-x64",
             "version": "[10.0.11, 10.0.11]"
           },
           {
-            "name": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64",
+            "name": "Microsoft.NETCore.App.Runtime.win-x64",
+            "version": "[10.0.11, 10.0.11]"
+          },
+          {
+            "name": "Microsoft.WindowsDesktop.App.Runtime.win-x64",
             "version": "[10.0.11, 10.0.11]"
           },
           {
@@ -2613,7 +2598,7 @@
       }
     },
     "runtimes": {
-      "linux-x64": {
+      "win-x64": {
         "#import": []
       }
     }

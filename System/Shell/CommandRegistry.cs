@@ -13,6 +13,7 @@ using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
 using Windose;
+using Windose.System.Kernel.Subsystem;
 
 public delegate void CommandHandler(CommandContext context, string[] arguments);
 
@@ -48,6 +49,12 @@ public sealed class CommandContext
     }
 
     public void WriteLine(string text = "") => writeLine?.Invoke(text ?? "");
+    public void ReadLine(string prompt, Action<string> callback)
+    {
+        WriteLine(prompt);
+        string input = Console.ReadLine() ?? "";
+        callback?.Invoke(input);
+    }
     public void Clear() => clear?.Invoke();
     public void Close() => close?.Invoke();
 
@@ -161,6 +168,78 @@ public static class CommandRegistry
         Register("diskmgr", "Disk Management Utility", "diskmgr", DiskManager);
         Register("svga", "Display Adapter Information", "svga [command]", DisplayProperties);
         Register("sys", "System Information", "sys", SystemProperties);
+
+        Register("uac", "User Access Control Settings", "uac [command]", DisplayUACSettings);
+
+    }
+
+    private static void DisplayUACSettings(CommandContext context, string[] arguments)
+    {
+        if (!RequireArguments(context, arguments, 1, "uac [command]")) return;
+
+        switch (arguments[0])
+        {
+            case "help":
+                {
+                    context.WriteLine("Available commands:");
+                    context.WriteLine("  status - Displays the current user and privilege level.");
+                    context.WriteLine("  elevate - Elevates privileges for the current user.");
+                    context.WriteLine("  end - Ends elevated privileges.");
+                    break;
+                }
+            case "create":
+                {
+                    UserAccount user = UserAccount.CreateAccount("SYSTEM", "SYSTEM", PrivilegeLevel.System);
+                    context.WriteLine($"Created user: {user.username} with privilege level: {user.privilege}");
+                    context.WriteLine($"Password: {user.password} with salt: {user.salt}");
+
+                    break;
+                }
+                case "login":
+                {
+                    
+                    break;
+                }
+
+            case "status":
+                {
+                    context.WriteLine($"Current User: {Session.CurrentUser?.username ?? "None"}");
+                    context.WriteLine($"Privilege Level: {Session.CurrentUser?.privilege.ToString() ?? "None"}");
+                    context.WriteLine($"Elevated: {Session.isElevated}");
+                    break;
+                }
+            case "elevate":
+                {
+                    if (Session.CurrentUser == null)
+                    {
+                        context.WriteLine("No user is currently logged in.");
+                        return;
+                    }
+                    context.WriteLine("Enter password to elevate privileges:");
+                    string password = Console.ReadLine() ?? ""; //TODO implement context.ReadLine() for proper input handling in the shell context
+                    if (Session.TryElevate(password))
+                    {
+                        context.WriteLine("Privileges elevated successfully.");
+                    }
+                    else
+                    {
+                        context.WriteLine("Failed to elevate privileges. Incorrect password.");
+                    }
+                    break;
+                }
+            case "end":
+                {
+                    
+                    context.WriteLine("Privileges de-elevated.");
+                    break;
+                }
+
+            default:
+                {
+                    context.WriteLine("Unknown command: " + arguments[0]);
+                    break;
+                }
+        }
 
     }
 

@@ -239,10 +239,12 @@ public class FileExplorer : Window
     private void BuildTree()
     {
         PopulateFilesystemLocation("/mnt");
+        TreeViewItem treeRoot = tree.AddRoot("/mnt", "/mnt");
+
 
         foreach (string dir in Directory.GetDirectories("/mnt"))
         {
-            TreeViewItem treeItem = tree.AddRoot(Path.GetFileName(dir), dir);
+            TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
             PopulateTreeItem(treeItem);
         }
 

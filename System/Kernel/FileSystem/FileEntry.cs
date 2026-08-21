@@ -35,6 +35,15 @@ public struct FileEntry
         CreatedAt = DateTime.Now.ToString("D");
     }
 
+    public FileEntry(FileInfo fileInfo)
+    {
+        FileName = fileInfo.Name;
+        FileType = FileType.File;
+        AbsoluteLocation = fileInfo.FullName;
+        SizeBytes = fileInfo.Length;
+        CreatedAt = fileInfo.CreationTime.ToString("D");
+    }
+
 
     /// <summary>
     /// A file entry struct
