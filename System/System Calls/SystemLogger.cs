@@ -65,7 +65,7 @@ namespace Windose.System.System_Calls
         public static void Dump()
         {
             Directory.CreateDirectory("/mnt/console");
-            File.WriteAllText($"/mnt/console{DateTime.Now.ToString("yyyyMMdd-HHmmss")}.log", logBuilder.ToString());
+            File.WriteAllText($"/mnt/console/{DateTime.Now.ToString("yyyyMMdd-HHmmss")}.log", logBuilder.ToString());
         }
 
     }

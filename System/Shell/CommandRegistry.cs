@@ -12,6 +12,7 @@ using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
+using System.Security;
 using Windose;
 using Windose.System.Kernel.Subsystem;
 
@@ -182,25 +183,44 @@ public static class CommandRegistry
             case "help":
                 {
                     context.WriteLine("Available commands:");
-                    context.WriteLine("  status - Displays the current user and privilege level.");
-                    context.WriteLine("  elevate - Elevates privileges for the current user.");
-                    context.WriteLine("  end - Ends elevated privileges.");
+                    context.WriteLine("  status - Displays the current user and privilege level");
+                    context.WriteLine("  create <username> <password> - Creates a user if one with the same username doesn't exist already");
+                    context.WriteLine("  login <username> <password> - Attempts to log in as a user");
+                    context.WriteLine("  override <username> <new password> - Overrides the user password");
+                    context.WriteLine("  elevate - Elevates privileges for the current user");
+                    context.WriteLine("  end - Ends elevated privileges");
                     break;
                 }
             case "create":
                 {
-                    UserAccount user = UserAccount.CreateAccount("SYSTEM", "SYSTEM", PrivilegeLevel.System);
+                    UserAccount user = UserAccount.CreateAccount(arguments[1], arguments[2], Session.ParsePrivilege(arguments[3]));
                     context.WriteLine($"Created user: {user.username} with privilege level: {user.privilege}");
-                    context.WriteLine($"Password: {user.password} with salt: {user.salt}");
-
+                    context.WriteLine($"Password: {user.password}");
                     break;
                 }
                 case "login":
                 {
-                    
+                    if(Session.LogIn(arguments[1], arguments[2]))
+                    {
+                        context.WriteLine($"Logged in as {arguments[1]}");
+                    }
+                    else
+                    {
+                        context.WriteLine("Failed to log in");
+                    }
                     break;
                 }
+            case "override":
+                {
+                    UserAccount ?current = Session.CurrentUser;
+                    if(current == null)
+                    {
+                        return;
+                    }
 
+                    current.ChangePassword(arguments[1]);
+                    break;
+                }
             case "status":
                 {
                     context.WriteLine($"Current User: {Session.CurrentUser?.username ?? "None"}");
@@ -215,16 +235,8 @@ public static class CommandRegistry
                         context.WriteLine("No user is currently logged in.");
                         return;
                     }
-                    context.WriteLine("Enter password to elevate privileges:");
-                    string password = Console.ReadLine() ?? ""; //TODO implement context.ReadLine() for proper input handling in the shell context
-                    if (Session.TryElevate(password))
-                    {
-                        context.WriteLine("Privileges elevated successfully.");
-                    }
-                    else
-                    {
-                        context.WriteLine("Failed to elevate privileges. Incorrect password.");
-                    }
+                     //TODO implement context.ReadLine() for proper input handling in the shell context
+
                     break;
                 }
             case "end":

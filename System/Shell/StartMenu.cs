@@ -56,7 +56,7 @@ public class StartMenu : Window
             Margin = new Thickness(0)
         };
         programs.AddSubmenuItem("VMWare SVGA Test", () => WindowManager.Register(new GraphicsEngine()));
-        programs.AddSubmenuItem("File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", true)));
+        programs.AddSubmenuItem("File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
 
             
         programs.AddSubmenuItem("Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
@@ -141,7 +141,7 @@ public class StartMenu : Window
         settings.AddSubmenuItem("Control Panel", () =>
         {
             FileExplorer explorer =
-                new FileExplorer(100, 100, 700, 480, "Control Panel", true);
+                new FileExplorer(100, 100, 700, 480, "Control Panel");
 
             explorer.NavigateToPath("control");
             WindowManager.Register(explorer);

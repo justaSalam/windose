@@ -182,10 +182,16 @@ public class Component : IDisposable
     public VerticalAlignment verticalAlignment = VerticalAlignment.Top;
 
 
+    public Action leftClickAction;
     public Action rightClickAction;
+    public Action middleClickAction;
+
+
+    public MenuPopup popup;
+
+
     public bool useRightClick = false;
 
-    public Window contextWindow;
 
     public Component(int x, int y, int width, int height, Thickness margin = new Thickness(), Thickness padding = new Thickness(), HorizontalAlignment horizontal = HorizontalAlignment.Left, VerticalAlignment vertical = VerticalAlignment.Top)
     {
@@ -195,6 +201,7 @@ public class Component : IDisposable
         verticalAlignment = vertical;
 
         Init(x, y, width, height);
+
     }
 
     private void Init(int x, int y, int width, int height)
@@ -208,6 +215,20 @@ public class Component : IDisposable
         visible = true;
         isRoot = true;
 
+        if (useRightClick)
+        {
+            popup = new MenuPopup(220, 28 * 8);
+            popup.AddItem("Close", () =>
+            {
+                popup.Hide();
+            });
+
+            rightClickAction += () =>
+            {
+                popup.ShowAt(MouseManager.X, MouseManager.Y);
+            };
+        }
+
         zIndex = currentZIndex;
 
         state = State.Normal;
@@ -219,14 +240,7 @@ public class Component : IDisposable
         currentZIndex++;
 
 
-        if (useRightClick)
-        {
-            contextWindow = new Window(X + Width, Y + Width, 100, 100, "Component Context");
-            rightClickAction = () =>
-            {
-                contextWindow.Visible = !contextWindow.Visible;
-            };
-        }
+
     }
 
 
@@ -297,16 +311,23 @@ public class Component : IDisposable
             Component child = children[i];
 
             if (!child.Visible)
+            {
                 continue;
+            }
 
             if (!child.IsInsideAbsolute(mouseX, mouseY))
+            {
                 continue;
+            }
 
-            if (child.HandleInput(mouseX, mouseY, mouse))
-                return true;
+
+            return child.HandleInput(mouseX, mouseY, mouse);
+                
         }
 
         if (IsInsideAbsolute(mouseX, mouseY) && mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
+        if (IsInsideAbsolute(mouseX, mouseY) && mouse.left == MouseEvents.Release) leftClickAction?.Invoke();
+        if (IsInsideAbsolute(mouseX, mouseY) && mouse.middle == MouseEvents.Release) middleClickAction?.Invoke();
 
         return true;
     }
@@ -1055,7 +1076,6 @@ public class Component : IDisposable
         highlightedFrame = null;
         pressedFrame = null;
 
-        contextWindow = null;
         rightClickAction = null;
 
         parent = null;

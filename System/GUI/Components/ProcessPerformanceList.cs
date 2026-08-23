@@ -1,5 +1,4 @@
 using System.Drawing;
-using Cosmos.Kernel.Core.Scheduler;
 using Cosmos.Kernel.System.Keyboard;
 
 public class ProcessPerformanceList : Component
@@ -39,6 +38,8 @@ public class ProcessPerformanceList : Component
         setPriorityItem.AddSubmenuItem("Normal", () => SetPriority(ProcessPriority.Normal));
         setPriorityItem.AddSubmenuItem("High", () => SetPriority(ProcessPriority.High));
         setPriorityItem.AddSubmenuItem("Critical", () => SetPriority(ProcessPriority.Critical));
+
+        
     }
 
     public override void DrawLocal()
@@ -286,7 +287,7 @@ public class ProcessPerformanceList : Component
     {
         string path = selectedProcess?.startInfo?.ExecutablePath;
         if (string.IsNullOrEmpty(path)) return;
-        FileExplorer explorer = new FileExplorer(100, 100, 800, 500, "Process Location", true);
+        FileExplorer explorer = new FileExplorer(100, 100, 800, 500, "Process Location", path);
         WindowManager.Register(explorer);
         selectedProcess = null;
         MarkDirty();

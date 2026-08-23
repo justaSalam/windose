@@ -1,55 +1,89 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Security.Cryptography;
-using System.Text;
+﻿using Windose.System.Kernel.Cryptography;
 
 namespace Windose.System.Kernel.Subsystem
 {
     public class UserAccount
     {
         public static List<UserAccount> accounts = new List<UserAccount>();
-        public static string accountsFilePath = "/mnt/System/Accounts.dat";
+        
 
         public string username;
 
-        public byte[] password;
-        public byte[] salt;
+        public string password;
 
         public string profilePath;
         public PrivilegeLevel privilege;
 
 
-        public UserAccount(string username, byte[] password, byte[] salt, string profilePath, PrivilegeLevel role)
+        public UserAccount(string username, string password, string profilePath, PrivilegeLevel role)
         {
             this.username = username;
             this.password = password;
-            this.salt = salt;
             this.profilePath = profilePath;
+            this.privilege = role;
+        }
+
+        public UserAccount(string username, string password, PrivilegeLevel role)
+        {
+            this.username = username;
+            this.password = password;
+            this.profilePath = $"/mnt/Users/{username}";
             this.privilege = role;
         }
 
         public bool VerifyPassword(string password)
         {
-            return true; //TODO: Implement password verification using SHA256 hashing
+            if(SHA256.ComputeString(password) != password)
+            {
+                //Display message
+                return false;
+            }
+            return true;
         }
 
         public void ChangePassword(string newPassword)
         {
-            //TODO: Implement password change using SHA256 hashing
+
+            string[] lines = File.ReadAllLines(Session.accountsFilePath);
+
+            
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string[] args = lines[i].Split(':');
+
+                if (args.Length != 3)
+                    continue;
+
+                if (args[0] != username)
+                    continue;
+
+                lines[i] = $"{username}:{SHA256.ComputeString(newPassword)}:{privilege}";
+                break;
+            }
+
+            File.WriteAllLines(Session.accountsFilePath, lines);
         }
 
-        public static UserAccount CreateAccount(string username, string password, PrivilegeLevel role)
+        /// <summary>
+        /// Returns a new User account if one doesn't exist already
+        /// </summary>
+        /// <param name="username"></param>
+        /// <param name="password"></param>
+        /// <param name="role"></param>
+        /// <returns></returns>
+        public static UserAccount ?CreateAccount(string username, string password, PrivilegeLevel role)
         {
-            byte[] salt = GenerateSalt(16);
-            //byte[] hash = HashPassword(password, salt);
+            string hash = SHA256.ComputeString(password);
             string profilePath = $"/mnt/Users/{username}";
 
 
-            UserAccount account = new UserAccount(username, new byte[16], salt, profilePath, role);
+            UserAccount account = new UserAccount(username, hash, profilePath, role);
 
 
             if (Directory.Exists(profilePath))
             {
+                return null;
                 // Handle the case where the profile directory already exists (e.g., throw an exception or log a warning)
             }
 
@@ -57,44 +91,11 @@ namespace Windose.System.Kernel.Subsystem
 
             accounts.Add(account);
 
-            StringBuilder stringBuilder = new StringBuilder();
-
-            foreach(UserAccount user in accounts)
-            {
-                stringBuilder.AppendLine($"{user.username}:{user.password}:{user.salt}:{user.privilege}");
-            }
-
-            File.WriteAllText(accountsFilePath, stringBuilder.ToString());
+            File.AppendAllText(Session.accountsFilePath, $"{account.username}:{account.password}:{account.privilege}");
 
             return account;
         }
 
-        private static byte[] GenerateSalt(int length)
-        {
-            byte[] salt = new byte[length];
-            Random rng = new Random();
-
-            rng.NextBytes(salt);
-
-            return salt;
-        }
-
-        //TODO: Implement password hashing, this throws rn
-        /// <summary>
-        /// Hashes the password with the provided salt using SHA256.
-        /// Provide an unhashed password and the salt to get the hashed password.
-        /// </summary>
-        /// <param name="password"></param>
-        /// <param name="salt"></param>
-        /// <returns></returns>
-        private static byte[] HashPassword(string password, byte[] salt)
-        {
-            byte[] combined = Encoding.UTF8.GetBytes(password).Concat(salt).ToArray();
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                return sha256.ComputeHash(combined);
-            }
-        }
     }
 
     public enum PrivilegeLevel

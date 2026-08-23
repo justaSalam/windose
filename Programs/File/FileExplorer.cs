@@ -3,7 +3,6 @@ using Cosmos.Kernel.System.Graphics;
 using Windose;
 using Windose.System.System_Calls;
 
-//Control Panel
 public class FileExplorer : Window
 {
     private DockPanel root;
@@ -24,7 +23,7 @@ public class FileExplorer : Window
     private ListViewItem? contextItem;
     private string currentLocation = "desktop";
 
-    public FileExplorer(int x, int y, int width, int height, string title, bool useTitleBar = false) : base(x, y, width, height, title, useTitleBar)
+    public FileExplorer(int x, int y, int width, int height, string title, string rootPath = "/mnt") : base(x, y, width, height, title, true)
     {
         root = new DockPanel(0, 0, Width, Height)
         {
@@ -34,177 +33,164 @@ public class FileExplorer : Window
             Padding = new Thickness(0),
             useBackground = true,
         };
-        try
+        menuBar = new MenuBar(0, 0, Width);
+        toolbar = new Toolbar(0, 0, Width);
+        addressBar = new AddressBar(0, 0, Width);
+        statusBar = new StatusBar(0, 0, Width);
+        explorerBody = new DockPanel(0, 0, Width, Height)
         {
-            menuBar = new MenuBar(0, 0, Width);
-            toolbar = new Toolbar(0, 0, Width);
-            addressBar = new AddressBar(0, 0, Width);
-            statusBar = new StatusBar(0, 0, Width);
-            explorerBody = new DockPanel(0, 0, Width, Height)
-            {
-                clampSize = false,
-                useBackground = true,
-                backgroundColor = Palette.ControlWhite,
-                Padding = new Thickness(0),
-            };
+            clampSize = false,
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+            Padding = new Thickness(0),
+        };
 
-            treeScroll = new ScrollView(0, 0, 180, Height)
-            {
-                showHorizontalScrollbar = false,
-                clampSize = false,
-                Margin = new Thickness(0),
-            };
-
-            tree = new TreeView(0, 0, 180, Height)
-            {
-                useBackground = true,
-                backgroundColor = Palette.ControlWhite,
-            };
-
-            Splitter splitter = new Splitter(0, 0, 4, Height)
-            {
-                orientation = LayoutOrientation.Vertical,
-                clampSize = false,
-                Margin = new Thickness(0),
-            };
-
-            fileScroll = new ScrollView(0, 0, Width, Height)
-            {
-                showHorizontalScrollbar = true,
-                clampSize = false,
-                Margin = new Thickness(0),
-            };
-
-            files = new ListView(0, 0, Width, Height)
-            {
-                viewMode = ListViewMode.LargeIcon,
-                useBackground = true,
-                backgroundColor = Palette.ControlWhite,
-                headers = ["Name", "Size", "Type", "Modified"],
-                headerWidths = [180, 80, 80, 120]
-            };
-
-            //public string nameHeader = "Name";
-            //public string sizeHeader = "Size";
-            //public string typeHeader = "Type";
-            //public string modifiedHeader = "Modified";
-
-            //public int nameColumnWidth = 180;
-            //public int sizeColumnWidth = 80;
-            //public int typeColumnWidth = 120;
-            fileContextMenu = new MenuPopup(160, 24 * 3);
-            openContextItem = fileContextMenu.AddItem("Open", OpenContextItem);
-            openContextItem = fileContextMenu.AddItem("Open With", OpenContextItem);
-            editContextItem = fileContextMenu.AddItem("Edit", EditContextItem);
-
-            fileContextMenu.AddSeparator();
-            fileContextMenu.AddItem("Cut", ShowContextProperties);
-            fileContextMenu.AddItem("Copy", ShowContextProperties);
-
-            fileContextMenu.AddSeparator();
-            fileContextMenu.AddItem("Create Shortcut", ShowContextProperties);
-            fileContextMenu.AddItem("Delete", DeleteFile);
-            fileContextMenu.AddItem("Rename", ShowContextProperties);
-
-            fileContextMenu.AddSeparator();
-            fileContextMenu.AddItem("Properties", ShowContextProperties);
-
-            root.AddDockChild(menuBar, Dock.Top);
-            root.AddDockChild(toolbar, Dock.Top);
-            root.AddDockChild(addressBar, Dock.Top);
-            root.AddDockChild(statusBar, Dock.Bottom);
-            root.AddDockChild(explorerBody, Dock.Fill);
-
-            treeScroll.SetContent(tree, 180, tree.GetContentHeight());
-            fileScroll.SetContent(files, Width, files.GetContentHeight());
-
-            explorerBody.AddDockChild(treeScroll, Dock.Left);
-            explorerBody.AddDockChild(splitter, Dock.Left);
-            explorerBody.AddDockChild(fileScroll, Dock.Fill);
-
-            MenuPage fileMenu = menuBar.AddMenuPage("File");
-            fileMenu.AddItem("Properties", ShowSelectedProperties);
-            fileMenu.AddSeparator();
-            fileMenu.AddItem("Close", () => WindowManager.PostClose(this));
-
-            MenuPage editMenu = menuBar.AddMenuPage("Edit");
-            editMenu.AddItem("Cut").enabled = false;
-            editMenu.AddItem("Copy").enabled = false;
-            editMenu.AddItem("Paste").enabled = false;
-            editMenu.AddSeparator();
-            editMenu.AddItem("Delete").enabled = false;
-
-            MenuPage viewMenu = menuBar.AddMenuPage("View");
-            viewMenu.AddItem("Large Icons", () => files.SetViewMode(ListViewMode.LargeIcon));
-            viewMenu.AddItem("List", () => files.SetViewMode(ListViewMode.List));
-            viewMenu.AddItem("Details", () => files.SetViewMode(ListViewMode.Details));
-            viewMenu.AddSeparator();
-            viewMenu.AddItem("Refresh", () => PopulateFiles(currentLocation));
-
-            MenuPage goMenu = menuBar.AddMenuPage("Go");
-            goMenu.AddItem("Desktop", () => NavigateTo("desktop", "Desktop"));
-            goMenu.AddItem("My Computer", () => NavigateTo("computer", "My Computer"));
-            goMenu.AddItem("My Documents", () => NavigateTo("documents", "My Documents"));
-
-            MenuPage helpMenu = menuBar.AddMenuPage("Help");
-            helpMenu.AddItem("Windose File Explorer").enabled = false;
-
-            toolbar.AddButton("Back");
-            toolbar.AddButton("Forward");
-            toolbar.AddButton("Up");
-
-            toolbar.AddSeparator();
-            toolbar.AddButton("Cut");
-            toolbar.AddButton("Copy");
-            toolbar.AddButton("Paste");
-
-            toolbar.AddSeparator();
-            toolbar.AddButton("Undo");
-
-            toolbar.AddSeparator();
-            toolbar.AddButton("Delete");
-            toolbar.AddButton("Properties", ShowSelectedProperties);
-
-            toolbar.AddSeparator();
-            toolbar.AddButton("Icons", () => files.SetViewMode(ListViewMode.LargeIcon), 48);
-            toolbar.AddButton("List", () => files.SetViewMode(ListViewMode.List), 48);
-            toolbar.AddButton("Details", () => files.SetViewMode(ListViewMode.Details), 64);
-
-            objectCountPanel = statusBar.AddPanel("0 object(s)", 120);
-            selectedPanel = statusBar.AddPanel("Selected", 180);
-
-            BuildTree();
-
-            tree.selectedChanged = OpenLocation;
-
-            tree.itemDoubleClick = OpenLocation;
-
-
-
-            files.selectedChanged = item =>
-            {
-                selectedPanel.text = item.text + " selected";
-                statusBar.MarkDirty();
-                RefreshExplorerVisuals();
-            };
-
-            files.itemDoubleClick = item =>
-            {
-                if (item.isFolder)
-                    OpenFolderItem(item);
-                else
-                    OpenFileItem(item);
-            };
-
-            files.itemRightClick = ShowFileContextMenu;
-
-            AddChild(root);
-            files.SetViewMode(ListViewMode.LargeIcon);
-        }
-        catch (Exception ex)
+        treeScroll = new ScrollView(0, 0, 180, Height)
         {
-            SystemLogger.WriteLine("File Explorer", ex.Message, ConsoleMessageType.Warning);
-        }
+            showHorizontalScrollbar = false,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+
+        tree = new TreeView(0, 0, 180, Height)
+        {
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+        };
+
+        Splitter splitter = new Splitter(0, 0, 4, Height)
+        {
+            orientation = LayoutOrientation.Vertical,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+
+        fileScroll = new ScrollView(0, 0, Width, Height)
+        {
+            showHorizontalScrollbar = true,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+
+        files = new ListView(0, 0, Width, Height)
+        {
+            viewMode = ListViewMode.LargeIcon,
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+            headers = ["Name", "Size", "Type", "Modified"],
+            headerWidths = [180, 80, 80, 120],
+            useRightClick = true
+        };
+
+        fileContextMenu = new MenuPopup(160, 24 * 3);
+        openContextItem = fileContextMenu.AddItem("Open", OpenContextItem);
+        openContextItem = fileContextMenu.AddItem("Open With", OpenContextItem);
+        editContextItem = fileContextMenu.AddItem("Edit", EditContextItem);
+
+        fileContextMenu.AddSeparator();
+        fileContextMenu.AddItem("Cut", ShowContextProperties);
+        fileContextMenu.AddItem("Copy", ShowContextProperties);
+
+        fileContextMenu.AddSeparator();
+        fileContextMenu.AddItem("Create Shortcut", ShowContextProperties);
+        fileContextMenu.AddItem("Delete", DeleteFile);
+        fileContextMenu.AddItem("Rename", ShowContextProperties);
+
+        fileContextMenu.AddSeparator();
+        fileContextMenu.AddItem("Properties", ShowContextProperties);
+
+        root.AddDockChild(menuBar, Dock.Top);
+        root.AddDockChild(toolbar, Dock.Top);
+        root.AddDockChild(addressBar, Dock.Top);
+        root.AddDockChild(statusBar, Dock.Bottom);
+        root.AddDockChild(explorerBody, Dock.Fill);
+
+        treeScroll.SetContent(tree, 180, tree.GetContentHeight());
+        fileScroll.SetContent(files, Width, files.GetContentHeight());
+
+        explorerBody.AddDockChild(treeScroll, Dock.Left);
+        explorerBody.AddDockChild(splitter, Dock.Left);
+        explorerBody.AddDockChild(fileScroll, Dock.Fill);
+
+        MenuPage fileMenu = menuBar.AddMenuPage("File");
+        fileMenu.AddItem("Properties", ShowSelectedProperties);
+        fileMenu.AddSeparator();
+        fileMenu.AddItem("Close", () => WindowManager.PostClose(this));
+
+        MenuPage editMenu = menuBar.AddMenuPage("Edit");
+        editMenu.AddItem("Cut").enabled = false;
+        editMenu.AddItem("Copy").enabled = false;
+        editMenu.AddItem("Paste").enabled = false;
+        editMenu.AddSeparator();
+        editMenu.AddItem("Delete").enabled = false;
+
+        MenuPage viewMenu = menuBar.AddMenuPage("View");
+        viewMenu.AddItem("Large Icons", () => files.SetViewMode(ListViewMode.LargeIcon));
+        viewMenu.AddItem("List", () => files.SetViewMode(ListViewMode.List));
+        viewMenu.AddItem("Details", () => files.SetViewMode(ListViewMode.Details));
+        viewMenu.AddSeparator();
+        viewMenu.AddItem("Refresh", () => PopulateFiles(currentLocation));
+
+        MenuPage goMenu = menuBar.AddMenuPage("Go");
+        goMenu.AddItem("Desktop", () => NavigateTo("desktop", "Desktop"));
+        goMenu.AddItem("My Computer", () => NavigateTo("computer", "My Computer"));
+        goMenu.AddItem("My Documents", () => NavigateTo("documents", "My Documents"));
+
+        MenuPage helpMenu = menuBar.AddMenuPage("Help");
+        helpMenu.AddItem("Windose File Explorer").enabled = false;
+
+        toolbar.AddButton("Back");
+        toolbar.AddButton("Forward");
+        toolbar.AddButton("Up");
+
+        toolbar.AddSeparator();
+        toolbar.AddButton("Cut");
+        toolbar.AddButton("Copy");
+        toolbar.AddButton("Paste");
+
+        toolbar.AddSeparator();
+        toolbar.AddButton("Undo");
+
+        toolbar.AddSeparator();
+        toolbar.AddButton("Delete");
+        toolbar.AddButton("Properties", ShowSelectedProperties);
+
+        toolbar.AddSeparator();
+        toolbar.AddButton("Icons", () => files.SetViewMode(ListViewMode.LargeIcon), 48);
+        toolbar.AddButton("List", () => files.SetViewMode(ListViewMode.List), 48);
+        toolbar.AddButton("Details", () => files.SetViewMode(ListViewMode.Details), 64);
+
+        objectCountPanel = statusBar.AddPanel("0 object(s)", 120);
+        selectedPanel = statusBar.AddPanel("Selected", 180);
+
+        BuildTree(rootPath);
+
+        tree.selectedChanged = OpenLocation;
+
+        tree.itemDoubleClick = OpenLocation;
+
+
+
+        files.selectedChanged = item =>
+        {
+            selectedPanel.text = item.text + " selected";
+            statusBar.MarkDirty();
+            RefreshExplorerVisuals();
+        };
+
+        files.itemDoubleClick = item =>
+        {
+            if (item.isFolder)
+                OpenFolderItem(item);
+            else
+                OpenFileItem(item);
+        };
+
+        files.itemRightClick = ShowFileContextMenu;
+
+        AddChild(root);
+        files.SetViewMode(ListViewMode.LargeIcon);
+
 
 
 
@@ -212,14 +198,14 @@ public class FileExplorer : Window
 
     private void DeleteFile()
     {
-        if(!IsItemValid(out ListViewItem item))
+        if (!IsItemValid(out ListViewItem item))
         {
             return;
         }
 
         FileEntry fileEntry = item.fileEntry;
 
-        switch(fileEntry.FileType)
+        switch (fileEntry.FileType)
         {
             case FileType.Directory:
                 Directory.Delete(fileEntry.AbsoluteLocation, true);
@@ -230,19 +216,19 @@ public class FileExplorer : Window
                 File.Delete(fileEntry.AbsoluteLocation);
                 break;
         }
-        
-        
+
+
         PopulateFiles(currentLocation);
-        
+
     }
 
-    private void BuildTree()
+    private void BuildTree(string path)
     {
-        PopulateFilesystemLocation("/mnt");
-        TreeViewItem treeRoot = tree.AddRoot("/mnt", "/mnt");
+        PopulateFilesystemLocation(path);
+        TreeViewItem treeRoot = tree.AddRoot(path, path);
 
 
-        foreach (string dir in Directory.GetDirectories("/mnt"))
+        foreach (string dir in Directory.GetDirectories(path))
         {
             TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
             PopulateTreeItem(treeItem);
@@ -351,8 +337,8 @@ public class FileExplorer : Window
     }
 
     private void ShowContextProperties()
-    { 
-        if(!IsItemValid(out ListViewItem item)) return;
+    {
+        if (!IsItemValid(out ListViewItem item)) return;
         WindowManager.Register(new FileProperties(X + 40, Y + 40, item.fileEntry));
     }
     private bool IsItemValid(out ListViewItem item)
@@ -425,7 +411,7 @@ public class FileExplorer : Window
 
         FileInfo[] fileInfo = directoryInfo.GetFiles();
 
-        foreach(FileInfo file in fileInfo)
+        foreach (FileInfo file in fileInfo)
         {
             FileEntry entry = new FileEntry(file.Name, FileType.File, file.FullName, file.Length);
             ListViewItem item = files.AddItem(entry);
