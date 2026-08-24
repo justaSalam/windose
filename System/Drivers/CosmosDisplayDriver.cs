@@ -27,7 +27,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
         if (device == null)
         {
-            SystemLogger.WriteLine("Display Driver", "PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.", ConsoleMessageType.Error);
+            SystemLogger.WriteLine("Display Driver", "PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.", ConsoleMessageType.Fatal);
             return;
         }
 
@@ -36,7 +36,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         int depth = (int)SystemRegistry.GetInteger("System/Display/BitsPerPixel", 32);
 
         Mode mode = new Mode(width, height, ColorDepth.ColorDepth32);
-
+         
         Canvas = new SVGAII3DCanvas(device, mode);
         
         
@@ -49,8 +49,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
             }
             catch (Exception ex)
             {
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.WriteLine(ex.Message);
+                SystemLogger.WriteLine("Display", ex.Message, ConsoleMessageType.Fatal);
             }
         }
 

@@ -216,7 +216,7 @@ public class DirectBitmap : Canvas
             (int)image.Width,
             (int)image.Height);
     }
-    public void DrawImageStretchAlpha(Image image, Rectangle sourceRect, Rectangle destRect)
+    public void DrawImageStretchAlpha(Image image, in Rectangle sourceRect, in Rectangle destRect)
     {
         if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
             return;

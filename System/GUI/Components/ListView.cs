@@ -35,6 +35,7 @@ public class ListView : Component
     public Action<ListViewItem> selectedChanged;
     public Action<ListViewItem> itemDoubleClick;
     public Action<ListViewItem, int, int> itemRightClick;
+    public Action<int,int> viewportRightClick;
 
     private int pressedIndex = -1;
     private int lastClickIndex = -1;
@@ -46,7 +47,7 @@ public class ListView : Component
     private Rectangle sourceRect;
     private Rectangle destRect;
 
-   
+
 
 
     public ListView(int x, int y, int width, int height) : base(x, y, width, height)
@@ -241,11 +242,11 @@ public class ListView : Component
 
         //DrawItemIcon(item, 4, y + 2, smallIconSize);
 
-        
+
         destRect = new Rectangle(4, y + 2, smallIconSize, smallIconSize);
 
         string ext = Path.GetExtension(item.fileEntry.AbsoluteLocation);
-        
+
 
         //DrawImageStretchAlpha(new Png(IconRegistry.Get(ext)), new Rectangle(4, y + 2, 32, 32), destRect);//TODO Fix image resizing + Add smaller icons ig 
         DrawString(item.text, color, 24, y + 2, fontSize);
@@ -346,9 +347,12 @@ public class ListView : Component
             {
                 SelectItem(items[index]);
                 itemRightClick?.Invoke(items[index], mouseX, mouseY);
+                return true;
             }
 
+            viewportRightClick?.Invoke(mouseX, mouseY);
             return true;
+
         }
 
         switch (mouse.left)

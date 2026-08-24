@@ -14,6 +14,7 @@ public class TreeView : Component
 
     public Action<TreeViewItem> selectedChanged;
     public Action<TreeViewItem> itemDoubleClick;
+    public Action<TreeViewItem> itemRightClick;
 
     private int pressedRow = -1;
     private TreeViewItem pressedItem;
@@ -119,11 +120,22 @@ public class TreeView : Component
 
             case MouseEvents.Release:
                 if (item != null && item == pressedItem && row == pressedRow)
+                {
                     ActivateItem(item, row, mouseX - AbsoluteX);
+                }
 
                 pressedRow = -1;
                 pressedItem = null;
                 return true;
+        }
+
+        if (mouse.right == MouseEvents.Release)
+        {
+            if (item != null && item == pressedItem && row == pressedRow)
+            {
+                ActivateItem(item, row, mouseX - AbsoluteX);
+            }
+            itemRightClick?.Invoke(item);
         }
 
         return true;

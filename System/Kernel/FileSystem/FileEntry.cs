@@ -14,17 +14,14 @@ public struct FileEntry
     public int ?directoryCount;
     public int ?fileCount;
 
+    public bool displayInExplorer = true;
+
 
     public string CreatedAt; //ToString("D");
 
     /// <summary>
     /// A directory entry struct
     /// </summary>
-    /// <param name="name"></param>
-    /// <param name="type"></param>
-    /// <param name="location"></param>
-    /// <param name="size"></param>
-    /// <param name="contains"></param>
     public FileEntry(string name, FileType type, string location, long size, string contains)
     {
         FileName = name;
@@ -35,6 +32,11 @@ public struct FileEntry
         CreatedAt = DateTime.Now.ToString("D");
     }
 
+
+    /// <summary>
+    /// Generic
+    /// </summary>
+    /// <param name="fileInfo"></param>
     public FileEntry(FileInfo fileInfo)
     {
         FileName = fileInfo.Name;
@@ -48,10 +50,6 @@ public struct FileEntry
     /// <summary>
     /// A file entry struct
     /// </summary>
-    /// <param name="name"></param>
-    /// <param name="type"></param>
-    /// <param name="location"></param>
-    /// <param name="size"></param>
     public FileEntry(string name, FileType type, string location, long size)
     {
         FileName = name;

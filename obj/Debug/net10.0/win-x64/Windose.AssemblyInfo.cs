@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Windose")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+04cdcc09bbc9af555f35dbfc54dffc276b3baca3")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+88b7dec6680fbf2f9560c0a7172ba6e6f24712ae")]
 [assembly: System.Reflection.AssemblyProductAttribute("Windose")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Windose")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

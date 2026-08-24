@@ -7,6 +7,8 @@ public class TreeViewItem
     public bool expanded = true;
     public bool selected;
 
+    public Action onRightClick;
+
     public TreeViewItem(string text, object tag = null)
     {
         this.text = text;

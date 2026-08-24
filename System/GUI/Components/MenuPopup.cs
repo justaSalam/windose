@@ -67,6 +67,7 @@ public class MenuPopup : Component
 
     public void ShowAt(int x, int y)
     {
+        
         X = x;
         Y = y;
         Visible = true;

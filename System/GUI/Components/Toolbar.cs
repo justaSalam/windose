@@ -1,3 +1,5 @@
+using Cosmos.Kernel.System.Graphics;
+
 public class Toolbar : Component
 {
     private readonly StackPanel items;
@@ -28,6 +30,22 @@ public class Toolbar : Component
         {
             text = text,
             fontSize = 16,
+            useBorders = true,
+            clampSize = false,
+            Margin = new Thickness(0),
+            leftMouseRelease = click,
+        };
+
+        items.AddStackChild(button);
+        MarkDirty();
+        return button;
+    }
+
+    public Button AddButton(Image image, Action ?click = null, int width = 28)
+    {
+        Button button = new Button(0, 0, width, Height - 6)
+        {
+            image = image,
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),

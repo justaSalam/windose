@@ -8,6 +8,10 @@ using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
 using Windose.System.System_Calls;
 
+
+/// <summary>
+/// TODO: Replace every File and Directory call with one made from this class for proper event handling
+/// </summary>
 public static class FileSystemManager
 {
     public static VfsManager.VfsMount? mount;
@@ -70,9 +74,12 @@ public static class FileSystemManager
 
     }
 
+    /// <summary>
+    /// When using an extension use format '.ext' 
+    /// </summary>
     public static string GetUniquePath(string directory, string baseName, string extension = "")
     {
-        string path = Path.Combine(directory, $"{baseName}.{extension}");
+        string path = Path.Combine(directory, $"{baseName}{extension}");
 
         if (!File.Exists(path) && !Directory.Exists(path))
             return path;
@@ -80,7 +87,7 @@ public static class FileSystemManager
         int i = 2;
         while (true)
         {
-            path = Path.Combine(directory, $"{baseName} ({i}).{extension}");
+            path = Path.Combine(directory, $"{baseName} ({i}){extension}");
 
             if (!File.Exists(path) && !Directory.Exists(path))
                 return path;

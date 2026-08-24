@@ -322,7 +322,7 @@ public class Component : IDisposable
 
 
             return child.HandleInput(mouseX, mouseY, mouse);
-                
+
         }
 
         if (IsInsideAbsolute(mouseX, mouseY) && mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
@@ -696,7 +696,7 @@ public class Component : IDisposable
         }
     }
 
-    public void AddChild(Component child)
+    public virtual void AddChild(Component child)
     {
         child.isRoot = false;
         child.parent = this;
@@ -710,7 +710,7 @@ public class Component : IDisposable
         MarkDirty();
     }
 
-    public void RemoveChild(Component child)
+    public virtual void RemoveChild(Component child)
     {
         if (!children.Remove(child)) return;
 
@@ -820,6 +820,12 @@ public class Component : IDisposable
     {
         buffer.DrawImageStretchAlpha(image, sourceRect, destRect);
     }
+
+    public void DrawImageStretchAlpha(Image image, int x, int y, int width, int heigth)
+    {
+        buffer.DrawImageStretchAlpha(image, new Rectangle(x, y, (int)image.Width, (int)image.Height), new Rectangle(x, y, width, heigth));
+    }
+
     public void DrawImageStretch(Image image, Rectangle sourceRect, Rectangle destRect)
     {
         buffer.DrawImageStretch(image, sourceRect, destRect);

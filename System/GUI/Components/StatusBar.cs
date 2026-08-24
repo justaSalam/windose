@@ -1,3 +1,5 @@
+using System.Drawing;
+
 public class StatusBar : Component
 {
     private readonly StackPanel panels;
@@ -42,9 +44,9 @@ public class StatusBar : Component
 
     public override void Resize(int width, int height)
     {
-        base.Resize(width, height);
         panels.Resize(Math.Max(1, width - 4), Math.Max(1, height - 4));
         panels.ResolveStackLayout();
+        base.Resize(width, height);
     }
 
     public override void Draw()
@@ -68,6 +70,7 @@ public class StatusBar : Component
         {
             Component child = panels.children[i];
             DrawSunkenRectangle(child.X + panels.X, child.Y + panels.Y, child.Width, child.Height);
+            DrawString(child.text, Color.White, child.X + 3, child.Y + 1);
         }
     }
 

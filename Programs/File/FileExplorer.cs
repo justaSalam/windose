@@ -1,5 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Mouse;
 using Windose;
 using Windose.System.System_Calls;
 
@@ -18,10 +19,11 @@ public class FileExplorer : Window
     private TreeView tree;
     private ListView files;
     private readonly MenuPopup fileContextMenu;
+    private readonly MenuPopup viewportContextMenu;
     private readonly MenuItem openContextItem;
     private readonly MenuItem editContextItem;
     private ListViewItem? contextItem;
-    private string currentLocation = "desktop";
+    private string currentLocation = "/mnt";
 
     public FileExplorer(int x, int y, int width, int height, string title, string rootPath = "/mnt") : base(x, y, width, height, title, true)
     {
@@ -58,6 +60,9 @@ public class FileExplorer : Window
             backgroundColor = Palette.ControlWhite,
         };
 
+        //TODO Tree item right click (proper version)
+        tree.itemRightClick += ctx => viewportContextMenu.ShowAt(MouseManager.X, MouseManager.Y);
+
         Splitter splitter = new Splitter(0, 0, 4, Height)
         {
             orientation = LayoutOrientation.Vertical,
@@ -83,6 +88,39 @@ public class FileExplorer : Window
         };
 
         fileContextMenu = new MenuPopup(160, 24 * 3);
+        viewportContextMenu = new MenuPopup(160, 24 * 3);
+
+        MenuItem viewContext = viewportContextMenu.AddItem("View");
+        viewContext.AddSubmenuItem("Icons", () => files.SetViewMode(ListViewMode.LargeIcon));
+        viewContext.AddSubmenuItem("List", () => files.SetViewMode(ListViewMode.List));
+        viewContext.AddSubmenuItem("Details", () => files.SetViewMode(ListViewMode.Details));
+
+        MenuItem sortContext = viewportContextMenu.AddItem("Sort");
+        sortContext.AddSubmenuItem("Name");
+        sortContext.AddSubmenuItem("Date");
+        sortContext.AddSubmenuItem("Type");
+        sortContext.AddSubmenuItem("Size");
+        sortContext.AddSubmenuSeparator();
+        sortContext.AddSubmenuItem("Ascending");
+        sortContext.AddSubmenuItem("Descending");
+
+        viewportContextMenu.AddSeparator();
+
+        viewportContextMenu.AddItem("Paste");
+        viewportContextMenu.AddSeparator();
+
+        viewportContextMenu.AddItem("Refresh", Refresh);
+        viewportContextMenu.AddSeparator();
+
+        MenuItem newFileContext = viewportContextMenu.AddItem("New");
+        newFileContext.AddSubmenuItem("File", NewFileFromContext);
+        newFileContext.AddSubmenuItem("Folder", NewDirectoryFromContext);
+        newFileContext.AddSubmenuSeparator();
+        newFileContext.AddSubmenuItem("Shortcut", NewFileFromContext);
+
+        viewportContextMenu.AddSeparator();
+        viewportContextMenu.AddItem("Properties", ShowContextProperties);
+
         openContextItem = fileContextMenu.AddItem("Open", OpenContextItem);
         openContextItem = fileContextMenu.AddItem("Open With", OpenContextItem);
         editContextItem = fileContextMenu.AddItem("Edit", EditContextItem);
@@ -129,7 +167,7 @@ public class FileExplorer : Window
         viewMenu.AddItem("List", () => files.SetViewMode(ListViewMode.List));
         viewMenu.AddItem("Details", () => files.SetViewMode(ListViewMode.Details));
         viewMenu.AddSeparator();
-        viewMenu.AddItem("Refresh", () => PopulateFiles(currentLocation));
+        viewMenu.AddItem("Refresh", Refresh);
 
         MenuPage goMenu = menuBar.AddMenuPage("Go");
         goMenu.AddItem("Desktop", () => NavigateTo("desktop", "Desktop"));
@@ -187,6 +225,7 @@ public class FileExplorer : Window
         };
 
         files.itemRightClick = ShowFileContextMenu;
+        files.viewportRightClick = viewportContextMenu.ShowAt;
 
         AddChild(root);
         files.SetViewMode(ListViewMode.LargeIcon);
@@ -194,6 +233,18 @@ public class FileExplorer : Window
 
 
 
+    }
+
+    private void NewFileFromContext()
+    {
+        File.Create(FileSystemManager.GetUniquePath(currentLocation, "New File", ".txt"));
+        Refresh(); 
+    }
+    private void NewDirectoryFromContext()
+    {
+        Directory.CreateDirectory(FileSystemManager.GetUniquePath(currentLocation, "New Directory"));
+        
+        Refresh();
     }
 
     private void DeleteFile()
@@ -211,19 +262,20 @@ public class FileExplorer : Window
                 Directory.Delete(fileEntry.AbsoluteLocation, true);
                 break;
 
-
             default:
                 File.Delete(fileEntry.AbsoluteLocation);
                 break;
         }
 
 
-        PopulateFiles(currentLocation);
+        Refresh();
 
     }
 
-    private void BuildTree(string path)
+    private void BuildTree(in string path)
     {
+        tree.ClearItems();
+
         PopulateFilesystemLocation(path);
         TreeViewItem treeRoot = tree.AddRoot(path, path);
 
@@ -259,6 +311,7 @@ public class FileExplorer : Window
 
         addressBar.Address = item.text;
         PopulateFiles((string)item.tag);
+        Refresh();
     }
 
     private void OpenFolderItem(ListViewItem item)
@@ -268,8 +321,13 @@ public class FileExplorer : Window
 
         addressBar.Address = item.text;
         PopulateFiles(path);
+        Refresh();
+
     }
 
+
+
+    //TODO: Registry file associations
     private void OpenFileItem(ListViewItem item)
     {
         string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : (string)item.tag;
@@ -312,6 +370,8 @@ public class FileExplorer : Window
         fileContextMenu.ShowAt(x, y);
         RefreshExplorerVisuals();
     }
+
+    
 
     private void OpenContextItem()
     {
@@ -367,6 +427,13 @@ public class FileExplorer : Window
             WindowManager.Register(new FileProperties(X + 40, Y + 40, files.selectedItem.fileEntry));
     }
 
+    private void Refresh()
+    {
+        BuildTree("/mnt");
+        PopulateFiles(currentLocation);
+
+    }
+
     private void PopulateFiles(string location)
     {
         currentLocation = location;
@@ -414,7 +481,14 @@ public class FileExplorer : Window
         foreach (FileInfo file in fileInfo)
         {
             FileEntry entry = new FileEntry(file.Name, FileType.File, file.FullName, file.Length);
+
+            if(!entry.displayInExplorer)
+            {
+                return;
+            }
             ListViewItem item = files.AddItem(entry);
+
+            //TODO: Replace with system registry association instead
             item.type = string.Equals(FileSystemManager.GetExtension(file.FullName), ".breeze", StringComparison.OrdinalIgnoreCase)
                 ? "Breeze Script"
                 : "File";
@@ -469,10 +543,14 @@ public class FileExplorer : Window
 
     public override void HandleMessage(UiMessage message)
     {
-        if (message.Command == "filesystem.changed" &&
-            currentLocation != null && (currentLocation.StartsWith("/mnt", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(currentLocation, "control", StringComparison.OrdinalIgnoreCase)))
+        if (message.Command == "filesystem.changed" 
+            && currentLocation != null 
+            && (currentLocation.StartsWith("/mnt", StringComparison.OrdinalIgnoreCase) 
+            || string.Equals(currentLocation, "control", StringComparison.OrdinalIgnoreCase)))
+        {
+
             PopulateFiles(currentLocation);
+        }
     }
 
     private void OnFileSystemChanged(FileSystemChange change)

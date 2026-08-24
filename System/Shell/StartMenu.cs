@@ -6,6 +6,7 @@ using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
 using System.Drawing;
 using Windose;
+using Windose.Programs;
 using Windose.System.System_Calls;
 
 public class StartMenu : Window
@@ -47,7 +48,7 @@ public class StartMenu : Window
 
         });
 
-        MenuItem programs = new MenuItem(0, 0, width, 24)
+        MenuItem programs = new MenuItem(0, 0, width + 30, 24)
         {
             text = "Programs",
             fontSize = 16,
@@ -60,6 +61,7 @@ public class StartMenu : Window
 
             
         programs.AddSubmenuItem("Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
+        programs.AddSubmenuItem("Internet Explorer", () => WindowManager.Register(new InternetExplorer(200, 200)));
         programs.AddSubmenuItem("Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
         programs.AddSubmenuSeparator();
         programs.AddSubmenuItem("Network Configuration", () => 
