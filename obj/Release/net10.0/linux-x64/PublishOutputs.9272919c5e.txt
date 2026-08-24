@@ -201,6 +201,7 @@ C:\Users\salam\Desktop\windose\output-x64\Cosmos.Kernel.Plugs.dll
 C:\Users\salam\Desktop\windose\output-x64\Cosmos.Kernel.SourceGenerators.dll
 C:\Users\salam\Desktop\windose\output-x64\Cosmos.Kernel.System.dll
 C:\Users\salam\Desktop\windose\output-x64\Cosmos.Kernel.Core.dll
+C:\Users\salam\Desktop\windose\output-x64\HtmlAgilityPack.dll
 C:\Users\salam\Desktop\windose\output-x64\Mono.Cecil.Mdb.dll
 C:\Users\salam\Desktop\windose\output-x64\Mono.Cecil.Pdb.dll
 C:\Users\salam\Desktop\windose\output-x64\Mono.Cecil.Rocks.dll

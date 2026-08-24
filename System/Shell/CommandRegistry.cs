@@ -12,6 +12,7 @@ using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
+using HtmlAgilityPack;
 using System.Security;
 using Windose;
 using Windose.System.Kernel.Subsystem;
@@ -172,6 +173,38 @@ public static class CommandRegistry
 
         Register("uac", "User Access Control Settings", "uac [command]", DisplayUACSettings);
 
+
+        Register("html", "markup read test", "html", (context, args) =>
+        {
+            string html = """
+<html>
+    <body>
+        <h1>Hello Windose From HTML</h1>
+<button id="test">Click me</button>
+    </body>
+</html>
+""";
+
+            try
+            {
+                HtmlDocument document = new HtmlDocument();
+                document.LoadHtml(html);
+
+                HtmlNode ?button = document.GetElementbyId("test");
+
+                context.WriteLine(button?.Name);
+                context.WriteLine(button?.InnerText);
+            }
+            catch (Exception ex)
+            {
+                context.WriteLine(ex.Message);
+            }
+
+        });
+
+
+
+
     }
 
     private static void DisplayUACSettings(CommandContext context, string[] arguments)
@@ -198,9 +231,9 @@ public static class CommandRegistry
                     context.WriteLine($"Password: {user.password}");
                     break;
                 }
-                case "login":
+            case "login":
                 {
-                    if(Session.LogIn(arguments[1], arguments[2]))
+                    if (Session.LogIn(arguments[1], arguments[2]))
                     {
                         context.WriteLine($"Logged in as {arguments[1]}");
                     }
@@ -212,8 +245,8 @@ public static class CommandRegistry
                 }
             case "override":
                 {
-                    UserAccount ?current = Session.CurrentUser;
-                    if(current == null)
+                    UserAccount? current = Session.CurrentUser;
+                    if (current == null)
                     {
                         return;
                     }
@@ -235,13 +268,13 @@ public static class CommandRegistry
                         context.WriteLine("No user is currently logged in.");
                         return;
                     }
-                     //TODO implement context.ReadLine() for proper input handling in the shell context
+                    //TODO implement context.ReadLine() for proper input handling in the shell context
 
                     break;
                 }
             case "end":
                 {
-                    
+
                     context.WriteLine("Privileges de-elevated.");
                     break;
                 }
@@ -319,7 +352,7 @@ public static class CommandRegistry
 
             case "format":
 
-                if(!VfsManager.TryUnmount("/mnt"))
+                if (!VfsManager.TryUnmount("/mnt"))
                 {
                     context.WriteLine("Failed to unmount");
                     context.WriteLine("Check if a device is mounted");

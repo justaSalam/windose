@@ -103,6 +103,10 @@
               "target": "Package",
               "version": "[3.0.82, )"
             },
+            "HtmlAgilityPack": {
+              "target": "Package",
+              "version": "[1.13.0, )"
+            },
             "Microsoft.NET.ILLink.Tasks": {
               "suppressParent": "All",
               "target": "Package",

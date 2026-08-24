@@ -15,7 +15,7 @@ namespace Windose.Programs
         private StatusBar statusBar;
         private DockPanel explorerBody;
 
-        
+        private WebView webView;
 
 
 
@@ -29,6 +29,8 @@ namespace Windose.Programs
                 Padding = new Thickness(0),
                 useBackground = true,
             };
+
+            webView = new WebView(0, 0, Width, Height);
             menuBar = new MenuBar(0, 0, Width);
 
             menuBar.AddMenuPage("File");
@@ -59,12 +61,14 @@ namespace Windose.Programs
                 Padding = new Thickness(0),
             };
 
+
             root.AddDockChild(menuBar, Dock.Top);
             root.AddDockChild(toolbar, Dock.Top);
             root.AddDockChild(addressBar, Dock.Top);
             root.AddDockChild(statusBar, Dock.Bottom);
             root.AddDockChild(explorerBody, Dock.Fill);
 
+            explorerBody.AddDockChild(webView, Dock.Fill);
 
             statusBar.AddPanel("Waiting for network");
 

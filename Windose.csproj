@@ -11,6 +11,7 @@
   <ItemGroup>
     <PackageReference Include="Cosmos.Kernel" Version="3.0.82" />
     <PackageReference Include="Cosmos.Kernel.System" Version="3.0.82" />
+    <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
   </ItemGroup>
 
     <ItemGroup>
@@ -225,5 +226,9 @@
     <EmbeddedResource Include=".\Resources\Fonts\lucida-10x16.psf" />
     <EmbeddedResource Include=".\Resources\Wallpapers\WRAMW.png" />
   </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="System\Libs\" />
+    </ItemGroup>
 
 </Project>

@@ -18,6 +18,7 @@ C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\Windose_patc
 -r:C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Kernel.Plugs.dll
 -r:C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Kernel.SourceGenerators.dll
 -r:C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Cosmos.Kernel.System.dll
+-r:C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\HtmlAgilityPack.dll
 -r:C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CodeAnalysis.CSharp.dll
 -r:C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CodeAnalysis.CSharp.Workspaces.dll
 -r:C:\Users\salam\Desktop\windose\obj\Release\net10.0\linux-x64\cosmos\ref\Microsoft.CodeAnalysis.dll

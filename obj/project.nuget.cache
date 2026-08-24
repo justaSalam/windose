@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "If4gxXbBQ2M=",
+  "dgSpecHash": "tqx2IFJ3Idc=",
   "success": true,
   "projectFilePath": "C:\\Users\\salam\\Desktop\\windose\\Windose.csproj",
   "expectedPackageFiles": [
@@ -23,6 +23,7 @@
     "C:\\Users\\salam\\.nuget\\packages\\cosmos.kernel.sourcegenerators\\3.0.82\\cosmos.kernel.sourcegenerators.3.0.82.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\cosmos.kernel.system\\3.0.82\\cosmos.kernel.system.3.0.82.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\cosmos.kernel.system.core\\3.0.82\\cosmos.kernel.system.core.3.0.82.nupkg.sha512",
+    "C:\\Users\\salam\\.nuget\\packages\\htmlagilitypack\\1.13.0\\htmlagilitypack.1.13.0.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\microsoft.codeanalysis.analyzers\\3.11.0\\microsoft.codeanalysis.analyzers.3.11.0.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\microsoft.codeanalysis.common\\4.14.0\\microsoft.codeanalysis.common.4.14.0.nupkg.sha512",
     "C:\\Users\\salam\\.nuget\\packages\\microsoft.codeanalysis.csharp\\4.14.0\\microsoft.codeanalysis.csharp.4.14.0.nupkg.sha512",
