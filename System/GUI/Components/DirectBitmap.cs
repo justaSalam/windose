@@ -117,9 +117,10 @@ public class DirectBitmap : Canvas
             int newGreen = (((colour >> 8) & 0xff) * alpha + ((bgColour >> 8) & 0xff) * invAlpha) >> 8;
             int newBlue = ((colour & 0xff) * alpha + (bgColour & 0xff) * invAlpha) >> 8;
 
-            Buffer[index] = (alpha << 24) | (newRed << 16) | (newGreen << 8) | newBlue;
+            Buffer[index] = unchecked((int)0xFF000000) | (newRed << 16) | (newGreen << 8) | newBlue;
         }
     }
+
 
     public void SetPixel(int x, int y, int colour)
     {

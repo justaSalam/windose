@@ -63,5 +63,5 @@ public sealed class CommandPrompt : Window
     }
 
     public override void HandleKeyboard(KeyEvent keyEvent) => input.HandleKeyboard(keyEvent);
-    public override string GetName() => "CommandPrompt";
+    public override string GetComponentName() => "CommandPrompt";
 }

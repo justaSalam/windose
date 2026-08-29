@@ -256,7 +256,7 @@ public class ComboBox : Component
         }
     }
 
-    public override string GetName() => "ComboBox";
+    public override string GetComponentName() => "ComboBox";
 
     public override void Dispose()
     {

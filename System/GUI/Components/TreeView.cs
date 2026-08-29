@@ -263,5 +263,5 @@ public class TreeView : Component
 
     public override bool IsOpaqueForCopy() => useBackground;
 
-    public override string GetName() => "TreeView";
+    public override string GetComponentName() => "TreeView";
 }

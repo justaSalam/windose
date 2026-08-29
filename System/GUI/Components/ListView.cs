@@ -327,11 +327,11 @@ public class ListView : Component
         DrawLine(Palette.ControlShadow, x + 8, y + 13, x + size - 5, y + 13);*/
     }
 
-    private void DrawCenteredText(string value, Color color, int x, int y, int width, int size)
+    private void DrawCenteredText(string text, Color color, int x, int y, int width, int size)
     {
-        int textWidth = MeasureStringWidth(value, size);
+        int textWidth = text.Length * 8;
         int textX = x + Math.Max(0, (width - textWidth) / 2);
-        DrawString(value, color, textX, y, size);
+        DrawString(text, color, textX, y, size);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
@@ -462,5 +462,5 @@ public class ListView : Component
 
     public override bool IsOpaqueForCopy() => useBackground;
 
-    public override string GetName() => "ListView";
+    public override string GetComponentName() => "ListView";
 }

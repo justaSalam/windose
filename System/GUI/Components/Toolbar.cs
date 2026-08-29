@@ -1,4 +1,5 @@
 using Cosmos.Kernel.System.Graphics;
+using Windose.System.GUI.Components;
 
 public class Toolbar : Component
 {
@@ -24,16 +25,16 @@ public class Toolbar : Component
         AddChild(items);
     }
 
-    public Button AddButton(string text, Action click = null, int width = 64)
+    public Button AddButton(string text, Action click = null)
     {
-        Button button = new Button(0, 0, width, Height - 6)
+        int width = text.Length * 10;
+        Button button = new Button(text, 0, 0, width, Height - 6)
         {
             text = text,
-            fontSize = 16,
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = click,
+            leftClickAction = click,
         };
 
         items.AddStackChild(button);
@@ -43,13 +44,13 @@ public class Toolbar : Component
 
     public Button AddButton(Image image, Action ?click = null, int width = 28)
     {
-        Button button = new Button(0, 0, width, Height - 6)
+        Button button = new Button(image, 0, 0, width, Height - 6)
         {
             image = image,
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = click,
+            leftClickAction = click,
         };
 
         items.AddStackChild(button);
@@ -95,5 +96,5 @@ public class Toolbar : Component
         }
     }
 
-    public override string GetName() => "Toolbar";
+    public override string GetComponentName() => "Toolbar";
 }

@@ -40,13 +40,13 @@ public sealed class RegistryEditor : Window
         viewMenu.AddItem("Refresh", RefreshAll);
 
         Toolbar toolbar = new Toolbar(0, 0, Width);
-        toolbar.AddButton("New String", () => CreateValue(RegistryValueKind.String), 92);
-        toolbar.AddButton("New Integer", () => CreateValue(RegistryValueKind.Integer), 96);
-        toolbar.AddButton("New Boolean", () => CreateValue(RegistryValueKind.Boolean), 96);
+        toolbar.AddButton("New String", () => CreateValue(RegistryValueKind.String));
+        toolbar.AddButton("New Integer", () => CreateValue(RegistryValueKind.Integer));
+        toolbar.AddButton("New Boolean", () => CreateValue(RegistryValueKind.Boolean));
         toolbar.AddSeparator();
-        toolbar.AddButton("Modify", EditSelected, 68);
-        toolbar.AddButton("Delete", DeleteSelected, 68);
-        toolbar.AddButton("Refresh", RefreshAll, 72);
+        toolbar.AddButton("Modify", EditSelected);
+        toolbar.AddButton("Delete", DeleteSelected);
+        toolbar.AddButton("Refresh", RefreshAll);
 
         addressBar = new AddressBar(0, 0, Width);
         addressBar.label.text = "Key";

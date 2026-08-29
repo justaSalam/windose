@@ -1,6 +1,7 @@
 using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Windose;
+using Windose.System.GUI.Components;
 
 public class PerformanceMonitor : Window
 {
@@ -132,14 +133,13 @@ public class PerformanceMonitor : Window
 
     private static Button CreateTab(string text, int width, Action action)
     {
-        return new Button(0, 0, width, 26)
+        return new Button(text, 0, 0, width, 26)
         {
             text = text,
-            fontSize = 14,
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = action,
+            leftClickAction = action,
         };
     }
 
@@ -195,5 +195,5 @@ public class PerformanceMonitor : Window
 
     private static float BytesToMb(ulong bytes) => bytes / (1024f * 1024f);
 
-    public override string GetName() => "PerformanceMonitor";
+    public override string GetComponentName() => "PerformanceMonitor";
 }

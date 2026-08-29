@@ -184,5 +184,5 @@ public class Tooltip : Component
         tooltipHeight = lineCount * (fontSize + 2) + padding;
     }
 
-    public override string GetName() => "Tooltip";
+    public override string GetComponentName() => "Tooltip";
 }

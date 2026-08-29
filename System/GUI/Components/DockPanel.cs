@@ -126,7 +126,7 @@ public class DockPanel : Component
         }
     }
 
-    public override string GetName() => "DockPanel";
+    public override string GetComponentName() => "DockPanel";
 
     public override bool IsOpaqueForCopy() => useBackground;
 }

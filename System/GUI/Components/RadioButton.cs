@@ -122,5 +122,5 @@ public class RadioButton : Component
         }
     }
 
-    public override string GetName() => "RadioButton";
+    public override string GetComponentName() => "RadioButton";
 }

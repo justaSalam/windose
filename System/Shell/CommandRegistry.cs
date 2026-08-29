@@ -173,38 +173,6 @@ public static class CommandRegistry
 
         Register("uac", "User Access Control Settings", "uac [command]", DisplayUACSettings);
 
-
-        Register("html", "markup read test", "html", (context, args) =>
-        {
-            string html = """
-<html>
-    <body>
-        <h1>Hello Windose From HTML</h1>
-<button id="test">Click me</button>
-    </body>
-</html>
-""";
-
-            try
-            {
-                HtmlDocument document = new HtmlDocument();
-                document.LoadHtml(html);
-
-                HtmlNode ?button = document.GetElementbyId("test");
-
-                context.WriteLine(button?.Name);
-                context.WriteLine(button?.InnerText);
-            }
-            catch (Exception ex)
-            {
-                context.WriteLine(ex.Message);
-            }
-
-        });
-
-
-
-
     }
 
     private static void DisplayUACSettings(CommandContext context, string[] arguments)

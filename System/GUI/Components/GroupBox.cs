@@ -107,5 +107,5 @@ public class GroupBox : Component
         return base.HandleInput(mouseX, mouseY, mouse);
     }
 
-    public override string GetName() => "GroupBox";
+    public override string GetComponentName() => "GroupBox";
 }

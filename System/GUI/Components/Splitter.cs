@@ -72,5 +72,5 @@ public class Splitter : Component
         return IsInsideAbsolute(mouseX, mouseY);
     }
 
-    public override string GetName() => "Splitter";
+    public override string GetComponentName() => "Splitter";
 }

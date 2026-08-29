@@ -47,7 +47,7 @@ public class MenuItem : Component
 
         if (highlighted)
         {
-            DrawFilledRectangle(Palette.Highlight, 2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2));
+            DrawFilledRectangle(Palette.Highlight,2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2));
             DrawString(text, Palette.HighlightText, textX, textY, fontSize);
         }
         else
@@ -174,5 +174,5 @@ public class MenuItem : Component
             Explorer.startMenu.HideMenuImmediate();
     }
 
-    public override string GetName() => "MenuItem";
+    public override string GetComponentName() => "MenuItem";
 }

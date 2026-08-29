@@ -9,13 +9,18 @@ public class Label : Component
     public int fontSize = 0;
     public Color textColor = Palette.ControlBlack;
 
-    public Font ?font;
+    public Font? font;
+
+    public HorizontalAlignment horizontalTextAlignment;
+    public VerticalAlignment verticalTextAlignment;
+
 
     public Label(int x, int y, int width, int height) : base(x, y, width, height)
     {
+        capturesInput = false;
+        horizontalAlignment = HorizontalAlignment.Center;
+        verticalAlignment = VerticalAlignment.Center;
     }
-
-
 
     public override void Draw()
     {
@@ -24,7 +29,6 @@ public class Label : Component
 
     public override void DrawLocal()
     {
-
         if (useBackground)
         {
             DrawSunkenRectangle(0, 0, Width, Height);
@@ -34,28 +38,63 @@ public class Label : Component
             DrawRaisedRectangle(0, 0, Width, Height);
         }
 
-        int currentOffset = 0;
-        if (text != "")
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        int effectiveFontSize = fontSize > 0
+            ? fontSize
+            : Math.Max(1, Height - 4);
+
+        string[] lines = text.Split("\n");
+
+        int lineHeight = effectiveFontSize + 2;
+        int totalTextHeight = lines.Length * lineHeight;
+
+        int startY = verticalTextAlignment switch
         {
-            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
-            int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
+            VerticalAlignment.Top => 0,
 
-            string[] formatted = text.Split("\n");
+            VerticalAlignment.Center => (Height - totalTextHeight) / 2,
 
-            foreach (string line in formatted)
+            VerticalAlignment.Bottom => Height - totalTextHeight,
+
+            _ => 0
+        };
+
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+
+            int textWidth = MeasureStringWidth(line, effectiveFontSize);
+
+            int x = horizontalTextAlignment switch
             {
-                if (font != null) DrawString(text, font, textColor, 2, textY + currentOffset);
-                else DrawString(text, textColor, 2, textY + currentOffset, effectiveFontSize);
-                currentOffset += effectiveFontSize + 2;
+                HorizontalAlignment.Left =>
+                    2,
+
+                HorizontalAlignment.Center =>
+                    (Width - textWidth) / 2,
+
+                HorizontalAlignment.Right =>
+                    Width - textWidth - 2,
+
+                _ => 2
+            };
+
+            int y = startY + (i * lineHeight);
+
+            x = Math.Max(0, x);
+            y = Math.Max(0, y);
+
+            if (font != null)
+            {
+                DrawString(line, font, textColor, x, y);
+            }
+            else
+            {
+                DrawString(line, textColor, x, y, effectiveFontSize);
             }
         }
     }
-
-
-    public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
-    {
-        return true;
-    }
-
     public override bool IsOpaqueForCopy() => useBackground;
 }

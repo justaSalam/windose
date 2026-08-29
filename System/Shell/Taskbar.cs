@@ -2,14 +2,12 @@ using System.Drawing;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
+using Windose.System.GUI.Components;
 
 public class Taskbar : Component
 {
-
-    public bool useBorders = false;
     private bool useGradient = false;
     public Color borderColor = Color.White;
-    public string text = "";
 
     public List<Button> windows = new List<Button>();
 
@@ -52,15 +50,14 @@ public class Taskbar : Component
 
 
         AddChild(bar);
-        startButton = new Button(0, 0, 50, Height)
+        startButton = new Button("Start", 0, 0, 50, Height)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Left,
-            text = "Start",
             textColor = Color.White,
             useBorders = true,
             Margin = new Thickness(0),
-            leftMouseRelease = () =>
+            leftClickAction = () =>
             {
                 Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
             }
@@ -123,6 +120,6 @@ public class Taskbar : Component
         base.Dispose();
     }
 
-    public override string GetName() => "Taskbar";
+    public override string GetComponentName() => "Taskbar";
 
 }

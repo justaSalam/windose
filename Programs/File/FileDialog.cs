@@ -1,3 +1,5 @@
+using Windose.System.GUI.Components;
+
 public enum FileDialogMode
 {
     Open,
@@ -47,9 +49,9 @@ public sealed class FileDialog : Window
         };
 
         Toolbar toolbar = new Toolbar(0, 0, Width);
-        toolbar.AddButton("Up", NavigateUp, 56);
-        toolbar.AddButton("Refresh", Refresh, 72);
-        toolbar.AddButton("Go", () => NavigateTo(addressBar.Address), 48);
+        toolbar.AddButton("Up", NavigateUp);
+        toolbar.AddButton("Refresh", Refresh);
+        toolbar.AddButton("Go", () => NavigateTo(addressBar.Address));
 
         addressBar = new AddressBar(0, 0, Width);
         addressBar.label.text = "Look in";
@@ -91,25 +93,21 @@ public sealed class FileDialog : Window
             horizontalAlignment = HorizontalAlignment.Stretch,
             Margin = new Thickness(4, 32, 174, 88),
         };
-        Button acceptButton = new Button(width - 170, 4, 76, 26)
+        Button acceptButton = new Button(GetAcceptButtonText(this.options), width - 170, 4, 76, 26)
         {
-            text = GetAcceptButtonText(this.options),
-            fontSize = 16,
             useBorders = true,
             clampSize = false,
             horizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 4, 90, 32),
-            leftMouseRelease = Accept,
+            leftClickAction = Accept,
         };
-        Button cancelButton = new Button(width - 88, 4, 76, 26)
+        Button cancelButton = new Button("Cancel", width - 88, 4, 76, 26)
         {
-            text = "Cancel",
-            fontSize = 16,
             useBorders = true,
             clampSize = false,
             horizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 4, 8, 32),
-            leftMouseRelease = () => WindowManager.PostClose(this),
+            leftClickAction = () => WindowManager.PostClose(this),
         };
         status = new Panel(Palette.ControlFace, 8, 34, width - 16, 22)
         {
@@ -285,5 +283,5 @@ public sealed class FileDialog : Window
         return options.Mode == FileDialogMode.Save ? "Save" : "Open";
     }
 
-    public override string GetName() => "FileDialog";
+    public override string GetComponentName() => "FileDialog";
 }

@@ -124,5 +124,5 @@ public class PerformanceGraph : Component
     }
 
     public override bool IsOpaqueForCopy() => true;
-    public override string GetName() => "PerformanceGraph";
+    public override string GetComponentName() => "PerformanceGraph";
 }

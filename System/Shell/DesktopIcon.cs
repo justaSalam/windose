@@ -68,7 +68,7 @@ namespace Windose.System.Shell
             if (isPressed)
                 DrawRectangle(Color.Blue, iconX - 2, IconTop - 2, IconSize + 4, IconSize + 4);
 
-            DrawImageAlpha(icon, iconX, IconTop);
+            DrawImage(icon, iconX, IconTop);
 
             DrawLabel();
         }
@@ -387,6 +387,6 @@ namespace Windose.System.Shell
             return File.Exists(path) || Directory.Exists(path);
         }
 
-        public override string GetName() => "DesktopIcon";
+        public override string GetComponentName() => "DesktopIcon";
     }
 }

@@ -130,17 +130,6 @@ public class Slider : Component
         DrawRaisedRectangle(thumbX - thumbSize / 2, (Height - thumbSize) / 2, thumbSize, thumbSize);
         DrawFilledRectangle(thumbFace, thumbX - thumbSize / 2 + 1, (Height - thumbSize) / 2 + 1, thumbSize - 2, thumbSize - 2);
 
-        /* Ticks
-        if (showTicks)
-        {
-            int tickCount = 10;
-            for (int i = 0; i <= tickCount; i++)
-            {
-                int tickX = trackLeft + (trackWidth * i / tickCount);
-                DrawLine(Palette.ControlShadow, tickX, trackY + trackHeight + 2, 1, 3);
-            }
-        }*/
-
 
         if (showValue)
         {
@@ -171,10 +160,9 @@ public class Slider : Component
         DrawSunkenRectangle(trackX, trackTop, trackWidth, trackHeight);
         if (thumbY < trackBottom)
             DrawFilledRectangle(trackActiveColor, trackX + 1, thumbY, Math.Max(1, trackWidth - 2), Math.Max(1, trackBottom - thumbY));
-
-        Color thumbFace = GUIFeatures.Blend(Palette.ControlFace, Palette.ActiveTitle, hoverBlend * 0.15f);
+;
         DrawRaisedRectangle((Width - thumbSize) / 2, thumbY - thumbSize / 2, thumbSize, thumbSize);
-        DrawFilledRectangle(thumbFace, (Width - thumbSize) / 2 + 1, thumbY - thumbSize / 2 + 1, thumbSize - 2, thumbSize - 2);
+        DrawRaisedRectangle((Width - thumbSize) / 2 + 1, thumbY - thumbSize / 2 + 1, thumbSize - 2, thumbSize - 2);
 
         if (showTicks)
         {
@@ -263,7 +251,7 @@ public class Slider : Component
         }
     }
 
-    public override string GetName() => "Slider";
+    public override string GetComponentName() => "Slider";
 }
 
 public enum Orientation

@@ -111,34 +111,31 @@ public class FileProperties : Window
             horizontalAlignment = HorizontalAlignment.Stretch
         });
 
-        buttons.AddStackChild(new Button(0, 0, 70, 24)
+        buttons.AddStackChild(new Button("Ok", 0, 0, 70, 24)
         {
-            text = "OK",
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = () =>
+            leftClickAction = () =>
             {
                 Apply();
                 Close();
             }
         });
-        buttons.AddStackChild(new Button(0, 0, 70, 24)
+        buttons.AddStackChild(new Button("Cancel", 0, 0, 70, 24)
         {
-            text = "Cancel",
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = Close
+            leftClickAction = Close
         });
 
-        buttons.AddStackChild(new Button(0, 0, 70, 24)
+        buttons.AddStackChild(new Button("Apply", 0, 0, 70, 24)
         {
-            text = "Apply",
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = Apply
+            leftClickAction = Apply
         });
 
 

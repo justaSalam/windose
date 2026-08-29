@@ -1,10 +1,11 @@
 using System.Drawing;
+using HtmlAgilityPack;
 using Microsoft.VisualBasic;
 
 public class WebView : Component
 {
 
-    private const string html = """
+    private const string test = """
 <html>
     <body>
         <h1>Hello Windose From HTML</h1>
@@ -15,10 +16,12 @@ public class WebView : Component
 
 
 
-
+    private HtmlDocument document;
+ 
     public WebView(int x, int y, int width, int height) : base(x, y, width, height)
     {
-
+        document = new HtmlDocument();
+        document.LoadHtml(test);
 
        
 
@@ -29,7 +32,9 @@ public class WebView : Component
     {
         try
         {
-            //DrawString($"{document.Body?.TextContent}", Color.Black, 0, 0);
+            var button = document.GetElementbyId("test");
+            DrawString($"{button?.Name}", Color.Black, 0, 20);
+            DrawString($"{button?.InnerText}", Color.Black, 0, 0);
 
         }
         catch (Exception ex)
@@ -39,5 +44,5 @@ public class WebView : Component
         }
     }
 
-    public override string GetName() => "ImageView";
+    public override string GetComponentName() => "ImageView";
 }

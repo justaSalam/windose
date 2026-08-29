@@ -392,5 +392,5 @@ public class ScrollView : Component
 
     public override bool IsOpaqueForCopy() => useBackground;
 
-    public override string GetName() => "ScrollView";
+    public override string GetComponentName() => "ScrollView";
 }

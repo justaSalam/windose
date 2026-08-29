@@ -1,3 +1,5 @@
+using Windose.System.GUI.Components;
+
 public sealed class ProcessProperties : Window
 {
     public ProcessProperties(int x, int y, Process process)
@@ -37,13 +39,12 @@ public sealed class ProcessProperties : Window
         AddDetail(details, "Arguments: " + DisplayValue(info.Arguments));
         AddDetail(details, "Working directory: " + DisplayValue(info.WorkingDirectory));
 
-        Button close = new Button(0, 0, 80, 26)
+        Button close = new Button("Close", 0, 0, 80, 26)
         {
-            text = "Close",
             horizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 6, 0, 0),
             clampSize = false,
-            leftMouseRelease = () => WindowManager.PostClose(this),
+            leftClickAction = () => WindowManager.PostClose(this),
         };
 
         root.AddDockChild(close, Dock.Bottom);

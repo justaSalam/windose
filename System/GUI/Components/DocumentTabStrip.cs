@@ -78,5 +78,5 @@ public class DocumentTabStrip : Component
         return result + "...";
     }
 
-    public override string GetName() => "DocumentTabStrip";
+    public override string GetComponentName() => "DocumentTabStrip";
 }

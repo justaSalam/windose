@@ -1,16 +1,11 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
-using Cosmos.Kernel.System.Mouse;
-using Windose;
 using Windose.System.System_Calls;
 
 public class Window : Component
 {
-
     public Rectangle bounds; //Window viewport, relative to the screen
-    public Rectangle content; //Content rect, relative to the window
-    private bool isCached;
 
     private bool inFocus;
 
@@ -39,7 +34,7 @@ public class Window : Component
     private Component? focusedComponent;
 
     private Png? Icon;
-    private Panel titlebar;
+    private StackPanel titlebar;
     private bool hasTitleBar;
     private bool windowFocused;
 
@@ -67,10 +62,9 @@ public class Window : Component
             base.Update();
 
         }
-        catch (Exception ex) 
+        catch (Exception ex)
         {
-            SystemLogger.WriteLine("Thread", ex.Message, ConsoleMessageType.Error);
-           
+            SystemLogger.WriteLine("Worker Thread", ex.Message, ConsoleMessageType.Error);
         }
     }
 
@@ -113,7 +107,8 @@ public class Window : Component
         {
             int border = Palette.BorderSize;
             int titleHeight = Palette.TitleBarHeight;
-            titlebar = new Panel(Palette.InactiveTitle, border, border, Width - border * 2, titleHeight)
+            
+            titlebar = new StackPanel(Palette.InactiveTitle, border, border, Width - (border * 2), titleHeight - border)
             {
                 useBackground = true,
                 textColor = Palette.TitleTextInactive,
@@ -121,6 +116,7 @@ public class Window : Component
                 text = title,
                 fontSize = 16,
                 horizontalAlignment = HorizontalAlignment.Stretch,
+                orientation = StackOrientation.Horizontal,
                 Margin = new Thickness(border)
             };
 
@@ -129,8 +125,8 @@ public class Window : Component
             AddChild(titlebar);
             hasTitleBar = true;
 
-            int titleButtonSize = Math.Max(20, titleHeight - 6);
-            int titleButtonTop = Math.Max(2, border + 1);
+            int titleButtonSize = titleHeight - 4;
+            int titleButtonTop = Math.Max(2, border + 2);
 
             CreateTitleControls(titleButtonSize, titleButtonTop);
         }
@@ -139,46 +135,40 @@ public class Window : Component
 
     private void CreateTitleControls(int titleButtonSize, int titleButtonTop)
     {
-        int buttonHeight = titleButtonSize - 5;
-        AddChild(new Button(0, 2, titleButtonSize, buttonHeight)
+        titlebar.AddStackChild(new Button("x", 0, 4, titleButtonSize, titleButtonSize)
         {
-            text = "X",
-            verticalAlignment = VerticalAlignment.Top,
+            verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
             useBorders = true,
             borderColor = Palette.ControlHighlight,
-            textColor = Palette.ControlBlack,
-            leftMouseRelease = () =>
+            textColor = Palette.ControlWhite,
+            leftClickAction = () =>
             {
                 WindowManager.PostClose(this);
             }
         });
 
-        AddChild(new Button(25, 2, titleButtonSize, buttonHeight)
+        titlebar.AddStackChild(new Button("o", 25, 4, titleButtonSize, titleButtonSize)
         {
-            text = "O",
-            verticalAlignment = VerticalAlignment.Top,
+            verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(6, 0, 6 + titleButtonSize, 3),
             useBorders = true,
             borderColor = Palette.ControlHighlight,
-            textColor = Palette.ControlBlack,
-            leftMouseRelease = () =>
+            textColor = Palette.ControlWhite,
+            leftClickAction = () =>
             {
                 WindowManager.ToggleMaximize(this);
             }
         });
 
-        AddChild(new Button(50, 2, titleButtonSize, buttonHeight)
+        titlebar.AddStackChild(new Button("_", 50, 4, titleButtonSize, titleButtonSize)
         {
-            text = "_",
-            verticalAlignment = VerticalAlignment.Top,
+            verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(6, 0, 9 + titleButtonSize * 2, 3),
             useBorders = true,
             borderColor = Palette.ControlHighlight,
-            textColor = Palette.ControlBlack,
-            leftMouseRelease = () =>
+            textColor = Palette.ControlWhite,
+            leftClickAction = () =>
             {
                 WindowManager.Minimize(this);
             }
@@ -216,9 +206,13 @@ public class Window : Component
         {
             inFocus = HitTest(mouseX, mouseY);
 
-            Component hit = GetChildAt(mouseX, mouseY);
+            Component? hit = GetChildAt(mouseX, mouseY);
+
+
             focusedComponent = (hit != this && hit != titlebar) ? hit : null;
-        }   
+
+
+        }
 
 
         DragWindow(mouseState, mouseX, mouseY);
@@ -467,6 +461,6 @@ public class Window : Component
         base.Dispose();
     }
 
-    public override string GetName() => "Window";
+    public override string GetComponentName() => "Window";
 
 }

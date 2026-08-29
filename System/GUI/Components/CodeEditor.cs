@@ -1501,7 +1501,7 @@ public class CodeEditor : Component
     }
 
     public override bool IsOpaqueForCopy() => true;
-    public override string GetName() => "CodeEditor";
+    public override string GetComponentName() => "CodeEditor";
 
     private readonly struct SyntaxSpan
     {

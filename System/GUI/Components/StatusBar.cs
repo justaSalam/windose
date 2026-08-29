@@ -74,5 +74,5 @@ public class StatusBar : Component
         }
     }
 
-    public override string GetName() => "StatusBar";
+    public override string GetComponentName() => "StatusBar";
 }

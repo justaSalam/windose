@@ -1,4 +1,5 @@
 using System.Globalization;
+using Windose.System.GUI.Components;
 
 public sealed class RegistryValueDialog : Window
 {
@@ -73,19 +74,18 @@ public sealed class RegistryValueDialog : Window
             Margin = new Thickness(0),
         };
 
-        Button saveButton = new Button(332, 220, 78, 26)
+        Button saveButton = new Button("Ok", 332, 220, 78, 26)
         {
-            text = "OK",
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = Save,
+            leftClickAction = Save,
         };
-        Button cancelButton = new Button(418, 220, 78, 26)
+        Button cancelButton = new Button("Cancel", 418, 220, 78, 26)
         {
             text = "Cancel",
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = () => WindowManager.PostClose(this),
+            leftClickAction = () => WindowManager.PostClose(this),
         };
 
         body.AddChild(errorLabel);
@@ -218,24 +218,22 @@ public sealed class RegistryDeleteDialog : Window
             clampSize = false,
             Margin = new Thickness(0),
         });
-        body.AddChild(new Button(270, 92, 78, 26)
+        body.AddChild(new Button("Delete", 270, 92, 78, 26)
         {
-            text = "Delete",
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = () =>
+            leftClickAction = () =>
             {
                 SystemRegistry.Delete(entry.Key);
                 deleted?.Invoke();
                 WindowManager.PostClose(this);
             },
         });
-        body.AddChild(new Button(356, 92, 78, 26)
+        body.AddChild(new Button("Cancel",356, 92, 78, 26)
         {
-            text = "Cancel",
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = () => WindowManager.PostClose(this),
+            leftClickAction = () => WindowManager.PostClose(this),
         });
         AddChild(body);
     }

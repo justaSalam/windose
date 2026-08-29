@@ -1,7 +1,10 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Keyboard;
-using Windose;
 
+
+/// <summary>
+/// TODO Implement multi line fields
+/// </summary>
 public class TextField : Component
 {
     public bool useBackground = true;
@@ -98,11 +101,6 @@ public class TextField : Component
                 }
                 break;
 
-            case ConsoleKeyEx.Enter:
-                text += "\n";
-                changed = true;
-                break;
-
             default:
                 char printable = GetPrintableCharacter(keyEvent);
                 if (printable != '\0')
@@ -117,5 +115,5 @@ public class TextField : Component
             MarkDirty();
     }
 
-    public override string GetName() => "TextField";
+    public override string GetComponentName() => "TextField";
 }

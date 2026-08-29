@@ -4,7 +4,7 @@ using Windose;
 
 public class Checkbox : Component
 {
-    private const int BoxSize = 16;
+    private const int BoxSize = 15;
     private const int TextGap = 6;
 
     public bool useBorders = true;
@@ -27,7 +27,7 @@ public class Checkbox : Component
         }
     }
 
-    public Checkbox(int x, int y) : base(x, y, 25, 25)
+    public Checkbox(int x, int y) : base(x, y, 15, 15)
     {
         clampSize = false;
     }
@@ -49,8 +49,12 @@ public class Checkbox : Component
 
         int boxY = Math.Max(0, (Height - BoxSize) / 2);
 
-        if (isPressed) DrawSunkenRectangle(0, boxY, BoxSize, BoxSize);
-        else DrawRaisedRectangle(0, boxY, BoxSize, BoxSize);
+        DrawSunkenRectangle(0, boxY, BoxSize, BoxSize);
+        if(isPressed)
+        {
+            DrawString("X", Color.Black, 2, boxY + 2);
+        }
+        
 
         if (string.IsNullOrEmpty(text)) return;
 
@@ -84,5 +88,5 @@ public class Checkbox : Component
 
     private int GetEffectiveFontSize() => fontSize > 0 ? fontSize : Math.Max(1, Height - 8);
 
-    public override string GetName() => "Checkbox";
+    public override string GetComponentName() => "Checkbox";
 }

@@ -15,7 +15,7 @@ public class Component : IDisposable
 {
 
     public int[] GetBuffer() => buffer.GetBufferBitmap;
-    public virtual string GetName() => "UNASSIGNED COMPONENT";
+    public virtual string GetComponentName() => "UNASSIGNED COMPONENT";
 
     public int Width
     {
@@ -122,7 +122,7 @@ public class Component : IDisposable
     public Component Parent => parent;
     public virtual bool HandlesMouseWheel => false;
 
-    public Window GetOwningWindow()
+    public Window? GetOwningWindow()
     {
         Component current = this;
         while (current != null)
@@ -133,6 +133,8 @@ public class Component : IDisposable
         return null;
     }
 
+
+    //TODO Replace text with label for proper component use
     public string text = string.Empty;
 
 
@@ -142,6 +144,7 @@ public class Component : IDisposable
     public Rectangle clampedBounds = new Rectangle(0, 0, 50, 50);
     public State state;
 
+    public bool capturesInput = true;
     protected bool dirty;
     protected bool childrenDirty;
     private bool disposed;
@@ -211,6 +214,7 @@ public class Component : IDisposable
 
         children = new List<Component>();
 
+
         dirty = false;
         visible = true;
         isRoot = true;
@@ -240,7 +244,7 @@ public class Component : IDisposable
         currentZIndex++;
 
 
-
+        //AddChild(label);
     }
 
 
@@ -306,6 +310,11 @@ public class Component : IDisposable
     }
     public virtual bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (IsInsideAbsolute(mouseX, mouseY) && mouse.left == MouseEvents.Release) leftClickAction?.Invoke();
+        if (IsInsideAbsolute(mouseX, mouseY) && mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
+        if (IsInsideAbsolute(mouseX, mouseY) && mouse.middle == MouseEvents.Release) middleClickAction?.Invoke();
+
+
         for (int i = children.Count - 1; i >= 0; i--)
         {
             Component child = children[i];
@@ -325,9 +334,6 @@ public class Component : IDisposable
 
         }
 
-        if (IsInsideAbsolute(mouseX, mouseY) && mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
-        if (IsInsideAbsolute(mouseX, mouseY) && mouse.left == MouseEvents.Release) leftClickAction?.Invoke();
-        if (IsInsideAbsolute(mouseX, mouseY) && mouse.middle == MouseEvents.Release) middleClickAction?.Invoke();
 
         return true;
     }
@@ -402,7 +408,7 @@ public class Component : IDisposable
     }
 
 
-    public void ResolveHorizontalAnchor()
+    public virtual void ResolveHorizontalAnchor()
     {
         if (isRoot || parent == null) return;
 
@@ -433,7 +439,7 @@ public class Component : IDisposable
         WindowManager.Invalidate(oldRectangle);
         WindowManager.Invalidate(this);
     }
-    public void ResolveVerticalAnchor()
+    public virtual void ResolveVerticalAnchor()
     {
         if (isRoot || parent == null) return;
 
@@ -561,7 +567,7 @@ public class Component : IDisposable
         {
             Component child = children[i];
 
-            if (!child.Visible)
+            if (!child.Visible || !child.capturesInput)
                 continue;
 
             if (!child.IsInsideAbsolute(mouseX, mouseY))
@@ -696,7 +702,7 @@ public class Component : IDisposable
         }
     }
 
-    public virtual void AddChild(Component child)
+    public virtual Component AddChild(Component child)
     {
         child.isRoot = false;
         child.parent = this;
@@ -708,6 +714,8 @@ public class Component : IDisposable
         components.Remove(child);
         children.Add(child);
         MarkDirty();
+
+        return child;
     }
 
     public virtual void RemoveChild(Component child)
@@ -735,8 +743,8 @@ public class Component : IDisposable
         buffer.DrawString(str, SystemFonts.spleen8x16, color, x, y);
     }
 
-    //Legacy method used with fontSize parameter, which is not used in the current implementation
-    //Implement TTF font rendering in the future to support different font sizes + FIX THIS IMPLEMENTATION OH MY FUCKING GOD
+    //TODO Legacy method used with fontSize parameter, which is not used in the current implementation
+    //TODO Implement TTF font rendering in the future to support different font sizes + FIX THIS IMPLEMENTATION OH MY FUCKING GOD
     public void DrawString(string str, Color color, int x, int y, int fontSize)
     {
         buffer.DrawString(str, SystemFonts.spleen8x16, color, x, y);
@@ -810,12 +818,6 @@ public class Component : IDisposable
     {
         buffer.DrawImageAlpha(image, x, y);
     }
-
-    public void DrawImageAlpha(Image image, int x, int y)
-    {
-        buffer.DrawImageAlpha(image, x, y);
-    }
-
     public void DrawImageStretchAlpha(Image image, Rectangle sourceRect, Rectangle destRect)
     {
         buffer.DrawImageStretchAlpha(image, sourceRect, destRect);
@@ -825,21 +827,6 @@ public class Component : IDisposable
     {
         buffer.DrawImageStretchAlpha(image, new Rectangle(x, y, (int)image.Width, (int)image.Height), new Rectangle(x, y, width, heigth));
     }
-
-    public void DrawImageStretch(Image image, Rectangle sourceRect, Rectangle destRect)
-    {
-        buffer.DrawImageStretch(image, sourceRect, destRect);
-    }
-
-    //TODO: Override the DrawImage method to draw into component buffer instead of the main screen buffer
-    //Drawing into main buffer will get overwritten by the component buffer when the component it's drawn
-    public void DrawImage(Image image, int x, int y, int w, int h, bool preventOffBoundPixels = true)
-    {
-        buffer.DrawImage(image, x, y, w, h, preventOffBoundPixels);
-    }
-
-
-
     public void DrawFilledCircle(Color color, int x, int y, int radius)
     {
         buffer.DrawFilledCircle(color, x, y, radius);
@@ -871,13 +858,6 @@ public class Component : IDisposable
         }
     }
 
-    public void OverrideLabel(string text)
-    {
-        this.text = text;
-        MarkDirty();
-    }
-
-    public virtual bool IsDirty() => dirty;
     public virtual bool HasDirtyTree() => dirty || childrenDirty || forceDirty;
     public virtual bool IsOpaqueForCopy() => opacity >= 255;
 
@@ -1073,19 +1053,6 @@ public class Component : IDisposable
 
         buffer?.Dispose();
         cacheBuffer?.Dispose();
-
-        buffer = null;
-        cacheBuffer = null;
-
-        frame = null;
-        normalFrame = null;
-        highlightedFrame = null;
-        pressedFrame = null;
-
-        rightClickAction = null;
-
-        parent = null;
-
         components.Remove(this);
     }
 }

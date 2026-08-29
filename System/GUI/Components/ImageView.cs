@@ -24,7 +24,7 @@ public class ImageView : Component
     {
         //DrawRectangle(Color.Black, 0, 0, Width, Height);
         DrawEtchedRectangle(0, 0, Width, Height);
-        DrawImageStretch(Image, sourceRect, targetRect);
+        DrawImageStretchAlpha(Image, sourceRect, targetRect);
         DrawString($"Scroll: {Mouse.scroll}", Color.White, 5, Height - 15);
     }
 
@@ -55,5 +55,5 @@ public class ImageView : Component
     }
 
 
-    public override string GetName() => "ImageView";
+    public override string GetComponentName() => "ImageView";
 }

@@ -92,15 +92,15 @@ show(main);
         helpMenu.AddItem("API Reference", () => WindowManager.Register(new BreezeApiBrowser(X + 40, Y + 40)));
 
         Toolbar toolbar = new Toolbar(0, 0, Width);
-        toolbar.AddButton("New", NewDocument, 56);
-        toolbar.AddButton("Open", OpenDocument, 64);
-        toolbar.AddButton("Save", SaveDocument, 64);
+        toolbar.AddButton("New", NewDocument);
+        toolbar.AddButton("Open", OpenDocument);
+        toolbar.AddButton("Save", SaveDocument);
         toolbar.AddSeparator();
-        toolbar.AddButton("Undo", () => editor.Undo(), 60);
-        toolbar.AddButton("Redo", () => editor.Redo(), 60);
+        toolbar.AddButton("Undo", () => editor.Undo());
+        toolbar.AddButton("Redo", () => editor.Redo());
         toolbar.AddSeparator();
-        toolbar.AddButton("Run", RunDocument, 56);
-        toolbar.AddButton("Background", RunBackgroundDocument, 104);
+        toolbar.AddButton("Run", RunDocument);
+        toolbar.AddButton("Background", RunBackgroundDocument);
 
         pathBar = new AddressBar(0, 0, Width);
         pathBar.label.text = "File";
@@ -548,5 +548,5 @@ show(main);
         base.Dispose();
     }
 
-    public override string GetName() => "BreezeEditor";
+    public override string GetComponentName() => "BreezeEditor";
 }

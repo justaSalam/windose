@@ -65,7 +65,7 @@ public class GridPanel : Component
         }
     }
 
-    public override string GetName() => "GridPanel";
+    public override string GetComponentName() => "GridPanel";
 
     public override bool IsOpaqueForCopy() => useBackground;
 }

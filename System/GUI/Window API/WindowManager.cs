@@ -4,6 +4,7 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
+using Windose.System.GUI.Components;
 using Windose.System.System_Calls;
 
 public class WindowManager : SingleThreadedProcess
@@ -126,8 +127,14 @@ public class WindowManager : SingleThreadedProcess
         {
             if (!failedWindows.Contains(capturedWindow))
             {
-                try { capturedWindow.HandleInput(mx, my, mouseState); }
-                catch (Exception exception) { FailApplication(capturedWindow, "handling mouse input", exception); }
+                try
+                {
+                    capturedWindow.HandleInput(mx, my, mouseState);
+                }
+                catch (Exception exception)
+                {
+                    FailApplication(capturedWindow, "handling mouse input", exception);
+                }
             }
 
             if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
@@ -137,17 +144,27 @@ public class WindowManager : SingleThreadedProcess
             DispatchMessages();
             ComposeDirtyRegions();
             DrawPreviewRect();
+
             PerformanceMetrics.AddWindowManager(updateStartedAt);
+
             return false;
         }
 
         if (capturedComponent != null)
         {
-            try { capturedComponent.HandleInput(mx, my, mouseState); }
-            catch (Exception exception) { FailApplication(capturedComponent.GetOwningWindow(), "handling mouse input", exception); }
+            try
+            {
+                capturedComponent.HandleInput(mx, my, mouseState);
+            }
+            catch (Exception exception)
+            {
+                FailApplication(capturedComponent.GetOwningWindow(), "handling mouse input", exception);
+            }
 
             if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
+            {
                 capturedComponent = null;
+            }
 
             HandleKeyboardInput();
             DispatchMessages();
@@ -568,15 +585,12 @@ public class WindowManager : SingleThreadedProcess
 
             if (!window.showInTaskbar || Explorer.taskbar == null) return;
 
-            Button taskbarButton = new Button(0, 0, 75, 25)
+            Button taskbarButton = new Button(window.text, 0, 0, 75, 25)
             {
-                text = window.text,
-                font = SystemFonts.spleen6x12,
-                fontSize = 14,
                 verticalAlignment = VerticalAlignment.Center,
                 useBorders = true,
 
-                leftMouseRelease = () =>
+                leftClickAction = () =>
                 {
                     if (window.isMinimized)
                     {
@@ -719,7 +733,7 @@ public class WindowManager : SingleThreadedProcess
             detail = "Unknown error";
         }
 
-        SystemLogger.WriteLine(applicationName ,"failed while " + operation + ": " + detail + "\n", ConsoleMessageType.Error);
+        SystemLogger.WriteLine(applicationName, "failed while " + operation + ": " + detail + "\n", ConsoleMessageType.Error);
         pendingFailures.Add(new ApplicationFailure(applicationName, operation, detail));
 
         if (window == null)
@@ -756,7 +770,7 @@ public class WindowManager : SingleThreadedProcess
             try
             {
                 string message = failure.application + " crashed while " + failure.operation + ": " + failure.detail;
-                
+
 
                 Window error = new Window(140, 140, 680, 130, "Application Error", true)
                 {
@@ -771,14 +785,14 @@ public class WindowManager : SingleThreadedProcess
                     useBackground = true,
                     horizontalAlignment = HorizontalAlignment.Stretch,
                     Margin = new Thickness(8, 34, 8, 8),
-                    
+
                 };
                 error.AddChild(text);
                 Register(error);
             }
             catch (Exception reportException)
             {
-                SystemLogger.WriteLine("DWM","Could not display application error: " + reportException.Message + "\n", ConsoleMessageType.Error);
+                SystemLogger.WriteLine("DWM", "Could not display application error: " + reportException.Message + "\n", ConsoleMessageType.Error);
             }
         }
 

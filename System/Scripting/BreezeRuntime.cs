@@ -1,4 +1,5 @@
 using Cosmos.Kernel.Core.IO;
+using Windose.System.GUI.Components;
 
 /// <summary>
 /// Add a language feature by:
@@ -742,10 +743,8 @@ public sealed class BreezeRuntime
                     int width = ToInt(args[1]);
                     int height = ToInt(args[2]);
                     if (HasError) return null;
-                    return new Button(0, 0, width, height)
+                    return new Button(ToText(args[0]),0, 0, width, height)
                     {
-                        text = ToText(args[0]),
-                        fontSize = 16,
                         useBorders = true,
                         clampSize = false,
                         Margin = new Thickness(0),
@@ -777,7 +776,7 @@ public sealed class BreezeRuntime
                     if (toolbar == null) return null;
                     int width = ToInt(args[2]);
                     if (HasError) return null;
-                    return toolbar.AddButton(ToText(args[1]), width: width);
+                    return toolbar.AddButton(ToText(args[1]));
                 }
 
             case "statusBar":
@@ -1263,7 +1262,7 @@ public sealed class BreezeRuntime
             return;
         }
 
-        if (target is Button button && eventName == "click") { button.leftMouseRelease = callback; return; }
+        if (target is Button button && eventName == "click") { button.leftClickAction = callback; return; }
         if (target is Checkbox checkbox && eventName == "click") { checkbox.Click = callback; return; }
         if (target is Checkbox checkboxChange && eventName == "change") { checkboxChange.CheckedChanged += _ => callback(); return; }
         if (target is RadioButton radio && eventName == "change") { radio.CheckedChanged += _ => callback(); return; }
@@ -1560,7 +1559,6 @@ public sealed class BreezeRuntime
                 {
                     int fontSize = ToInt(value);
                     if (HasError) return;
-                    if (component is Button button) button.fontSize = fontSize;
                     else if (component is Panel panel) panel.fontSize = fontSize;
                     else if (component is TextField field) field.fontSize = fontSize;
                     else if (component is ProgressBar progress) progress.fontSize = fontSize;

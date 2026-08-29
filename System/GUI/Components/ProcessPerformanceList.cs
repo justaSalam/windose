@@ -44,7 +44,7 @@ public class ProcessPerformanceList : Component
 
     public override void DrawLocal()
     {
-        DrawFilledRectangle(backgroundColor, 0, 0, Width, Height);
+        //DrawFilledRectangle(backgroundColor, 0, 0, Width, Height);
         DrawSunkenRectangle(0, 0, Width, Height);
 
         int colX = 6;
@@ -129,7 +129,7 @@ public class ProcessPerformanceList : Component
 
         int summaryY = Height - 20;
         DrawFilledRectangle(Palette.ControlFace, 0, summaryY, Width, 20);
-        DrawLine(Palette.ControlShadow, 0, summaryY, Width, 1);
+        //DrawLine(Palette.ControlShadow, 0, summaryY, Width, 1);
 
         int runningCount = 0;
         int crashedCount = 0;
@@ -343,5 +343,4 @@ public class ProcessPerformanceList : Component
     }
 
     public override bool IsOpaqueForCopy() => true;
-    public override string GetName() => "ProcessPerformanceList";
 }

@@ -41,9 +41,9 @@ public class BreezeApiBrowser : Window
         viewMenu.AddItem("Home", () => Navigate("overview", true));
 
         Toolbar toolbar = new Toolbar(0, 0, Width);
-        toolbar.AddButton("Back", Back, 64);
-        toolbar.AddButton("Forward", Forward, 80);
-        toolbar.AddButton("Home", () => Navigate("overview", true), 64);
+        toolbar.AddButton("Back", Back);
+        toolbar.AddButton("Forward", Forward);
+        toolbar.AddButton("Home", () => Navigate("overview", true));
 
         StatusBar statusBar = new StatusBar(0, 0, Width);
         status = statusBar.AddPanel("Breeze API", 520);
@@ -761,5 +761,5 @@ Lexer, parser, native-binding, and event errors are returned to BreezeHost witho
 Errors include line numbers for invalid syntax. Unknown functions, variables, properties, and incorrect argument counts produce direct messages.");
     }
 
-    public override string GetName() => "BreezeApiBrowser";
+    public override string GetComponentName() => "BreezeApiBrowser";
 }

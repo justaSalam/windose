@@ -33,5 +33,5 @@ public class Separator : Component
         return IsInsideAbsolute(mouseX, mouseY);
     }
 
-    public override string GetName() => "Separator";
+    public override string GetComponentName() => "Separator";
 }

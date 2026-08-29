@@ -245,5 +245,5 @@ public class StartMenu : Window
     }
 
 
-    public override string GetName() => "StartMenu";
+    public override string GetComponentName() => "StartMenu";
 }

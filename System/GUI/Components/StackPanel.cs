@@ -38,55 +38,63 @@ public class StackPanel : Panel
         int availableWidth = Width - Padding.left - Padding.right;
         int availableHeight = Height - Padding.top - Padding.bottom;
 
-        for (int i = 0; i < children.Count; i++)
+        if (orientation == StackOrientation.Vertical)
         {
-            Component child = children[i];
-            if (!child.Visible) continue;
-
-            child.PrepareLayout();
-
-            if (orientation == StackOrientation.Vertical)
+            for (int i = 0; i < children.Count; i++)
             {
-                child.X = cursorX + child.Margin.left;
+                Component child = children[i];
+                if (!child.Visible) continue;
+                child.PrepareLayout();
 
+                child.X = child.horizontalAlignment switch
+                {
+                    HorizontalAlignment.Center => Padding.left + (availableWidth - child.Width) / 2,
+                    HorizontalAlignment.Right => Width - Padding.right - child.Margin.right - child.Width,
+                    _ => cursorX + child.Margin.left,
+                };
                 if (child.horizontalAlignment == HorizontalAlignment.Stretch)
-                {
                     child.Resize(availableWidth - child.Margin.left - child.Margin.right, child.Height);
-                }
-                else if (child.horizontalAlignment == HorizontalAlignment.Center)
-                {
-                    child.X = Padding.left + (availableWidth - child.Width) / 2;
-                }
-                else if (child.horizontalAlignment == HorizontalAlignment.Right)
-                {
-                    child.X = Width - Padding.right - child.Margin.right - child.Width;
-                }
 
                 child.Y = cursorY + child.Margin.top;
                 cursorY = child.Y + child.Height + child.Margin.bottom + spacing;
+
+                child.MarkDirty();
             }
-            else
+        }
+        else
+        {
+            int leftCursor = cursorX;
+            int rightCursor = Width - Padding.right;
+
+            for (int i = 0; i < children.Count; i++)
             {
-                child.Y = cursorY + child.Margin.top;
+                Component child = children[i];
+                if (!child.Visible) continue;
+                child.PrepareLayout();
 
+                child.Y = child.verticalAlignment switch
+                {
+                    VerticalAlignment.Center => Padding.top + (availableHeight - child.Height) / 2,
+                    VerticalAlignment.Bottom => Height - Padding.bottom - child.Margin.bottom - child.Height,
+                    _ => cursorY + child.Margin.top,
+                };
                 if (child.verticalAlignment == VerticalAlignment.Stretch)
-                {
                     child.Resize(child.Width, availableHeight - child.Margin.top - child.Margin.bottom);
-                }
-                else if (child.verticalAlignment == VerticalAlignment.Center)
+
+                if (child.horizontalAlignment == HorizontalAlignment.Right)
                 {
-                    child.Y = Padding.top + (availableHeight - child.Height) / 2;
+                    rightCursor -= child.Margin.right + child.Width;
+                    child.X = rightCursor;
+                    rightCursor -= child.Margin.left + spacing;
                 }
-                else if (child.verticalAlignment == VerticalAlignment.Bottom)
+                else
                 {
-                    child.Y = Height - Padding.bottom - child.Margin.bottom - child.Height;
+                    child.X = leftCursor + child.Margin.left;
+                    leftCursor = child.X + child.Width + child.Margin.right + spacing;
                 }
 
-                child.X = cursorX + child.Margin.left;
-                cursorX = child.X + child.Width + child.Margin.right + spacing;
+                child.MarkDirty();
             }
-
-            child.MarkDirty();
         }
 
         MarkDirty();

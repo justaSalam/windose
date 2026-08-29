@@ -90,7 +90,7 @@ public sealed class TerminalView : Component
     private int MaxScrollLine() => Math.Max(0, lines.Count - VisibleLineCount());
     private void ScrollToBottom() => scrollLine = MaxScrollLine();
     public override bool IsOpaqueForCopy() => true;
-    public override string GetName() => "TerminalView";
+    public override string GetComponentName() => "TerminalView";
 }
 
 public sealed class CommandLineInput : Component
@@ -188,5 +188,5 @@ public sealed class CommandLineInput : Component
     }
 
     public override bool IsOpaqueForCopy() => true;
-    public override string GetName() => "CommandLineInput";
+    public override string GetComponentName() => "CommandLineInput";
 }

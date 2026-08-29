@@ -84,5 +84,5 @@ public class MenuBar : Component
         }
     }
 
-    public override string GetName() => "MenuBar";
+    public override string GetComponentName() => "MenuBar";
 }

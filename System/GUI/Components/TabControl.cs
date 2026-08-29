@@ -278,5 +278,5 @@ public class TabControl : Component
         return IsInsideAbsolute(mouseX, mouseY);
     }
 
-    public override string GetName() => "TabControl";
+    public override string GetComponentName() => "TabControl";
 }

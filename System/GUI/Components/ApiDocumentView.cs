@@ -196,5 +196,5 @@ public class ApiDocumentView : Component
     }
 
     public override bool IsOpaqueForCopy() => true;
-    public override string GetName() => "ApiDocumentView";
+    public override string GetComponentName() => "ApiDocumentView";
 }

@@ -194,9 +194,9 @@ public class FileExplorer : Window
         toolbar.AddButton("Properties", ShowSelectedProperties);
 
         toolbar.AddSeparator();
-        toolbar.AddButton("Icons", () => files.SetViewMode(ListViewMode.LargeIcon), 48);
-        toolbar.AddButton("List", () => files.SetViewMode(ListViewMode.List), 48);
-        toolbar.AddButton("Details", () => files.SetViewMode(ListViewMode.Details), 64);
+        toolbar.AddButton("Icons", () => files.SetViewMode(ListViewMode.LargeIcon));
+        toolbar.AddButton("List", () => files.SetViewMode(ListViewMode.List));
+        toolbar.AddButton("Details", () => files.SetViewMode(ListViewMode.Details));
 
         objectCountPanel = statusBar.AddPanel("0 object(s)", 120);
         selectedPanel = statusBar.AddPanel("Selected", 180);

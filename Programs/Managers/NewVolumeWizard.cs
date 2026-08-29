@@ -2,6 +2,7 @@ using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Windose;
+using Windose.System.GUI.Components;
 
 public class DiskmgrNewVolume : Window
 {
@@ -217,14 +218,12 @@ public class DiskmgrNewVolume : Window
 
     private static Button CreateTab(string text, int width, Action action)
     {
-        return new Button(0, 0, width, 26)
+        return new Button(text, 0, 0, width, 26)
         {
-            text = text,
-            fontSize = 14,
             useBorders = true,
             clampSize = false,
             Margin = new Thickness(0),
-            leftMouseRelease = action,
+            leftClickAction = action,
         };
     }
 
@@ -247,5 +246,5 @@ public class DiskmgrNewVolume : Window
 
     private static float BytesToMb(ulong bytes) => bytes / (1024f * 1024f);
 
-    public override string GetName() => "Disk Manager New Volume";
+    public override string GetComponentName() => "Disk Manager New Volume";
 }

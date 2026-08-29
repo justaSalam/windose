@@ -1,3 +1,5 @@
+using Windose.System.GUI.Components;
+
 public class AddressBar : Component
 {
     public Panel label;
@@ -27,10 +29,8 @@ public class AddressBar : Component
             Margin = new Thickness(3, 3, 24, 68),
         };
 
-        dropDownButton = new Button(width - 22, 3, 18, height - 6)
+        dropDownButton = new Button("v",width - 22, 3, 18, height - 6)
         {
-            text = "v",
-            fontSize = 14,
             useBorders = true,
             clampSize = false,
             horizontalAlignment = HorizontalAlignment.Right,
@@ -80,5 +80,5 @@ public class AddressBar : Component
         }
     }
 
-    public override string GetName() => "AddressBar";
+    public override string GetComponentName() => "AddressBar";
 }

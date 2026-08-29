@@ -1,6 +1,7 @@
 using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 using Windose;
+using Windose.System.GUI.Components;
 using Windose.System.Kernel;
 
 public sealed class DisplaySettings : Window
@@ -194,11 +195,11 @@ public sealed class DisplaySettings : Window
 
     private Button CreateButton(int x, int y, string text, Action action)
     {
-        return new Button(x, y, 78, 26)
+        return new Button(text,x, y, 78, 26)
         {
             text = text,
             clampSize = false,
-            leftMouseRelease = action,
+            leftClickAction = action,
         };
     }
 
@@ -307,5 +308,5 @@ public sealed class DisplaySettings : Window
         }
     }
 
-    public override string GetName() => "DisplaySettings";
+    public override string GetComponentName() => "DisplaySettings";
 }

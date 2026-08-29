@@ -114,5 +114,5 @@ public class ProgressBar : Component
         }
     }
 
-    public override string GetName() => "ProgressBar";
+    public override string GetComponentName() => "ProgressBar";
 }

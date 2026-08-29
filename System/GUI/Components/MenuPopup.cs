@@ -154,5 +154,5 @@ public class MenuPopup : Component
         Resize(itemWidth, Math.Max(itemHeight, contentHeight));
     }
 
-    public override string GetName() => "MenuPopup";
+    public override string GetComponentName() => "MenuPopup";
 }
