@@ -1,5 +1,6 @@
 *.img
 *.vs
+*.vs/
 bin/
 obj/
 output-x64/
