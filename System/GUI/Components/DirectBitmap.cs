@@ -1,6 +1,3 @@
-using Cosmos.Kernel.Core.IO;
-using Cosmos.Kernel.HAL.Pci;
-using Cosmos.Kernel.HAL.Pci.Enums;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using System.Drawing;
@@ -57,10 +54,6 @@ public class DirectBitmap : Canvas
         ResetContext(new Rectangle(0, 0, Width, Height));
     }
 
-    public bool PushContext(int x, int y, int width, int height)
-    {
-        return PushContext(x, y, width, height, new Rectangle(x, y, width, height));
-    }
 
     public bool PushContext(int x, int y, int width, int height, Rectangle parentLocalClip)
     {
@@ -120,33 +113,6 @@ public class DirectBitmap : Canvas
             Buffer[index] = unchecked((int)0xFF000000) | (newRed << 16) | (newGreen << 8) | newBlue;
         }
     }
-
-
-    public void SetPixel(int x, int y, int colour)
-    {
-        x += originX;
-        y += originY;
-        if (!ContainsClipped(x, y)) return;
-        int index = x + y * Width;
-
-        if (index >= 0 && index < Buffer.Length)
-        {
-            if ((colour >> 24) == 0xFF)
-            {
-                Buffer[index] = colour;
-                return;
-            }
-
-            int bgColour = Buffer[index];
-            int alpha = 255;
-            int invAlpha = 255 - alpha;
-            int newRed = (((colour >> 16) & 0xff) * alpha + ((bgColour >> 16) & 0xff) * invAlpha) >> 8;
-            int newGreen = (((colour >> 8) & 0xff) * alpha + ((bgColour >> 8) & 0xff) * invAlpha) >> 8;
-            int newBlue = ((colour & 0xff) * alpha + (bgColour & 0xff) * invAlpha) >> 8;
-
-            Buffer[index] = (alpha << 24) | (newRed << 16) | (newGreen << 8) | newBlue;
-        }
-    }
     public override void Clear(Color color)
     {
         Array.Fill(Buffer, color.ToArgb());
@@ -173,14 +139,6 @@ public class DirectBitmap : Canvas
         Buffer[y * Width + x] = color.ToArgb();
     }
 
-
-    public override void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
-    {
-        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y,
-            (int)image.Width, (int)image.Height);
-    }
-
-
     public override Bitmap GetImage(int x, int y, int width, int height)
     {
         Bitmap bitmap = new Bitmap((uint)width, (uint)height, ColorDepth.ColorDepth32);
@@ -198,26 +156,21 @@ public class DirectBitmap : Canvas
 
     public override void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
     {
-        int num = Math.Min((int)image.Width, maxWidth);
-        int num2 = Math.Min((int)image.Height, maxHeight);
-        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, num, num2);
+        int croppedWidth = Math.Min((int)image.Width, maxWidth);
+        int croppedHeigth = Math.Min((int)image.Height, maxHeight);
+
+        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, croppedWidth, croppedHeigth);
     }
 
-    
 
-    public new void DrawImageAlpha(Image image, int x, int y, bool preventOffBoundPixels = true)
+
+    public new void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
-        DrawArrayAlphaClipped(
-            image.RawData,
-            (int)image.Width,
-            0,
-            0,
-            x,
-            y,
-            (int)image.Width,
-            (int)image.Height);
+        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, (int)image.Width, (int)image.Height);
     }
-    public void DrawImageStretchAlpha(Image image, in Rectangle sourceRect, in Rectangle destRect)
+
+
+    public void DrawImageStretch(Image image, in Rectangle sourceRect, in Rectangle destRect)
     {
         if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
             return;
@@ -240,34 +193,6 @@ public class DirectBitmap : Canvas
 
                 int color = image.RawData[srcX + srcY * image.Width];
                 SetPixelAlpha(destRect.Left + xi, destRect.Top + yi, color);
-                
-            }
-        }
-    }
-
-    public void DrawImageStretch(Image image, Rectangle sourceRect, Rectangle destRect)
-    {
-        if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
-            return;
-
-        float scaleX = (float)sourceRect.Width / destRect.Width;
-        float scaleY = (float)sourceRect.Height / destRect.Height;
-
-        for (int xi = 0; xi < destRect.Width; xi++)
-        {
-            for (int yi = 0; yi < destRect.Height; yi++)
-            {
-                int srcX = (int)(xi * scaleX) + sourceRect.Left;
-                int srcY = (int)(yi * scaleY) + sourceRect.Top;
-
-                srcX = Math.Min(srcX, sourceRect.Right - 1);
-                srcY = Math.Min(srcY, sourceRect.Bottom - 1);
-
-                if (srcX < 0 || srcY < 0 || srcX >= image.Width || srcY >= image.Height)
-                    continue;
-
-                int color = image.RawData[srcX + srcY * image.Width];
-                SetPixel(destRect.Left + xi, destRect.Top + yi, color);
 
             }
         }

@@ -96,7 +96,7 @@ public class Window : Component
 
         if (Icon != null)
         {
-            DrawImageStretchAlpha(Icon, cachedSourceRect, cachedDestRect);
+            DrawImageStretch(Icon, cachedSourceRect, cachedDestRect);
         }
     }
 

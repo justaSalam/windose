@@ -24,7 +24,7 @@ public class ImageView : Component
     {
         //DrawRectangle(Color.Black, 0, 0, Width, Height);
         DrawEtchedRectangle(0, 0, Width, Height);
-        DrawImageStretchAlpha(Image, sourceRect, targetRect);
+        DrawImageStretch(Image, sourceRect, targetRect);
         DrawString($"Scroll: {Mouse.scroll}", Color.White, 5, Height - 15);
     }
 

@@ -744,7 +744,7 @@ public class Component : IDisposable
     }
 
     //TODO Legacy method used with fontSize parameter, which is not used in the current implementation
-    //TODO Implement TTF font rendering in the future to support different font sizes + FIX THIS IMPLEMENTATION OH MY FUCKING GOD
+    //TODO Implement TTF font rendering in the future to support different font sizes + kamosko jebne ma
     public void DrawString(string str, Color color, int x, int y, int fontSize)
     {
         buffer.DrawString(str, SystemFonts.spleen8x16, color, x, y);
@@ -765,7 +765,7 @@ public class Component : IDisposable
         return str.Length * font.Width;
     }
 
-    public int MeasureStringHeight(int fontSize)
+    public int MeasureStringHeight(int fontSize)//TODO co presne????
     {
         return fontSize;
     }
@@ -784,29 +784,14 @@ public class Component : IDisposable
         buffer.DrawRaisedRect(x, y, width, height);
     }
 
-    public void DrawRaisedRectangle(int x, int y, int width, int height, Color face, Color highlight, Color shadow, Color darkShadow)
-    {
-        buffer.DrawRaisedRect(x, y, width, height, face, highlight, shadow, darkShadow);
-    }
-
     public void DrawSunkenRectangle(int x, int y, int width, int height)
     {
         buffer.DrawSunkenRect(x, y, width, height);
     }
 
-    public void DrawSunkenRectangle(int x, int y, int width, int height, Color face, Color darkShadow, Color shadow, Color highlight)
-    {
-        buffer.DrawSunkenRect(x, y, width, height, face, darkShadow, shadow, highlight);
-    }
-
     public void DrawEtchedRectangle(int x, int y, int width, int height)
     {
         buffer.DrawEtchedRect(x, y, width, height);
-    }
-
-    public void DrawEtchedRectangle(int x, int y, int width, int height, Color shadow, Color highlight)
-    {
-        buffer.DrawEtchedRect(x, y, width, height, shadow, highlight);
     }
 
     public void DrawLine(Color color, int xStart, int yStart, int width, int height)
@@ -816,17 +801,13 @@ public class Component : IDisposable
 
     public void DrawImage(Image image, int x, int y)
     {
-        buffer.DrawImageAlpha(image, x, y);
+        buffer.DrawImage(image, x, y);
     }
-    public void DrawImageStretchAlpha(Image image, Rectangle sourceRect, Rectangle destRect)
+    public void DrawImageStretch (Image image, Rectangle sourceRect, Rectangle destRect)
     {
-        buffer.DrawImageStretchAlpha(image, sourceRect, destRect);
+        buffer.DrawImageStretch(image, sourceRect, destRect);
     }
 
-    public void DrawImageStretchAlpha(Image image, int x, int y, int width, int heigth)
-    {
-        buffer.DrawImageStretchAlpha(image, new Rectangle(x, y, (int)image.Width, (int)image.Height), new Rectangle(x, y, width, heigth));
-    }
     public void DrawFilledCircle(Color color, int x, int y, int radius)
     {
         buffer.DrawFilledCircle(color, x, y, radius);

@@ -286,7 +286,7 @@ public class ListView : Component
     {
         if (item.icon != null)
         {
-            buffer.DrawImageAlpha(item.icon, x, y);
+            buffer.DrawImage(item.icon, x, y);
             return;
         }
 
