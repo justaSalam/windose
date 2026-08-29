@@ -77,7 +77,7 @@ public class Window : Component
     }
 
     Rectangle cachedSourceRect = new(0, 0, 32, 32);
-    Rectangle cachedDestRect = new(0, 0, 25, 25);
+    Rectangle cachedDestRect = new(2, 2, 20, 20);
     /// <summary>
     /// Component rendering, coordinates relative to the window
     /// </summary>

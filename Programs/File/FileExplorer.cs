@@ -309,8 +309,10 @@ public class FileExplorer : Window
     {
         if (item == null) return;
 
-        addressBar.Address = item.text;
-        PopulateFiles((string)item.tag);
+        string path = (string)item.tag;
+
+        addressBar.Address = path;
+        PopulateFiles(path);
         Refresh();
     }
 
@@ -453,10 +455,10 @@ public class FileExplorer : Window
     {
         files.MarkDirty(false);
         fileScroll.ForceDirty();
-        statusBar.ForceDirty();
 
-        // Explorer contains several cached layout buffers. Redraw the owning
-        // window after interaction so those updated buffers reach the screen.
+        statusBar.ForceDirty();
+        addressBar.Address = currentLocation;
+        // Explorer contains several cached layout buffers. Redraw the explorer after interaction so those updated buffers reach the screen.
         ForceDirty();
     }
 
