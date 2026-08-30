@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Graphics;
 using System.Globalization;
 
 public sealed class RegistryEditor : Window
@@ -169,6 +170,7 @@ public sealed class RegistryEditor : Window
             if (entry == null) continue;
 
             ListViewItem item = valueList.AddItem(GetLeafName(entry.Key), tag: entry);
+            item.icon = new Png("/mnt/System/Icons/regedit_binary.png");
             item.size = GetValueType(entry.Value);
             item.type = FormatValue(entry.Value);
             item.modified = entry.RequiresRestart ? "Yes" : "No";

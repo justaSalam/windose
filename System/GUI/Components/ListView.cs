@@ -45,8 +45,7 @@ public class ListView : Component
     private Png itemIcon;
 
     private Png folderIcon;
-    private Rectangle sourceRect;
-    private Rectangle destRect;
+
 
 
 
@@ -230,16 +229,7 @@ public class ListView : Component
 
         DrawItemIcon(item, 4, y + 2, smallIconSize);
 
-
-        destRect = new Rectangle(4, y + 2, smallIconSize, smallIconSize);
-
-        string ext = Path.GetExtension(item.fileEntry.AbsoluteLocation);
-
-        DrawString($"{item.text} | {item.fileEntry.SizeBytes} | {item.fileEntry.FileType} | {item.modified}", color, 24, y + 2, fontSize);
-
-        //int sizeX = nameColumnWidth;
-        //int typeX = sizeX + sizeColumnWidth;
-        //int modifiedX = typeX + typeColumnWidth;
+        DrawString($"{item.text}    {item.fileEntry.SizeBytes}Bytes     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
 
         int currentX = 0;
         for (int i = 0; i < headerWidths.Length; i++)
@@ -247,10 +237,6 @@ public class ListView : Component
             DrawString(headers[i], Palette.ControlBlack, currentX + 4, 2, fontSize);
             currentX += headerWidths[i];
         }
-
-        //DrawString(item.size, color, sizeX + 4, y + 2, fontSize);
-        //DrawString(item.type, color, typeX + 4, y + 2, fontSize);
-        //DrawString(item.modified, color, modifiedX + 4, y + 2, fontSize);
     }
 
     private void DrawItemRow(ListViewItem item, int x, int y, int width, int height, bool drawIcon)
@@ -272,9 +258,15 @@ public class ListView : Component
     {
         if (item.icon != null)
         {
-            buffer.DrawImage(item.icon, x, y);
+            DrawImageStretch(item.icon, new Rectangle(x, y - 2, 19, 19));
             return;
         }
+
+        if(!item.hasFileEntry)
+        {
+            return;
+        }
+        
 
         if (item.isFolder)
             DrawFolderIcon(x, y, size);
@@ -284,7 +276,20 @@ public class ListView : Component
 
     private void DrawFolderIcon(int x, int y, int size)
     {
-        DrawImage(folderIcon, x, y);
+        switch (viewMode)
+        {
+            case ListViewMode.List:
+                DrawImageStretch(folderIcon, new Rectangle(x, y, 18, 18));
+                break;
+
+            case ListViewMode.Details:
+                DrawImageStretch(folderIcon, new Rectangle(x, y, 16, 16));
+                break;
+
+            default:
+                DrawImage(folderIcon, x, y);
+                break;
+        }
     }
 
     private static readonly Dictionary<string, Png> iconCache = new Dictionary<string, Png>(StringComparer.OrdinalIgnoreCase);
@@ -307,7 +312,6 @@ public class ListView : Component
             default:
                 DrawImage(icon, x, y);
                 break;
-
         }
     }
 

@@ -1,6 +1,7 @@
 using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Filesystems.Fat;
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
 
@@ -187,13 +188,18 @@ public sealed class DiskManagement : Window
         for (int i = 0; i < StorageManager.DeviceCount; i++)
         {
             IBlockDevice? device = StorageManager.GetDevice(i);
-            deviceListView.AddItem($"{device?.Name} - {device?.BlockSize * device?.BlockCount / 1024} KB").tag = device;
+            ListViewItem deviceItem = deviceListView.AddItem($"{device?.Name} - {device?.BlockSize * device?.BlockCount / 1024} KB");
+            deviceItem.tag = device;
+            deviceItem.icon = new Png("/mnt/System/Icons/hard_disk_drive.png");
 
         }
 
         foreach (Partition partition in StorageManager.Partitions)
         {
-            partitionListView.AddItem($"{partition?.Name} - {partition?.BlockSize * partition?.BlockCount / 1024} KB - {partition?.Host.Name}").tag = partition;
+            ListViewItem partitionItem = partitionListView.AddItem($"{partition?.Name} - {partition?.BlockSize * partition?.BlockCount / 1024} KB - {partition?.Host.Name}");
+            partitionItem.tag = partition;
+            partitionItem.icon = new Png("/mnt/System/Icons/hard_disk_drive_pie.png");
+
         }
     }
 
