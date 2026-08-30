@@ -31,9 +31,9 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
             return;
         }
 
-        uint width = (uint)SystemRegistry.GetInteger("System/Display/Width", 1920);
-        uint height = (uint)SystemRegistry.GetInteger("System/Display/Height", 1080);
-        int depth = (int)SystemRegistry.GetInteger("System/Display/BitsPerPixel", 32);
+        uint width = (uint)Registry.GetInteger("System/Display/Width", 1920);
+        uint height = (uint)Registry.GetInteger("System/Display/Height", 1080);
+        int depth = (int)Registry.GetInteger("System/Display/BitsPerPixel", 32);
 
         Mode mode = new Mode(width, height, ColorDepth.ColorDepth32);
          

@@ -76,12 +76,12 @@ public static class Palette
         if (initialized) return;
         initialized = true;
         ApplyFromRegistry();
-        SystemRegistry.Changed += OnRegistryChanged;
+        Registry.Changed += OnRegistryChanged;
     }
 
     public static void ApplyFromRegistry()
     {
-        Apply(SystemRegistry.GetString(ThemeRegistryKey, "classic"), persist: false);
+        Apply(Registry.GetString(ThemeRegistryKey, "classic"), persist: false);
     }
 
     public static bool Apply(string name, bool persist = true)
@@ -91,9 +91,9 @@ public static class Palette
 
         if (persist)
         {
-            string current = SystemRegistry.GetString(ThemeRegistryKey, theme.Name);
+            string current = Registry.GetString(ThemeRegistryKey, theme.Name);
             if (!current.Equals(theme.Name, StringComparison.OrdinalIgnoreCase))
-                SystemRegistry.Set(ThemeRegistryKey, theme.Name);
+                Registry.Set(ThemeRegistryKey, theme.Name);
         }
 
         return true;

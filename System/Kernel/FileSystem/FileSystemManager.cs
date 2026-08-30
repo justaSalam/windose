@@ -65,7 +65,7 @@ public static class FileSystemManager
         }
 
         CreateSystemDirectories();
-        SystemRegistry.Initialize();
+        Registry.Initialize();
 
         File.WriteAllText("mnt/System/Breeze/startup.breeze", StartupService);
 

@@ -511,27 +511,27 @@ public sealed class BreezeRuntime
                 return WatchPath(ToText(args[0]), ToBool(args[1]));
 
             case "registryGet":
-                return ToBreezeRegistryValue(SystemRegistry.Get(ToText(args[0])));
+                return ToBreezeRegistryValue(Registry.Get(ToText(args[0])));
 
             case "registrySet":
                 if (!EnsureRegistryWrite(ToText(args[0]))) return false;
-                return SystemRegistry.Set(ToText(args[0]), args[1]);
+                return Registry.Set(ToText(args[0]), args[1]);
 
             case "registryDefine":
                 if (!EnsureRegistryWrite(ToText(args[0]))) return false;
-                SystemRegistry.Define(ToText(args[0]), args[1], ToText(args[2]), ToBool(args[3]));
-                return SystemRegistry.Save();
+                Registry.Define(ToText(args[0]), args[1], ToText(args[2]), ToBool(args[3]));
+                return Registry.Save();
 
             case "registryDelete":
                 if (!EnsureRegistryWrite(ToText(args[0]))) return false;
-                return SystemRegistry.Delete(ToText(args[0]));
+                return Registry.Delete(ToText(args[0]));
 
             case "registryExists":
-                return SystemRegistry.Exists(ToText(args[0]));
+                return Registry.Exists(ToText(args[0]));
 
             case "registryKeys":
                 {
-                    List<string> keys = SystemRegistry.GetKeys(ToText(args[0]));
+                    List<string> keys = Registry.GetKeys(ToText(args[0]));
                     List<object> result = new List<object>(keys.Count);
                     for (int i = 0; i < keys.Count; i++) result.Add(keys[i]);
                     return result;
@@ -539,7 +539,7 @@ public sealed class BreezeRuntime
 
             case "registryInfo":
                 {
-                    RegistryEntry entry = SystemRegistry.GetEntry(ToText(args[0]));
+                    RegistryEntry entry = Registry.GetEntry(ToText(args[0]));
                     if (entry == null) return null;
                     Dictionary<string, object> result = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
                     result["key"] = entry.Key;
@@ -552,10 +552,10 @@ public sealed class BreezeRuntime
                 }
 
             case "registrySave":
-                return SystemRegistry.Save();
+                return Registry.Save();
 
             case "registryRestartRequired":
-                return SystemRegistry.RestartRequired;
+                return Registry.RestartRequired;
 
             case "clock":
                 return (double)(DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond);
@@ -1902,7 +1902,7 @@ public sealed class BreezeRuntime
 
     private bool EnsureRegistryWrite(string key)
     {
-        string normalized = SystemRegistry.NormalizeKey(key);
+        string normalized = Registry.NormalizeKey(key);
         string capability = normalized.StartsWith("System/", StringComparison.OrdinalIgnoreCase)
             ? "registry.write"
             : "registry.custom.write";

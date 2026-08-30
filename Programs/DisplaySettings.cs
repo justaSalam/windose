@@ -75,10 +75,10 @@ public sealed class DisplaySettings : Window
 
         resolutionCombo.SelectedIndex = FindResolutionIndex();
         colorDepthCombo.SelectedIndex = FindDepthIndex();
-        snapToGrid.Checked = SystemRegistry.GetBoolean("System/Desktop/IconGridEnabled", true);
-        showGrid.Checked = SystemRegistry.GetBoolean("System/Desktop/IconGridVisible", false);
-        gridWidthSlider.Value = SystemRegistry.GetInteger("System/Desktop/IconGridWidth", 80);
-        gridHeightSlider.Value = SystemRegistry.GetInteger("System/Desktop/IconGridHeight", 80);
+        snapToGrid.Checked = Registry.GetBoolean("System/Desktop/IconGridEnabled", true);
+        showGrid.Checked = Registry.GetBoolean("System/Desktop/IconGridVisible", false);
+        gridWidthSlider.Value = Registry.GetInteger("System/Desktop/IconGridWidth", 80);
+        gridHeightSlider.Value = Registry.GetInteger("System/Desktop/IconGridHeight", 80);
         UpdateGridLabels();
         UpdateDisplayLabels();
     }
@@ -218,13 +218,13 @@ public sealed class DisplaySettings : Window
     private void ApplySettings()
     {
         GetSelectedResolution(out int width, out int height);
-        SystemRegistry.Set(WidthKey, (long)width);
-        SystemRegistry.Set(HeightKey, (long)height);
-        SystemRegistry.Set(BppKey, (long)GetSelectedDepth());
-        SystemRegistry.Set("System/Desktop/IconGridEnabled", snapToGrid.Checked);
-        SystemRegistry.Set("System/Desktop/IconGridVisible", showGrid.Checked);
-        SystemRegistry.Set("System/Desktop/IconGridWidth", (long)gridWidthSlider.Value);
-        SystemRegistry.Set("System/Desktop/IconGridHeight", (long)gridHeightSlider.Value);
+        Registry.Set(WidthKey, (long)width);
+        Registry.Set(HeightKey, (long)height);
+        Registry.Set(BppKey, (long)GetSelectedDepth());
+        Registry.Set("System/Desktop/IconGridEnabled", snapToGrid.Checked);
+        Registry.Set("System/Desktop/IconGridVisible", showGrid.Checked);
+        Registry.Set("System/Desktop/IconGridWidth", (long)gridWidthSlider.Value);
+        Registry.Set("System/Desktop/IconGridHeight", (long)gridHeightSlider.Value);
 
         UpdateDisplayLabels();
     }
@@ -238,8 +238,8 @@ public sealed class DisplaySettings : Window
 
     private void UpdateDisplayLabels()
     {
-        long currentWidth = SystemRegistry.GetInteger("System/Display/CurrentWidth", Global.screenWidth);
-        long currentHeight = SystemRegistry.GetInteger("System/Display/CurrentHeight", Global.screenHeight);
+        long currentWidth = Registry.GetInteger("System/Display/CurrentWidth", Global.screenWidth);
+        long currentHeight = Registry.GetInteger("System/Display/CurrentHeight", Global.screenHeight);
         GetSelectedResolution(out int requestedWidth, out int requestedHeight);
 
         currentMode.text = "Current display: " + currentWidth + " x " + currentHeight + ", " + GetSelectedDepth() + "-bit color";
@@ -267,8 +267,8 @@ public sealed class DisplaySettings : Window
 
     private int FindResolutionIndex()
     {
-        long width = SystemRegistry.GetInteger(WidthKey, 1920);
-        long height = SystemRegistry.GetInteger(HeightKey, 1080);
+        long width = Registry.GetInteger(WidthKey, 1920);
+        long height = Registry.GetInteger(HeightKey, 1080);
         string value = width + " x " + height;
 
         for (int i = 0; i < resolutionCombo.ItemCount; i++)
@@ -279,7 +279,7 @@ public sealed class DisplaySettings : Window
 
     private int FindDepthIndex()
     {
-        long depth = SystemRegistry.GetInteger(BppKey, 32);
+        long depth = Registry.GetInteger(BppKey, 32);
         if (depth == 16) return 0;
         if (depth == 24) return 1;
         return 2;

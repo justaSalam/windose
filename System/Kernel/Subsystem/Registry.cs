@@ -1,6 +1,7 @@
 using Cosmos.Kernel.System.Vfs;
 using System.Globalization;
 using System.Text;
+using Windose.System.Kernel.Subsystem;
 
 public sealed class RegistryEntry
 {
@@ -29,7 +30,7 @@ public readonly struct RegistryChange
     }
 }
 
-public static class SystemRegistry
+public static class Registry
 {
     public const string StoragePath = @"mnt/System/registry.db";
 
@@ -64,22 +65,58 @@ public static class SystemRegistry
             DefineNoLock("System/Display/Width", 1920L, "Requested boot framebuffer width.", true, true);
             DefineNoLock("System/Display/Height", 1080L, "Requested boot framebuffer height.", true, true);
             DefineNoLock("System/Display/BitsPerPixel", 32L, "Requested boot framebuffer color depth.", true, true);
+
+
+
+            DefineDefault(StaticRegistry.FileAssociation);
+            DefineDefault("User");
+            DefineDefault("Software");
+            DefineDefault("Hardware");
+
+
+
+
+            Define($"{StaticRegistry.FileAssociation}/fallback", "/mnt/System/Icons/file_question.png");
+            Define($"{StaticRegistry.FileAssociation}/.png", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.db", "/mnt/System/Icons/regedit_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.dat", "/mnt/System/Icons/file_windows.png");
+            Define($"{StaticRegistry.FileAssociation}/.sys", "/mnt/System/Icons/file_windows.png");
+            Define($"{StaticRegistry.FileAssociation}/.breeze", "/mnt/System/Icons/script_file_blue.png");
         }
 
         Load();
     }
 
+
+    /// <summary>
+    /// Defines a new persistent Regitry Key
+    /// </summary>
     public static void Define(string key, object defaultValue, string description = "", bool requiresRestart = false)
     {
         key = NormalizeKey(key);
         lock (sync) DefineNoLock(key, NormalizeValue(defaultValue), description, requiresRestart, false);
     }
 
+    public static void DefineDefault(string key)
+    {
+        key = NormalizeKey($"{key}/Default");
+        lock (sync) DefineNoLock(key, 0, "No Value", false, false);
+    }
+
+    /// <summary>
+    /// Sets a value to registry key.
+    /// A registry key is created if one doesn't exist already (Uses a default key desc.)
+    /// </summary>
     public static bool Set(string key, object value, bool persist = true)
     {
         return SetCore(NormalizeKey(key), NormalizeValue(value), persist, true, true, true);
     }
 
+    /// <summary>
+    /// Defines a new non-persistent Regitry Key.
+    /// Use for transient runtime state.
+    /// Does NOT write a new entry into registry.db
+    /// </summary>
     public static bool SetRuntimeValue(string key, object value)
     {
         return SetCore(NormalizeKey(key), NormalizeValue(value), false, false, false, false);

@@ -50,7 +50,7 @@ public class Desktop : Component
         ApplyRegistryBackground();
         ApplyIconGridSettings();
 
-        SystemRegistry.Changed += OnRegistryChanged;
+        Registry.Changed += OnRegistryChanged;
 
         contextMenu = new MenuPopup(260, 24 * 3)
         {
@@ -320,7 +320,7 @@ public class Desktop : Component
 
     private void ApplyRegistryBackground()
     {
-        string value = SystemRegistry.GetString("System/Desktop/BackgroundColor", "theme");
+        string value = Registry.GetString("System/Desktop/BackgroundColor", "theme");
         backgroundColor = IsThemeBackground(value)
             ? Palette.DesktopBackground
             : TryParseColor(value, out Color color) ? color : Palette.DesktopBackground;
@@ -346,12 +346,12 @@ public class Desktop : Component
 
     private void ApplyIconGridSettings()
     {
-        SnapIconsToGrid = SystemRegistry.GetBoolean("System/Desktop/IconGridEnabled", true);
-        ShowIconGrid = SystemRegistry.GetBoolean("System/Desktop/IconGridVisible", false);
-        IconGridWidth = ClampGridValue(SystemRegistry.GetInteger("System/Desktop/IconGridWidth", 80), DesktopIcon.DefaultWidth, 256);
-        IconGridHeight = ClampGridValue(SystemRegistry.GetInteger("System/Desktop/IconGridHeight", 80), DesktopIcon.DefaultHeight, 256);
-        IconGridOffsetX = ClampGridValue(SystemRegistry.GetInteger("System/Desktop/IconGridOffsetX", 8), 0, Math.Max(0, Width - 1));
-        IconGridOffsetY = ClampGridValue(SystemRegistry.GetInteger("System/Desktop/IconGridOffsetY", 8), 0, Math.Max(0, Height - 1));
+        SnapIconsToGrid = Registry.GetBoolean("System/Desktop/IconGridEnabled", true);
+        ShowIconGrid = Registry.GetBoolean("System/Desktop/IconGridVisible", false);
+        IconGridWidth = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridWidth", 80), DesktopIcon.DefaultWidth, 256);
+        IconGridHeight = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridHeight", 80), DesktopIcon.DefaultHeight, 256);
+        IconGridOffsetX = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridOffsetX", 8), 0, Math.Max(0, Width - 1));
+        IconGridOffsetY = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridOffsetY", 8), 0, Math.Max(0, Height - 1));
     }
 
     private static int ClampGridValue(long value, int minimum, int maximum)
@@ -363,12 +363,12 @@ public class Desktop : Component
 
     private void ToggleIconGrid()
     {
-        SystemRegistry.Set("System/Desktop/IconGridVisible", !ShowIconGrid);
+        Registry.Set("System/Desktop/IconGridVisible", !ShowIconGrid);
     }
 
     private void ToggleSnapToGrid()
     {
-        SystemRegistry.Set("System/Desktop/IconGridEnabled", !SnapIconsToGrid);
+        Registry.Set("System/Desktop/IconGridEnabled", !SnapIconsToGrid);
     }
 
     private void DrawIconGrid()
@@ -387,8 +387,8 @@ public class Desktop : Component
 
     private void SetIconGridPreset(int width, int height)
     {
-        SystemRegistry.Set("System/Desktop/IconGridWidth", (long)width);
-        SystemRegistry.Set("System/Desktop/IconGridHeight", (long)height);
+        Registry.Set("System/Desktop/IconGridWidth", (long)width);
+        Registry.Set("System/Desktop/IconGridHeight", (long)height);
     }
 
     private DesktopIcon FindIconAt(int mouseX, int mouseY)
@@ -591,7 +591,7 @@ public class Desktop : Component
 
     public override void Dispose()
     {
-        SystemRegistry.Changed -= OnRegistryChanged;
+        Registry.Changed -= OnRegistryChanged;
         base.Dispose();
     }
 

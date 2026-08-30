@@ -77,8 +77,8 @@ public class Kernel : Sys.Kernel
 
         Global.screenHeight = displayDriver.Height;
         Global.screenWidth = displayDriver.Width;
-        SystemRegistry.SetRuntimeValue("System/Display/CurrentWidth", (long)displayDriver.Width);
-        SystemRegistry.SetRuntimeValue("System/Display/CurrentHeight", (long)displayDriver.Height);
+        Registry.SetRuntimeValue("System/Display/CurrentWidth", (long)displayDriver.Width);
+        Registry.SetRuntimeValue("System/Display/CurrentHeight", (long)displayDriver.Height);
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
 
@@ -97,14 +97,6 @@ public class Kernel : Sys.Kernel
         File.WriteAllText("/mnt/Programs/CLAUDE.breeze", breezeScript);
 
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze","service.control");
-
-        IconRegistry.Register(".txt", "/mnt/System/Icons/file_lines.png");
-        IconRegistry.Register(".png", "/mnt/System/Icons/paint_file.png");
-        IconRegistry.Register(".breeze", "/mnt/System/Icons/script_file_blue.png");
-        IconRegistry.Register(".log", "/mnt/System/Icons/file_windows.png");
-        IconRegistry.Register(".db", "/mnt/System/Icons/regedit_file.png");
-
-
     }
 
     private long lastFrameTicks;

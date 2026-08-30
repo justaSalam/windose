@@ -121,7 +121,7 @@ public sealed class RegistryEditor : Window
         keyTree.selectedChanged = SelectKey;
         valueList.selectedChanged = SelectValue;
         valueList.itemDoubleClick = item => EditSelected();
-        SystemRegistry.Changed += OnRegistryChanged;
+        Registry.Changed += OnRegistryChanged;
 
         RefreshAll();
     }
@@ -131,7 +131,7 @@ public sealed class RegistryEditor : Window
         string pathToRestore = selectedPath;
         keyTree.ClearItems();
         TreeViewItem computer = keyTree.AddRoot("Computer", "");
-        List<string> keys = SystemRegistry.GetKeys();
+        List<string> keys = Registry.GetKeys();
 
         for (int i = 0; i < keys.Count; i++)
         {
@@ -161,11 +161,11 @@ public sealed class RegistryEditor : Window
     private void PopulateValues()
     {
         valueList.ClearItems();
-        List<string> keys = SystemRegistry.GetKeys(selectedPath);
+        List<string> keys = Registry.GetKeys(selectedPath);
         for (int i = 0; i < keys.Count; i++)
         {
             if (!string.Equals(GetParentKey(keys[i]), selectedPath, StringComparison.OrdinalIgnoreCase)) continue;
-            RegistryEntry entry = SystemRegistry.GetEntry(keys[i]);
+            RegistryEntry entry = Registry.GetEntry(keys[i]);
             if (entry == null) continue;
 
             ListViewItem item = valueList.AddItem(GetLeafName(entry.Key), tag: entry);
@@ -222,7 +222,7 @@ public sealed class RegistryEditor : Window
 
     public override void Dispose()
     {
-        SystemRegistry.Changed -= OnRegistryChanged;
+        Registry.Changed -= OnRegistryChanged;
         base.Dispose();
     }
 

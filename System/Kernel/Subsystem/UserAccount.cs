@@ -66,7 +66,7 @@ namespace Windose.System.Kernel.Subsystem
         }
 
         /// <summary>
-        /// Returns a new User account if one doesn't exist already
+        /// Returns and creates a new User account if one doesn't exist already
         /// </summary>
         /// <param name="username"></param>
         /// <param name="password"></param>
@@ -92,6 +92,7 @@ namespace Windose.System.Kernel.Subsystem
             accounts.Add(account);
 
             File.AppendAllText(Session.accountsFilePath, $"{account.username}:{account.password}:{account.privilege}");
+            Registry.Define($"User/{username}/Default", null);
 
             return account;
         }

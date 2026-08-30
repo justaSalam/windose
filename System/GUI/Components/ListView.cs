@@ -2,6 +2,7 @@ using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Mono.Cecil;
 using Windose.System.Kernel;
+using Windose.System.Kernel.Subsystem;
 
 public class ListView : Component
 {
@@ -293,38 +294,31 @@ public class ListView : Component
         if (item.isFolder)
             DrawFolderIcon(x, y, size);
         else
-            DrawFileIcon(x, y, size);
+            DrawFileIcon(item, x, y, size);
     }
 
     private void DrawFolderIcon(int x, int y, int size)
     {
         DrawImage(folderIcon, x, y);
-
-
-        /*int tabHeight = Math.Max(3, size / 4);
-        int bodyY = y + tabHeight;
-
-        DrawFilledRectangle(Color.FromArgb(255, 224, 64), x + 2, y + 2, size / 2, tabHeight);
-        DrawRectangle(Palette.ControlShadow, x + 2, y + 2, size / 2, tabHeight);
-        DrawFilledRectangle(Color.FromArgb(255, 240, 96), x, bodyY, size, size - tabHeight);
-        DrawRectangle(Palette.ControlShadow, x, bodyY, size, size - tabHeight);*/
     }
 
-    public override void MarkDirty(bool invalidate = true)
+    private static readonly Dictionary<string, Png> iconCache = new Dictionary<string, Png>(StringComparer.OrdinalIgnoreCase);
+
+    private void DrawFileIcon(ListViewItem item, int x, int y, int size)
     {
-        base.MarkDirty(invalidate);
+        string ext = Path.GetExtension(item.fileEntry.FileName);
+        Png icon = GetCachedIcon(ext);
+        DrawImage(icon, x, y);
     }
 
-    private void DrawFileIcon(int x, int y, int size)
+    private static Png GetCachedIcon(string extension)
     {
-        DrawImage(itemIcon, x, y);
-        /*
-        DrawFilledRectangle(Palette.ControlWhite, x + 4, y, size - 7, size);
-        DrawRectangle(Palette.ControlShadow, x + 4, y, size - 7, size);
-        DrawLine(Palette.ControlShadow, x + size - 7, y, x + size - 2, y + 5);
-        DrawLine(Palette.ControlShadow, x + size - 2, y + 5, x + size - 2, y + size - 1);
-        DrawLine(Palette.ControlShadow, x + 8, y + 9, x + size - 5, y + 9);
-        DrawLine(Palette.ControlShadow, x + 8, y + 13, x + size - 5, y + 13);*/
+        if (iconCache.TryGetValue(extension, out Png cached)) return cached;
+
+        string iconPath = Registry.GetString($"{StaticRegistry.FileAssociation}/{extension}", "/mnt/System/Icons/file_question.png");
+        Png icon = new Png(iconPath);
+        iconCache[extension] = icon;
+        return icon;
     }
 
     private void DrawCenteredText(string text, Color color, int x, int y, int width, int size)

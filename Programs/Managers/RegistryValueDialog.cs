@@ -104,8 +104,8 @@ public sealed class RegistryValueDialog : Window
             return;
         }
 
-        string key = existingKey ?? SystemRegistry.NormalizeKey(parentPath == "" ? name : parentPath + "/" + name);
-        if (existingKey == null && SystemRegistry.Exists(key))
+        string key = existingKey ?? Registry.NormalizeKey(parentPath == "" ? name : parentPath + "/" + name);
+        if (existingKey == null && Registry.Exists(key))
         {
             ShowError("A value with this name already exists.");
             return;
@@ -122,11 +122,11 @@ public sealed class RegistryValueDialog : Window
             return;
         }
 
-        RegistryEntry current = existingKey == null ? null : SystemRegistry.GetEntry(existingKey);
+        RegistryEntry current = existingKey == null ? null : Registry.GetEntry(existingKey);
         if (current == null || !current.IsBuiltIn)
-            SystemRegistry.Define(key, value, descriptionField.text ?? "", requiresRestart);
-        SystemRegistry.Set(key, value);
-        SystemRegistry.Save();
+            Registry.Define(key, value, descriptionField.text ?? "", requiresRestart);
+        Registry.Set(key, value);
+        Registry.Save();
         saved?.Invoke();
         WindowManager.PostClose(this);
     }
@@ -224,7 +224,7 @@ public sealed class RegistryDeleteDialog : Window
             Margin = new Thickness(0),
             leftClickAction = () =>
             {
-                SystemRegistry.Delete(entry.Key);
+                Registry.Delete(entry.Key);
                 deleted?.Invoke();
                 WindowManager.PostClose(this);
             },
