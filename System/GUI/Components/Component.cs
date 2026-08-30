@@ -803,9 +803,14 @@ public class Component : IDisposable
     {
         buffer.DrawImage(image, x, y);
     }
-    public void DrawImageStretch (Image image, Rectangle sourceRect, Rectangle destRect)
+    public void DrawImageStretch (Image image, in Rectangle sourceRect, in Rectangle destRect)
     {
         buffer.DrawImageStretch(image, sourceRect, destRect);
+    }
+
+    public void DrawImageStretch(Image image, in Rectangle destRect)
+    {
+        buffer.DrawImageStretch(image, destRect);
     }
 
     public void DrawFilledCircle(Color color, int x, int y, int radius)

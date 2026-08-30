@@ -36,7 +36,7 @@ public class ListView : Component
     public Action<ListViewItem> selectedChanged;
     public Action<ListViewItem> itemDoubleClick;
     public Action<ListViewItem, int, int> itemRightClick;
-    public Action<int,int> viewportRightClick;
+    public Action<int, int> viewportRightClick;
 
     private int pressedIndex = -1;
     private int lastClickIndex = -1;
@@ -215,19 +215,6 @@ public class ListView : Component
             DrawString(headers[i], Palette.ControlBlack, currentX + 4, 2, fontSize);
             currentX += headerWidths[i];
         }
-
-        //int sizeX = nameColumnWidth;
-        //int typeX = sizeX + sizeColumnWidth;
-        //int modifiedX = typeX + typeColumnWidth;
-        //DrawSunkenRectangle(0, 0, nameColumnWidth, headerHeight);
-        //DrawSunkenRectangle(sizeX, 0, sizeColumnWidth, headerHeight);
-        //DrawSunkenRectangle(typeX, 0, typeColumnWidth, headerHeight);
-        //DrawSunkenRectangle(modifiedX, 0, Math.Max(1, Width - modifiedX), headerHeight);
-
-        //DrawString(nameHeader, Palette.ControlBlack, 4, 2, fontSize);
-        //DrawString(sizeHeader, Palette.ControlBlack, sizeX + 4, 2, fontSize);
-        //DrawString(typeHeader, Palette.ControlBlack, typeX + 4, 2, fontSize);
-        //DrawString(modifiedHeader, Palette.ControlBlack, modifiedX + 4, 2, fontSize);
     }
 
 
@@ -241,16 +228,14 @@ public class ListView : Component
 
         Color color = selected ? Palette.HighlightText : textColor;
 
-        //DrawItemIcon(item, 4, y + 2, smallIconSize);
+        DrawItemIcon(item, 4, y + 2, smallIconSize);
 
 
         destRect = new Rectangle(4, y + 2, smallIconSize, smallIconSize);
 
         string ext = Path.GetExtension(item.fileEntry.AbsoluteLocation);
 
-
-        //DrawImageStretchAlpha(new Png(IconRegistry.Get(ext)), new Rectangle(4, y + 2, 32, 32), destRect);//TODO Fix image resizing + Add smaller icons ig 
-        DrawString(item.text, color, 24, y + 2, fontSize);
+        DrawString($"{item.text} | {item.fileEntry.SizeBytes} | {item.fileEntry.FileType} | {item.modified}", color, 24, y + 2, fontSize);
 
         //int sizeX = nameColumnWidth;
         //int typeX = sizeX + sizeColumnWidth;
@@ -294,7 +279,7 @@ public class ListView : Component
         if (item.isFolder)
             DrawFolderIcon(x, y, size);
         else
-            DrawFileIcon(item, x, y, size);
+            DrawFileIcon(item, x, y);
     }
 
     private void DrawFolderIcon(int x, int y, int size)
@@ -304,11 +289,26 @@ public class ListView : Component
 
     private static readonly Dictionary<string, Png> iconCache = new Dictionary<string, Png>(StringComparer.OrdinalIgnoreCase);
 
-    private void DrawFileIcon(ListViewItem item, int x, int y, int size)
+    private void DrawFileIcon(ListViewItem item, int x, int y)
     {
         string ext = Path.GetExtension(item.fileEntry.FileName);
         Png icon = GetCachedIcon(ext);
-        DrawImage(icon, x, y);
+
+        switch (viewMode)
+        {
+            case ListViewMode.List:
+                DrawImageStretch(icon, new Rectangle(x, y, 18, 18));
+                break;
+
+            case ListViewMode.Details:
+                DrawImageStretch(icon, new Rectangle(x, y, 16, 16));
+                break;
+
+            default:
+                DrawImage(icon, x, y);
+                break;
+
+        }
     }
 
     private static Png GetCachedIcon(string extension)

@@ -169,7 +169,14 @@ public class DirectBitmap : Canvas
         DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, (int)image.Width, (int)image.Height);
     }
 
+    /// <summary>
+    /// Draw Image stretch method overload, auto source rect.
+    /// </summary>
+    public void DrawImageStretch(Image image, in Rectangle destRect) => DrawImageStretch(image, new Rectangle(0, 0, (int)image.Width, (int)image.Height), destRect);
 
+    /// <summary>
+    /// Use the overloaded method instead of this one
+    /// </summary>
     public void DrawImageStretch(Image image, in Rectangle sourceRect, in Rectangle destRect)
     {
         if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
