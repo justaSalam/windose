@@ -18,6 +18,9 @@ public class Button : Component
     public Action leftMouseHold;
 
 
+    public bool stretchImage = false;
+
+
     public Button(string text, int x, int y, int width, int height) : base(x, y, width, height)
     {
         label = new Label(0, 0, width, height)
@@ -28,7 +31,7 @@ public class Button : Component
             textColor = textColor,
             leftClickAction = leftClickAction
         };
-        
+
         AddChild(label);
 
 
@@ -47,14 +50,23 @@ public class Button : Component
             if (isPressed) DrawSunkenRectangle(0, 0, Width, Height);
             else DrawRaisedRectangle(0, 0, Width, Height);
 
-            if (string.IsNullOrEmpty(label.text) || label == null || image != null)
+        }
+
+
+        if (label == null && image != null)
+        {
+            if (stretchImage)
             {
-                DrawImage(image, Width / 4, Height / 4);
+                DrawImageStretch(image, new Rectangle(0, 0, Width, Height));
             }
             else
             {
-                DrawChild(label);
+                DrawImage(image, (int)((Width / 2) - (image.Width / 2)), (int)((Height / 2) - (image.Height / 2)));
             }
+        }
+        else
+        {
+            DrawChild(label);
         }
 
 

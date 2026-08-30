@@ -1,41 +1,57 @@
 using System.Drawing;
-using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Mouse;
-using Windose;
-using Windose.System.GUI.Components;
 
 public class Taskbar : Component
 {
-    private bool useGradient = false;
     public Color borderColor = Color.White;
 
     public List<Button> windows = new List<Button>();
 
     public StackPanel bar;
+    public StackPanel trayPanel;
     private Button startButton;
     private Label timeLabel;
 
+    private Button trayButton;
+
+    public static Tray tray;
     private readonly MenuPopup contextMenu;
 
 
     public Taskbar(int x, int y, int width, int height) : base(x, y, width, height)
     {
-
-        useGradient = false;
         zLayer = DrawLayer.Taskbar;
 
 
-        bar = new StackPanel(Palette.ControlFace, 0, 0, Width, Height)
+
+
+        bar = new StackPanel(Palette.ControlFace, 0, 0, Width - 250, Height)
         {
             useBackground = false,
             useBorders = false,
-            horizontalAlignment = HorizontalAlignment.Stretch,
+            horizontalAlignment = HorizontalAlignment.Left,
             verticalAlignment = VerticalAlignment.Stretch,
             orientation = StackOrientation.Horizontal,
             Margin = new Thickness(0),
             Padding = new Thickness(0),
             rightClickAction = ShowContextMenu
         };
+
+
+        trayPanel = new StackPanel(Palette.ControlFace, 0, 0, 250, Height)
+        {
+            useBackground = false,
+            useBorders = false,
+            horizontalAlignment = HorizontalAlignment.Right,
+            verticalAlignment = VerticalAlignment.Stretch,
+            orientation = StackOrientation.Horizontal,
+            Margin = new Thickness(0),
+            Padding = new Thickness(0),
+            rightClickAction = ShowContextMenu
+        };
+
+        AddChild(bar);
+        AddChild(trayPanel);
 
         contextMenu = new MenuPopup(230, 24 * 3)
         {
@@ -48,8 +64,6 @@ public class Taskbar : Component
 
 
 
-
-        AddChild(bar);
         startButton = new Button("Start", 0, 0, 50, Height)
         {
             verticalAlignment = VerticalAlignment.Center,
@@ -73,7 +87,32 @@ public class Taskbar : Component
             useBackground = false,
             useForeground = true
         };
-        AddChild(timeLabel);
+        trayPanel.AddStackChild(timeLabel);
+
+        trayButton = new Button("^", 0, 0, Height, Height)
+        {
+            horizontalAlignment = HorizontalAlignment.Right,
+            verticalAlignment = VerticalAlignment.Center,
+            leftClickAction = ToggleTray
+        };
+
+        trayPanel.AddStackChild(trayButton);
+
+
+        int trayX = (int)Registry.GetInteger("System/Display/Width", 1920) - 250;
+        int trayY = (int)Registry.GetInteger("System/Display/Heigth", 1080) - 160 - Height;
+        tray = new Tray(trayX,trayY);
+        WindowManager.Register(tray);
+
+        
+    }
+
+    private void ToggleTray()
+    {
+        tray.Visible = !tray.Visible;
+
+        trayButton.label!.text = tray.Visible ? "v" : "^";
+        trayButton.MarkDirty();
     }
 
     public override void Update()

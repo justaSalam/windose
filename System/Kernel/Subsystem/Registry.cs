@@ -142,6 +142,8 @@ public static class Registry
         return long.TryParse(value?.ToString(), out long parsed) ? parsed : fallback;
     }
 
+
+
     public static bool GetBoolean(string key, bool fallback = false)
     {
         object value = Get(key, fallback);

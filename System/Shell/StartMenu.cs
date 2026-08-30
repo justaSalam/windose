@@ -1,11 +1,7 @@
-using Cosmos.Kernel.Core;
 using Cosmos.Kernel.System;
-using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
-using System.Drawing;
-using Windose;
 using Windose.Programs;
 using Windose.System.System_Calls;
 
@@ -13,7 +9,6 @@ public class StartMenu : Window
 {
 
     private StackPanel panel;
-    private readonly Rectangle homeBounds;
     public StartMenu(int x, int y, int width, int height, string title, bool useTitleBar) : base(x, y, width, height, title, useTitleBar)
     {
 
@@ -183,19 +178,8 @@ public class StartMenu : Window
         panel.AddStackChild(documents);
         panel.AddStackChild(settings);
         panel.AddStackChild(powerOptions);
-        homeBounds = bounds;
         MarkDirty();
 
-    }
-
-    public Rectangle HomeBounds => homeBounds;
-
-    public bool AtHomePosition()
-    {
-        return bounds.X == homeBounds.X &&
-               bounds.Y == homeBounds.Y &&
-               bounds.Width == homeBounds.Width &&
-               bounds.Height == homeBounds.Height;
     }
 
 
@@ -226,11 +210,6 @@ public class StartMenu : Window
         }
     }
 
-    public void ApplyThemeStyle()
-    {
-        panel.MarkDirty();
-        MarkDirty();
-    }
 
     public override void OnLoseFocus()
     {

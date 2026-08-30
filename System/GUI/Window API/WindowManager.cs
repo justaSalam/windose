@@ -561,6 +561,8 @@ public class WindowManager : SingleThreadedProcess
         Kernel.mainBuffer.DrawDottedRectangle(Color.White, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
     }
 
+
+    //TODO Potential self register through the constructor
     public static void Register(Window window)
     {
         PostRegister(window);
