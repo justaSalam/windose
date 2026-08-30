@@ -310,16 +310,19 @@ public class Component : IDisposable
     }
     public virtual bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
-        if (IsInsideAbsolute(mouseX, mouseY) && mouse.left == MouseEvents.Release) leftClickAction?.Invoke();
-        if (IsInsideAbsolute(mouseX, mouseY) && mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
-        if (IsInsideAbsolute(mouseX, mouseY) && mouse.middle == MouseEvents.Release) middleClickAction?.Invoke();
+        if (IsInsideAbsolute(mouseX, mouseY))
+        {
+            if (mouse.left == MouseEvents.Release) leftClickAction?.Invoke();
+            if (mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
+            if (mouse.middle == MouseEvents.Release) middleClickAction?.Invoke();
+        }
 
 
         for (int i = children.Count - 1; i >= 0; i--)
         {
             Component child = children[i];
 
-            if (!child.Visible)
+            if (!child.Visible || !child.capturesInput)
             {
                 continue;
             }
@@ -803,7 +806,7 @@ public class Component : IDisposable
     {
         buffer.DrawImage(image, x, y);
     }
-    public void DrawImageStretch (Image image, in Rectangle sourceRect, in Rectangle destRect)
+    public void DrawImageStretch(Image image, in Rectangle sourceRect, in Rectangle destRect)
     {
         buffer.DrawImageStretch(image, sourceRect, destRect);
     }

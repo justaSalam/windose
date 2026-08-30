@@ -1,4 +1,5 @@
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Mouse;
 using System.Drawing;
 
 public class Tray : Window
@@ -13,6 +14,7 @@ public class Tray : Window
         canMove = false;
         showInTaskbar = false;
 
+
         panel = new GridPanel(0, 0, Width, Height)
         {
             verticalAlignment = VerticalAlignment.Stretch,
@@ -25,15 +27,16 @@ public class Tray : Window
         };
         AddChild(panel);
 
+        MenuPopup popup = new MenuPopup(120, 20);
+        popup.AddItem("Control Panel");
+        popup.AddSeparator();
+        popup.AddItem("Exit");
 
-        AddTrayIcon(new Button(new Png("/mnt/System/Icons/cable.png"), 0, 0, 32, 32), TrayAction);
-        AddTrayIcon(new Button(new Png("/mnt/System/Icons/calculator.png"), 0, 0, 32, 32), TrayAction);
-        AddTrayIcon(new Button(new Png("/mnt/System/Icons/chart.png"), 0, 0, 32, 32), TrayAction);
-        AddTrayIcon(new Button(new Png("/mnt/System/Icons/directx.png"), 0, 0, 32, 32), TrayAction);
-        AddTrayIcon(new Button(new Png("/mnt/System/Icons/odbc.png"), 0, 0, 32, 32), TrayAction);
+        AddTrayIcon(new Button(new Png("/mnt/System/Icons/directx.png"), 0, 0, 32, 32), popup, TrayAction, "DirectX");
+        AddTrayIcon(new Button(new Png("/mnt/System/Icons/directx.png"), 0, 0, 32, 32), popup, TrayAction, "DirectX");
     }
 
-    public static void AddTrayIcon(Component component, Action action)
+    public static void AddTrayIcon(Component component, MenuPopup context, Action action, string tooltipText = "Tray Icon")
     {
         if (component == null)
         {
@@ -41,6 +44,12 @@ public class Tray : Window
         }
 
         component.leftClickAction += action;
+
+        component.rightClickAction += () =>
+        {
+            context.ShowAt(MouseManager.X, MouseManager.Y);
+        };
+
         panel.AddGridChild(component);
     }
 
