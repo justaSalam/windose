@@ -123,9 +123,10 @@ public class Button : Component
                 leftClickAction?.Invoke();
                 break;
         }
+        if (mouse.right == MouseEvents.Release) rightClickAction?.Invoke();
+
 
         return true;
-
     }
 
     public override string GetComponentName() => "Button";

@@ -19,6 +19,7 @@ public class Tooltip : Component
     private int tooltipWidth = 200;
     private int tooltipHeight = 20;
     private int padding = 4;
+    private int mouseOffset = 4; // gap between cursor tip and tooltip box
 
     public Color backColor = Color.FromArgb(255, 255, 225);
     public Color borderColor = Palette.ControlShadow;
@@ -59,9 +60,6 @@ public class Tooltip : Component
         }
 
         targets.Add(new TooltipTarget { Component = component, Text = text ?? "" });
-        trackedComponent = component;
-        tooltipText = text ?? "";
-        RecalculateSize();
     }
 
     public void Detach()
@@ -70,6 +68,7 @@ public class Tooltip : Component
         trackedComponent = null;
         isShowing = false;
         Visible = false;
+        hoverStartTime = 0;
     }
 
     public override void Update()
@@ -94,6 +93,7 @@ public class Tooltip : Component
                 isShowing = false;
                 Visible = false;
             }
+            trackedComponent = null;
             hoverStartTime = 0;
             return;
         }
@@ -103,7 +103,7 @@ public class Tooltip : Component
             trackedComponent = hoveredTarget.Component;
             tooltipText = hoveredTarget.Text;
             RecalculateSize();
-            hoverStartTime = 0;
+            hoverStartTime = DateTime.UtcNow.Ticks / 10000.0;
             isShowing = false;
             Visible = false;
         }
@@ -111,7 +111,7 @@ public class Tooltip : Component
         if (!isShowing)
         {
             if (hoverStartTime == 0)
-                hoverStartTime = Kernel.DeltaTimeMs + DateTime.UtcNow.Ticks / 10000.0;
+                hoverStartTime = DateTime.UtcNow.Ticks / 10000.0;
 
             double now = DateTime.UtcNow.Ticks / 10000.0;
             if (now - hoverStartTime >= displayDelay)
@@ -119,17 +119,22 @@ public class Tooltip : Component
                 isShowing = true;
                 Visible = true;
 
-                // Position below the tracked component
-                int tipX = trackedComponent.AbsoluteX;
-                int tipY = trackedComponent.AbsoluteY + trackedComponent.Height + 2;
+                // Position above the mouse cursor
+                int tipX = MouseManager.X;
+                int tipY = MouseManager.Y - tooltipHeight - mouseOffset;
 
                 // Keep on screen
                 if (tipX + tooltipWidth > Global.screenWidth)
                     tipX = Global.screenWidth - tooltipWidth - 4;
+                if (tipX < 0)
+                    tipX = 4;
+
+                // If there's no room above the cursor, fall back to below it
+                if (tipY < 0)
+                    tipY = MouseManager.Y + mouseOffset + 16; // 16 ~= cursor height, keeps tooltip clear of the pointer
+
                 if (tipY + tooltipHeight > Global.screenHeight)
-                    tipY = trackedComponent.AbsoluteY - tooltipHeight - 2;
-                if (tipX < 0) tipX = 4;
-                if (tipY < 0) tipY = 4;
+                    tipY = Global.screenHeight - tooltipHeight - 4;
 
                 X = tipX;
                 Y = tipY;
@@ -141,6 +146,8 @@ public class Tooltip : Component
 
     public override void DrawLocal()
     {
+        if (!Visible) return;
+
         DrawFilledRectangle(backColor, 0, 0, Width, Height);
         DrawRectangle(borderColor, 0, 0, Width, Height);
 
