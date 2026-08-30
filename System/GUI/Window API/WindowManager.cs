@@ -55,7 +55,10 @@ public class WindowManager : SingleThreadedProcess
 
     public override void Update()
     {
-        try { UpdateDesktop(); }
+        try 
+        { 
+            UpdateDesktop(); 
+        }
         catch (Exception exception)
         {
             Window likelyOwner = focusedWindow;
@@ -81,7 +84,7 @@ public class WindowManager : SingleThreadedProcess
 
         ComponentZSort();
 
-        GeneralWindowUpdate();
+        //GeneralWindowUpdate();
 
         UpdateComponents();
 

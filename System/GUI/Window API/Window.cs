@@ -39,6 +39,9 @@ public class Window : Component
     private bool windowFocused;
 
 
+    private SingleThreadedProcess process;
+
+    //TODO Process manager should be responsible for every update instead of window manager being a separate subsystem
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png? icon = null) : base(x, y, width, height)
     {
         text = title;
@@ -46,13 +49,20 @@ public class Window : Component
         bounds = new Rectangle(x, y, width, height);
         zLayer = DrawLayer.Window;
 
+        process = new SingleThreadedProcess(title, ProcessType.Program);
+
+        process.onDispose += () => WindowManager.PostClose(this);
+        process.onUpdate += Update;
+        process.onStart += () => WindowManager.PostRegister(this);
+
+
         TitlebarSetup(useTitleBar, title);
     }
 
 
     public void Start()
     {
-        WindowManager.PostRegister(this);
+        ProcessManger.QueueStart(process);
     }
 
     public override void Update()
@@ -76,8 +86,6 @@ public class Window : Component
         base.Draw();
     }
 
-    Rectangle cachedSourceRect = new(0, 0, 32, 32);
-    Rectangle cachedDestRect = new(2, 2, 20, 20);
     /// <summary>
     /// Component rendering, coordinates relative to the window
     /// </summary>
@@ -96,7 +104,7 @@ public class Window : Component
 
         if (Icon != null)
         {
-            DrawImageStretch(Icon, cachedSourceRect, cachedDestRect);
+            DrawImageStretch(Icon, new(2, 2, 18, 18));
         }
     }
 
@@ -107,7 +115,7 @@ public class Window : Component
         {
             int border = Palette.BorderSize;
             int titleHeight = Palette.TitleBarHeight;
-            
+
             titlebar = new StackPanel(Palette.InactiveTitle, border, border, Width - (border * 2), titleHeight - border)
             {
                 useBackground = true,
@@ -144,7 +152,7 @@ public class Window : Component
             textColor = Palette.ControlWhite,
             leftClickAction = () =>
             {
-                WindowManager.PostClose(this);
+                ProcessManger.QueueStop(process);
             }
         });
 

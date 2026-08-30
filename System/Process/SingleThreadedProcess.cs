@@ -1,8 +1,12 @@
 using Cosmos.Kernel.Core.IO;
+using Windose.System.System_Calls;
 
 
-public abstract class SingleThreadedProcess : Process
+public class SingleThreadedProcess : Process
 {
+    public Action onDispose;
+    public Action onStart;
+    public Action onUpdate;
 
     public SingleThreadedProcess(string name, ProcessType processType)
     {
@@ -24,13 +28,14 @@ public abstract class SingleThreadedProcess : Process
             Running = true;
             Initialized = true;
             startTime = DateTime.Now.ToString("HH:mm:ss");
+
+            onStart?.Invoke();
         }
         catch (Exception ex)
         {
             Running = false;
             Initialized = false;
-            Serial.WriteString($"Thread : {name} | failed to start");
-            Serial.WriteString(ex.Message);
+            SystemLogger.WriteLine(name, ex.Message, ConsoleMessageType.Error);
         }
     }
     public override void Main()
@@ -38,20 +43,23 @@ public abstract class SingleThreadedProcess : Process
         try
         {
             if (Running)
+            {
                 Update();
+                onUpdate?.Invoke();
+            }
         }
         catch (Exception ex)
         {
-            Serial.WriteString($"Thread : {name} | An exception occurred");
-            Serial.WriteString(ex.Message);
+            SystemLogger.WriteLine(name, ex.Message, ConsoleMessageType.Error);
             Running = false;
         }
     }
 
-    public abstract void Update();
+    public virtual void Update() { }
 
     public override void Dispose()
     {
+        onDispose?.Invoke();
         Running = false;
         Initialized = false;
     }
