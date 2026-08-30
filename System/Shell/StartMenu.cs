@@ -11,7 +11,7 @@ public class StartMenu : Window
     private StackPanel panel;
     public StartMenu(int x, int y, int width, int height, string title, bool useTitleBar) : base(x, y, width, height, title, useTitleBar)
     {
-
+        process.processType = ProcessType.System;
         zLayer = DrawLayer.Popup;
         Visible = false;
         canResize = false;

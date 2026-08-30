@@ -13,7 +13,7 @@ public class Tray : Window
         canResize = false;
         canMove = false;
         showInTaskbar = false;
-
+        process.processType = ProcessType.System;
 
         panel = new GridPanel(0, 0, Width, Height)
         {

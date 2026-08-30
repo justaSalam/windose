@@ -39,7 +39,7 @@ public class Window : Component
     private bool windowFocused;
 
 
-    private SingleThreadedProcess process;
+    protected SingleThreadedProcess process;
 
     //TODO Process manager should be responsible for every update instead of window manager being a separate subsystem
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png? icon = null) : base(x, y, width, height)

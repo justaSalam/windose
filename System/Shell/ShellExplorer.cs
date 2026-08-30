@@ -1,9 +1,10 @@
 
-using System.Drawing;
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Mouse;
+using System.Diagnostics;
+using System.Drawing;
 using Windose;
 
 
@@ -14,7 +15,7 @@ public class Explorer : SingleThreadedProcess
     public static StartMenu startMenu;
     private Canvas canvas;
 
-    public Explorer(Canvas canvas) : base("Explorer", ProcessType.Program)
+    public Explorer(Canvas canvas) : base("Explorer", ProcessType.System)
     {
         this.canvas = canvas;
     }

@@ -42,7 +42,7 @@ public class WindowManager : SingleThreadedProcess
     };
     private int mx, my;
 
-    public WindowManager() : base("Desktop Window Manager", ProcessType.Kernel)
+    public WindowManager() : base("Desktop Window Manager", ProcessType.System)
     {
         components = Component.components;
         canTerminate = false;

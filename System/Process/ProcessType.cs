@@ -1,4 +1,4 @@
 public enum ProcessType
 {
-    Kernel, Driver, Program, Utility, Undefined
+    Kernel, Driver, System, Program, Utility, Undefined
 }
