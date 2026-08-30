@@ -1,4 +1,5 @@
 using Cosmos.Kernel.System;
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
@@ -51,15 +52,15 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
-        programs.AddSubmenuItem("VMWare SVGA Test", () => WindowManager.Register(new GraphicsEngine()));
-        programs.AddSubmenuItem("File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/directx.png"), "VMWare SVGA Test", () => WindowManager.Register(new GraphicsEngine()));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
 
             
-        programs.AddSubmenuItem("Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
-        programs.AddSubmenuItem("Internet Explorer", () => WindowManager.Register(new InternetExplorer(200, 200)));
-        programs.AddSubmenuItem("Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/hard_disk_drive_pie.png"), "Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/msie.png"), "Internet Explorer", () => WindowManager.Register(new InternetExplorer(200, 200)));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/computer_taskmgr.png"), "Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
         programs.AddSubmenuSeparator();
-        programs.AddSubmenuItem("Network Configuration", () => 
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/network_normal_two_pcs.png"), "Network Configuration", () => 
         {
             if (NetworkManager.PrimaryDevice != null)
             {
@@ -85,11 +86,11 @@ public class StartMenu : Window
         });
 
         programs.AddSubmenuSeparator();
-        programs.AddSubmenuItem("SYSDUMP", SystemLogger.Dump);
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/gears_tweakui_a.png"), "SYSDUMP", SystemLogger.Dump);
 
 
         MenuItem breeze = programs.AddSubmenuItem("Breeze");
-        breeze.AddSubmenuItem("Breeze Editor", () => WindowManager.Register(new BreezeEditor()));
+        breeze.AddSubmenuItem(new Png("/mnt/System/Icons/write_wordpad.png"), "Breeze Editor", () => WindowManager.Register(new BreezeEditor()));
         breeze.AddSubmenuItem("Breeze API", () => WindowManager.Register(new BreezeApiBrowser()));
 
 
@@ -107,12 +108,12 @@ public class StartMenu : Window
         });
 
 
-        programs.AddSubmenuItem("Command Prompt", () =>
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/console_prompt.png"), "Command Prompt", () =>
         {
             WindowManager.Register(new CommandPrompt());
         });
         MenuItem systemTools = programs.AddSubmenuItem("System Tools");
-        systemTools.AddSubmenuItem("Registry Editor", () =>
+        systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/scanregw.png"), "Registry Editor", () =>
         {
             WindowManager.Register(new RegistryEditor());
         });
@@ -135,7 +136,7 @@ public class StartMenu : Window
             Margin = new Thickness(0)
         };
 
-        settings.AddSubmenuItem("Control Panel", () =>
+        settings.AddSubmenuItem(new Png("/mnt/System/Icons/appwizard.png"), "Control Panel", () =>
         {
             FileExplorer explorer =
                 new FileExplorer(100, 100, 700, 480, "Control Panel");
@@ -143,7 +144,7 @@ public class StartMenu : Window
             explorer.NavigateToPath("control");
             WindowManager.Register(explorer);
         });
-        settings.AddSubmenuItem("Display Settings", () =>
+        settings.AddSubmenuItem(new Png("/mnt/System/Icons/monitor_gear.png"), "Display Settings", () =>
         {
             WindowManager.Register(new DisplaySettings());
         });

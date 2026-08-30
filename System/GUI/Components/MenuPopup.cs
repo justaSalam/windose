@@ -49,6 +49,21 @@ public class MenuPopup : Component
         ResizeToContent();
         return item;
     }
+    public MenuItem AddItem(Png icon, string text, Action click = null)
+    {
+        MenuItem item = new MenuItem(icon, 0, 0, itemWidth - 4, itemHeight)
+        {
+            text = text,
+            click = click,
+            clampSize = false,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0),
+        };
+
+        items.AddStackChild(item);
+        ResizeToContent();
+        return item;
+    }
 
     public MenuItem AddSeparator()
     {

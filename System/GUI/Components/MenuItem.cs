@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 
 public class MenuItem : Component
@@ -16,9 +17,19 @@ public class MenuItem : Component
 
     private bool isPressed;
 
+    private Png ?itemIcon;
+    private int imageOffset;
     public MenuItem(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        imageOffset = 0;
+    }
+
+    public MenuItem(Png icon, int x, int y, int width, int height) : base(x, y, width, height)
+    {
+        clampSize = false;
+        itemIcon = icon;
+        imageOffset = (int)icon.Width + 4;
     }
 
     public override void Draw()
@@ -45,15 +56,21 @@ public class MenuItem : Component
         int textX = isPressed ? 9 : 8;
         int textY = Math.Max(0, (Height - MeasureStringHeight(fontSize)) / 2);
 
+
         if (highlighted)
         {
             DrawFilledRectangle(Palette.Highlight,2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2));
-            DrawString(text, Palette.HighlightText, textX, textY, fontSize);
+            DrawString(text, Palette.HighlightText, textX + imageOffset, textY, fontSize);
         }
         else
         {
             Color color = enabled ? textColor : disabledTextColor;
-            DrawString(text, color, textX, textY, fontSize);
+            DrawString(text, color, textX + imageOffset, textY, fontSize);
+        }
+
+        if (itemIcon != null)
+        {
+            DrawImageStretch(itemIcon, new Rectangle(textX, textY - 2, 24, 24));
         }
 
         if (hasSubmenu && drawSubmenuArrow)
@@ -120,7 +137,7 @@ public class MenuItem : Component
         return true;
     }
 
-    public MenuPopup CreateSubmenu(int width = 160)
+    public MenuPopup CreateSubmenu(int width = 240)
     {
         submenu = new MenuPopup(width, 24);
         submenu.Visible = false;
@@ -133,6 +150,13 @@ public class MenuItem : Component
             CreateSubmenu();
 
         return submenu.AddItem(text, click);
+    }
+    public MenuItem AddSubmenuItem(Png icon, string text, Action click = null)
+    {
+        if (submenu == null)
+            CreateSubmenu();
+
+        return submenu.AddItem(icon, text, click);
     }
 
     public MenuItem AddSubmenuSeparator()
