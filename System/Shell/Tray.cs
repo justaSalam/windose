@@ -4,7 +4,7 @@ using System.Drawing;
 public class Tray : Window
 {
 
-    private GridPanel panel;
+    private static GridPanel panel;
     public Tray(int x, int y) : base(x, y, 160, 160, "Taskbar Tray", false)
     {
         zLayer = DrawLayer.Popup;
@@ -26,35 +26,32 @@ public class Tray : Window
         AddChild(panel);
 
 
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
-        panel.AddGridChild(new Button(new Png("/mnt/System/Icons/cable.png"),0, 0, 32, 32));
+        AddTrayIcon(new Button(new Png("/mnt/System/Icons/cable.png"), 0, 0, 32, 32), TrayAction);
+        AddTrayIcon(new Button(new Png("/mnt/System/Icons/calculator.png"), 0, 0, 32, 32), TrayAction);
+        AddTrayIcon(new Button(new Png("/mnt/System/Icons/chart.png"), 0, 0, 32, 32), TrayAction);
+        AddTrayIcon(new Button(new Png("/mnt/System/Icons/directx.png"), 0, 0, 32, 32), TrayAction);
+        AddTrayIcon(new Button(new Png("/mnt/System/Icons/odbc.png"), 0, 0, 32, 32), TrayAction);
     }
 
-
-
-    public override void Update()
+    public static void AddTrayIcon(Component component, Action action)
     {
-        base.Update();
+        if (component == null)
+        {
+            return;
+        }
+
+        component.leftClickAction += action;
+        panel.AddGridChild(component);
     }
 
-
-    public override void Draw()
+    private void TrayAction()
     {
-        DrawLocal();
-        DrawToScreen();
+        WindowManager.Register(new PerformanceMonitor(100, 100));
     }
 
     public override void DrawLocal()
     {
-
         DrawRaisedRectangle(0, 0, Width, Height);
-
 
         foreach (Component child in children)
         {

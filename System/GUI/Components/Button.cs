@@ -1,8 +1,10 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
+using Windose.System.GUI.Layout;
 
 public class Button : Component
 {
+    public ImageDisplayMode imageDisplayMode = ImageDisplayMode.None;
     public Label? label;
     public Image? image;
 
@@ -16,10 +18,6 @@ public class Button : Component
 
     public Action leftMousePress;
     public Action leftMouseHold;
-
-
-    public bool stretchImage = false;
-
 
     public Button(string text, int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -39,8 +37,13 @@ public class Button : Component
 
     public Button(Image image, int x, int y, int width, int height) : base(x, y, width, height)
     {
+        if (image == null)
+        {
+            return;
+        }
         this.image = image;
     }
+
 
     public override void DrawLocal()
     {
@@ -55,14 +58,24 @@ public class Button : Component
 
         if (label == null && image != null)
         {
-            if (stretchImage)
+            int diff = Math.Min(Width, Height);
+            switch (imageDisplayMode)
             {
-                DrawImageStretch(image, new Rectangle(0, 0, Width, Height));
+                case ImageDisplayMode.None:
+
+                    DrawImageStretch(image, new Rectangle((int)((Width / 2) - (image.Width / 2)) + 2, (int)((Height / 2) - (image.Height / 2)) + 2, diff - 4, diff - 4));
+                    break;
+
+                case ImageDisplayMode.Stretch:
+                    DrawImageStretch(image, new Rectangle(0, 0, Width, Height));
+                    break;
+
+                case ImageDisplayMode.Fill:
+                    DrawImageStretch(image, new Rectangle(0, 0, diff, diff));
+                    break;
             }
-            else
-            {
-                DrawImage(image, (int)((Width / 2) - (image.Width / 2)), (int)((Height / 2) - (image.Height / 2)));
-            }
+
+
         }
         else
         {
