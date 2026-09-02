@@ -1,6 +1,7 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Mono.Cecil;
+using Windose.System.Features;
 using Windose.System.Kernel;
 using Windose.System.Kernel.Subsystem;
 
@@ -229,7 +230,7 @@ public class ListView : Component
 
         DrawItemIcon(item, 4, y + 2, smallIconSize);
 
-        DrawString($"{item.text}    {ByteFormat.FormatBytes(item.fileEntry.SizeBytes)}     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
+        DrawString($"{TextFeatures.Fill(item.text, 20)}    {ByteFormat.FormatBytes(item.fileEntry.SizeBytes)}     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
 
         int currentX = 0;
         for (int i = 0; i < headerWidths.Length; i++)
