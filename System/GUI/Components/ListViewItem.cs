@@ -38,17 +38,9 @@ public class ListViewItem
         tag = fileEntry.AbsoluteLocation;
         isFolder = fileEntry.FileType == FileType.Directory;
 
-        size = isFolder ? "" : FormatSize(fileEntry.SizeBytes);
+        size = isFolder ? "" : ByteFormat.FormatBytes(fileEntry.SizeBytes);
         type = isFolder ? "File Folder" : fileEntry.FileType.ToString();
 
         modified = fileEntry.CreatedAt;
-    }
-
-    private static string FormatSize(long bytes)
-    {
-        if (bytes < 1024)
-            return bytes + " B";
-
-        return bytes / 1024 + " KB";
     }
 }

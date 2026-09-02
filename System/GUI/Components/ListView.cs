@@ -229,7 +229,7 @@ public class ListView : Component
 
         DrawItemIcon(item, 4, y + 2, smallIconSize);
 
-        DrawString($"{item.text}    {item.fileEntry.SizeBytes}Bytes     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
+        DrawString($"{item.text}    {ByteFormat.FormatBytes(item.fileEntry.SizeBytes)}     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
 
         int currentX = 0;
         for (int i = 0; i < headerWidths.Length; i++)

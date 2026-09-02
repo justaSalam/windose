@@ -94,7 +94,7 @@ public class FileProperties : Window
 
         group.AddGroupChild(new Label(0, 0, Width, 30)
         {
-            text = $"Size: {fileEntry.SizeBytes / 1024} kB",
+            text = $"Size: {ByteFormat.FormatBytes(fileEntry.SizeBytes)}",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch
         });
