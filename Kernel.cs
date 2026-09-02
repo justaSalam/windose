@@ -1,6 +1,8 @@
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
+using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
+using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Network;
 using Cosmos.Kernel.System.Network.Config;
 using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
@@ -88,8 +90,11 @@ public class Kernel : Sys.Kernel
 
 
 
+
         ProcessManger.Start(explorer);
         ProcessManger.Start(windowManager);
+        ProcessManger.Start(new HotkeyManager());
+
 
         Directory.CreateDirectory("/mnt/Programs");
         Directory.CreateDirectory("/mnt/Apps");
@@ -97,6 +102,10 @@ public class Kernel : Sys.Kernel
         File.WriteAllText("/mnt/Programs/CLAUDE.breeze", breezeScript);
 
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze","service.control");
+
+            
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Tab, Modifiers = ConsoleModifiers.Alt}, Power.Reboot);
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.S, Modifiers = ConsoleModifiers.Control & ConsoleModifiers.Shift }, Power.Reboot);
     }
 
     private long lastFrameTicks;

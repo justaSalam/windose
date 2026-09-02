@@ -4,6 +4,7 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
+using Windose.System.Drivers;
 using Windose.System.GUI.Components;
 using Windose.System.System_Calls;
 
@@ -412,9 +413,7 @@ public class WindowManager : SingleThreadedProcess
 
     private void HandleKeyboardInput()
     {
-        if (!KeyboardManager.KeyAvailable) return;
-
-        KeyEvent keyEvent = KeyboardManager.ReadKey();
+        KeyEvent keyEvent = Keyboard.CurrentEvent();
 
         if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput)
         {
