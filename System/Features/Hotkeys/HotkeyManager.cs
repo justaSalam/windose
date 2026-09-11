@@ -27,14 +27,23 @@ public class HotkeyManager : SingleThreadedProcess
 
     public static void HandleKeyEvent()
     {
-        KeyEvent keyEvent = Keyboard.CurrentEvent();
+        SystemKeyEvent key;
+        if (!Keyboard.CurrentEvent(out key))
+            return;
+
+        if (key.consumed)
+            return;
+
         foreach (GlobalHotkey hotkey in Hotkeys)
         {
-            if (hotkey.keyEvent.Key == keyEvent.Key && hotkey.keyEvent.Modifiers == keyEvent.Modifiers && hotkey.keyEvent.Type == keyEvent.Type)
+            if (hotkey.keyEvent.Key == key.KeyEvent.Key && hotkey.keyEvent.Modifiers == key.KeyEvent.Modifiers && hotkey.keyEvent.Type == key.KeyEvent.Type)
             {
+                key.consumed = true;
                 hotkey.action?.Invoke();
+                break;
             }
         }
+
     }
 
     public override void Update()

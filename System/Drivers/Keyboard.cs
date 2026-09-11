@@ -4,15 +4,36 @@ namespace Windose.System.Drivers
 {
     public static class Keyboard
     {
-        public static KeyEvent CurrentEvent()
+        private static bool hasCurrentEvent;
+        private static SystemKeyEvent currentEvent;
+
+        public static void BeginFrame()
         {
+            hasCurrentEvent = false;
+            currentEvent = null;
+        }
+
+        public static bool CurrentEvent(out SystemKeyEvent keyEvent)
+        {
+            if (hasCurrentEvent)
+            {
+                keyEvent = currentEvent;
+                return keyEvent != null;
+            }
+
+            hasCurrentEvent = true;
+
             if (KeyboardManager.KeyAvailable)
             {
-                return KeyboardManager.ReadKey();
+                currentEvent = new SystemKeyEvent(KeyboardManager.ReadKey(), false);
+                keyEvent = currentEvent;
+                return true;
             }
             else
             {
-                return new KeyEvent();
+                currentEvent = null;
+                keyEvent = null;
+                return false;
             }
         }
     }

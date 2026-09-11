@@ -56,9 +56,9 @@ public class WindowManager : SingleThreadedProcess
 
     public override void Update()
     {
-        try 
-        { 
-            UpdateDesktop(); 
+        try
+        {
+            UpdateDesktop();
         }
         catch (Exception exception)
         {
@@ -413,17 +413,29 @@ public class WindowManager : SingleThreadedProcess
 
     private void HandleKeyboardInput()
     {
-        KeyEvent keyEvent = Keyboard.CurrentEvent();
+        SystemKeyEvent key;
+        if (!Keyboard.CurrentEvent(out key))
+            return;
+
+        if (key.consumed)
+            return;
+
+        
+
+        if (key.consumed)
+            return;
 
         if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput)
         {
-            Explorer.desktop.HandleKeyboard(keyEvent);
+            Explorer.desktop.HandleKeyboard(key.KeyEvent);
+            key.consumed = true;
             return;
         }
 
         if (focusedWindow != null && !failedWindows.Contains(focusedWindow))
         {
-            focusedWindow.HandleKeyboard(keyEvent);
+            focusedWindow.HandleKeyboard(key.KeyEvent);
+            key.consumed = true;
 
             return;
         }
@@ -436,10 +448,12 @@ public class WindowManager : SingleThreadedProcess
             if (!component.isRoot) continue;
 
 
-            component.HandleKeyboard(keyEvent);
+            component.HandleKeyboard(key.KeyEvent);
+            key.consumed = true;
 
             return;
         }
+
 
     }
 

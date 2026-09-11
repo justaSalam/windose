@@ -105,9 +105,6 @@ public class Kernel : Sys.Kernel
 
             
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Tab, Modifiers = ConsoleModifiers.Alt}, Power.Reboot);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.S, Modifiers = ConsoleModifiers.Control & ConsoleModifiers.Shift }, Power.Reboot);
-
-
 
         File.WriteAllBytes("/mnt/System/kbReadTest.bin", new byte[1024]);
         File.WriteAllBytes("/mnt/System/mbReadTest.bin", new byte[1024 * 1024]);
@@ -122,6 +119,7 @@ public class Kernel : Sys.Kernel
         try
         {
             mouseDriver.Update();
+            Windose.System.Drivers.Keyboard.BeginFrame();
             Tick();
 
             PerformanceMetrics.BeginFrame();
