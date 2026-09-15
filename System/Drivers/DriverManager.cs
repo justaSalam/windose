@@ -47,12 +47,13 @@ public static class DriverManager
 
 
             driver.Start();
+
+            SystemLogger.WriteLine("DM", "Started driver: " + driver.Name, ConsoleMessageType.Log);
+
         }
         catch (Exception exception)
         {
             SystemLogger.WriteLine("DM", "Failed to start driver: " + driver.Name, ConsoleMessageType.Log);
-
-            KernelPanic.Show("DRIVER_START_FAILURE", exception);
         }
     }
 

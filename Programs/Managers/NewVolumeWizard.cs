@@ -2,7 +2,6 @@ using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Windose;
-using Windose.System.GUI.Components;
 
 public class DiskmgrNewVolume : Window
 {

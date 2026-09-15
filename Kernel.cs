@@ -1,5 +1,6 @@
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System;
+using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
@@ -27,35 +28,30 @@ public class Kernel : Sys.Kernel
 
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
-    public static SVGAII3DCanvas canvas;
-    
-    
-    
+    public static Canvas canvas;
+
+
+
 
     private WindowManager windowManager = null!;
     public CosmosDisplayDriver displayDriver = null!;
     private CosmosMouseDriver mouseDriver = null!;
-    private int tick = 0;
-
     protected override void BeforeRun()
     {
-        
-        KernelConsole.Default.Font = SystemFonts.lucida;
-        KernelPanic.Install();
+
         try
         {
             InitializeKernel();
         }
         catch (Exception exception)
         {
-            KernelPanic.Show("KERNEL_INITIALIZATION_FAILURE", exception);
+            Log.WriteString("KERNEL FAILED TO INIT\n");
         }
     }
 
     private async void InitializeKernel()
     {
         Instance = this;
-        GarbageCollector.Initialize();
         Palette.Initialize();
 
 
@@ -68,7 +64,7 @@ public class Kernel : Sys.Kernel
         DriverManager.Register(displayDriver);
         DriverManager.Start(displayDriver);
 
-        canvas = displayDriver.Canvas;
+        canvas = displayDriver.canvas;
         mainBuffer = displayDriver.BackBuffer;
 
 
@@ -84,6 +80,7 @@ public class Kernel : Sys.Kernel
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
 
+        Log.WriteString("KERNEL INIT\n");
         Background.Load();
         Explorer explorer = new Explorer(canvas);
         windowManager = new WindowManager();
@@ -99,15 +96,16 @@ public class Kernel : Sys.Kernel
         Directory.CreateDirectory("/mnt/Programs");
         Directory.CreateDirectory("/mnt/Apps");
         File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
-        File.WriteAllText("/mnt/Programs/CLAUDE.breeze", breezeScript);
+        //File.WriteAllText("/mnt/Programs/CLAUDE.breeze", breezeScript);
 
-        BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze","service.control");
+        BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze", "service.control");
 
-            
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Tab, Modifiers = ConsoleModifiers.Alt}, Power.Reboot);
 
-        File.WriteAllBytes("/mnt/System/kbReadTest.bin", new byte[1024]);
-        File.WriteAllBytes("/mnt/System/mbReadTest.bin", new byte[1024 * 1024]);
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Tab, Modifiers = ConsoleModifiers.Alt }, WindowManager.SwapFocusedWindow);
+
+
+        //File.WriteAllBytes("/mnt/System/kbReadTest.bin", new byte[1024]);
+        //File.WriteAllBytes("/mnt/System/mbReadTest.bin", new byte[1024 * 1024]);
     }
 
     private long lastFrameTicks;
@@ -130,14 +128,11 @@ public class Kernel : Sys.Kernel
 
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
-            displayDriver.Present(mainBuffer, mouseDriver.X, mouseDriver.Y);
-
-            tick++;
+            displayDriver.Present(mouseDriver.X, mouseDriver.Y);
 
         }
         catch (Exception ex)
         {
-            KernelPanic.Show("KERNEL_FRAME_FAILURE", ex);
         }
 
     }

@@ -1,5 +1,4 @@
 using System.Globalization;
-using Windose.System.GUI.Components;
 
 public sealed class RegistryValueDialog : Window
 {

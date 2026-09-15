@@ -95,7 +95,7 @@ public static class BreezeHost
 
     private static void TryWriteSerial(string message)
     {
-        try { Serial.WriteString(message + "\n"); }
+        try { }
         catch { }
     }
 

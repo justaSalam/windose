@@ -272,9 +272,9 @@ namespace Windose.System.Shell
 
             for (int i = 0; i < lines.Length; i++)
             {
-                int lineWidth = MeasureStringWidth(lines[i], SystemFonts.spleen6x12);
+                int lineWidth = MeasureStringWidth(lines[i], 6);
                 int x = Math.Max(0, (Width - lineWidth) / 2);
-                DrawString(lines[i], SystemFonts.spleen6x12, renaming ? Color.Black : Color.White, x, LabelTop + i * LabelLineHeight);
+                DrawString(lines[i], renaming ? Color.Black : Color.White, x, LabelTop + i * LabelLineHeight);
             }
 
             if (renaming)
@@ -283,7 +283,7 @@ namespace Windose.System.Shell
 
         private string[] BuildLabelLines(string text)
         {
-            int maxCharsPerLine = Math.Max(1, Width / SystemFonts.spleen6x12.Width);
+            int maxCharsPerLine = Math.Max(1, Width / 6);
             List<string> lines = new List<string>();
             string current = "";
             bool truncated = false;
@@ -365,7 +365,7 @@ namespace Windose.System.Shell
             if (lines.Length == 0) return;
 
             string lastLine = lines[lines.Length - 1];
-            int lineWidth = MeasureStringWidth(lastLine, SystemFonts.spleen6x12);
+            int lineWidth = MeasureStringWidth(lastLine, 6);
             int x = Math.Min(Width - 1, Math.Max(0, (Width - lineWidth) / 2 + lineWidth + 1));
             int y = LabelTop + (lines.Length - 1) * LabelLineHeight;
             DrawLine(Color.Black, x, y + 1, x, y + LabelLineHeight - 2);

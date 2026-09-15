@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using Cosmos.Kernel.System.Diagnostics;
 
 namespace Windose.System.System_Calls
 {
@@ -19,6 +20,7 @@ namespace Windose.System.System_Calls
                 case ConsoleMessageType.Log:
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.WriteLine($"[{source}] {message}");
+                    Log.WriteString($"[{source}] {message}\n");
                     break;
 
                 case ConsoleMessageType.Warning:
@@ -30,6 +32,7 @@ namespace Windose.System.System_Calls
 
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.WriteLine($"] {message}");
+                    Log.WriteString($"[{source}] {message}\n");
 
                     break;
 
@@ -42,6 +45,8 @@ namespace Windose.System.System_Calls
 
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.WriteLine($"] {message}");
+                    Log.WriteString($"[{source}] {message}\n");
+
                     break;
 
                 case ConsoleMessageType.Fatal:
@@ -53,6 +58,8 @@ namespace Windose.System.System_Calls
 
                     Console.ForegroundColor = ConsoleColor.White;
                     Console.WriteLine($"] {message}");
+                    Log.WriteString($"[{source}] {message}\n");
+
                     Dump();
                     break;
 

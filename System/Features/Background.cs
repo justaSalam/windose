@@ -11,7 +11,7 @@ namespace Windose.System.Features
         {
             Default = Wallpapers.Lithium;
             //Default = new Png("/mnt/System/Wallpapers/Lithium.png");
-            Current = Default;
+            //Current = Default;
         }
     }
 }

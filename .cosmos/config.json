@@ -1,11 +1,11 @@
 {
   "targetArch": "x64",
   "qemu": {
-    "memory": "256M",
+    "memory": "512M",
     "machineType": "q35",
     "cpuModel": "max",
     "serialMode": "stdio",
-    "networkCard": "virtio-net-pci",
+    "networkCard": "e1000e",
     "keyboard": "virtio-keyboard-pci",
     "mouse": "virtio-mouse-pci",
     "enableNetwork": false,

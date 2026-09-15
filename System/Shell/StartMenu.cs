@@ -59,31 +59,8 @@ public class StartMenu : Window
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/hard_disk_drive_pie.png"), "Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/msie.png"), "Internet Explorer", () => WindowManager.Register(new InternetExplorer(200, 200)));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/computer_taskmgr.png"), "Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
-        programs.AddSubmenuSeparator();
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/network_normal_two_pcs.png"), "Network Configuration", () => 
-        {
-            if (NetworkManager.PrimaryDevice != null)
-            {
-                NetworkStack.Initialize();
-                DHCPClient dhcpClient = new DHCPClient();
+        
 
-                if (dhcpClient.SendDiscoverPacket() != -1)
-                {
-                    IPConfig? config = NetworkConfigManager.Get(NetworkManager.PrimaryDevice);
-
-                    SystemLogger.WriteLine("Network", "DHCP configuration obtained successfully", ConsoleMessageType.Log);
-
-                    SystemLogger.WriteLine("Network", $"IP address: {config.IPAddress}", ConsoleMessageType.Log);
-                    SystemLogger.WriteLine("Network", $"Subnet: {config.SubnetMask}", ConsoleMessageType.Log);
-                    SystemLogger.WriteLine("Network", $"Gateway: {config.DefaultGateway}", ConsoleMessageType.Log);
-                }
-                else
-                {
-                    SystemLogger.WriteLine("Network", "DHCP timed out", ConsoleMessageType.Warning);
-                }
-
-            }
-        });
 
         programs.AddSubmenuSeparator();
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/gears_tweakui_a.png"), "SYSDUMP", SystemLogger.Dump);

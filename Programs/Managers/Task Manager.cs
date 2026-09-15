@@ -1,7 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Windose;
-using Windose.System.GUI.Components;
 
 public class PerformanceMonitor : Window
 {
@@ -174,26 +173,7 @@ public class PerformanceMonitor : Window
         summary.MarkDirty();
         frameGraph.AddSample((float)Kernel.DeltaTimeMs, 16.7f);
 
-        GarbageCollector.GetStats(out int collections, out int freed);
-        float heapMb = BytesToMb(GarbageCollector.GetHeapSizeBytes());
-        float committedMb = BytesToMb(GarbageCollector.GetTotalCommittedBytes());
-        float fragmentedMb = BytesToMb(GarbageCollector.GetFragmentedBytes());
-        int gcPercent = GarbageCollector.GetLastGCPercentTimeInGC();
-        ulong pinnedObjects = GarbageCollector.GetPinnedObjectsCount();
-
-        float largestValue = Math.Max(heapMb, Math.Max(committedMb, fragmentedMb));
-        if (largestValue > memoryGraphMaximum)
-        {
-            memoryGraphMaximum = Math.Max(16, (float)Math.Ceiling(largestValue / 8) * 8);
-            memoryGraph.maximum = memoryGraphMaximum;
-        }
-
-        memorySummary.text = $"Heap {heapMb:0.00}M  Commit {committedMb:0.00}M  Frag {fragmentedMb:0.00}M  GC {gcPercent}%  Runs {collections}  Freed {freed}  Pinned {pinnedObjects}";
-        memorySummary.MarkDirty();
-        memoryGraph.AddSample(heapMb, committedMb, fragmentedMb);
     }
-
-    private static float BytesToMb(ulong bytes) => bytes / (1024f * 1024f);
 
     public override string GetComponentName() => "PerformanceMonitor";
 }

@@ -144,7 +144,6 @@ public static class BreezeServiceManager
             }
             catch (Exception exception)
             {
-                Cosmos.Kernel.Core.IO.Serial.WriteString("Could not restart service " + stopped.Name + ": " + exception.Message + "\n");
             }
         }
     }

@@ -1,6 +1,4 @@
 using Cosmos.Kernel.System.Graphics;
-using Windose.System.GUI.Components;
-
 public class Toolbar : Component
 {
     private readonly StackPanel items;

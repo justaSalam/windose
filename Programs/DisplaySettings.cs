@@ -1,7 +1,6 @@
 using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 using Windose;
-using Windose.System.GUI.Components;
 using Windose.System.Kernel;
 
 public sealed class DisplaySettings : Window

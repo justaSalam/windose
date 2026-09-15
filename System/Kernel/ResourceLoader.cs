@@ -17,7 +17,7 @@ namespace Windose.System.Kernel
         {
             try
             {
-                return ResourceManager.GetResourceAsSpan(path).ToArray();
+                return new byte[128];
             }
             catch (Exception e)
             {

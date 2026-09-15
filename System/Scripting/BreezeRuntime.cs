@@ -1,8 +1,6 @@
 using Cosmos.Kernel.Core.IO;
-using Windose.System.GUI.Components;
-
 /// <summary>
-/// Add a language feature by:
+/// Add a language feature:
 /// <list type="number">
 /// <item><description>
 /// Defining it in <see cref="CallNative(string, object[])"/>
@@ -564,7 +562,7 @@ public sealed class BreezeRuntime
                 return (double)ProcessManger.ProcessCount;
 
             case "log":
-                Serial.WriteString("[Breeze:" + processHandle.name + "] " + ToText(args[0]) + "\n");
+                //Serial.WriteString("[Breeze:" + processHandle.name + "] " + ToText(args[0]) + "\n");
                 return true;
 
             case "capability":
@@ -1013,7 +1011,7 @@ public sealed class BreezeRuntime
 
             case "print":
                 RequireCount(name, args, 1);
-                Serial.WriteString(ToText(args[0]) + "\n");
+                //Serial.WriteString(ToText(args[0]) + "\n");
                 return args[0];
 
             // === NEW CONTROLS ===

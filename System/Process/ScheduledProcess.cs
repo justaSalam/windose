@@ -45,9 +45,6 @@ public abstract class ScheduledProcess : Process
             Initialized = false;
 
             workerExited = true;
-
-            Serial.WriteString("Scheduled process " + name + " failed to start\n");
-            Serial.WriteString(exception.Message + "\n");
         }
     }
 
@@ -67,8 +64,6 @@ public abstract class ScheduledProcess : Process
         }
         catch (Exception exception)
         {
-            Serial.WriteString("Scheduled process " + name + " stopped after an error\n");
-            Serial.WriteString(exception.Message + "\n");
         }
         finally
         {

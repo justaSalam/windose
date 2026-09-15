@@ -29,6 +29,18 @@ public class DirectBitmap : Canvas
         }
     }
 
+    public int[]? Buffer
+    {
+        get
+        {
+            return GetBuffer();
+        }
+        set
+        {
+            Buffer = value;
+        }
+    }
+
     public DirectBitmap(int width, int height)
     {
         Width = Math.Max(1, width);
@@ -141,7 +153,7 @@ public class DirectBitmap : Canvas
 
     public override Bitmap GetImage(int x, int y, int width, int height)
     {
-        Bitmap bitmap = new Bitmap((uint)width, (uint)height, ColorDepth.ColorDepth32);
+        Bitmap bitmap = new Bitmap(width, height, ColorDepth.ColorDepth32);
         for (int i = 0; i < height; i++)
         {
             for (int j = 0; j < width; j++)
@@ -238,10 +250,6 @@ public class DirectBitmap : Canvas
         return Buffer[y * Width + x];
     }
 
-    public int[]? GetBuffer()
-    {
-        return Buffer;
-    }
 
     internal int GetPointOffset(int x, int y)
     {
@@ -751,7 +759,7 @@ public class DirectBitmap : Canvas
         }
     }
 
-    public override void DrawArc(int x, int y, int width, int height, Color color, int startAngle = 0, int endAngle = 360)
+    public new void DrawArc(int x, int y, int width, int height, Color color, int startAngle = 0, int endAngle = 360)
     {
         if (width != 0 && height != 0)
         {
@@ -781,7 +789,7 @@ public class DirectBitmap : Canvas
         DrawLine(color, point3.X, point3.Y, point4.X, point4.Y);
     }
 
-    public override void DrawSquare(Color color, int x, int y, int size)
+    public new void DrawSquare(Color color, int x, int y, int size)
     {
         DrawRectangle(color, x, y, size, size);
     }
@@ -866,7 +874,7 @@ public class DirectBitmap : Canvas
         DrawLine(highlight, right, y + 1, right, bottom);
     }
 
-    public override void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
+    public new void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
     {
         if (height == -1)
         {

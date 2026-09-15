@@ -12,7 +12,7 @@ public static class DriveUtils
     }
     public static void DeleteMBRPartition(IBlockDevice device, int index)
     {
-        Mbr.DeletePartition(device, index);
+        Mbr.RemovePartition(device, index);
     }
 
     public static bool CreateMbrPartition(IBlockDevice device, ulong startBlock = 0, ulong blockCount = 0, byte mbrSystemId = 0x0C)

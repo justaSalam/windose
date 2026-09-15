@@ -5,7 +5,6 @@ using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
 using Windose.System.Drivers;
-using Windose.System.GUI.Components;
 using Windose.System.System_Calls;
 
 public class WindowManager : SingleThreadedProcess
@@ -31,6 +30,7 @@ public class WindowManager : SingleThreadedProcess
     private Window? capturedWindow;
     private Component? capturedComponent;
     public static Window? focusedWindow;
+    public static Window? lastFocusedWindow;
 
     private MouseState mouseState;
 
@@ -420,7 +420,8 @@ public class WindowManager : SingleThreadedProcess
         if (key.consumed)
             return;
 
-        
+        HotkeyManager.HandleKeyEvent();
+
 
         if (key.consumed)
             return;
@@ -482,13 +483,20 @@ public class WindowManager : SingleThreadedProcess
 
     private static void SetFocusedWindow(Window window)
     {
-        if (focusedWindow == window) return;
+        if (focusedWindow == window)
+        {
+            return;
+        }
 
-        if (focusedWindow != null) focusedWindow.SetFocused(false);
-
+        if (focusedWindow != null)
+        {
+            lastFocusedWindow = focusedWindow;
+            focusedWindow.SetFocused(false);
+        }
 
         focusedWindow = window;
         focusedWindow.SetFocused(true);
+
     }
 
     public static void ClearFocusedWindow()
@@ -497,6 +505,24 @@ public class WindowManager : SingleThreadedProcess
 
         focusedWindow.SetFocused(false);
         focusedWindow = null;
+    }
+
+    public static void SwapFocusedWindow()
+    {
+        if (focusedWindow == lastFocusedWindow || lastFocusedWindow == null)
+        {
+            return;
+        }
+        if (focusedWindow == null)
+        {
+            return;
+        }
+
+        focusedWindow.SetFocused(false);
+        SetFocusedWindow(lastFocusedWindow);
+        BringToFront(focusedWindow);
+
+
     }
 
     private void ComposeDirtyRegions()
@@ -535,7 +561,7 @@ public class WindowManager : SingleThreadedProcess
                 }
                 catch (Exception exception)
                 {
-                    FailApplication(owner, "drawing", exception);
+                    FailApplication(owner, "Drawing", exception);
                 }
             }
         }
@@ -864,6 +890,7 @@ public class WindowManager : SingleThreadedProcess
     public static void Invalidate(Component dirty)
     {
         Invalidate(dirty.AbsoluteRectangle);
+        
     }
 
     public static void Invalidate(Rectangle dirtyRect)
@@ -900,7 +927,7 @@ public class WindowManager : SingleThreadedProcess
     }
 
 
-    public void BringToFront(Window window)
+    public static void BringToFront(Window window)
     {
         window.zIndex = nextZIndex++;
         Invalidate(window);

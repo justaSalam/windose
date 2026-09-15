@@ -258,26 +258,11 @@ public static class CommandRegistry
 
     private static void DisplayProperties(CommandContext context, string[] arguments)
     {
-        SVGAII3DCanvas canvas = Windose.Kernel.canvas;
 
-        PciDevice? device = PciManager.GetDevice(VendorId.VmWare, DeviceId.SvgaiiAdapter);
-        context.WriteLine($"Vendor: {device.VendorId} ({device.DeviceId})");
-
-        context.WriteLine($"Resolution: {canvas.Height}x{canvas.Width}");
-        context.WriteLine($"Refresh Rate: {canvas.RefreshRate} Hz");
-
-
-        context.WriteLine($"3D Hardware Version: {canvas.Driver3D.HW3DVer}");
-        context.WriteLine($"3D Enabled: {canvas.Driver3D.Is3DEnabled}");
-        context.WriteLine($"VRAM Size: {canvas.Driver.VideoMemory.Size / 1024 / 1024} MB");
-        context.WriteLine($"Capabilities: {canvas.Driver.Capabilities}");
     }
 
     private static void SystemProperties(CommandContext context, string[] arguments)
     {
-        context.WriteLine($"CPU Count: {SchedulerManager.CpuCount}");
-        context.WriteLine($"CPU Clock Speed: {Cpu.RhpGetTickCount64() / 1000000000} GHz");
-        context.WriteLine($"Thread Count: {SchedulerManager.ThreadCount}");
     }
 
 
@@ -477,15 +462,6 @@ public static class CommandRegistry
 
     private static void ListProcesses(CommandContext context, string[] args)
     {
-        context.WriteLine("Thread ID  State  CPU ID");
-
-        for (int i = 0; i < SchedulerManager.ThreadCount; i++)
-        {
-            Cosmos.Kernel.Core.Scheduler.Thread? thread = SchedulerManager.Threads[i];
-            if (thread == null) continue;
-
-            context.WriteLine($"{thread.Id} {thread.State} {thread.CpuId}");
-        }
 
     }
 
@@ -507,22 +483,6 @@ public static class CommandRegistry
 
     private static void DisplayNetInfo(CommandContext context, string[] args)
     {
-        for (int i = 0; i < NetworkManager.DeviceCount; i++)
-        {
-            INetworkDevice? device = NetworkManager.GetDevice(i);
-            if (device == null) return;
-
-            IPConfig? config = NetworkConfigManager.Get(device);
-            if (device == null) return;
-
-
-            context.WriteLine($"Device:     {device.Name}:");
-            context.WriteLine($"    MAC. . . . . . . : {NetworkManager.PrimaryDevice.MacAddress}");
-            context.WriteLine($"    IP address . . . : {config.IPAddress}");
-            context.WriteLine($"    Subnet Mask. . . : {config.SubnetMask}");
-            context.WriteLine($"    Gateway. . . . . : {config.DefaultGateway}");
-
-        }
 
     }
 

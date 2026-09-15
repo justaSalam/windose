@@ -23,7 +23,6 @@ public sealed class CosmosMouseDriver : IWindoseDriver
 
     public void Start()
     {
-        MouseManager.Initialize();
         MouseManager.SetScreenSize(screenWidth, screenHeight);
         State = WindoseDriverState.Started;
     }

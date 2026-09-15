@@ -1,12 +1,6 @@
-using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
-using Cosmos.Kernel;
-using Cosmos.Kernel.HAL.Devices.Graphic.SVGAII;
-using Cosmos.Kernel.HAL.Pci;
-using Cosmos.Kernel.HAL.Pci.Enums;
+using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
-using Windose.System.System_Calls;
 
 namespace Windose.Drivers;
 
@@ -15,56 +9,39 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
     public string Name => "Cosmos GOP Display";
     public WindoseDriverState State { get; private set; } = WindoseDriverState.Created;
 
-    public SVGAII3DCanvas Canvas { get; private set; }
+    public Canvas canvas { get; private set; }
     public DirectBitmap BackBuffer { get; private set; }
-    public DirectBitmap PerformanceOverlay { get; private set; }
-    public int Width => Canvas == null ? 0 : Canvas.Width;
-    public int Height => Canvas == null ? 0 : Canvas.Height;
+    public int Width => canvas == null ? 0 : canvas.Width;
+    public int Height => canvas == null ? 0 : canvas.Height;
 
     public void Start()
     {
-        PciDevice? device = PciManager.GetDevice(VendorId.VmWare, DeviceId.SvgaiiAdapter);
 
-        if (device == null)
-        {
-            SystemLogger.WriteLine("Display Driver", "PCI device not found. Ensure that the SVGAII driver is loaded and the device is present.", ConsoleMessageType.Fatal);
-            return;
-        }
 
-        uint width = (uint)Registry.GetInteger("System/Display/Width", 1920);
-        uint height = (uint)Registry.GetInteger("System/Display/Height", 1080);
+        int width = (int)Registry.GetInteger("System/Display/Width", 1920);
+        int height = (int)Registry.GetInteger("System/Display/Height", 1080);
         int depth = (int)Registry.GetInteger("System/Display/BitsPerPixel", 32);
 
         Mode mode = new Mode(width, height, ColorDepth.ColorDepth32);
-         
-        Canvas = new SVGAII3DCanvas(device, mode);
-        
-        
 
-        if (Canvas.HasHardwareCursor)
-        {
-            try
-            {
-                Canvas.DefineAlphaCursor(0, 0, (int)Cursors.arrow.Width, (int)Cursors.arrow.Height, Cursors.arrow.RawData);
-            }
-            catch (Exception ex)
-            {
-                SystemLogger.WriteLine("Display", ex.Message, ConsoleMessageType.Fatal);
-            }
-        }
+        canvas = Canvas.GetFullScreen();
+        Log.WriteString($"Canvas init\n");
 
-        BackBuffer = new DirectBitmap(Canvas.Width, Canvas.Height);
-        PerformanceOverlay = new DirectBitmap(Math.Max(1, Math.Min(800, Canvas.Width - 20)), 52);
+
+
+
+        BackBuffer = new DirectBitmap(canvas.Width, canvas.Height);
         State = WindoseDriverState.Started;
+
     }
 
-    public void Present(DirectBitmap frame, int cursorX, int cursorY)
+    public void Present(int cursorX, int cursorY)
     {
-        if (State != WindoseDriverState.Started || Canvas == null || frame == null) return;
-        Canvas.Clear(Color.Black);
+        if (State != WindoseDriverState.Started || canvas == null) return;
+        canvas.Clear(Color.Black);
 
         long uploadStartedAt = PerformanceMetrics.Now;
-        Canvas.DrawArray(frame.GetBuffer(), 0, 0, Canvas.Width, Canvas.Height);
+        canvas.DrawArray(BackBuffer.Buffer, 0, 0, canvas.Width, canvas.Height);
 
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 
@@ -75,7 +52,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
 
         long displayStartedAt = PerformanceMetrics.Now;
-        Canvas.Display();
+        canvas.Display();
         PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
     }
 
@@ -88,7 +65,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
     private void DrawCursor(int x, int y)
     {
-        Canvas.SetCursor(true, x, y);
+        //Canvas.SetCursor(true, x, y);
     }
 
 }

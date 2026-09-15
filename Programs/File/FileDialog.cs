@@ -1,4 +1,3 @@
-using Windose.System.GUI.Components;
 
 public enum FileDialogMode
 {
