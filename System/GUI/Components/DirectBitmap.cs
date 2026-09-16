@@ -5,9 +5,9 @@ using System.Drawing;
 
 public class DirectBitmap : Canvas
 {
-
     public int Width { get; private set; }
     public int Height { get; private set; }
+    public int[] Buffer => GetBuffer();
 
     internal int Stride;
     internal int Pitch;
@@ -21,32 +21,11 @@ public class DirectBitmap : Canvas
     private int originY;
     private Rectangle clipBounds;
 
-    public int[] GetBufferBitmap
-    {
-        get
-        {
-            return Buffer;
-        }
-    }
 
-    public int[]? Buffer
-    {
-        get
-        {
-            return GetBuffer();
-        }
-        set
-        {
-            Buffer = value;
-        }
-    }
-
-    public DirectBitmap(int width, int height)
+    public DirectBitmap(int width, int height) : base(Math.Max(1, width), Math.Max(1, height), ColorDepth.ColorDepth32)
     {
         Width = Math.Max(1, width);
         Height = Math.Max(1, height);
-        Buffer = new int[width * height];
-
         Stride = 32 / 8;
         Pitch = Width * Stride;
         clipBounds = new Rectangle(0, 0, Width, Height);
@@ -127,13 +106,14 @@ public class DirectBitmap : Canvas
     }
     public override void Clear(Color color)
     {
-        Array.Fill(Buffer, color.ToArgb());
+        Array.Fill(GetBuffer(), color.ToArgb());
     }
     public override void DrawPoint(Color color, int x, int y)
     {
         x += originX;
         y += originY;
-        if (Buffer == null || Buffer == null || !ContainsClipped(x, y))
+        int[] buffer = GetBuffer();
+        if (buffer == null || !ContainsClipped(x, y))
         {
             return;
         }
@@ -145,10 +125,10 @@ public class DirectBitmap : Canvas
                 return;
             }
 
-            color = AlphaBlend(color, Color.FromArgb(Buffer[y * Width + x]), color.A);
+            color = AlphaBlend(color, Color.FromArgb(buffer[y * Width + x]), color.A);
         }
 
-        Buffer[y * Width + x] = color.ToArgb();
+        buffer[y * Width + x] = color.ToArgb();
     }
 
     public override Bitmap GetImage(int x, int y, int width, int height)
@@ -369,12 +349,14 @@ public class DirectBitmap : Canvas
 
         if (width <= 0 || height <= 0) return;
 
+        int[] buffer = GetBuffer();
+
         for (int j = 0; j < height; j++)
         {
             int sourceIndex = (sourceY + j) * sourceWidth + sourceX;
             int destinationIndex = (destinationY + j) * Width + destinationX;
 
-            Array.Copy(colors, sourceIndex, Buffer, destinationIndex, width);
+            Array.Copy(colors, sourceIndex, buffer, destinationIndex, width);
         }
     }
 
@@ -468,6 +450,8 @@ public class DirectBitmap : Canvas
 
         if (width <= 0 || height <= 0) return;
 
+        int[] buffer = GetBuffer();
+
         for (int y = 0; y < height; y++)
         {
             int sourceIndex = (sourceY + y) * sourceWidth + sourceX;
@@ -486,17 +470,17 @@ public class DirectBitmap : Canvas
 
                 if (alpha == 0xff)
                 {
-                    Buffer[destinationIndex + x] = color;
+                    buffer[destinationIndex + x] = color;
                     continue;
                 }
 
-                int bgColor = Buffer[destinationIndex + x];
+                int bgColor = buffer[destinationIndex + x];
                 int invAlpha = 255 - alpha;
                 int red = (((color >> 16) & 0xff) * alpha + ((bgColor >> 16) & 0xff) * invAlpha) >> 8;
                 int green = (((color >> 8) & 0xff) * alpha + ((bgColor >> 8) & 0xff) * invAlpha) >> 8;
                 int blue = ((color & 0xff) * alpha + (bgColor & 0xff) * invAlpha) >> 8;
 
-                Buffer[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+                buffer[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
             }
         }
     }
@@ -523,10 +507,12 @@ public class DirectBitmap : Canvas
         int bottom = Math.Min(Math.Min(targetY + length, clipBounds.Bottom), Height);
         int argb = color.ToArgb();
 
+        int[] buffer = GetBuffer();
+
         for (int y = top; y < bottom; y++)
         {
             if (color.A == byte.MaxValue)
-                Buffer[y * Width + targetX] = argb;
+                buffer[y * Width + targetX] = argb;
             else
                 BlendTargetPixel(targetX, y, argb);
         }
@@ -547,10 +533,11 @@ public class DirectBitmap : Canvas
         if (left >= right) return;
 
         int argb = color.ToArgb();
+        int[] buffer = GetBuffer();
         int index = targetY * Width + left;
         if (color.A == byte.MaxValue)
         {
-            Array.Fill(Buffer, argb, index, right - left);
+            Array.Fill(buffer, argb, index, right - left);
             return;
         }
 
@@ -887,10 +874,11 @@ public class DirectBitmap : Canvas
         if (target.Width <= 0 || target.Height <= 0) return;
 
         int argb = color.ToArgb();
+        int[] buffer = GetBuffer();
         if (color.A == byte.MaxValue)
         {
             for (int y = target.Top; y < target.Bottom; y++)
-                Array.Fill(Buffer, argb, y * Width + target.Left, target.Width);
+                Array.Fill(buffer, argb, y * Width + target.Left, target.Width);
             return;
         }
 
@@ -927,16 +915,16 @@ public class DirectBitmap : Canvas
         if (alpha == 0) return;
         if (alpha == 0xff)
         {
-            Buffer[index] = color;
+            GetBuffer()[index] = color;
             return;
         }
 
-        int background = Buffer[index];
+        int background = GetBuffer()[index];
         int inverse = 255 - alpha;
         int red = (((color >> 16) & 0xff) * alpha + ((background >> 16) & 0xff) * inverse) >> 8;
         int green = (((color >> 8) & 0xff) * alpha + ((background >> 8) & 0xff) * inverse) >> 8;
         int blue = ((color & 0xff) * alpha + (background & 0xff) * inverse) >> 8;
-        Buffer[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+        GetBuffer()[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
     }
 
     protected void TrimLine(ref int x1, ref int y1, ref int x2, ref int y2)
@@ -1038,6 +1026,6 @@ public class DirectBitmap : Canvas
             return;
 
         disposed = true;
-        Buffer = null!;
+        // Canvas owns its backing store; callers release this wrapper by dropping it.
     }
 }

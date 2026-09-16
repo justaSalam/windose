@@ -6,6 +6,7 @@ using Windose.System.System_Calls;
 public class Window : Component
 {
     public Rectangle bounds; //Window viewport, relative to the screen
+    public Canvas Canvas => RenderCanvas;
 
     private bool inFocus;
 

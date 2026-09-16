@@ -6,6 +6,7 @@ using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
+using Windose.System.Kernel;
 
 
 /// <summary>
@@ -13,9 +14,8 @@ using Windose;
 /// </summary>
 public class Component : IDisposable
 {
-
-    public int[] GetBuffer() => buffer.GetBufferBitmap;
     public virtual string GetComponentName() => "UNASSIGNED COMPONENT";
+    public Canvas RenderCanvas => buffer;
 
     public int Width
     {
@@ -139,6 +139,7 @@ public class Component : IDisposable
 
 
     protected DirectBitmap buffer;
+    private bool ownsRenderSurface;
     public Rectangle rectangle;
     public Rectangle clampedBounds = new Rectangle(0, 0, 50, 50);
     public State state;
@@ -210,6 +211,7 @@ public class Component : IDisposable
     {
         rectangle = new Rectangle(x, y, width, height);
         buffer = new DirectBitmap(rectangle.Width, rectangle.Height);
+        ownsRenderSurface = true;
 
         children = new List<Component>();
 
@@ -491,18 +493,7 @@ public class Component : IDisposable
 
     public void DrawToScreen()
     {
-        // Always use alpha-blended copy so that pixels with alpha < 255
-        // (e.g. glass/translucent theme colors) blend with the desktop
-        // background behind this component.
-        Kernel.mainBuffer.DrawArrayAlphaClipped(
-            buffer.GetBuffer(),
-            buffer.Width,
-            0,
-            0,
-            AbsoluteX,
-            AbsoluteY,
-            Math.Min(Width, buffer.Width),
-            Math.Min(Height, buffer.Height));
+        Kernel.mainBuffer.DrawCanvas(RenderCanvas, AbsoluteX, AbsoluteY);
     }
 
     public void DrawToScreen(Rectangle dirtyRect)
@@ -510,16 +501,7 @@ public class Component : IDisposable
         Rectangle clipped = Rectangle.Intersect(AbsoluteRectangle, dirtyRect);
         if (clipped.Width <= 0 || clipped.Height <= 0) return;
 
-        // Always use alpha-blended copy for proper transparency compositing.
-        Kernel.mainBuffer.DrawArrayAlphaClipped(
-            buffer.GetBuffer(),
-            buffer.Width,
-            clipped.X - AbsoluteX,
-            clipped.Y - AbsoluteY,
-            clipped.X,
-            clipped.Y,
-            Math.Min(clipped.Width, buffer.Width - (clipped.X - AbsoluteX)),
-            Math.Min(clipped.Height, buffer.Height - (clipped.Y - AbsoluteY)));
+        DrawToScreen();
     }
 
 
@@ -615,10 +597,9 @@ public class Component : IDisposable
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
         rectangle = new Rectangle(X, Y, width, height);
 
-        if (isRoot && (width > buffer.Width || height > buffer.Height))
+        if (isRoot && (width != buffer.Width || height != buffer.Height))
         {
-            int newBufferWidth = RoundUpToChunk(Math.Max(width, buffer.Width), 64);
-            int newBufferHeight = RoundUpToChunk(Math.Max(height, buffer.Height), 64);
+            ResizeRenderSurface(width, height);
         }
 
         WindowManager.Invalidate(oldRectangle);
@@ -704,7 +685,7 @@ public class Component : IDisposable
 
         child.ResolveHorizontalAnchor();
         child.ResolveVerticalAnchor();
-        child.BindRenderSurface(buffer);
+        child.BindRenderSurface(buffer, false);
         components.Remove(child);
         children.Add(child);
         MarkDirty();
@@ -734,6 +715,7 @@ public class Component : IDisposable
 
     public void DrawString(string str, Color color, int x, int y)
     {
+
         buffer.DrawString(str, PCScreenFont.DefaultFont, color, x, y);
     }
 
@@ -973,7 +955,7 @@ public class Component : IDisposable
         if (child.IsOpaqueForCopy())
         {
             buffer.DrawArrayClipped(
-                child.GetBuffer(),
+                child.buffer.GetBuffer(),
                 child.buffer.Width,
                 sourceX,
                 sourceY,
@@ -985,7 +967,7 @@ public class Component : IDisposable
         }
 
         buffer.DrawArrayAlphaClipped(
-            child.GetBuffer(),
+            child.buffer.GetBuffer(),
             child.buffer.Width,
             sourceX,
             sourceY,
@@ -1012,11 +994,28 @@ public class Component : IDisposable
         forceDirty = false;
     }
 
-    private void BindRenderSurface(DirectBitmap surface)
+    private void BindRenderSurface(DirectBitmap surface, bool ownsSurface)
     {
+        if (ownsRenderSurface && !ReferenceEquals(buffer, surface))
+            buffer.Dispose();
+
         buffer = surface;
+        ownsRenderSurface = ownsSurface;
         for (int i = 0; i < children.Count; i++)
-            children[i].BindRenderSurface(surface);
+            children[i].BindRenderSurface(surface, false);
+    }
+
+    protected void ResizeRenderSurface(int width, int height)
+    {
+        if (!ownsRenderSurface) return;
+
+        DirectBitmap oldSurface = buffer;
+        buffer = new DirectBitmap(width, height);
+
+        for (int i = 0; i < children.Count; i++)
+            children[i].BindRenderSurface(buffer, false);
+
+        oldSurface?.Dispose();
     }
 
     public virtual void Dispose()
@@ -1031,7 +1030,8 @@ public class Component : IDisposable
 
         children.Clear();
 
-        buffer?.Dispose();
+        if (ownsRenderSurface)
+            buffer?.Dispose();
         components.Remove(this);
     }
 }

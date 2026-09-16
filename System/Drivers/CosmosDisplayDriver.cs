@@ -38,10 +38,8 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
     public void Present(int cursorX, int cursorY)
     {
         if (State != WindoseDriverState.Started || canvas == null) return;
-        canvas.Clear(Color.Black);
-
         long uploadStartedAt = PerformanceMetrics.Now;
-        canvas.DrawArray(BackBuffer.Buffer, 0, 0, canvas.Width, canvas.Height);
+        canvas.DrawCanvas(BackBuffer, 0, 0);
 
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 
@@ -65,7 +63,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
     private void DrawCursor(int x, int y)
     {
-        //Canvas.SetCursor(true, x, y);
+        canvas.DrawFilledCircle(Color.Black, x, y, 2);
     }
 
 }

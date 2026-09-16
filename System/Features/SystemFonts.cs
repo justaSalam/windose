@@ -1,11 +1,12 @@
 
+using System.Reflection;
 using Cosmos.Kernel.Core.Runtime;
 using Cosmos.Kernel.System.Graphics.Fonts;
 
 //TODO Add font loading at runtime
 public static class SystemFonts
 {
-    //public static TrueTypeFont arial = new TrueTypeFont(ResourceManager.GetResourceAsSpan("Windose.Resources.Fonts.ARIAL.TTF").ToArray());
+
 
     //public static Font lucida = PCScreenFont.LoadFont(ResourceManager.GetResourceAsSpan("Windose.Resources.Fonts.lucida-10x16.psf").ToArray());
     //public static Font spleen12x24 = PCScreenFont.LoadFont(ResourceManager.GetResourceAsSpan("Windose.Resources.Fonts.spleen-12x24.psfu").ToArray());

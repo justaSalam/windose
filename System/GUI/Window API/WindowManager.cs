@@ -525,42 +525,38 @@ public class WindowManager : SingleThreadedProcess
 
     private void ComposeDirtyRegions()
     {
-        if (dirtyRects.Count == 0) return;
-
         long startedAt = PerformanceMetrics.Now;
         renderedComponents.Clear();
+        Kernel.mainBuffer.Clear(Color.Black);
 
-        for (int i = 0; i < dirtyRects.Count; i++)
+        for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
         {
-            Rectangle dirtyRect = dirtyRects[i];
+            Component component = components[componentIndex];
+            if (component == null || !component.Visible || !component.isRoot) continue;
 
-            for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
+            Window owner = component.GetOwningWindow();
+            if (owner != null && failedWindows.Contains(owner)) continue;
+
+            try
             {
-                Component component = components[componentIndex];
-                if (!component.Visible) continue;
-
-                Window owner = component.GetOwningWindow();
-                if (owner != null && failedWindows.Contains(owner)) continue;
-
-                if (!component.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
-
-                try
+                if (component.HasDirtyTree())
                 {
-                    if (component.HasDirtyTree())
-                    {
-                        component.DrawDirtyLocal(dirtyRect);
-                        component.DrawToScreen(dirtyRect);
-                        renderedComponents.Add(component);
-                    }
-                    else
-                    {
-                        component.DrawToScreen(dirtyRect);
-                    }
+                    component.DrawDirtyLocal(component.AbsoluteRectangle);
+                    renderedComponents.Add(component);
                 }
-                catch (Exception exception)
+
+                if (component is Window window)
                 {
-                    FailApplication(owner, "Drawing", exception);
+                    Kernel.mainBuffer.DrawCanvas(window.Canvas, window.bounds.X, window.bounds.Y);
                 }
+                else
+                {
+                    component.DrawToScreen();
+                }
+            }
+            catch (Exception exception)
+            {
+                FailApplication(owner, "Drawing", exception);
             }
         }
 

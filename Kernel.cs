@@ -63,7 +63,10 @@ public class Kernel : Sys.Kernel
 
         MouseManager.SetScreenSize(canvas.Width, canvas.Height);
 
+        displayDriver = new CosmosDisplayDriver();
+        DriverManager.Register(displayDriver);
         DriverManager.StartAll();
+        mainBuffer = displayDriver.BackBuffer;
 
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
@@ -106,7 +109,7 @@ public class Kernel : Sys.Kernel
     {
         try
         {
-            canvas.Clear();
+            Mouse.Update();
             System.Drivers.Keyboard.BeginFrame();
             Tick();
 
@@ -119,7 +122,6 @@ public class Kernel : Sys.Kernel
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
             displayDriver.Present(MouseManager.X, MouseManager.Y);
-            canvas.Display();
         }
         catch (Exception ex)
         {
