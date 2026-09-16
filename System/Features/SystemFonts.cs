@@ -7,7 +7,7 @@ using Cosmos.Kernel.System.Graphics.Fonts;
 public static class SystemFonts
 {
 
-
+    public static TrueTypeFont msSansSerif = new TrueTypeFont("/mnt/System/Fonts/ARIAL.ttf");
     //public static Font lucida = PCScreenFont.LoadFont(ResourceManager.GetResourceAsSpan("Windose.Resources.Fonts.lucida-10x16.psf").ToArray());
     //public static Font spleen12x24 = PCScreenFont.LoadFont(ResourceManager.GetResourceAsSpan("Windose.Resources.Fonts.spleen-12x24.psfu").ToArray());
     //public static Font spleen16x32 = PCScreenFont.LoadFont(ResourceManager.GetResourceAsSpan("Windose.Resources.Fonts.spleen-16x32.psfu").ToArray());

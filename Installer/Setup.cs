@@ -16,9 +16,7 @@ namespace Windose.Installer
             return;
         }
     }),
-    ("Installing", InstallIcons),
-    ("Finalizing", () => { Console.WriteLine("Finalizing installation..."); }),
-    //("Installing System Resources", CreateUserFolders),
+    ("Loading Assembly", ResourceLoader.LoadAssemblyResources),
 };
 
 

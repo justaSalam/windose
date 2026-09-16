@@ -4,7 +4,7 @@ using Cosmos.Kernel.System.Graphics;
 
 public static class Wallpapers
 {
-    public static Png Lithium = new Png("/mnt/System/Icons/executable.png");
+    public static Png Lithium = new Png("/mnt/System/Wallpapers/Lithium.png");
     //public static Png WRAMW = new Png(ResourceManager.GetResourceAsSpan("Windose.Resources.Wallpapers.WRAMW.png").ToArray());
 
 }

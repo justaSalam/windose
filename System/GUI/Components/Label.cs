@@ -92,7 +92,7 @@ public class Label : Component
             }
             else
             {
-                DrawString(line, textColor, x, y, effectiveFontSize);
+                DrawString(line, textColor, x, y, 12);
             }
         }
     }

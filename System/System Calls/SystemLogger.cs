@@ -15,58 +15,13 @@ namespace Windose.System.System_Calls
 
         public static void WriteLine(string source, string message, ConsoleMessageType type = ConsoleMessageType.Log)
         {
-            switch (type)
-            {
-                case ConsoleMessageType.Log:
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"[{source}] {message}");
-                    Log.WriteString($"[{source}] {message}\n");
-                    break;
-
-                case ConsoleMessageType.Warning:
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"[");
-
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.Write(source);
-
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"] {message}");
-                    Log.WriteString($"[{source}] {message}\n");
-
-                    break;
-
-                case ConsoleMessageType.Error:
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"[");
-
-                    Console.ForegroundColor = ConsoleColor.DarkRed;
-                    Console.Write(source);
-
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"] {message}");
-                    Log.WriteString($"[{source}] {message}\n");
-
-                    break;
-
-                case ConsoleMessageType.Fatal:
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.Write($"[");
-
-                    Console.ForegroundColor = ConsoleColor.DarkRed;
-                    Console.Write(source);
-
-                    Console.ForegroundColor = ConsoleColor.White;
-                    Console.WriteLine($"] {message}");
-                    Log.WriteString($"[{source}] {message}\n");
-
-                    Dump();
-                    break;
-
-            }
-
+            Log.WriteString($"[{type}] [{source}] {message}\n");
             logBuilder.AppendLine($"<{DateTime.Now.ToString("HH:mm:ss")}> [{type}] [{source}] {message}");
 
+            if (type == ConsoleMessageType.Fatal)
+            {
+                Dump();
+            }
         }
 
         public static void Dump()

@@ -7,7 +7,7 @@ namespace Windose.System.Kernel
 {
     public static class ResourceLoader
     {
-        public static Assembly assembly { get; private set; } = Assembly.GetCallingAssembly();
+        public static Assembly assembly { get; private set; } = typeof(ResourceLoader).Assembly;
         /// <summary>
         /// Loads a resource from the embedded resources and returns its byte array representation.
         /// AssemblyName.ResourceFolder.ResourceFileName.ResourceExtension.
@@ -24,7 +24,7 @@ namespace Windose.System.Kernel
                     return null;
                 }
 
-                var buffer = new byte[stream.Length];
+                byte[] buffer = new byte[stream.Length];
                 stream.Read(buffer, 0, buffer.Length);
                 return buffer;
             }
@@ -65,7 +65,13 @@ namespace Windose.System.Kernel
                     return false;
                 }
 
+                string? directory = Path.GetDirectoryName(path);
+
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+
                 File.WriteAllBytes(path, data);
+
                 return true;
             }
             catch (OperationCanceledException e)
@@ -112,7 +118,6 @@ namespace Windose.System.Kernel
         const string storageRoot = "/mnt/System";
         public static void LoadAssemblyResources()
         {
-
             foreach (string resource in assembly.GetManifestResourceNames())
             {
                 if (!resource.StartsWith(prefix))
@@ -128,9 +133,7 @@ namespace Windose.System.Kernel
                 string name = relative.Substring(0, extensionIndex);
                 string extension = relative.Substring(extensionIndex);
 
-                string path = storageRoot + "/" +
-                              name.Replace('.', '/') +
-                              extension;
+                string path = storageRoot + "/" + name.Replace('.', '/') + extension;
 
                 if (!File.Exists(path))
                 {

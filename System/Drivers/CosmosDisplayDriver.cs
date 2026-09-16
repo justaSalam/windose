@@ -16,19 +16,12 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
     public void Start()
     {
+        canvas = Kernel.canvas;
 
 
         int width = (int)Registry.GetInteger("System/Display/Width", 1920);
         int height = (int)Registry.GetInteger("System/Display/Height", 1080);
         int depth = (int)Registry.GetInteger("System/Display/BitsPerPixel", 32);
-
-        Mode mode = new Mode(width, height, ColorDepth.ColorDepth32);
-
-        canvas = Canvas.GetFullScreen();
-        Log.WriteString($"Canvas init\n");
-
-
-
 
         BackBuffer = new DirectBitmap(canvas.Width, canvas.Height);
         State = WindoseDriverState.Started;
@@ -63,7 +56,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
 
     private void DrawCursor(int x, int y)
     {
-        canvas.DrawFilledCircle(Color.Black, x, y, 2);
+        canvas.DrawImageAlpha(Cursors.arrow, x, y);
     }
 
 }

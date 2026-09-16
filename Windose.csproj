@@ -16,6 +16,7 @@
 
     <ItemGroup>
     <EmbeddedResource Include=".\Resources\Fonts\ARIAL.TTF" />
+    <EmbeddedResource Include=".\Resources\Fonts\MSSansSerif.ttf"/>
     <EmbeddedResource Include=".\Resources\Cursors\arrow.png" />
     <EmbeddedResource Include=".\Resources\Fonts\spleen-12x24.psfu" />
     <EmbeddedResource Include=".\Resources\Fonts\spleen-16x32.psfu" />
