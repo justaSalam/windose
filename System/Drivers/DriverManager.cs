@@ -13,10 +13,20 @@ public static class DriverManager
 
     public static void Register(IWindoseDriver driver)
     {
-        SystemLogger.WriteLine("DM", "Registered driver: " + driver.Name, ConsoleMessageType.Log);
+        try
+        {
 
-        if (driver == null) return;
-        drivers.Add(driver);
+            SystemLogger.WriteLine("DM", "Registered driver: " + driver.Name, ConsoleMessageType.Log);
+
+            if (driver == null) return;
+            drivers.Add(driver);
+
+        }
+        catch (Exception exception)
+        {
+            Console.WriteLine("Failed to register driver: " + driver.Name + " Exception: " + exception.Message);
+            SystemLogger.WriteLine("DM", "Failed to register driver: " + driver.Name, ConsoleMessageType.Error);
+        }
     }
 
     public static T Get<T>() where T : class, IWindoseDriver
@@ -31,6 +41,7 @@ public static class DriverManager
 
     public static void StartAll()
     {
+
         for (int i = 0; i < drivers.Count; i++)
         {
             Start(drivers[i]);
@@ -53,6 +64,7 @@ public static class DriverManager
         }
         catch (Exception exception)
         {
+            Console.WriteLine("Failed to start driver: " + driver.Name + " Exception: " + exception.Message);
             SystemLogger.WriteLine("DM", "Failed to start driver: " + driver.Name, ConsoleMessageType.Log);
         }
     }

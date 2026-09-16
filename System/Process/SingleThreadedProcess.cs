@@ -10,6 +10,7 @@ public class SingleThreadedProcess : Process
 
     public SingleThreadedProcess(string name, ProcessType processType)
     {
+        SystemLogger.WriteLine(name, "New Process", ConsoleMessageType.Log);
         this.name = name;
         this.processType = processType;
         startInfo.Name = name;
@@ -17,6 +18,16 @@ public class SingleThreadedProcess : Process
         Running = false;
         Initialized = false;
         canTerminate = true;
+
+        onStart += () =>
+        {
+            SystemLogger.WriteLine(name, "Running Process", ConsoleMessageType.Log);
+        };
+
+        onDispose += () =>
+        {
+            SystemLogger.WriteLine(name, "Stopping Process", ConsoleMessageType.Log);
+        };
     }
 
     public override void Start()
@@ -24,6 +35,7 @@ public class SingleThreadedProcess : Process
         try
         {
             if (Initialized) return;
+            SystemLogger.WriteLine(name, "Starting Process", ConsoleMessageType.Log);
 
             Running = true;
             Initialized = true;
@@ -55,7 +67,9 @@ public class SingleThreadedProcess : Process
         }
     }
 
-    public virtual void Update() { }
+    public virtual void Update()
+    {
+    }
 
     public override void Dispose()
     {

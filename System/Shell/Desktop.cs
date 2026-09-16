@@ -285,7 +285,7 @@ public class Desktop : Component
     public override void DrawLocal()
     {
         //DrawImageStretch(Background.Current, new Rectangle(0, 0, (int)Background.Current.Width, (int)Background.Current.Height), new Rectangle(0, 0, Width, Height));
-
+        DrawFilledRectangle(Color.Turquoise, 0, 0, Width, Height);
         if (ShowIconGrid)
             DrawIconGrid();
 

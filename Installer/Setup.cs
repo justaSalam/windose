@@ -7,8 +7,8 @@ namespace Windose.Installer
     {
         private static readonly (string Name, Action Action)[] Stages =
 {
-    
-    ("Creating Partitions", CreatePartitions), 
+
+    ("Creating Partitions", CreatePartitions),
     ("System Setup Check", () =>
     {
         if(File.Exists("/mnt/.setup"))
@@ -235,21 +235,29 @@ namespace Windose.Installer
         public static void Run(string[]? args = null)
         {
 
-            // Set up the static header once at the top of the screen
-            Console.BackgroundColor = ConsoleColor.Blue;
-            Console.ForegroundColor = ConsoleColor.White;
-
-            Console.Clear();
-            Console.SetCursorPosition(0, 0);
-            Console.Write("Windose Setup");
-            Console.CursorVisible = false;
-
-            for (int i = 0; i < Stages.Length; i++)
+            try
             {
-                RunStage(i);
+                // Set up the static header once at the top of the screen
+                Console.BackgroundColor = ConsoleColor.Blue;
+                Console.ForegroundColor = ConsoleColor.White;
+
+                Console.Clear();
+                Console.SetCursorPosition(0, 0);
+                Console.Write("Windose Setup");
+                Console.CursorVisible = false;
+
+                for (int i = 0; i < Stages.Length; i++)
+                {
+                    RunStage(i);
+                }
+
+                File.Create(path); //signals an already set up system
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
             }
 
-            File.Create(path).Dispose(); //signals an already set up system
         }
 
         private static void RunStage(int index)

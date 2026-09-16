@@ -52,8 +52,6 @@ public class WindowManager : SingleThreadedProcess
 
     private List<Component> components;
 
-
-
     public override void Update()
     {
         try
@@ -890,7 +888,7 @@ public class WindowManager : SingleThreadedProcess
     public static void Invalidate(Component dirty)
     {
         Invalidate(dirty.AbsoluteRectangle);
-        
+
     }
 
     public static void Invalidate(Rectangle dirtyRect)

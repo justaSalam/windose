@@ -1,10 +1,4 @@
-
-using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Graphics.Fonts;
-using Cosmos.Kernel.System.Mouse;
-using System.Diagnostics;
-using System.Drawing;
 using Windose;
 
 
@@ -32,6 +26,7 @@ public class Explorer : SingleThreadedProcess
 
     public override void Update()
     {
+        base.Update();
         desktop.Update();
         taskbar.Update();
     }

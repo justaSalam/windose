@@ -139,7 +139,6 @@ public class Component : IDisposable
 
 
     protected DirectBitmap buffer;
-    private DirectBitmap cacheBuffer;
     public Rectangle rectangle;
     public Rectangle clampedBounds = new Rectangle(0, 0, 50, 50);
     public State state;
@@ -620,14 +619,6 @@ public class Component : IDisposable
         {
             int newBufferWidth = RoundUpToChunk(Math.Max(width, buffer.Width), 64);
             int newBufferHeight = RoundUpToChunk(Math.Max(height, buffer.Height), 64);
-
-            buffer = new DirectBitmap(newBufferWidth, newBufferHeight);
-
-            for (int i = 0; i < children.Count; i++)
-                children[i].BindRenderSurface(buffer);
-
-            if (cacheBuffer != null)
-                cacheBuffer = new DirectBitmap(newBufferWidth, newBufferHeight);
         }
 
         WindowManager.Invalidate(oldRectangle);
@@ -1041,7 +1032,6 @@ public class Component : IDisposable
         children.Clear();
 
         buffer?.Dispose();
-        cacheBuffer?.Dispose();
         components.Remove(this);
     }
 }

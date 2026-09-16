@@ -1,8 +1,5 @@
 using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Network;
-using Cosmos.Kernel.System.Network.Config;
-using Cosmos.Kernel.System.Network.IPv4.UDP.DHCP;
 using Windose.Programs;
 using Windose.System.System_Calls;
 
