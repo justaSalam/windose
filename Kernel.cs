@@ -1,3 +1,4 @@
+using Cosmos.Kernel.Core.Scheduler;
 using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
@@ -31,10 +32,11 @@ public class Kernel : Sys.Kernel
     public CosmosDisplayDriver displayDriver = null!;
     protected override void BeforeRun()
     {
-
         try
         {
+            Console.WriteLine("[boot] BeforeRun");
             InitializeKernel();
+            Console.WriteLine("[boot] BeforeRun done");
         }
         catch (Exception exception)
         {
@@ -43,18 +45,18 @@ public class Kernel : Sys.Kernel
         }
     }
 
-    private async void InitializeKernel()
+    private void InitializeKernel()
     {
         Instance = this;
+
         Palette.Initialize();
 
+        SystemLogger.WriteLine("BOOT", "FileSystemManager.Setup() starting", ConsoleMessageType.Log);
+        FileSystemManager.Setup();
 
-        //TODO: 
-        //main partition, copy files, general setup
-        Setup.Run();
+        SystemLogger.WriteLine("BOOT", "Canvas starting", ConsoleMessageType.Log);
 
-
-        canvas = Canvas.GetFullScreen();
+        canvas = Canvas.GetFullScreen(new Mode(1920, 1080, ColorDepth.ColorDepth32));
 
         Console.WriteLine("Canvas:     " + canvas.Name);
         Console.WriteLine("Resolution: " + canvas.Width + "x" + canvas.Height);
@@ -105,10 +107,24 @@ public class Kernel : Sys.Kernel
     public static double DeltaTimeMs;
     public static double DeltaTimeSeconds;
     public static int Fps;
+
+
+    public static ulong startWall;
+    public static ulong endWall;
+    public static ulong wallDelta;
+
+    public static ulong startBusy;
+    public static ulong endBusy;
+    public static ulong busyDelta;
+
+    public static double utilization;
     protected override void Run()
     {
         try
         {
+            startWall = Clock.Nanoseconds;
+            startBusy = SchedulerInfo.BusyCpuTimeNs;
+
             Mouse.Update();
             System.Drivers.Keyboard.BeginFrame();
             Tick();
@@ -122,6 +138,19 @@ public class Kernel : Sys.Kernel
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
             displayDriver.Present(MouseManager.X, MouseManager.Y);
+            canvas.DrawString($"Util.: {utilization}%", SystemFonts.msSansSerif, Color.Black, 10, 10);
+
+            endWall = Clock.Nanoseconds;
+            endBusy = SchedulerInfo.BusyCpuTimeNs;
+
+            wallDelta = endWall - startWall;
+            busyDelta = endBusy - startBusy;
+
+            utilization = (double)busyDelta / (wallDelta * SchedulerInfo.CpuCount) * 100;
+
+
+
+
         }
         catch (Exception ex)
         {

@@ -10,7 +10,7 @@ public sealed class CommandPrompt : Window
     private readonly CommandContext context;
 
     public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460)
-        : base(x, y, width, height, "Command Prompt", true, new Png(ResourceLoader.FromStream("Windose.Resources.Icons.console_prompt.png")))
+        : base(x, y, width, height, "Command Prompt", true, new Png("mnt/System/Icons/console_prompt.png"))
     {
         CommandRegistry.EnsureBuiltIns();
 

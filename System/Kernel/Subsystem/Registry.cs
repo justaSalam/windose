@@ -32,7 +32,7 @@ public readonly struct RegistryChange
 
 public static class Registry
 {
-    public const string StoragePath = @"mnt/System/registry.db";
+    public const string StoragePath = @"/mnt/System/registry.db";
 
     private static readonly Dictionary<string, RegistryEntry> entries =
         new Dictionary<string, RegistryEntry>(StringComparer.OrdinalIgnoreCase);
@@ -78,10 +78,20 @@ public static class Registry
 
             Define($"{StaticRegistry.FileAssociation}/fallback", "/mnt/System/Icons/file_question.png");
             Define($"{StaticRegistry.FileAssociation}/.png", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.db", "/mnt/System/Icons/regedit_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.dat", "/mnt/System/Icons/file_windows.png");
-            Define($"{StaticRegistry.FileAssociation}/.sys", "/mnt/System/Icons/file_windows.png");
             Define($"{StaticRegistry.FileAssociation}/.breeze", "/mnt/System/Icons/script_file_blue.png");
+            Define($"{StaticRegistry.FileAssociation}/.db", "/mnt/System/Icons/regedit_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.log", "/mnt/System/Icons/event_log.png");
+
+            Define($"{StaticRegistry.FileAssociation}/.ttf", "/mnt/System/Icons/font_tt.png");
+            Define($"{StaticRegistry.FileAssociation}/.psf", "/mnt/System/Icons/font_bitmap.png");
+            Define($"{StaticRegistry.FileAssociation}/.psfu", "/mnt/System/Icons/font_bitmap.png");
+
+            Define($"{StaticRegistry.FileAssociation}/.elf", "/mnt/System/Icons/file_cd.png");
+            Define($"{StaticRegistry.FileAssociation}/.efi", "/mnt/System/Icons/file_gears.png");
+            Define($"{StaticRegistry.FileAssociation}/.conf", "/mnt/System/Icons/file_gears.png");
+            Define($"{StaticRegistry.FileAssociation}/.sys", "/mnt/System/Icons/file_windows.png");
+            Define($"{StaticRegistry.FileAssociation}/.dat", "/mnt/System/Icons/file_gears.png");
+
         }
 
         Load();

@@ -15,6 +15,9 @@ namespace Windose.System.System_Calls
 
         public static void WriteLine(string source, string message, ConsoleMessageType type = ConsoleMessageType.Log)
         {
+            ///ENABLE DEBUG ONLY
+            ///WILL INTERRUPT THE CANVAS
+            ///Console.WriteLine($"[{source}] {message}");
             Log.WriteString($"[{type}] [{source}] {message}\n");
             logBuilder.AppendLine($"<{DateTime.Now.ToString("HH:mm:ss")}> [{type}] [{source}] {message}");
 

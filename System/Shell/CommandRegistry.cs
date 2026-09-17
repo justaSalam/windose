@@ -6,6 +6,7 @@ using Cosmos.Kernel.HAL.Pci;
 using Cosmos.Kernel.HAL.Pci.Enums;
 using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System;
+using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Filesystems.Fat;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Network;
@@ -169,7 +170,7 @@ public static class CommandRegistry
 
         Register("diskmgr", "Disk Management Utility", "diskmgr", DiskManager);
         Register("svga", "Display Adapter Information", "svga [command]", DisplayProperties);
-        Register("sys", "System Information", "sys", SystemProperties);
+        Register("cpu", "System Information", "sys", SystemProperties);
 
         Register("uac", "User Access Control Settings", "uac [command]", DisplayUACSettings);
 
@@ -263,6 +264,25 @@ public static class CommandRegistry
 
     private static void SystemProperties(CommandContext context, string[] arguments)
     {
+        context.WriteLine($"Supported:   {SchedulerInfo.IsSupported}");
+        context.WriteLine($"Initialized: {SchedulerInfo.IsInitialized}");
+        context.WriteLine($"Running:     {SchedulerInfo.IsRunning}");
+
+        context.WriteLine($"CPU Count: {SchedulerInfo.CpuCount}");
+        context.WriteLine($"Thread Count: {SchedulerInfo.ThreadCount}");
+        context.WriteLine($"Thread Slot Count: {SchedulerInfo.ThreadSlotCount}");
+        context.WriteLine($"Total RAM: {ByteFormat.FormatBytes(MemoryInfo.RamSizeBytes)}");
+
+        context.WriteLine($"Timestamp start: {Windose.Kernel.startWall}");
+        context.WriteLine($"Timestamp end:   {Windose.Kernel.endWall}");
+        context.WriteLine($"Timestamp delta: {Windose.Kernel.wallDelta}");
+
+        context.WriteLine($"Busy start:      {Windose.Kernel.startBusy}");
+        context.WriteLine($"Busy end:        {Windose.Kernel.endBusy}");
+        context.WriteLine($"Busy delta:      {Windose.Kernel.busyDelta}");
+        context.WriteLine($"TOTAL BUSY:      {SchedulerInfo.BusyCpuTimeNs}");
+
+
     }
 
 
@@ -270,7 +290,7 @@ public static class CommandRegistry
 
     private static void DiskManager(CommandContext context, string[] arguments)
     {
-        if (!RequireArguments(context, arguments, 1, "diskmgr [command]")) return;
+        if (!RequireArguments(context, arguments, 1, "diskmgr [command] ?help")) return;
 
         switch (arguments[0])
         {
@@ -293,6 +313,21 @@ public static class CommandRegistry
                     {
                         context.WriteLine($"    {mount.Name} | {mount.MountPoint} | {mount.Source}");
                     }
+
+                    context.WriteLine($"\nMount Info :");
+
+                    if (VfsManager.TryStatFs("/mnt", out VfsStatFs stats))
+                    {
+                        ulong freeBytes = stats.Bavail * stats.BlockSize;
+                        ulong totalBytes = stats.Blocks * stats.BlockSize;
+
+                        context.WriteLine($"Total Size: {ByteFormat.FormatBytes(totalBytes)}");
+                        context.WriteLine($"Free Size: {ByteFormat.FormatBytes(freeBytes)}");
+                        context.WriteLine($"Fragment Size: {ByteFormat.FormatBytes(stats.Frsize)}");
+                        context.WriteLine($"Max. File name length: {stats.NameMax}");
+                        context.WriteLine($"FS TYPE MAGIC: {stats.Type}");
+                    }
+
 
                     context.WriteLine($"\nPartition Info: (Name | Block size | Block count)");
                     foreach (Partition partition in StorageManager.Partitions)

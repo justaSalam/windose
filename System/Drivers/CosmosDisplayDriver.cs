@@ -33,6 +33,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         if (State != WindoseDriverState.Started || canvas == null) return;
         long uploadStartedAt = PerformanceMetrics.Now;
         canvas.DrawCanvas(BackBuffer, 0, 0);
+        canvas.DrawString($"Util.: {Kernel.utilization:F3}%", SystemFonts.msSansSerif, Color.Black, 10, 10);
 
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 

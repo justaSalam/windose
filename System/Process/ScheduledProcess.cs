@@ -4,20 +4,24 @@ using Cosmos.Kernel.Core.IO;
 /// Runs blocking or CPU-heavy work on its own managed worker thread.
 /// Implementations must communicate with the UI through thread-safe queues.
 /// </summary>
-public abstract class ScheduledProcess : Process
+public class ScheduledProcess : Process
 {
+
+    public Action onStart;
+    public Action onUpdate;
+    public Action onDispose;
+
     private Thread workerThread;
     private volatile bool stopRequested = false;
     private volatile bool workerExited = false;
     private readonly int updateIntervalMs;
 
-    protected ScheduledProcess(string name, ProcessType processType, int updateIntervalMs = 100)
+    public ScheduledProcess(string name, ProcessType processType)
     {
         startInfo.Name = name;
 
         this.name = name;
         this.processType = processType;
-        this.updateIntervalMs = Math.Max(1, updateIntervalMs);
 
         Running = false;
         Initialized = false;
@@ -38,6 +42,7 @@ public abstract class ScheduledProcess : Process
 
             workerThread = new Thread(WorkerLoop);
             workerThread.Start();
+            onStart?.Invoke();
         }
         catch (Exception exception)
         {
@@ -72,7 +77,10 @@ public abstract class ScheduledProcess : Process
         }
     }
 
-    public abstract void Update();
+    public virtual void Update()
+    {
+        onUpdate?.Invoke();
+    }
 
     protected virtual int GetNextUpdateIntervalMs() => updateIntervalMs;
 
@@ -90,6 +98,7 @@ public abstract class ScheduledProcess : Process
         RequestStop();
         Initialized = false;
         workerThread = null;
+        onDispose?.Invoke();
     }
 }
 

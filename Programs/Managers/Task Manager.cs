@@ -1,5 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
+using Cosmos.Kernel.System.Diagnostics;
 using Windose;
 
 public class PerformanceMonitor : Window
@@ -173,6 +174,8 @@ public class PerformanceMonitor : Window
         summary.MarkDirty();
         frameGraph.AddSample((float)Kernel.DeltaTimeMs, 16.7f);
 
+
+        memoryGraph.AddSample(MemoryInfo.TotalPages * MemoryInfo.PageSizeBytes);
     }
 
     public override string GetComponentName() => "PerformanceMonitor";

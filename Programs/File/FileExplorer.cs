@@ -277,7 +277,9 @@ public class FileExplorer : Window
         tree.ClearItems();
 
         PopulateFilesystemLocation(path);
+
         TreeViewItem treeRoot = tree.AddRoot(path, path);
+        TreeViewItem bootTree = tree.AddRoot("/boot", "/boot");
 
 
         foreach (string dir in Directory.GetDirectories(path))
@@ -286,6 +288,11 @@ public class FileExplorer : Window
             PopulateTreeItem(treeItem);
         }
 
+        foreach (string dir in Directory.GetDirectories("/boot"))
+        {
+            TreeViewItem treeItem = bootTree.AddChild(Path.GetFileName(dir), dir);
+            PopulateTreeItem(treeItem);
+        }
     }
 
     private void PopulateTreeItem(TreeViewItem item)

@@ -1,4 +1,5 @@
 using System.Drawing;
+using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Windose.System.System_Calls;
@@ -52,10 +53,9 @@ public class Window : Component
 
         process = new SingleThreadedProcess(title, ProcessType.Program);
 
+        process.onStart += () => WindowManager.PostRegister(this);
         process.onDispose += () => WindowManager.PostClose(this);
         process.onUpdate += Update;
-        process.onStart += () => WindowManager.PostRegister(this);
-
 
         TitlebarSetup(useTitleBar, title);
     }
@@ -64,6 +64,7 @@ public class Window : Component
     public void Start()
     {
         ProcessManger.QueueStart(process);
+
     }
 
     public override void Update()
@@ -71,7 +72,6 @@ public class Window : Component
         try
         {
             base.Update();
-
         }
         catch (Exception ex)
         {

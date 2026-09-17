@@ -3,18 +3,19 @@
     public const long kilo = 1024;
     public const long mega = kilo * 1024;
     public const long giga = mega * 1024;
+    public const long tera = giga * 1024;
 
 
     public static string FormatBytes(long bytes)
     {
-        if (bytes < kilo)
-            return $"{bytes} bytes";
-        else if (bytes < mega)
-            return $"{(bytes / (double)kilo):F2} KB";
-        else if (bytes < giga)
-            return $"{(bytes / (double)mega):F2} MB";
-        else
-            return $"{(bytes / (double)giga):F2} GB";
+        return bytes switch
+        {
+            < kilo => $"{bytes} bytes",
+            < mega => $"{bytes / kilo:F2} KB",
+            < giga => $"{bytes / mega:F2} MB",
+            < tera => $"{bytes / giga:F2} GB",
+            _ => $"{bytes / tera:F2} TB",
+        };
     }
 
     public static string FormatBytes(byte[] bytes)
@@ -24,14 +25,14 @@
 
     public static string FormatBytes(ulong bytes)
     {
-        if (bytes < kilo)
-            return $"{bytes} B";
-        else if (bytes < mega)
-            return $"{(bytes / (double)kilo):F2} KB";
-        else if (bytes < giga)
-            return $"{(bytes / (double)mega):F2} MB";
-        else
-            return $"{(bytes / (double)giga):F2} GB";
+        return bytes switch
+        {
+            < kilo => $"{bytes} bytes",
+            < mega => $"{bytes / kilo:F2} KB",
+            < giga => $"{bytes / mega:F2} MB",
+            < tera => $"{bytes / giga:F2} GB",
+            _ => $"{bytes / tera:F2} TB",
+        };
     }
 
 
