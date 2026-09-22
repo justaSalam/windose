@@ -34,13 +34,14 @@ public class Kernel : Sys.Kernel
     {
         try
         {
-            Console.WriteLine("[boot] BeforeRun");
+            SystemLogger.WriteLine("BOOT", "BeforeRun starting", ConsoleMessageType.Log);
+
             InitializeKernel();
-            Console.WriteLine("[boot] BeforeRun done");
+
         }
         catch (Exception exception)
         {
-            Console.WriteLine(exception.Message);
+            SystemLogger.WriteLine("BOOT", "Error occurred while initializing kernel, " + exception.Message, ConsoleMessageType.Error);
             Log.WriteString("KERNEL FAILED TO INIT\n");
         }
     }
@@ -87,7 +88,7 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(new HotkeyManager());
 
 
-        Log.WriteString("KERNEL INIT\n");
+        
         Directory.CreateDirectory("/mnt/Programs");
         Directory.CreateDirectory("/mnt/Apps");
         File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
@@ -96,11 +97,11 @@ public class Kernel : Sys.Kernel
 
 
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Tab, Modifiers = ConsoleModifiers.Alt }, WindowManager.SwapFocusedWindow);
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.E & ConsoleKeyEx.LWin }, () => WindowManager.PostRegister(new FileExplorer(100, 100, 800, 500, "File Explorer")));
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
 
-        //File.WriteAllBytes("/mnt/System/kbReadTest.bin", new byte[1024]);
-        //File.WriteAllBytes("/mnt/System/mbReadTest.bin", new byte[1024 * 1024]);
     }
 
     private long lastFrameTicks;

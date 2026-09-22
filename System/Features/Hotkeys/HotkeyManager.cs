@@ -7,11 +7,14 @@ public class HotkeyManager : SingleThreadedProcess
 {
     public static List<GlobalHotkey> Hotkeys = new List<GlobalHotkey>();
 
+    public static Queue<QueueCommand> CommandQueue = new Queue<QueueCommand>();
+
     public HotkeyManager() : base("syshtks", ProcessType.Kernel)
     { 
         canOverridePriority = false;
         canTerminate = false;
         Priority = ProcessPriority.High;
+        
     }
 
     public static void RegisterHotkey(KeyEvent keyEvent, Action action)
@@ -24,6 +27,8 @@ public class HotkeyManager : SingleThreadedProcess
     {
         Hotkeys.RemoveAll(h => h.keyEvent.Key == keyEvent.Key && h.keyEvent.Modifiers == keyEvent.Modifiers);
     }
+
+    
 
     public static void HandleKeyEvent()
     {
@@ -46,9 +51,15 @@ public class HotkeyManager : SingleThreadedProcess
 
     }
 
+
+
     public override void Update()
     {
         HandleKeyEvent();
     }
+}
+public struct QueueCommand
+{
+    public GlobalHotkey hotkey;
 }
 
