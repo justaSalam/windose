@@ -4,10 +4,15 @@ using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using System.Drawing;
+using Wacs.Core;
+using Wacs.Core.Runtime;
 using Windose.Drivers;
 using Windose.Installer;
 using Windose.Programs.Breeze;
+using Windose.System.ABI.WIN;
+using Windose.System.Kernel.FileSystem;
 using Windose.System.System_Calls;
+using Windose.System.WASM;
 using Sys = Cosmos.Kernel.System;
 
 
@@ -45,7 +50,7 @@ public class Kernel : Sys.Kernel
             Log.WriteString("KERNEL FAILED TO INIT\n");
         }
     }
-
+    private WasmRuntime runtime;
     private void InitializeKernel()
     {
         Instance = this;
@@ -54,6 +59,12 @@ public class Kernel : Sys.Kernel
 
         SystemLogger.WriteLine("BOOT", "FileSystemManager.Setup() starting", ConsoleMessageType.Log);
         FileSystemManager.Setup();
+        
+        runtime = new WasmRuntime();
+        WinHost host = new WinHost(runtime);
+        host.Register();
+        SystemLogger.WriteLine("WASM", "Runtime initialized", ConsoleMessageType.Log, true);
+
 
         SystemLogger.WriteLine("BOOT", "Canvas starting", ConsoleMessageType.Log);
 
@@ -65,6 +76,7 @@ public class Kernel : Sys.Kernel
 
 
         MouseManager.SetScreenSize(canvas.Width, canvas.Height);
+
 
         displayDriver = new CosmosDisplayDriver();
         DriverManager.Register(displayDriver);
@@ -101,6 +113,25 @@ public class Kernel : Sys.Kernel
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
+        
+
+        if (IO.TryLoadFile("/mnt/Programs/win.wasm", out byte[] program))
+        {
+            //using var stream = new MemoryStream(program);
+
+            //Module module = BinaryModuleParser.ParseWasm(stream);
+
+            //var instance = runtime.InstantiateModule(module);
+
+            //runtime.RegisterModule("app", instance);
+
+            //if (runtime.TryGetExportedFunction(("app", "main"), out var mainAddr))
+            //{
+                //Func<Value> main = runtime.CreateInvokerFunc<Value>(mainAddr);
+                //main();
+               
+            //}
+        }
 
     }
 

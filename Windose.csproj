@@ -12,11 +12,12 @@
     <PackageReference Include="Cosmos.Kernel" Version="3.0.88" />
     <PackageReference Include="Cosmos.Kernel.System" Version="3.0.88" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
+    <PackageReference Include="WACS" Version="0.16.14" />
   </ItemGroup>
 
     <ItemGroup>
     <EmbeddedResource Include=".\Resources\Fonts\ARIAL.TTF" />
-    <EmbeddedResource Include=".\Resources\Fonts\MSSansSerif.ttf"/>
+    <EmbeddedResource Include=".\Resources\Fonts\MSSansSerif.ttf" />
     <EmbeddedResource Include=".\Resources\Cursors\arrow.png" />
     <EmbeddedResource Include=".\Resources\Fonts\spleen-12x24.psfu" />
     <EmbeddedResource Include=".\Resources\Fonts\spleen-16x32.psfu" />
