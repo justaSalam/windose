@@ -22,7 +22,6 @@ public class AddressBar : Component
 
         addressField = new TextField(68, 3, width - 92, height - 6)
         {
-            fontSize = 16,
             text = "",
             clampSize = false,
             horizontalAlignment = HorizontalAlignment.Stretch,

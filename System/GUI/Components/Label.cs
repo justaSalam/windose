@@ -6,10 +6,10 @@ public class Label : Component
 
     public bool useBackground = true;
     public bool useForeground = false;
-    public int fontSize = 0;
+    public int fontSize = 16;
     public Color textColor = Palette.ControlBlack;
 
-    public Font? font;
+    public TrueTypeFont font = new TrueTypeFont("/mnt/System/Fonts/ARIAL.ttf");
 
     public HorizontalAlignment horizontalTextAlignment;
     public VerticalAlignment verticalTextAlignment;
@@ -41,8 +41,8 @@ public class Label : Component
         if (string.IsNullOrEmpty(text))
             return;
 
-        int effectiveFontSize = fontSize > 0
-            ? fontSize
+        int effectiveFontSize = font.SizePx > 0
+            ? font.SizePx
             : Math.Max(1, Height - 4);
 
         string[] lines = text.Split("\n");
@@ -65,7 +65,7 @@ public class Label : Component
         {
             string line = lines[i];
 
-            int textWidth = MeasureStringWidth(line, effectiveFontSize);
+            int textWidth = font.MeasureString(line, effectiveFontSize);
 
             int x = horizontalTextAlignment switch
             {
@@ -88,11 +88,7 @@ public class Label : Component
 
             if (font != null)
             {
-                DrawString(line, font, textColor, x, y);
-            }
-            else
-            {
-                DrawString(line, textColor, x, y, 12);
+                DrawString(line, font, fontSize,textColor, x, y);
             }
         }
     }

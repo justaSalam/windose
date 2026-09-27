@@ -8,7 +8,7 @@ public class ComboBox : Component
     private bool isDroppedDown;
     private float hoverBlend;
     private bool isPressed;
-    private readonly int collapsedHeight = 25;
+    private readonly int collapsedHeight = 20;
     private MenuPopup dropDown;
 
     public bool useBorders = true;

@@ -3,7 +3,6 @@ using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Timer;
-using Windose;
 
 public sealed class TerminalView : Component
 {

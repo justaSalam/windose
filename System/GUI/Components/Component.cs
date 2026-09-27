@@ -715,36 +715,24 @@ public class Component : IDisposable
 
     public void DrawString(string str, Color color, int x, int y)
     {
-
         buffer.DrawString(str, SystemFonts.msSansSerif, 16, color, x, y);
-
     }
 
-    //TODO Legacy method used with fontSize parameter, which is not used in the current implementation
-    //TODO Implement TTF font rendering in the future to support different font sizes + kamosko jebne ma
     public void DrawString(string str, Color color, int x, int y, int fontSize)
     {
         buffer.DrawString(str, SystemFonts.msSansSerif, fontSize, color, x, y);
     }
 
-    public void DrawString(string str, Font font, Color color, int x, int y)
-    {
-        buffer.DrawString(str, SystemFonts.msSansSerif, 16, color, x, y);
-    }
     public void DrawString(string str, TrueTypeFont font, int sizePx, Color color, int x, int y)
     {
         buffer.DrawString(str, font, sizePx, color, x, y);
 
     }
 
+    //TODO Replace with proper font measurement using TrueTypeFont
     public int MeasureStringWidth(string str, int fontSize)
     {
         return str.Length * Math.Max(1, PCScreenFont.DefaultFont.Width * fontSize / PCScreenFont.DefaultFont.Height);
-    }
-
-    public int MeasureStringWidth(string str, Font font)
-    {
-        return str.Length * font.Width;
     }
 
     public int MeasureStringHeight(int fontSize)//TODO co presne????

@@ -757,7 +757,6 @@ public sealed class BreezeRuntime
                     return new TextField(0, 0, 100, height)
                     {
                         text = ToText(args[0]),
-                        fontSize = 16,
                         clampSize = false,
                         Margin = new Thickness(0),
                     };
@@ -1558,7 +1557,6 @@ public sealed class BreezeRuntime
                     int fontSize = ToInt(value);
                     if (HasError) return;
                     else if (component is Panel panel) panel.fontSize = fontSize;
-                    else if (component is TextField field) field.fontSize = fontSize;
                     else if (component is ProgressBar progress) progress.fontSize = fontSize;
                     else if (component is RadioButton radio) radio.fontSize = fontSize;
                     else if (component is ComboBox combo) combo.fontSize = fontSize;

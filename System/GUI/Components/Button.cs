@@ -27,7 +27,9 @@ public class Button : Component
             useBackground = false,
             useForeground = false,
             textColor = textColor,
-            leftClickAction = leftClickAction
+            leftClickAction = leftClickAction,
+            horizontalTextAlignment = HorizontalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Center
         };
 
         AddChild(label);

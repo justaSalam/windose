@@ -181,10 +181,9 @@ public sealed class RegistryValueDialog : Window
 
     private static TextField AddField(Panel parent, int x, int y, int width, int height, string text)
     {
-        TextField field = new TextField(x, y, width, height)
+        TextField field = new TextField(x, y, width)
         {
             text = text ?? "",
-            fontSize = 16,
             clampSize = false,
             Margin = new Thickness(0),
         };

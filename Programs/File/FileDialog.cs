@@ -87,7 +87,6 @@ public sealed class FileDialog : Window
         fileName = new TextField(88, 4, Math.Max(120, width - 270), 26)
         {
             text = GetInitialFileName(this.options.InitialPath, this.options.DefaultFileName),
-            fontSize = 16,
             clampSize = false,
             horizontalAlignment = HorizontalAlignment.Stretch,
             Margin = new Thickness(4, 32, 174, 88),
