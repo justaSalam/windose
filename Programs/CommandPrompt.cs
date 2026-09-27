@@ -41,9 +41,10 @@ public sealed class CommandPrompt : Window
 
         context = new CommandContext(output.WriteLine, output.Clear, () => WindowManager.PostClose(this))
         {
-            CurrentDirectory = "/mnt"
+            CurrentDirectory = "/"
         };
-        input.prompt = () => context.CurrentDirectory + ">";
+
+        input.prompt = () => $"cosmos:{context.CurrentDirectory}$ ";
         input.submitted = Execute;
 
         root.AddDockChild(input, Dock.Bottom);

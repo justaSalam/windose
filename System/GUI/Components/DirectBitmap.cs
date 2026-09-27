@@ -1,5 +1,4 @@
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Graphics.Fonts;
 using System.Drawing;
 
 
@@ -148,17 +147,17 @@ public class DirectBitmap : Canvas
 
     public override void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
     {
-        int croppedWidth = Math.Min((int)image.Width, maxWidth);
-        int croppedHeigth = Math.Min((int)image.Height, maxHeight);
+        int croppedWidth = Math.Min(image.Width, maxWidth);
+        int croppedHeigth = Math.Min(image.Height, maxHeight);
 
-        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, croppedWidth, croppedHeigth);
+        DrawArrayAlphaClipped(image.RawData, image.Width, 0, 0, x, y, croppedWidth, croppedHeigth);
     }
 
 
 
     public new void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
-        DrawArrayAlphaClipped(image.RawData, (int)image.Width, 0, 0, x, y, (int)image.Width, (int)image.Height);
+        DrawArrayAlphaClipped(image.RawData, image.Width, 0, 0, x, y, image.Width, image.Height);
     }
 
     /// <summary>
@@ -197,22 +196,6 @@ public class DirectBitmap : Canvas
         }
     }
 
-    public override Color GetPointColor(int x, int y)
-    {
-        if (Buffer == null)
-        {
-            return Color.Black;
-        }
-
-        x += originX;
-        y += originY;
-        if (x < 0 || x >= Width || y < 0 || y >= Height)
-        {
-            return Color.Black;
-        }
-
-        return Color.FromArgb(Buffer[y * Width + x]);
-    }
     public override int GetRawPointColor(int x, int y)
     {
         if (Buffer == null)
@@ -230,36 +213,32 @@ public class DirectBitmap : Canvas
         return Buffer[y * Width + x];
     }
 
-
-    internal int GetPointOffset(int x, int y)
+    public void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
     {
-        return x * Stride + y * Pitch;
-    }
-
-    public override void DrawArray(Color[] colors, int x, int y, int width, int height)
-    {
-        for (int i = 0; i < width; i++)
+        if (height == -1)
         {
-            for (int j = 0; j < height; j++)
-            {
-                DrawPoint(colors[j * width + i], x + i, y + j);
-            }
+            height = width;
         }
-    }
-    public override void DrawArray(int[] colors, int x, int y, int width, int height)
-    {
-        DrawArrayClipped(colors, width, 0, 0, x, y, width, height);
-    }
 
-    private bool FontPixelSet(char c, Font font, int x, int y)
-    {
-        int bytesPerRow = (font.Width + 7) / 8;
-        int glyphOffset = font.Height * bytesPerRow * (byte)c;
-        byte value = font.Data[glyphOffset + y * bytesPerRow + x / 8];
+        Rectangle target = new Rectangle(originX + xStart, originY + yStart, width, height);
+        target = Rectangle.Intersect(target, clipBounds);
+        target = Rectangle.Intersect(target, new Rectangle(0, 0, Width, Height));
+        if (target.Width <= 0 || target.Height <= 0) return;
 
-        return font.ConvertByteToBitAddress(value, x % 8 + 1);
+        int argb = color.ToArgb();
+        int[] ?buffer = GetBuffer();
+
+        if (color.A == byte.MaxValue)
+        {
+            for (int y = target.Top; y < target.Bottom; y++)
+                Array.Fill(buffer, argb, y * Width + target.Left, target.Width);
+            return;
+        }
+
+        for (int y = target.Top; y < target.Bottom; y++)
+            for (int x = target.Left; x < target.Right; x++)
+                BlendTargetPixel(x, y, argb);
     }
-
     public virtual void DrawArrayClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
         if (colors == null || sourceWidth <= 0) return;
@@ -637,158 +616,6 @@ public class DirectBitmap : Canvas
         }
     }
 
-    public override void DrawCircle(Color color, int xCenter, int yCenter, int radius)
-    {
-        int num = radius;
-        int num2 = 0;
-        int num3 = 0;
-        while (num >= num2)
-        {
-            DrawPoint(color, xCenter + num, yCenter + num2);
-            DrawPoint(color, xCenter + num2, yCenter + num);
-            DrawPoint(color, xCenter - num2, yCenter + num);
-            DrawPoint(color, xCenter - num, yCenter + num2);
-            DrawPoint(color, xCenter - num, yCenter - num2);
-            DrawPoint(color, xCenter - num2, yCenter - num);
-            DrawPoint(color, xCenter + num2, yCenter - num);
-            DrawPoint(color, xCenter + num, yCenter - num2);
-            num2++;
-            if (num3 <= 0)
-            {
-                num3 += 2 * num2 + 1;
-            }
-
-            if (num3 > 0)
-            {
-                num--;
-                num3 -= 2 * num + 1;
-            }
-        }
-    }
-
-    public override void DrawFilledCircle(Color color, int x0, int y0, int radius)
-    {
-        int num = radius;
-        int num2 = 0;
-        int num3 = 1 - (radius << 1);
-        int num4 = 0;
-        int num5 = 0;
-        while (num >= num2)
-        {
-            for (int i = x0 - num; i <= x0 + num; i++)
-            {
-                DrawPoint(color, i, y0 + num2);
-                DrawPoint(color, i, y0 - num2);
-            }
-
-            for (int j = x0 - num2; j <= x0 + num2; j++)
-            {
-                DrawPoint(color, j, y0 + num);
-                DrawPoint(color, j, y0 - num);
-            }
-
-            num2++;
-            num5 += num4;
-            num4 += 2;
-            if ((num5 << 1) + num3 > 0)
-            {
-                num--;
-                num5 += num3;
-                num3 += 2;
-            }
-        }
-    }
-
-    public override void DrawEllipse(Color color, int xCenter, int yCenter, int xR, int yR)
-    {
-        int num = 2 * xR;
-        int num2 = 2 * yR;
-        int num3 = num2 & 1;
-        int num4 = 4 * (1 - num) * num2 * num2;
-        int num5 = 4 * (num3 + 1) * num * num;
-        int num6 = num4 + num5 + num3 * num * num;
-        int num7 = 0;
-        int num8 = xR;
-        num *= 8 * num;
-        num3 = 8 * num2 * num2;
-        while (num8 >= 0)
-        {
-            DrawPoint(color, xCenter + num8, yCenter + num7);
-            DrawPoint(color, xCenter - num8, yCenter + num7);
-            DrawPoint(color, xCenter - num8, yCenter - num7);
-            DrawPoint(color, xCenter + num8, yCenter - num7);
-            int num9 = 2 * num6;
-            if (num9 <= num5)
-            {
-                num7++;
-                num6 += (num5 += num);
-            }
-
-            if (num9 >= num4 || 2 * num6 > num5)
-            {
-                num8--;
-                num6 += (num4 += num3);
-            }
-        }
-    }
-
-    public override void DrawFilledEllipse(Color color, int xCenter, int yCenter, int yR, int xR)
-    {
-        for (int i = -yR; i <= yR; i++)
-        {
-            for (int j = -xR; j <= xR; j++)
-            {
-                if (j * j * yR * yR + i * i * xR * xR <= yR * yR * xR * xR)
-                {
-                    DrawPoint(color, xCenter + j, yCenter + i);
-                }
-            }
-        }
-    }
-
-    public new void DrawArc(int x, int y, int width, int height, Color color, int startAngle = 0, int endAngle = 360)
-    {
-        if (width != 0 && height != 0)
-        {
-            for (double num = startAngle; num < (double)endAngle; num += 0.5)
-            {
-                double num2 = Math.PI * num / 180.0;
-                int num3 = (int)((double)width * Math.Cos(num2));
-                int num4 = (int)((double)height * Math.Sin(num2));
-                DrawPoint(color, x + num3, y + num4);
-            }
-        }
-    }
-
-    public override void DrawPolygon(Color color, params Point[] points)
-    {
-        if (points == null || points.Length < 3) return;
-
-        for (int i = 0; i < points.Length - 1; i++)
-        {
-            Point point = points[i];
-            Point point2 = points[i + 1];
-            DrawLine(color, point.X, point.Y, point2.X, point2.Y);
-        }
-
-        Point point3 = points[0];
-        Point point4 = points[^1];
-        DrawLine(color, point3.X, point3.Y, point4.X, point4.Y);
-    }
-
-    public new void DrawSquare(Color color, int x, int y, int size)
-    {
-        DrawRectangle(color, x, y, size, size);
-    }
-
-    public override void DrawRectangle(Color color, int x, int y, int width, int height)
-    {
-        DrawLine(color, x, y, x + width, y);
-        DrawLine(color, x, y, x, y + height);
-        DrawLine(color, x, y + height - 1, x + width, y + height - 1);
-        DrawLine(color, x + width - 1, y, x + width - 1, y + height);
-    }
-
     public virtual void DrawRaisedRect(int x, int y, int width, int height)
     {
         DrawRaisedRect(x, y, width, height, Palette.ControlFace, Palette.ControlWhite, Palette.ControlShadow, Palette.ControlBlack);
@@ -861,46 +688,6 @@ public class DirectBitmap : Canvas
         DrawLine(highlight, right, y + 1, right, bottom);
     }
 
-    public new void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
-    {
-        if (height == -1)
-        {
-            height = width;
-        }
-
-        Rectangle target = new Rectangle(originX + xStart, originY + yStart, width, height);
-        target = Rectangle.Intersect(target, clipBounds);
-        target = Rectangle.Intersect(target, new Rectangle(0, 0, Width, Height));
-        if (target.Width <= 0 || target.Height <= 0) return;
-
-        int argb = color.ToArgb();
-        int[] buffer = GetBuffer();
-        if (color.A == byte.MaxValue)
-        {
-            for (int y = target.Top; y < target.Bottom; y++)
-                Array.Fill(buffer, argb, y * Width + target.Left, target.Width);
-            return;
-        }
-
-        for (int y = target.Top; y < target.Bottom; y++)
-            for (int x = target.Left; x < target.Right; x++)
-                BlendTargetPixel(x, y, argb);
-    }
-
-    public override void DrawTriangle(Color color, int v1x, int v1y, int v2x, int v2y, int v3x, int v3y)
-    {
-        DrawLine(color, v1x, v1y, v2x, v2y);
-        DrawLine(color, v1x, v1y, v3x, v3y);
-        DrawLine(color, v2x, v2y, v3x, v3y);
-    }
-
-    protected bool IsCoordinateValid(int x, int y)
-    {
-        x += originX;
-        y += originY;
-        return ContainsClipped(x, y);
-    }
-
     private bool ContainsClipped(int x, int y)
     {
         return x >= 0 && x < Width && y >= 0 && y < Height &&
@@ -931,10 +718,10 @@ public class DirectBitmap : Canvas
     {
         if (x1 == x2)
         {
-            x1 = Math.Min((Width - 1), Math.Max(0, x1));
+            x1 = Math.Min(Width - 1, Math.Max(0, x1));
             x2 = x1;
-            y1 = Math.Min((Height - 1), Math.Max(0, y1));
-            y2 = Math.Min((Height - 1), Math.Max(0, y2));
+            y1 = Math.Min(Height - 1, Math.Max(0, y1));
+            y2 = Math.Min(Height - 1, Math.Max(0, y2));
             return;
         }
 
@@ -949,10 +736,10 @@ public class DirectBitmap : Canvas
             num = 0f;
             num2 = num6;
         }
-        else if (num >= (float)Width)
+        else if (num >= Width)
         {
             num = Width - 1;
-            num2 = (float)(Width - 1) * num5 + num6;
+            num2 = (Width - 1) * num5 + num6;
         }
 
         if (num3 < 0f)
@@ -960,10 +747,10 @@ public class DirectBitmap : Canvas
             num3 = 0f;
             num4 = num6;
         }
-        else if (num3 >= (float)Width)
+        else if (num3 >= Width)
         {
             num3 = Width - 1;
-            num4 = (float)(Width - 1) * num5 + num6;
+            num4 = (Width - 1) * num5 + num6;
         }
 
         if (num2 < 0f)
@@ -971,9 +758,9 @@ public class DirectBitmap : Canvas
             num = (0f - num6) / num5;
             num2 = 0f;
         }
-        else if (num2 >= (float)Height)
+        else if (num2 >= Height)
         {
-            num = ((float)(Height - 1) - num6) / num5;
+            num = (Height - 1 - num6) / num5;
             num2 = Height - 1;
         }
 
@@ -982,13 +769,13 @@ public class DirectBitmap : Canvas
             num3 = (0f - num6) / num5;
             num4 = 0f;
         }
-        else if (num4 >= (float)Height)
+        else if (num4 >= Height)
         {
-            num3 = ((float)(Height - 1) - num6) / num5;
+            num3 = (Height - 1 - num6) / num5;
             num4 = Height - 1;
         }
 
-        if (num < 0f || num >= (float)Width || num2 < 0f || num2 >= (float)Height)
+        if (num < 0f || num >= Width || num2 < 0f || num2 >= Height)
         {
             num = 0f;
             num3 = 0f;
@@ -996,7 +783,7 @@ public class DirectBitmap : Canvas
             num4 = 0f;
         }
 
-        if (num3 < 0f || num3 >= (float)Width || num4 < 0f || num4 >= (float)Height)
+        if (num3 < 0f || num3 >= Width || num4 < 0f || num4 >= Height)
         {
             num = 0f;
             num3 = 0f;

@@ -1,5 +1,8 @@
 using System.Drawing;
+using Cosmos.Kernel.HAL.Interfaces.Devices;
+using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
+using Cosmos.Kernel.System.Timer;
 using Windose;
 
 public sealed class TerminalView : Component
@@ -99,29 +102,47 @@ public sealed class CommandLineInput : Component
     private int historyIndex;
     public Func<string> prompt;
     public Action<string> submitted;
-    public int fontSize = 16;
 
+    private bool cursorVisible = true;
+    private SoftwareTimer ?timer;
+
+    private TrueTypeFont font = SystemFonts.msSansSerif;
+    private int fontSize = 16;
     public CommandLineInput(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
         Margin = new Thickness(0);
+
+        timer = TimerManager.ScheduleRecurring(() =>
+        {
+            cursorVisible = !cursorVisible;
+            MarkDirty();
+        }, TimeSpan.FromMilliseconds(500));
     }
 
     public override void DrawLocal()
     {
         DrawFilledRectangle(Color.Black, 0, 0, Width, Height);
+
         string prefix = prompt?.Invoke() ?? ">";
-        int prefixWidth = MeasureStringWidth(prefix, fontSize);
-        DrawString(prefix, Color.FromArgb(128, 255, 128), 4, 3, fontSize);
+        int prefixWidth = font.MeasureString(prefix);
+
+        DrawString(prefix, font, fontSize, Color.FromArgb(128, 255, 128), 4, 3);
 
         int available = Math.Max(1, Width - prefixWidth - 14);
         string visible = text ?? "";
-        while (visible.Length > 0 && MeasureStringWidth(visible, fontSize) > available)
+        while (visible.Length > 0 && font.MeasureString(visible) > available)
+        {
             visible = visible.Substring(1);
+        }
 
         int textX = 6 + prefixWidth;
-        DrawString(visible, Palette.ControlWhite, textX, 3, fontSize);
-        DrawString("_", Palette.ControlWhite, textX + MeasureStringWidth(visible, fontSize), 3, fontSize);
+        DrawString(visible, font, fontSize, Palette.ControlWhite, textX, 3);
+
+        if (cursorVisible)
+        {
+            DrawString("_", font, fontSize, Palette.ControlWhite, textX + font.MeasureString(visible), 3);
+        }
         DrawLine(Palette.ControlShadow, 0, 0, Width - 1, 0);
     }
 
@@ -130,10 +151,19 @@ public sealed class CommandLineInput : Component
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
         bool isControlPressed = IsControlPressed(keyEvent);
+
         if (isControlPressed)
         {
-            if (keyEvent.Key == ConsoleKeyEx.C) WindoseClipboard.SetText(text ?? "");
-            else if (keyEvent.Key == ConsoleKeyEx.V && WindoseClipboard.HasText) text += WindoseClipboard.Text.Replace("\r", "").Replace("\n", " ");
+            if (keyEvent.Key == ConsoleKeyEx.C)
+            {
+                WindoseClipboard.SetText(text ?? "");
+            }
+
+            else if (keyEvent.Key == ConsoleKeyEx.V && WindoseClipboard.HasText)
+            {
+                text += WindoseClipboard.Text.Replace("\r", "").Replace("\n", " ");
+            }
+
             MarkDirty();
             return;
         }
@@ -142,11 +172,7 @@ public sealed class CommandLineInput : Component
         {
             case ConsoleKeyEx.Enter:
                 string command = text ?? "";
-                if (!string.IsNullOrWhiteSpace(command))
-                {
-                    history.Add(command);
-                    if (history.Count > 100) history.RemoveAt(0);
-                }
+
                 historyIndex = history.Count;
                 text = "";
                 submitted?.Invoke(command);
@@ -189,4 +215,11 @@ public sealed class CommandLineInput : Component
 
     public override bool IsOpaqueForCopy() => true;
     public override string GetComponentName() => "CommandLineInput";
+
+    public override void Dispose()
+    {
+        TimerManager.Cancel(timer);
+        base.Dispose();
+
+    }
 }
