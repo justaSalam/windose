@@ -22,8 +22,6 @@ public static class CommandRegistry
 
     static CommandRegistry()
     {
-        // Register built-in commands on first access to the registry.
-        EnsureBuiltIns();
     }
 
     public static bool Register(IShellCommand command)
@@ -45,6 +43,8 @@ public static class CommandRegistry
 
     public static void Execute(CommandContext context, string commandLine)
     {
+        if(context == null) throw new ArgumentNullException(nameof(context));
+
         string[] parts = Parse(commandLine);
         if (parts.Length == 0) return;
 
@@ -93,6 +93,7 @@ public static class CommandRegistry
 
         Register(new UacCommand());
         Register(new DirectoryCommand());
+        Register(new DiskPart());
 
 
         // Register(new DiskManagerCommand());

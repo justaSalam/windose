@@ -52,7 +52,7 @@ namespace Windose.System.Kernel.Subsystem
                 PrivilegeLevel privilegeLevel = ParsePrivilege(args[2]);
 
                 UserAccount.accounts.Add(new UserAccount(username, password, privilegeLevel));
-                
+
             }
 
         }
@@ -68,7 +68,10 @@ namespace Windose.System.Kernel.Subsystem
                 isElevated = true;
                 return true;
             }
-            return false;
+            else
+            {
+                return false;
+            }
         }
 
         public static void EndElevate()

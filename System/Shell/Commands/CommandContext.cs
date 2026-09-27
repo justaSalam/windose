@@ -3,25 +3,27 @@
     private readonly Action<string> writeLine;
     private readonly Action clear;
     private readonly Action close;
+    private readonly Func<string, string> readLine;
 
     public string CurrentDirectory { get; set; } = "/";
 
-    public CommandContext(Action<string> writeLine, Action clear, Action close)
+    public CommandContext(Action<string> writeLine, Action clear, Action close, Func<string, string> readLine)
     {
         this.writeLine = writeLine;
         this.clear = clear;
         this.close = close;
+        this.readLine = readLine;
     }
 
     public void WriteLine(string text = "") => writeLine?.Invoke(text ?? "");
-    public void ReadLine(string prompt, Action<string> callback)
-    {
-        WriteLine(prompt);
-        string input = Console.ReadLine() ?? "";
-        callback?.Invoke(input);
-    }
     public void Clear() => clear?.Invoke();
     public void Close() => close?.Invoke();
+
+    // Blocks the CALLING thread (the command's own worker thread) until the
+    // user submits a line in the owning TerminalConsole. Call this only from
+    // a command's worker thread — never from the thread that delivers
+    // keyboard events, or it deadlocks against itself.
+    public string ReadLine(string prompt) => readLine(prompt);
 
     public string ResolvePath(string path)
     {
@@ -35,7 +37,10 @@
             return CurrentDirectory;
 
         if (path == "..")
-            return Path.GetPathRoot(path);
+        {
+            string parent = Path.GetDirectoryName(CurrentDirectory.TrimEnd('/'));
+            return string.IsNullOrEmpty(parent) ? "/" : parent;
+        }
 
         return Path.Combine(CurrentDirectory, path);
     }

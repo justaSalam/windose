@@ -1,25 +1,28 @@
 ﻿using Windose.System.Kernel.Subsystem;
 
-public sealed class UacCommand : IShellCommand
+public sealed class UacCommand : InteractiveShellCommand
 {
-    public string Name => "uac";
-    public string Description => "User Access Control Settings";
-    public string Usage => "uac [command]";
+    public override string Name => "uac";
 
-    private readonly SubcommandDispatcher dispatcher;
+    public override string Description => "Interactive User Account Control";
 
-    public UacCommand()
+    public override string Usage => "uac";
+
+    protected override string Prompt => "UAC>";
+
+    protected override SubcommandDispatcher BuildDispatcher()
     {
-        dispatcher = new SubcommandDispatcher(Usage)
+        return new SubcommandDispatcher(Usage)
             .Add("status", "", 0, Status)
             .Add("create", "<username> <password> <privilege>", 3, Create)
             .Add("login", "<username> <password>", 2, Login)
             .Add("override", "<new password>", 1, Override)
-            .Add("elevate", "", 0, Elevate)
+            .Add("elevate", "<password>", 0, Elevate)
             .Add("end", "", 0, End);
     }
-
-    public void Execute(CommandContext context, string[] args) => dispatcher.Dispatch(context, args);
+   
+    
+   
 
     private void Status(CommandContext context, string[] args)
     {
@@ -61,12 +64,21 @@ public sealed class UacCommand : IShellCommand
             context.WriteLine("No user is currently logged in.");
             return;
         }
-        context.WriteLine("Elevate not implemented yet.");
-        // TODO: context.ReadLine() for password prompt
+        if(!Session.TryElevate(args[0]))
+        {
+            context.WriteLine("Failed to elevate.");
+            context.WriteLine("Invalid password.");
+            return;
+        }
+
+        context.WriteLine("Session Elevated!");
+
+
     }
 
     private void End(CommandContext context, string[] args)
     {
         context.WriteLine("Privileges de-elevated.");
     }
+
 }

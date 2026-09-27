@@ -1,23 +1,54 @@
-using System.Drawing;
 using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Timer;
+using System.Collections.Concurrent;
+using System.Drawing;
 
 public sealed class TerminalView : Component
 {
     public override bool HandlesMouseWheel => true;
+
     private readonly List<string> lines = new List<string>();
+    private readonly List<string> history = new List<string>();
+    // Enter on the input line pushes here. ReadLineSync (called from a
+    // command's own worker thread) blocks on Take() until something arrives.
+    private readonly BlockingCollection<string> pendingInput = new BlockingCollection<string>();
+
     private int scrollLine;
+    private int historyIndex;
+    private bool cursorVisible = true;
+    private SoftwareTimer? cursorTimer;
+
+    private string inputText = "";
+    private bool isReadingLine;     // true while some command's ReadLineSync is blocked
+    private string activePrompt = "> ";
+
     public int fontSize = 16;
     public int maxLines = 500;
+
+    // Called with the finished line ONLY when nobody is inside ReadLineSync —
+    // i.e. this is a normal top-level command entry. Wire this to whatever
+    // dispatches onto the per-window/command worker thread; do NOT call
+    // CommandRegistryV2.Execute directly from in here, or the first command
+    // still blocks this input-delivery thread.
+    public Action<string>? OnTopLevelSubmit;
+
+    private TrueTypeFont font = SystemFonts.msSansSerif;
 
     public TerminalView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
         Margin = new Thickness(0);
+
+        cursorTimer = TimerManager.ScheduleRecurring(() =>
+        {
+            cursorVisible = !cursorVisible;
+            MarkDirty();
+        }, TimeSpan.FromMilliseconds(500));
     }
 
+    // ---- output, unchanged from TerminalView ----
     public void WriteLine(string text = "")
     {
         string[] sourceLines = (text ?? "").Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
@@ -34,6 +65,20 @@ public sealed class TerminalView : Component
         MarkDirty();
     }
 
+    // ---- blocking read for interactive commands (diskpart, uac elevate) ----
+    // Call this FROM the command's own worker thread, never from the thread
+    // that delivers keyboard events, or it deadlocks itself.
+    public string ReadLineSync(string prompt)
+    {
+        activePrompt = prompt;
+        isReadingLine = true;
+        MarkDirty();
+        string result = pendingInput.Take();
+        isReadingLine = false;
+        activePrompt = "> ";
+        return result;
+    }
+
     public override void Resize(int width, int height)
     {
         base.Resize(width, height);
@@ -46,19 +91,42 @@ public sealed class TerminalView : Component
         int lineHeight = LineHeight();
         int visibleLines = VisibleLineCount();
         int y = 3;
-        for (int i = scrollLine; i < lines.Count && i < scrollLine + visibleLines; i++)
+
+        // Reserve the last visible row for the live input line.
+        int scrollbackRows = Math.Max(0, visibleLines - 1);
+        for (int i = scrollLine; i < lines.Count && i < scrollLine + scrollbackRows; i++)
         {
             DrawString(lines[i], Palette.ControlWhite, 4, y, fontSize);
             y += lineHeight;
         }
 
+        DrawInputLine(y);
+
         if (MaxScrollLine() > 0)
         {
-            int barHeight = Math.Max(12, Height * visibleLines / Math.Max(1, lines.Count));
+            int barHeight = Math.Max(12, Height * scrollbackRows / Math.Max(1, lines.Count));
             int travel = Math.Max(0, Height - barHeight);
             int barY = MaxScrollLine() == 0 ? 0 : scrollLine * travel / MaxScrollLine();
             DrawFilledRectangle(Palette.ControlShadow, Width - 4, barY, 4, barHeight);
         }
+    }
+
+    private void DrawInputLine(int y)
+    {
+        string prefix = activePrompt;
+        int prefixWidth = font.MeasureString(prefix);
+        DrawString(prefix, font, fontSize, Color.FromArgb(128, 255, 128), 4, y);
+
+        int available = Math.Max(1, Width - prefixWidth - 14);
+        string visible = inputText ?? "";
+        while (visible.Length > 0 && font.MeasureString(visible) > available)
+            visible = visible.Substring(1);
+
+        int textX = 6 + prefixWidth;
+        DrawString(visible, font, fontSize, Palette.ControlWhite, textX, y);
+
+        if (cursorVisible)
+            DrawString("_", font, fontSize, Palette.ControlWhite, textX + font.MeasureString(visible), y);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
@@ -70,6 +138,89 @@ public sealed class TerminalView : Component
             MarkDirty();
         }
         return true;
+    }
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        bool isControlPressed = IsControlPressed(keyEvent);
+
+        if (isControlPressed)
+        {
+            if (keyEvent.Key == ConsoleKeyEx.C)
+                WindoseClipboard.SetText(inputText ?? "");
+            else if (keyEvent.Key == ConsoleKeyEx.V && WindoseClipboard.HasText)
+                inputText += WindoseClipboard.Text.Replace("\r", "").Replace("\n", " ");
+
+            MarkDirty();
+            return;
+        }
+
+        switch (keyEvent.Key)
+        {
+            case ConsoleKeyEx.Enter:
+                Submit();
+                return;
+
+            case ConsoleKeyEx.Backspace:
+                if (!string.IsNullOrEmpty(inputText)) inputText = inputText.Substring(0, inputText.Length - 1);
+                MarkDirty();
+                return;
+
+            case ConsoleKeyEx.UpArrow:
+                if (history.Count > 0)
+                {
+                    historyIndex = Math.Max(0, historyIndex - 1);
+                    inputText = history[historyIndex];
+                    MarkDirty();
+                }
+                return;
+
+            case ConsoleKeyEx.DownArrow:
+                if (history.Count > 0)
+                {
+                    historyIndex = Math.Min(history.Count, historyIndex + 1);
+                    inputText = historyIndex == history.Count ? "" : history[historyIndex];
+                    MarkDirty();
+                }
+                return;
+
+            default:
+                char printable = GetPrintableCharacter(keyEvent);
+                if (printable != '\0')
+                {
+                    inputText += printable;
+                    MarkDirty();
+                }
+                return;
+        }
+    }
+
+    private void Submit()
+    {
+        string submitted = inputText ?? "";
+        inputText = "";
+        historyIndex = history.Count;
+        if (submitted.Length > 0) history.Add(submitted);
+
+        // Echo what was typed into the scrollback — this is the part the
+        // old two-widget setup never did.
+        WriteLine(activePrompt + submitted);
+
+        if (isReadingLine)
+        {
+            // Feeds whatever command is blocked inside ReadLineSync. This is
+            // just a queue push — it does not run any command logic itself,
+            // so it can't deadlock no matter what thread we're on.
+            pendingInput.Add(submitted);
+        }
+        else
+        {
+            // Top-level command line. Hand off to a worker thread — do not
+            // invoke CommandRegistryV2.Execute directly from this method.
+            OnTopLevelSubmit?.Invoke(submitted);
+        }
+
+        MarkDirty();
     }
 
     private void AddWrappedLine(string value)
@@ -89,136 +240,16 @@ public sealed class TerminalView : Component
 
     private int LineHeight() => Math.Max(12, MeasureStringHeight(fontSize) + 2);
     private int VisibleLineCount() => Math.Max(1, (Height - 6) / LineHeight());
-    private int MaxScrollLine() => Math.Max(0, lines.Count - VisibleLineCount());
+    private int MaxScrollLine() => Math.Max(0, lines.Count - Math.Max(0, VisibleLineCount() - 1));
     private void ScrollToBottom() => scrollLine = MaxScrollLine();
-    public override bool IsOpaqueForCopy() => true;
-    public override string GetComponentName() => "TerminalView";
-}
-
-public sealed class CommandLineInput : Component
-{
-    private readonly List<string> history = new List<string>();
-    private int historyIndex;
-    public Func<string> prompt;
-    public Action<string> submitted;
-
-    private bool cursorVisible = true;
-    private SoftwareTimer ?timer;
-
-    private TrueTypeFont font = SystemFonts.msSansSerif;
-    private int fontSize = 16;
-    public CommandLineInput(int x, int y, int width, int height) : base(x, y, width, height)
-    {
-        clampSize = false;
-        Margin = new Thickness(0);
-
-        timer = TimerManager.ScheduleRecurring(() =>
-        {
-            cursorVisible = !cursorVisible;
-            MarkDirty();
-        }, TimeSpan.FromMilliseconds(500));
-    }
-
-    public override void DrawLocal()
-    {
-        DrawFilledRectangle(Color.Black, 0, 0, Width, Height);
-
-        string prefix = prompt?.Invoke() ?? ">";
-        int prefixWidth = font.MeasureString(prefix);
-
-        DrawString(prefix, font, fontSize, Color.FromArgb(128, 255, 128), 4, 3);
-
-        int available = Math.Max(1, Width - prefixWidth - 14);
-        string visible = text ?? "";
-        while (visible.Length > 0 && font.MeasureString(visible) > available)
-        {
-            visible = visible.Substring(1);
-        }
-
-        int textX = 6 + prefixWidth;
-        DrawString(visible, font, fontSize, Palette.ControlWhite, textX, 3);
-
-        if (cursorVisible)
-        {
-            DrawString("_", font, fontSize, Palette.ControlWhite, textX + font.MeasureString(visible), 3);
-        }
-        DrawLine(Palette.ControlShadow, 0, 0, Width - 1, 0);
-    }
-
-    public override bool HandleInput(int mouseX, int mouseY, MouseState mouse) => IsInsideAbsolute(mouseX, mouseY);
-
-    public override void HandleKeyboard(KeyEvent keyEvent)
-    {
-        bool isControlPressed = IsControlPressed(keyEvent);
-
-        if (isControlPressed)
-        {
-            if (keyEvent.Key == ConsoleKeyEx.C)
-            {
-                WindoseClipboard.SetText(text ?? "");
-            }
-
-            else if (keyEvent.Key == ConsoleKeyEx.V && WindoseClipboard.HasText)
-            {
-                text += WindoseClipboard.Text.Replace("\r", "").Replace("\n", " ");
-            }
-
-            MarkDirty();
-            return;
-        }
-
-        switch (keyEvent.Key)
-        {
-            case ConsoleKeyEx.Enter:
-                string command = text ?? "";
-
-                historyIndex = history.Count;
-                text = "";
-                submitted?.Invoke(command);
-                MarkDirty();
-                return;
-
-            case ConsoleKeyEx.Backspace:
-                if (!string.IsNullOrEmpty(text)) text = text.Substring(0, text.Length - 1);
-                MarkDirty();
-                return;
-
-            case ConsoleKeyEx.UpArrow:
-                if (history.Count > 0)
-                {
-                    historyIndex = Math.Max(0, historyIndex - 1);
-                    text = history[historyIndex];
-                    MarkDirty();
-                }
-                return;
-
-            case ConsoleKeyEx.DownArrow:
-                if (history.Count > 0)
-                {
-                    historyIndex = Math.Min(history.Count, historyIndex + 1);
-                    text = historyIndex == history.Count ? "" : history[historyIndex];
-                    MarkDirty();
-                }
-                return;
-
-            default:
-                char printable = GetPrintableCharacter(keyEvent);
-                if (printable != '\0')
-                {
-                    text += printable;
-                    MarkDirty();
-                }
-                return;
-        }
-    }
 
     public override bool IsOpaqueForCopy() => true;
-    public override string GetComponentName() => "CommandLineInput";
+    public override string GetComponentName() => "TerminalConsole";
 
     public override void Dispose()
     {
-        TimerManager.Cancel(timer);
+        TimerManager.Cancel(cursorTimer);
+        pendingInput.Dispose();
         base.Dispose();
-
     }
 }
