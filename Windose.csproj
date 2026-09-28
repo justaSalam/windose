@@ -229,9 +229,4 @@
     <EmbeddedResource Include=".\Resources\Wallpapers\WRAMW.png" />
   </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="System\Libs\" />
-      <Folder Include="System\Scheduler\" />
-    </ItemGroup>
-
 </Project>

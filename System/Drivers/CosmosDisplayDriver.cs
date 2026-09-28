@@ -1,6 +1,8 @@
 using System.Drawing;
-using Cosmos.Kernel.System.Diagnostics;
+using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Timer;
+using Windose.System.Kernel;
 
 namespace Windose.Drivers;
 
@@ -14,6 +16,9 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
     public int Width => canvas == null ? 0 : canvas.Width;
     public int Height => canvas == null ? 0 : canvas.Height;
 
+
+    private SoftwareTimer ?timer;
+
     public void Start()
     {
         canvas = Kernel.canvas;
@@ -26,6 +31,10 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         BackBuffer = new DirectBitmap(canvas.Width, canvas.Height);
         State = WindoseDriverState.Started;
 
+        timer = TimerManager.ScheduleRecurring(() =>
+        {
+            isCursorVisible = !isCursorVisible;
+        }, TimeSpan.FromMilliseconds(5));
     }
 
     public void Present(int cursorX, int cursorY)
@@ -55,8 +64,11 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         State = WindoseDriverState.Stopped;
     }
 
+    private bool isCursorVisible = true;
+
     private void DrawCursor(int x, int y)
     {
+        if (!isCursorVisible && LaunchTracker.isStarting) return;
         canvas.DrawImageAlpha(Cursors.arrow, x, y);
     }
 

@@ -1,6 +1,7 @@
 using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Graphics;
 using Windose.Programs;
+using Windose.System.Kernel;
 using Windose.System.System_Calls;
 
 public class StartMenu : Window
@@ -49,14 +50,14 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/directx.png"), "VMWare SVGA Test", () => WindowManager.Register(new GraphicsEngine()));
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () => WindowManager.Register(new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/directx.png"), "VMWare SVGA Test", () => LaunchTracker.Start(() => new GraphicsEngine()));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () => LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
 
             
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/hard_disk_drive_pie.png"), "Disk Management", () => WindowManager.Register(new DiskManagement(100, 100, 600, 350)));
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/msie.png"), "Internet Explorer", () => WindowManager.Register(new InternetExplorer(200, 200)));
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/computer_taskmgr.png"), "Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
-        
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/hard_disk_drive_pie.png"), "Disk Management", () => LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350)));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/msie.png"), "Internet Explorer", () => LaunchTracker.Start(() => new InternetExplorer(200, 200)));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/computer_taskmgr.png"), "Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
+
 
 
         programs.AddSubmenuSeparator();
@@ -64,8 +65,8 @@ public class StartMenu : Window
 
 
         MenuItem breeze = programs.AddSubmenuItem("Breeze");
-        breeze.AddSubmenuItem(new Png("/mnt/System/Icons/write_wordpad.png"), "Breeze Editor", () => WindowManager.Register(new BreezeEditor()));
-        breeze.AddSubmenuItem("Breeze API", () => WindowManager.Register(new BreezeApiBrowser()));
+        breeze.AddSubmenuItem(new Png("/mnt/System/Icons/write_wordpad.png"), "Breeze Editor", () => LaunchTracker.Start(() => new BreezeEditor()));
+        breeze.AddSubmenuItem("Breeze API", () => LaunchTracker.Start(() => new BreezeApiBrowser()));
 
 
         breeze.AddSubmenuItem("Breeze Demo", BreezeDemo.Run);
@@ -84,12 +85,13 @@ public class StartMenu : Window
 
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/console_prompt.png"), "Command Prompt", () =>
         {
-            WindowManager.Register(new CommandPrompt());
+            LaunchTracker.Start(() => new CommandPrompt());
         });
+
         MenuItem systemTools = programs.AddSubmenuItem("System Tools");
         systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/scanregw.png"), "Registry Editor", () =>
         {
-            WindowManager.Register(new RegistryEditor());
+            LaunchTracker.Start(() => new RegistryEditor());
         });
 
         MenuItem documents = new MenuItem(0, 0, width, 24)

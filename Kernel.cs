@@ -1,18 +1,13 @@
-using Cosmos.Kernel.Core.Scheduler;
 using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using System.Drawing;
-using Wacs.Core;
 using Wacs.Core.Runtime;
 using Windose.Drivers;
-using Windose.Installer;
 using Windose.Programs.Breeze;
 using Windose.System.ABI.WIN;
-using Windose.System.Kernel.FileSystem;
 using Windose.System.System_Calls;
-using Windose.System.WASM;
 using Sys = Cosmos.Kernel.System;
 
 
@@ -113,26 +108,7 @@ public class Kernel : Sys.Kernel
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
-        
-
-        if (IO.TryLoadFile("/mnt/Programs/win.wasm", out byte[] program))
-        {
-            //using var stream = new MemoryStream(program);
-
-            //Module module = BinaryModuleParser.ParseWasm(stream);
-
-            //var instance = runtime.InstantiateModule(module);
-
-            //runtime.RegisterModule("app", instance);
-
-            //if (runtime.TryGetExportedFunction(("app", "main"), out var mainAddr))
-            //{
-                //Func<Value> main = runtime.CreateInvokerFunc<Value>(mainAddr);
-                //main();
-               
-            //}
-        }
-
+       
     }
 
     private long lastFrameTicks;
@@ -170,7 +146,7 @@ public class Kernel : Sys.Kernel
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
             displayDriver.Present(MouseManager.X, MouseManager.Y);
-            canvas.DrawString($"Util.: {utilization}%", SystemFonts.msSansSerif, Color.Black, 10, 10);
+
 
             endWall = Clock.Nanoseconds;
             endBusy = SchedulerInfo.BusyCpuTimeNs;
@@ -181,8 +157,7 @@ public class Kernel : Sys.Kernel
             utilization = (double)busyDelta / (wallDelta * SchedulerInfo.CpuCount) * 100;
 
 
-
-
+            canvas.DrawString($"Util.: {utilization:F3}%", SystemFonts.msSansSerif, Color.White, 10, 10);
         }
         catch (Exception ex)
         {

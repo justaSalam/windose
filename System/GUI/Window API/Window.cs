@@ -53,7 +53,7 @@ public class Window : Component
 
         process = new SingleThreadedProcess(title, ProcessType.Program);
 
-        process.onStart += () => WindowManager.PostRegister(this);
+        //process.onStart += () => WindowManager.PostRegister(this);
         process.onDispose += () => WindowManager.PostClose(this);
         process.onUpdate += Update;
 
@@ -64,7 +64,6 @@ public class Window : Component
     public void Start()
     {
         ProcessManger.QueueStart(process);
-
     }
 
     public override void Update()

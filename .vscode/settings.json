@@ -7,5 +7,5 @@
     "limine.conf": "ini"
   },
   "editor.formatOnSave": true,
-  "dotnet.defaultSolution": "disable"
+  "dotnet.defaultSolution": "Windose.slnx"
 }

@@ -213,7 +213,7 @@ public class DirectBitmap : Canvas
         return Buffer[y * Width + x];
     }
 
-    public void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
+    public new void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
     {
         if (height == -1)
         {
@@ -226,8 +226,7 @@ public class DirectBitmap : Canvas
         if (target.Width <= 0 || target.Height <= 0) return;
 
         int argb = color.ToArgb();
-        int[] ?buffer = GetBuffer();
-
+        int[] buffer = GetBuffer();
         if (color.A == byte.MaxValue)
         {
             for (int y = target.Top; y < target.Bottom; y++)
@@ -239,6 +238,7 @@ public class DirectBitmap : Canvas
             for (int x = target.Left; x < target.Right; x++)
                 BlendTargetPixel(x, y, argb);
     }
+
     public virtual void DrawArrayClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
         if (colors == null || sourceWidth <= 0) return;
@@ -338,7 +338,10 @@ public class DirectBitmap : Canvas
             Array.Copy(colors, sourceIndex, buffer, destinationIndex, width);
         }
     }
-
+    public override void DrawArray(int[] colors, int x, int y, int width, int height)
+    {
+        DrawArrayClipped(colors, width, 0, 0, x, y, width, height);
+    }
     public virtual void DrawArrayAlphaClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
         DrawArrayAlphaClipped(colors, sourceWidth, sourceX, sourceY, destinationX, destinationY, width, height, 255);
