@@ -34,7 +34,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         timer = TimerManager.ScheduleRecurring(() =>
         {
             isCursorVisible = !isCursorVisible;
-        }, TimeSpan.FromMilliseconds(5));
+        }, TimeSpan.FromMilliseconds(83));
     }
 
     public void Present(int cursorX, int cursorY)
@@ -42,12 +42,14 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         if (State != WindoseDriverState.Started || canvas == null) return;
         long uploadStartedAt = PerformanceMetrics.Now;
         canvas.DrawCanvas(BackBuffer, 0, 0);
-        canvas.DrawString($"Util.: {Kernel.utilization:F3}%", SystemFonts.msSansSerif, Color.Black, 10, 10);
+        canvas.DrawString($"Util.: {Kernel.utilization:F3}%", SystemFonts.msSansSerif, Color.White, 10, 10);
 
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 
         long overlayStartedAt = PerformanceMetrics.Now;
         DrawCursor(cursorX, cursorY);
+        canvas.DrawString($"Starting Count: {LaunchTracker.startingCount}", SystemFonts.msSansSerif, Color.White, 10, 30);
+        canvas.DrawString($"Is starting: {LaunchTracker.isStarting}", SystemFonts.msSansSerif, Color.White, 10, 50);
         PerformanceMetrics.OverlayTicks = PerformanceMetrics.Now - overlayStartedAt;
 
 

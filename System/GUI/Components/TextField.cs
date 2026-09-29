@@ -1,6 +1,8 @@
 using System.Drawing;
+using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
+using Cosmos.Kernel.System.Timer;
 
 
 /// <summary>
@@ -16,14 +18,18 @@ public class TextField : Component
     private bool cursorVisible = true;
     private bool selected;
 
-    //private SoftwareTimer cursorTimer;
+    private SoftwareTimer ?cursorTimer;
 
 
     private TrueTypeFont font = new TrueTypeFont("/mnt/System/Fonts/ARIAL.ttf");
 
     public TextField(int x, int y, int width, int height = 20) : base(x, y, width, height)
     {
-
+        cursorTimer = TimerManager.ScheduleRecurring(() =>
+        {
+            cursorVisible = !cursorVisible;
+            MarkDirty();
+        }, TimeSpan.FromMilliseconds(500));
     }
 
     public override void DrawLocal()

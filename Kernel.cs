@@ -150,8 +150,6 @@ public class Kernel : Sys.Kernel
 
             utilization = (double)busyDelta / (wallDelta * SchedulerInfo.CpuCount) * 100;
 
-
-            canvas.DrawString($"Util.: {utilization:F3}%", SystemFonts.msSansSerif, Color.White, 10, 10);
         }
         catch (Exception ex)
         {

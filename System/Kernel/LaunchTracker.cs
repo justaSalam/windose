@@ -6,7 +6,7 @@ namespace Windose.System.Kernel
     {
 
         public static int startingCount;
-        public static bool isStarting = Volatile.Read(ref startingCount) > 0;
+        public static bool isStarting => Volatile.Read(ref startingCount) > 0;
 
         public static void Start(Func<Window> create)
         {
