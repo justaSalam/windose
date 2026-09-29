@@ -2,12 +2,14 @@ using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Drawing;
 using System.Globalization;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Xml.Serialization;
 using Windose;
 using Windose.System.Features;
+using Windose.System.Kernel;
 using Windose.System.Shell;
 using Windose.System.System_Calls;
 
@@ -65,6 +67,28 @@ public class Desktop : Component
         CreateDesktopContextMenu();
         LoadLayout();
     }
+    //TODO Load last wallpaper from a config file
+    public static Image wallpaper = new Png("/mnt/System/Wallpapers/Lithium.png");
+
+
+    public static void SetWallpaper(string path)
+    {
+        wallpaper = new Png(path);
+    }
+    public override void DrawLocal()
+    {
+        DrawImageStretch(wallpaper, new Rectangle(0, 0, Width, Height));
+
+        if (ShowIconGrid)
+            DrawIconGrid();
+
+        foreach (DesktopIcon icon in Icons)
+        {
+            if (!icon.Visible) continue;
+            DrawChild(icon);
+        }
+
+    }
 
     private void CreateDesktopContextMenu()
     {
@@ -99,7 +123,7 @@ public class Desktop : Component
         contextMenu.AddSeparator();
         renameMenuItem = contextMenu.AddItem("Rename", BeginContextRename);
         contextMenu.AddSeparator();
-        contextMenu.AddItem("Display Settings", () => WindowManager.Register(new DisplaySettings(contextX, contextY)));
+        contextMenu.AddItem("Display Settings", () => LaunchTracker.Start(() => new DisplaySettings(contextX, contextY)));
         contextMenu.AddItem("Personalise");
     }
 
@@ -282,20 +306,7 @@ public class Desktop : Component
         }
     }
 
-    public override void DrawLocal()
-    {
-        DrawImageStretch(Wallpapers.Lithium, new Rectangle(0, 0, Width, Height));
 
-        if (ShowIconGrid)
-            DrawIconGrid();
-
-        foreach (DesktopIcon icon in Icons)
-        {
-            if (!icon.Visible) continue;
-            DrawChild(icon);
-        }
-
-    }
 
     private void OnRegistryChanged(RegistryChange change)
     {

@@ -1,4 +1,5 @@
 using Cosmos.Kernel.Core.IO;
+using Windose.System.Kernel;
 using Windose.System.System_Calls;
 
 public static class BreezeHost
@@ -135,6 +136,6 @@ public static class BreezeHost
         root.AddChild(text);
 
         error.AddChild(root);
-        WindowManager.Register(error);
+        LaunchTracker.Start(() => error);
     }
 }

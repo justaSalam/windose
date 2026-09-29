@@ -1,4 +1,5 @@
 using Cosmos.Kernel.Core.IO;
+using Windose.System.Kernel;
 /// <summary>
 /// Add a language feature:
 /// <list type="number">
@@ -991,7 +992,7 @@ public sealed class BreezeRuntime
                 {
                     Window window = Require<Window>(name, args[0]);
                     if (window == null) return null;
-                    WindowManager.Register(window);
+                    LaunchTracker.Start(() => window);
                     return args[0];
                 }
 

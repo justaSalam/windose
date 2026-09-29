@@ -124,31 +124,35 @@ namespace Windose.System.Kernel.FileSystem
             }
         }
 
-        public static bool TryGetFiles(string path, out string[] files)
+        public static void TryGetFilesAsync(string path, Action<string[], bool> callback)
         {
-            try
+            new Thread(() =>
             {
-                files = Directory.GetFiles(path);
-                return true;
-            }
-            catch
-            {
-                files = Array.Empty<string>();
-                return false;
-            }
+                try
+                {
+                    callback(Directory.GetFiles(path), true);
+                }
+                catch
+                {
+                    callback(Array.Empty<string>(), false);
+                }
+            }).Start();
         }
-        public static bool TryGetDirectories(string path, out string[] directories)
+        public static void TryGetDirectoriesAsync(string path, Action<string[], bool> callback)
         {
-            try
+            new Thread(() =>
             {
-                directories = Directory.GetDirectories(path);
-                return true;
-            }
-            catch
-            {
-                directories = Array.Empty<string>();
-                return false;
-            }
+                try
+                {
+                    callback(Directory.GetDirectories(path), true);
+
+                }
+                catch
+                {
+                    callback(Array.Empty<string>(), false);
+
+                }
+            }).Start();                
         }
 
         public static bool TryGetFileInfo(string path, out FileInfo fileInfo)
@@ -180,5 +184,5 @@ namespace Windose.System.Kernel.FileSystem
         }
 
 
-        }
+    }
 }

@@ -1,5 +1,6 @@
-using System.Drawing;
 using Cosmos.Kernel.System.Keyboard;
+using System.Drawing;
+using Windose.System.Kernel;
 
 public class ProcessPerformanceList : Component
 {
@@ -288,7 +289,7 @@ public class ProcessPerformanceList : Component
         string path = selectedProcess?.startInfo?.ExecutablePath;
         if (string.IsNullOrEmpty(path)) return;
         FileExplorer explorer = new FileExplorer(100, 100, 800, 500, "Process Location", path);
-        WindowManager.Register(explorer);
+        LaunchTracker.Start(() => explorer);
         selectedProcess = null;
         MarkDirty();
     }
@@ -296,7 +297,7 @@ public class ProcessPerformanceList : Component
     private void OpenProcessProperties()
     {
         if (selectedProcess == null) return;
-        WindowManager.Register(new ProcessProperties(200, 200, selectedProcess));
+        LaunchTracker.Start(() => new ProcessProperties(200, 200, selectedProcess));
         selectedProcess = null;
         MarkDirty();
     }

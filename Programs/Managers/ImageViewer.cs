@@ -1,5 +1,6 @@
 using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
+using Windose;
 
 
 public sealed class ImageViewer : Window
@@ -29,6 +30,8 @@ public sealed class ImageViewer : Window
 
         file.AddItem("Open", () => { });
         file.AddItem("Save", () => { });
+        file.AddSeparator();
+        file.AddItem("Set Wallpaper", () => {Desktop.SetWallpaper(image); });
         file.AddSeparator();
         file.AddItem("Copy", () => { });
         file.AddSeparator();

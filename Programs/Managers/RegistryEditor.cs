@@ -1,5 +1,6 @@
 using Cosmos.Kernel.System.Graphics;
 using System.Globalization;
+using Windose.System.Kernel;
 
 public sealed class RegistryEditor : Window
 {
@@ -192,7 +193,7 @@ public sealed class RegistryEditor : Window
 
     private void CreateValue(RegistryValueKind kind)
     {
-        WindowManager.Register(new RegistryValueDialog(selectedPath, kind, () => RefreshAll(), X + 80, Y + 80));
+        LaunchTracker.Start(() => new RegistryValueDialog(selectedPath, kind, () => RefreshAll(), X + 80, Y + 80));
     }
 
     private void EditSelected()
@@ -203,7 +204,7 @@ public sealed class RegistryEditor : Window
             status.MarkDirty();
             return;
         }
-        WindowManager.Register(new RegistryValueDialog(entry, () => RefreshAll(), X + 80, Y + 80));
+        LaunchTracker.Start(() => new RegistryValueDialog(entry, () => RefreshAll(), X + 80, Y + 80));
     }
 
     private void DeleteSelected()
@@ -214,7 +215,7 @@ public sealed class RegistryEditor : Window
             status.MarkDirty();
             return;
         }
-        WindowManager.Register(new RegistryDeleteDialog(entry, () => RefreshAll(), X + 100, Y + 100));
+        LaunchTracker.Start(() => new RegistryDeleteDialog(entry, () => RefreshAll(), X + 100, Y + 100));
     }
 
     private void OnRegistryChanged(RegistryChange change)

@@ -1,5 +1,6 @@
-using System.Drawing;
 using Cosmos.Kernel.System.Mouse;
+using System.Drawing;
+using Windose.System.Kernel;
 
 public class Taskbar : Component
 {
@@ -57,7 +58,7 @@ public class Taskbar : Component
         {
             itemHeight = 18
         };
-        contextMenu.AddItem("Task Manager", () => WindowManager.Register(new PerformanceMonitor(180, 120)));
+        contextMenu.AddItem("Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
         contextMenu.AddSeparator();
         contextMenu.AddItem("Minimize All Windows");
         contextMenu.AddItem("Properties");
@@ -102,7 +103,7 @@ public class Taskbar : Component
         int trayX = (int)Registry.GetInteger("System/Display/Width", 1920) - 250;
         int trayY = (int)Registry.GetInteger("System/Display/Heigth", 1080) - 160 - Height;
         tray = new Tray(trayX,trayY);
-        WindowManager.Register(tray);
+        LaunchTracker.Start(() => tray);
 
         
     }

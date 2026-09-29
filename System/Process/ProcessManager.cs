@@ -173,13 +173,19 @@ public static class ProcessManger
     public static void QueueStart(Process process)
     {
         if (process == null) return;
-        lock (pendingLock) pendingStarts.Add(process);
+        lock (pendingLock)
+        {
+            pendingStarts.Add(process);
+        }
     }
 
     public static void QueueStop(Process process)
     {
         if (process == null) return;
-        lock (pendingLock) pendingStops.Add(process);
+        lock (pendingLock)
+        {
+            pendingStops.Add(process);
+        }
     }
 
     public static void QueueRestart(Process process, bool force = false)

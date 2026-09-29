@@ -1,6 +1,7 @@
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Mouse;
 using System.Drawing;
+using Windose.System.Kernel;
 
 public class Tray : Window
 {
@@ -50,7 +51,7 @@ public class Tray : Window
 
     private void TrayAction()
     {
-        WindowManager.Register(new PerformanceMonitor(100, 100));
+        LaunchTracker.Start(() => new PerformanceMonitor(100, 100));
     }
 
     public override void DrawLocal()

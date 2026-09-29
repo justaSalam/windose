@@ -4,6 +4,7 @@ using Cosmos.Kernel.System.Filesystems.Fat;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
+using Windose.System.Kernel;
 
 public sealed class DiskManagement : Window
 {
@@ -156,7 +157,7 @@ public sealed class DiskManagement : Window
 
     private void CreateVolume()
     {
-        WindowManager.Register(new DiskmgrNewVolume(200, 200, selectedDevice));
+        LaunchTracker.Start(() => new DiskmgrNewVolume(200, 200, selectedDevice));
         //DriveUtils.CreateMBR(selectedDevice);
         //DriveUtils.CreateMbrPartition(selectedDevice);
         //DriveUtils.FAT32MountDrive("fatmount", "1", MountFlags.None, "/mnt", out VfsManager.VfsMount? mount);

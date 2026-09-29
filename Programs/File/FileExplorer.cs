@@ -1,7 +1,9 @@
-using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Mouse;
+using System.Drawing;
 using Windose;
+using Windose.System.Kernel;
+using Windose.System.Kernel.FileSystem;
 using Windose.System.System_Calls;
 
 public class FileExplorer : Window
@@ -238,12 +240,12 @@ public class FileExplorer : Window
     private void NewFileFromContext()
     {
         File.Create(FileSystemManager.GetUniquePath(currentLocation, "New File", ".txt"));
-        Refresh(); 
+        Refresh();
     }
     private void NewDirectoryFromContext()
     {
         Directory.CreateDirectory(FileSystemManager.GetUniquePath(currentLocation, "New Directory"));
-        
+
         Refresh();
     }
 
@@ -282,17 +284,31 @@ public class FileExplorer : Window
         TreeViewItem bootTree = tree.AddRoot("/boot", "/boot");
 
 
-        foreach (string dir in Directory.GetDirectories(path))
+        IO.TryGetDirectoriesAsync(path, (directories, success) =>
         {
-            TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
-            PopulateTreeItem(treeItem);
-        }
+            if (!success)
+            {
+                return;
+            }
+            foreach (string dir in directories)
+            {
+                TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
+                PopulateTreeItem(treeItem);
+            }
+        });
 
-        foreach (string dir in Directory.GetDirectories("/boot"))
+        IO.TryGetDirectoriesAsync("/boot", (directories, success) =>
         {
-            TreeViewItem treeItem = bootTree.AddChild(Path.GetFileName(dir), dir);
-            PopulateTreeItem(treeItem);
-        }
+            if (!success)
+            {
+                return;
+            }
+            foreach (string dir in directories)
+            {
+                TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
+                PopulateTreeItem(treeItem);
+            }
+        });
     }
 
     private void PopulateTreeItem(TreeViewItem item)
@@ -304,12 +320,16 @@ public class FileExplorer : Window
         if (string.IsNullOrEmpty(path)) return;
         item.children.Clear();
 
-        string[] directories = Directory.GetDirectories(path);
-        foreach (string dir in directories)
+        IO.TryGetDirectoriesAsync(path, (directories, success) =>
         {
-            TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), dir);
-            PopulateTreeItem(childItem);
-        }
+            foreach (string dir in directories)
+            {
+                TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), dir);
+                PopulateTreeItem(childItem);
+            }
+        });
+
+
     }
 
     private void OpenLocation(TreeViewItem item)
@@ -346,11 +366,11 @@ public class FileExplorer : Window
         switch (ext)
         {
             case ".txt":
-                WindowManager.Register(new BreezeEditor(X + 40, Y + 40, 900, 620, path));
+                LaunchTracker.Start(() => new BreezeEditor(X + 40, Y + 40, 900, 620, path));
                 break;
 
             case ".log":
-                WindowManager.Register(new BreezeEditor(X + 40, Y + 40, 900, 620, path));
+                LaunchTracker.Start(() => new BreezeEditor(X + 40, Y + 40, 900, 620, path));
                 break;
 
             case ".breeze":
@@ -358,7 +378,7 @@ public class FileExplorer : Window
                 break;
 
             case ".png":
-                WindowManager.Register(new ImageViewer(path, X + 40, Y + 40, 900, 620));
+                LaunchTracker.Start(() => new ImageViewer(path, X + 40, Y + 40, 900, 620));
                 break;
 
             default:
@@ -380,7 +400,7 @@ public class FileExplorer : Window
         RefreshExplorerVisuals();
     }
 
-    
+
 
     private void OpenContextItem()
     {
@@ -402,13 +422,13 @@ public class FileExplorer : Window
 
         string path = item.fileEntry.AbsoluteLocation;
         if (string.IsNullOrEmpty(path)) return;
-        WindowManager.Register(new BreezeEditor(X + 40, Y + 40, 900, 620, path));
+        LaunchTracker.Start(() => new BreezeEditor(X + 40, Y + 40, 900, 620, path));
     }
 
     private void ShowContextProperties()
     {
         if (!IsItemValid(out ListViewItem item)) return;
-        WindowManager.Register(new FileProperties(X + 40, Y + 40, item.fileEntry));
+        LaunchTracker.Start(() => new FileProperties(X + 40, Y + 40, item.fileEntry));
     }
     private bool IsItemValid(out ListViewItem item)
     {
@@ -433,7 +453,7 @@ public class FileExplorer : Window
     private void ShowSelectedProperties()
     {
         if (files.selectedItem != null && files.selectedItem.hasFileEntry)
-            WindowManager.Register(new FileProperties(X + 40, Y + 40, files.selectedItem.fileEntry));
+            LaunchTracker.Start(() => new FileProperties(X + 40, Y + 40, files.selectedItem.fileEntry));
     }
 
     private void Refresh()
@@ -491,7 +511,7 @@ public class FileExplorer : Window
         {
             FileEntry entry = new FileEntry(file.Name, FileType.File, file.FullName, file.Length);
 
-            if(!entry.displayInExplorer)
+            if (!entry.displayInExplorer)
             {
                 return;
             }
@@ -552,9 +572,9 @@ public class FileExplorer : Window
 
     public override void HandleMessage(UiMessage message)
     {
-        if (message.Command == "filesystem.changed" 
-            && currentLocation != null 
-            && (currentLocation.StartsWith("/mnt", StringComparison.OrdinalIgnoreCase) 
+        if (message.Command == "filesystem.changed"
+            && currentLocation != null
+            && (currentLocation.StartsWith("/mnt", StringComparison.OrdinalIgnoreCase)
             || string.Equals(currentLocation, "control", StringComparison.OrdinalIgnoreCase)))
         {
 

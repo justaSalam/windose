@@ -1,3 +1,5 @@
+using Windose.System.Kernel;
+
 public class BreezeEditor : Window
 {
     private sealed class EditorDocument
@@ -89,7 +91,7 @@ show(main);
         runMenu.AddItem("Run Background", RunBackgroundDocument);
 
         MenuPage helpMenu = menuBar.AddMenuPage("Help");
-        helpMenu.AddItem("API Reference", () => WindowManager.Register(new BreezeApiBrowser(X + 40, Y + 40)));
+        helpMenu.AddItem("API Reference", () => LaunchTracker.Start(() => new BreezeApiBrowser(X + 40, Y + 40)));
 
         Toolbar toolbar = new Toolbar(0, 0, Width);
         toolbar.AddButton("New", NewDocument);
@@ -180,7 +182,7 @@ show(main);
     private void NewDocument()
     {
         FileDialogOptions options = CreateBreezeDialogOptions(FileDialogMode.Save, "New Breeze Script", "New");
-        WindowManager.Register(new FileDialog(options, path =>
+        LaunchTracker.Start(() => new FileDialog(options, path =>
         {
             projectRoot = FileSystemManager.GetParent(path);
             CreateDocument(path, DefaultSource, true, true);
@@ -191,7 +193,7 @@ show(main);
     private void OpenDocument()
     {
         FileDialogOptions options = CreateBreezeDialogOptions(FileDialogMode.Open, "Open Breeze Script", "Open");
-        WindowManager.Register(new FileDialog(options, path => OpenPath(path, true), X + 40, Y + 30));
+        LaunchTracker.Start(() => new FileDialog(options, path => OpenPath(path, true), X + 40, Y + 30));
     }
 
     private FileDialogOptions CreateBreezeDialogOptions(FileDialogMode mode, string title, string buttonText)

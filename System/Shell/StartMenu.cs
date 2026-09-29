@@ -119,11 +119,11 @@ public class StartMenu : Window
                 new FileExplorer(100, 100, 700, 480, "Control Panel");
 
             explorer.NavigateToPath("control");
-            WindowManager.Register(explorer);
+            LaunchTracker.Start(() => explorer);
         });
         settings.AddSubmenuItem(new Png("/mnt/System/Icons/monitor_gear.png"), "Display Settings", () =>
         {
-            WindowManager.Register(new DisplaySettings());
+            LaunchTracker.Start(() => new DisplaySettings());
         });
 
 
@@ -141,6 +141,7 @@ public class StartMenu : Window
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {
             Desktop.SaveLayout();
+            Power.Shutdown();
 
         });
 

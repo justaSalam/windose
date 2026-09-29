@@ -2,7 +2,7 @@ using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 public class ImageView : Component
 {
-    private Image Image;
+    public Image Image { protected set; get; }
     private Rectangle targetRect;
 
     public int scrollMultiplier = 6;
