@@ -1,7 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
-using Cosmos.Kernel.System.Timer;
 
 
 /// <summary>
@@ -16,7 +15,7 @@ public class TextField : Component
     public Color textColor = Color.Black;
     private bool cursorVisible = true;
     private bool selected;
-    private Label label;
+
     //private SoftwareTimer cursorTimer;
 
 
@@ -24,71 +23,41 @@ public class TextField : Component
 
     public TextField(int x, int y, int width, int height = 20) : base(x, y, width, height)
     {
-        TimerManager.ScheduleRecurring(() =>
-        {
-            cursorVisible = !cursorVisible;
-            MarkDirty();
-        }, TimeSpan.FromMilliseconds(500));
 
-
-        label = new Label(0, 0, width, height)
-        {
-            text = text,
-            useBackground = false,
-            useForeground = false,
-            textColor = textColor,
-            leftClickAction = leftClickAction,
-            horizontalTextAlignment = HorizontalAlignment.Left,
-            verticalAlignment = VerticalAlignment.Center
-        };
-
-        AddChild(label);
-    }
-
-
-
-    public override void Draw()
-    {
-        base.Draw();
     }
 
     public override void DrawLocal()
     {
-
         if (useBackground)
         {
             DrawSunkenRectangle(0, 0, Width, Height);
         }
 
-
         int effectiveFontSize = font.SizePx > 0 ? font.SizePx : Math.Max(1, Height - 4);
         int textY = Math.Max(0, (Height - font.SizePx) / 2);
 
-        string visibleText = label.text;
-        int stringWidth = font.MeasureString(visibleText);
+        int stringWidth = font.MeasureString(text);
 
 
-        if (visibleText != "")
+        if (text != "")
         {
-
             if (stringWidth >= Width && truncate)
             {
                 int maxCharacters = Math.Max(0, (Width - font.MeasureString("...", effectiveFontSize) - 4) / Math.Max(1, font.MeasureString("W", effectiveFontSize)));
 
-                if (visibleText.Length > maxCharacters)
-                    visibleText = visibleText.Substring(0, maxCharacters) + "...";
+                if (text.Length > maxCharacters)
+                    text = text.Substring(0, maxCharacters) + "...";
             }
-            //DrawString(visibleText, textColor, 2, textY, effectiveFontSize);
+            DrawString(text, textColor, 2, textY, effectiveFontSize);
         }
 
-        DrawChild(label);
-
         if (!readOnly && cursorVisible && selected)
-            DrawString("_", Color.Black, font.MeasureString(visibleText), textY);
+            DrawString("_", Color.Black, font.MeasureString(text), textY);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+
         selected = base.HandleInput(mouseX, mouseY, mouse);
         return selected;
     }
@@ -103,21 +72,21 @@ public class TextField : Component
         {
             if (keyEvent.Key == ConsoleKeyEx.C)
             {
-                WindoseClipboard.SetText(label.text);
+                WindoseClipboard.SetText(text);
                 return;
             }
             if (keyEvent.Key == ConsoleKeyEx.X)
             {
-                WindoseClipboard.SetText(label.text);
-                if (label.text.Length == 0) return;
-                label.text = "";
+                WindoseClipboard.SetText(text);
+                if (text.Length == 0) return;
+                text = "";
                 MarkDirty();
                 return;
             }
             if (keyEvent.Key == ConsoleKeyEx.V)
             {
                 if (!WindoseClipboard.HasText) return;
-                label.text += WindoseClipboard.Text;
+                text += WindoseClipboard.Text;
                 MarkDirty();
                 return;
             }
@@ -130,7 +99,7 @@ public class TextField : Component
             case ConsoleKeyEx.Backspace:
                 if (text.Length != 0)
                 {
-                    label.text = label.text.Substring(0, label.text.Length - 1);
+                    text = text.Substring(0, text.Length - 1);
                     changed = true;
                 }
                 break;
@@ -139,7 +108,7 @@ public class TextField : Component
                 char printable = GetPrintableCharacter(keyEvent);
                 if (printable != '\0')
                 {
-                    label.text += printable;
+                    text += printable;
                     changed = true;
                 }
                 break;

@@ -93,6 +93,9 @@ public static class CommandRegistry
 
         Register(new UacCommand());
         Register(new DirectoryCommand());
+        Register(new ChangeDirectoryCommand());
+        Register(new SchedulerInfoCommand());
+        Register(new MemoryInfoCommand());
         Register(new DiskPart());
 
 

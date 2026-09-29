@@ -1,7 +1,4 @@
-using System.Collections.Generic;
 using System.Drawing;
-using Cosmos.Kernel.Core.IO;
-using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
 using Windose.System.Drivers;
@@ -181,41 +178,45 @@ public class WindowManager : SingleThreadedProcess
 
     private void HandleWindowCapture()
     {
-        bool hitWindow = false;
-        bool hitComponent = false;
-
-        for (int i = windows.Count - 1; i >= 0; i--)//Window Capturing
+        lock (windows)
         {
-            Window win = windows[i];
 
-            if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
-            if (!win.HitTest(mx, my)) continue;
+            bool hitWindow = false;
+            bool hitComponent = false;
 
-            hitWindow = true;
-
-            if (mouseState.left == MouseEvents.Press)
+            for (int i = windows.Count - 1; i >= 0; i--)//Window Capturing
             {
-                BringToFront(win);
-                SetFocusedWindow(win);
-                capturedWindow = win;
-            }
-            try
-            {
-                if (win.HandleInput(mx, my, mouseState)) break;
-            }
-            catch (Exception exception)
-            {
-                FailApplication(win, "handling mouse input", exception);
-                break;
+                Window win = windows[i];
+
+                if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
+                if (!win.HitTest(mx, my)) continue;
+
+                hitWindow = true;
+
+                if (mouseState.left == MouseEvents.Press)
+                {
+                    BringToFront(win);
+                    SetFocusedWindow(win);
+                    capturedWindow = win;
+                }
+                try
+                {
+                    if (win.HandleInput(mx, my, mouseState)) break;
+                }
+                catch (Exception exception)
+                {
+                    FailApplication(win, "handling mouse input", exception);
+                    break;
+                }
+
             }
 
+            if (!hitWindow)
+                hitComponent = HandleRootComponentInput();
+
+            if (!hitWindow && !hitComponent && mouseState.left == MouseEvents.Press)
+                ClearFocusedWindow();
         }
-
-        if (!hitWindow)
-            hitComponent = HandleRootComponentInput();
-
-        if (!hitWindow && !hitComponent && mouseState.left == MouseEvents.Press)
-            ClearFocusedWindow();
     }
 
 
@@ -240,30 +241,37 @@ public class WindowManager : SingleThreadedProcess
 
     private void ComponentZSort()
     {
-        components.Sort((component1, component2) =>
+        lock (Component.components)
         {
-            int zLayer = component1.zLayer.CompareTo(component2.zLayer);
-            if (zLayer != 0) return zLayer;
+            components.Sort((component1, component2) =>
+            {
+                int zLayer = component1.zLayer.CompareTo(component2.zLayer);
+                if (zLayer != 0) return zLayer;
 
-            return component1.zIndex.CompareTo(component2.zIndex);
-        });
-        windows.Sort(zIndexCompare);
+                return component1.zIndex.CompareTo(component2.zIndex);
+            });
+            windows.Sort(zIndexCompare);
+        }
     }
 
     private void UpdateComponents()
     {
-        for (int i = components.Count - 1; i >= 0; i--)
+        lock (Component.components)
         {
-            Component component = components[i];
-            if (component == null || component is Window || !component.isRoot) continue;
-            if (!component.Visible && component is not Tooltip) continue;
-            try
+
+            for (int i = components.Count - 1; i >= 0; i--)
             {
-                component.Update();
-            }
-            catch (Exception exception)
-            {
-                FailApplication(component.GetOwningWindow(), "updating component", exception);
+                Component component = components[i];
+                if (component == null || component is Window || !component.isRoot) continue;
+                if (!component.Visible && component is not Tooltip) continue;
+                try
+                {
+                    component.Update();
+                }
+                catch (Exception exception)
+                {
+                    FailApplication(component.GetOwningWindow(), "updating component", exception);
+                }
             }
         }
     }
@@ -411,46 +419,50 @@ public class WindowManager : SingleThreadedProcess
 
     private void HandleKeyboardInput()
     {
-        SystemKeyEvent key;
-        if (!Keyboard.CurrentEvent(out key))
-            return;
-
-        if (key.consumed)
-            return;
-
-        HotkeyManager.HandleKeyEvent();
-
-
-        if (key.consumed)
-            return;
-
-        if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput)
+        lock (Component.components)
         {
-            Explorer.desktop.HandleKeyboard(key.KeyEvent);
-            key.consumed = true;
-            return;
-        }
 
-        if (focusedWindow != null && !failedWindows.Contains(focusedWindow))
-        {
-            focusedWindow.HandleKeyboard(key.KeyEvent);
-            key.consumed = true;
+            SystemKeyEvent key;
+            if (!Keyboard.CurrentEvent(out key))
+                return;
 
-            return;
-        }
+            if (key.consumed)
+                return;
 
-        for (int i = components.Count - 1; i >= 0; i--)
-        {
-            Component component = components[i];
-            if (component == null || !component.Visible) continue;
-            if (component is Window) continue;
-            if (!component.isRoot) continue;
+            HotkeyManager.HandleKeyEvent();
 
 
-            component.HandleKeyboard(key.KeyEvent);
-            key.consumed = true;
+            if (key.consumed)
+                return;
 
-            return;
+            if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput)
+            {
+                Explorer.desktop.HandleKeyboard(key.KeyEvent);
+                key.consumed = true;
+                return;
+            }
+
+            if (focusedWindow != null && !failedWindows.Contains(focusedWindow))
+            {
+                focusedWindow.HandleKeyboard(key.KeyEvent);
+                key.consumed = true;
+
+                return;
+            }
+
+            for (int i = components.Count - 1; i >= 0; i--)
+            {
+                Component component = components[i];
+                if (component == null || !component.Visible) continue;
+                if (component is Window) continue;
+                if (!component.isRoot) continue;
+
+
+                component.HandleKeyboard(key.KeyEvent);
+                key.consumed = true;
+
+                return;
+            }
         }
 
 
@@ -525,46 +537,50 @@ public class WindowManager : SingleThreadedProcess
 
     private void ComposeDirtyRegions()
     {
-        long startedAt = PerformanceMetrics.Now;
-        renderedComponents.Clear();
-        Kernel.mainBuffer.Clear(Color.Black);
-
-        for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
+        lock (Component.components)
         {
-            Component component = components[componentIndex];
-            if (component == null || !component.Visible || !component.isRoot) continue;
 
-            Window owner = component.GetOwningWindow();
-            if (owner != null && failedWindows.Contains(owner)) continue;
+            long startedAt = PerformanceMetrics.Now;
+            renderedComponents.Clear();
+            Kernel.mainBuffer.Clear(Color.Black);
 
-            try
+            for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
             {
-                if (component.HasDirtyTree())
-                {
-                    component.DrawDirtyLocal(component.AbsoluteRectangle);
-                    renderedComponents.Add(component);
-                }
+                Component component = components[componentIndex];
+                if (component == null || !component.Visible || !component.isRoot) continue;
 
-                if (component is Window window)
+                Window owner = component.GetOwningWindow();
+                if (owner != null && failedWindows.Contains(owner)) continue;
+
+                try
                 {
-                    Kernel.mainBuffer.DrawCanvas(window.Canvas, window.bounds.X, window.bounds.Y);
+                    if (component.HasDirtyTree())
+                    {
+                        component.DrawDirtyLocal(component.AbsoluteRectangle);
+                        renderedComponents.Add(component);
+                    }
+
+                    if (component is Window window)
+                    {
+                        Kernel.mainBuffer.DrawCanvas(window.Canvas, window.bounds.X, window.bounds.Y);
+                    }
+                    else
+                    {
+                        component.DrawToScreen();
+                    }
                 }
-                else
+                catch (Exception exception)
                 {
-                    component.DrawToScreen();
+                    FailApplication(owner, "Drawing", exception);
                 }
             }
-            catch (Exception exception)
-            {
-                FailApplication(owner, "Drawing", exception);
-            }
+
+            foreach (Component component in renderedComponents)
+                component.MarkCleaned();
+
+            dirtyRects.Clear();
+            PerformanceMetrics.AddCompose(startedAt);
         }
-
-        foreach (Component component in renderedComponents)
-            component.MarkCleaned();
-
-        dirtyRects.Clear();
-        PerformanceMetrics.AddCompose(startedAt);
     }
 
     public static void ShowPreviewRect(Rectangle rect)

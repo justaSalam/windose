@@ -28,7 +28,7 @@ public class AddressBar : Component
             Margin = new Thickness(3, 3, 24, 68),
         };
 
-        dropDownButton = new Button("v",width - 22, 3, 18, height - 6)
+        dropDownButton = new Button("v", width - 22, 3, 18, height - 6)
         {
             useBorders = true,
             clampSize = false,
@@ -43,7 +43,10 @@ public class AddressBar : Component
 
     public string Address
     {
-        get { return addressField.text; }
+        get
+        {
+            return addressField.text;
+        }
         set
         {
             addressField.text = value;
@@ -63,6 +66,7 @@ public class AddressBar : Component
     public override void Draw()
     {
         base.Draw();
+
     }
 
     public override void DrawLocal()
@@ -70,6 +74,7 @@ public class AddressBar : Component
         DrawFilledRectangle(Palette.ControlFace, 0, 0, Width, Height);
         DrawLine(Palette.ControlWhite, 0, 0, Width - 1, 0);
         DrawLine(Palette.ControlShadow, 0, Height - 1, Width - 1, Height - 1);
+
 
         foreach (Component child in children)
         {

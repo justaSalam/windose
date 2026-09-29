@@ -18,9 +18,6 @@ namespace Windose;
 /// </summary>
 public class Kernel : Sys.Kernel
 {
-    public static Color Gray = Color.FromArgb(123, 126, 121);
-    public static Color Blue = Color.FromArgb(0, 0, 128);
-
     public static Kernel Instance = null!;
     public static DirectBitmap mainBuffer;
     public static Canvas canvas;
@@ -45,7 +42,6 @@ public class Kernel : Sys.Kernel
             Log.WriteString("KERNEL FAILED TO INIT\n");
         }
     }
-    private WasmRuntime runtime;
     private void InitializeKernel()
     {
         Instance = this;
@@ -54,10 +50,7 @@ public class Kernel : Sys.Kernel
 
         SystemLogger.WriteLine("BOOT", "FileSystemManager.Setup() starting", ConsoleMessageType.Log);
         FileSystemManager.Setup();
-        
-        runtime = new WasmRuntime();
-        WinHost host = new WinHost(runtime);
-        host.Register();
+
         SystemLogger.WriteLine("WASM", "Runtime initialized", ConsoleMessageType.Log, true);
 
 
@@ -80,6 +73,7 @@ public class Kernel : Sys.Kernel
 
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
+
         Registry.SetRuntimeValue("System/Display/CurrentWidth", (long)canvas.Width);
         Registry.SetRuntimeValue("System/Display/CurrentHeight", (long)canvas.Height);
 
@@ -95,7 +89,7 @@ public class Kernel : Sys.Kernel
         ProcessManger.Start(new HotkeyManager());
 
 
-        
+
         Directory.CreateDirectory("/mnt/Programs");
         Directory.CreateDirectory("/mnt/Apps");
         File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
@@ -108,7 +102,7 @@ public class Kernel : Sys.Kernel
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
-       
+
     }
 
     private long lastFrameTicks;

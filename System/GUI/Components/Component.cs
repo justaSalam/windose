@@ -1,12 +1,9 @@
 using System.Drawing;
-using Cosmos.Kernel.Core.IO;
-using Cosmos.Kernel.Core.Runtime;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
 using Windose;
-using Windose.System.Kernel;
 
 
 /// <summary>
@@ -151,6 +148,9 @@ public class Component : IDisposable
     public bool clampSize = true;
     public bool forceDirty { get; private set; }
     protected bool visible;
+
+    //Should not render until added as a child or is a parent
+    protected bool canRender = false;
     private byte opacity = 255;
     public bool isRoot;
 
@@ -209,43 +209,44 @@ public class Component : IDisposable
 
     private void Init(int x, int y, int width, int height)
     {
-        rectangle = new Rectangle(x, y, width, height);
-        buffer = new DirectBitmap(rectangle.Width, rectangle.Height);
-        ownsRenderSurface = true;
-
-        children = new List<Component>();
-
-
-        dirty = false;
-        visible = true;
-        isRoot = true;
-
-        if (useRightClick)
+        lock (components)
         {
-            popup = new MenuPopup(220, 28 * 8);
-            popup.AddItem("Close", () =>
-            {
-                popup.Hide();
-            });
 
-            rightClickAction += () =>
+            rectangle = new Rectangle(x, y, width, height);
+            buffer = new DirectBitmap(rectangle.Width, rectangle.Height);
+            ownsRenderSurface = true;
+
+            children = new List<Component>();
+
+
+            dirty = false;
+            visible = true;
+            isRoot = true;
+
+            if (useRightClick)
             {
-                popup.ShowAt(MouseManager.X, MouseManager.Y);
-            };
+                popup = new MenuPopup(220, 28 * 8);
+                popup.AddItem("Close", () =>
+                {
+                    popup.Hide();
+                });
+
+                rightClickAction += () =>
+                {
+                    popup.ShowAt(MouseManager.X, MouseManager.Y);
+                };
+            }
+
+            zIndex = currentZIndex;
+
+            state = State.Normal;
+
+            ComputeAbsoluteCoordinates();
+
+            components.Add(this);
+            MarkDirty();
+            currentZIndex++;
         }
-
-        zIndex = currentZIndex;
-
-        state = State.Normal;
-
-        ComputeAbsoluteCoordinates();
-
-        components.Add(this);
-        MarkDirty();
-        currentZIndex++;
-
-
-        //AddChild(label);
     }
 
 
@@ -302,6 +303,10 @@ public class Component : IDisposable
     /// </summary>
     public virtual void Draw()
     {
+        if (!canRender)
+        {
+            return;
+        }
         DrawLocal();
         DrawToScreen();
     }
@@ -679,6 +684,7 @@ public class Component : IDisposable
 
     public virtual Component AddChild(Component child)
     {
+        child.canRender = true;
         child.isRoot = false;
         child.parent = this;
         zIndex++;
@@ -686,8 +692,15 @@ public class Component : IDisposable
         child.ResolveHorizontalAnchor();
         child.ResolveVerticalAnchor();
         child.BindRenderSurface(buffer, false);
-        components.Remove(child);
-        children.Add(child);
+
+        lock (components)
+        {
+            components.Remove(child);
+        }
+        lock (children)
+        {
+            children.Add(child);
+        }
         MarkDirty();
 
         return child;
@@ -695,12 +708,15 @@ public class Component : IDisposable
 
     public virtual void RemoveChild(Component child)
     {
-        if (!children.Remove(child)) return;
+        lock (components)
+        {
+            if (!children.Remove(child)) return;
 
-        WindowManager.Invalidate(child.AbsoluteRectangle);
-        child.isRoot = true;
-        components.Remove(child);
-        MarkDirty();
+            WindowManager.Invalidate(child.AbsoluteRectangle);
+            child.isRoot = true;
+            components.Remove(child);
+            MarkDirty();
+        }
     }
 
     public void Clear(Color color)

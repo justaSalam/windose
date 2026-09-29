@@ -33,7 +33,7 @@ public class StartMenu : Window
         {
             verticalAlignment = VerticalAlignment.Top,
             horizontalAlignment = HorizontalAlignment.Stretch,
-            text = $"Windose NativeAOT {Cosmos.Kernel.System.Kernel.VersionString}",
+            text = $"Windose NativeAOT {Kernel.VersionString}",
             useBackground = false,
 
             fontSize = 16,
@@ -53,7 +53,7 @@ public class StartMenu : Window
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/directx.png"), "VMWare SVGA Test", () => LaunchTracker.Start(() => new GraphicsEngine()));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () => LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
 
-            
+
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/hard_disk_drive_pie.png"), "Disk Management", () => LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350)));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/msie.png"), "Internet Explorer", () => LaunchTracker.Start(() => new InternetExplorer(200, 200)));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/computer_taskmgr.png"), "Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
@@ -62,6 +62,7 @@ public class StartMenu : Window
 
         programs.AddSubmenuSeparator();
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/gears_tweakui_a.png"), "SYSDUMP", SystemLogger.Dump);
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/gears_tweakui_a.png"), "ENV", () => LaunchTracker.Start(() => new ControlEnv(180, 120)));
 
 
         MenuItem breeze = programs.AddSubmenuItem("Breeze");

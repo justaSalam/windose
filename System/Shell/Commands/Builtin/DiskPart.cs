@@ -32,7 +32,7 @@ public sealed class DiskPart : InteractiveShellCommand
             {
                 IBlockDevice? device = StorageManager.GetDevice(i);
 
-                if(device == null)
+                if (device == null)
                 {
                     context.WriteLine($"Disk {i}    <unavailable>");
                     continue;
@@ -45,10 +45,10 @@ public sealed class DiskPart : InteractiveShellCommand
         }
         if (args[0].Equals("partition", StringComparison.OrdinalIgnoreCase))
         {
-            if (selectedDisk == null) 
-            { 
-                context.WriteLine("No disk selected."); 
-                return; 
+            if (selectedDisk == null)
+            {
+                context.WriteLine("No disk selected.");
+                return;
             }
             int index = 0;
             foreach (Partition partition in StorageManager.Partitions)
@@ -69,10 +69,10 @@ public sealed class DiskPart : InteractiveShellCommand
         if (args[0].Equals("disk", StringComparison.OrdinalIgnoreCase))
         {
             IBlockDevice? device = StorageManager.GetDevice(index);
-            if (device == null) 
-            { 
-                context.WriteLine("No such disk."); 
-                return; 
+            if (device == null)
+            {
+                context.WriteLine("No such disk.");
+                return;
             }
             selectedDisk = device;
             selectedPartition = null;
@@ -85,20 +85,66 @@ public sealed class DiskPart : InteractiveShellCommand
     private void CreatePartition(CommandContext context, string[] args)
     {
         if (selectedDisk == null)
-        { 
-            context.WriteLine("No disk selected."); 
-            return; 
+        {
+            context.WriteLine("No disk selected.");
+            return;
         }
-        // ... hand off to StorageManager's actual partitioning call
-        context.WriteLine("Created partition on " + selectedDisk.Name);
+
+        if (args.Length < 3 || !ulong.TryParse(args[2], out ulong sizeMb) || sizeMb == 0)
+        {
+            context.WriteLine("Usage: create partition primary <size in MB>");
+            return;
+        }
+
+        ulong sectorCount = sizeMb * ByteFormat.mega / selectedDisk.BlockSize;
+
+        if (!Gpt.IsGpt(selectedDisk))
+        {
+            context.WriteLine("Disk is not GPT. Creating GPT partition table.");
+            Gpt.Create(selectedDisk);
+        }
+
+
+
+        // First free, 1 MiB-aligned sector after existing partitions.
+        ulong alignment = 1024 * 1024 / selectedDisk.BlockSize; // 2048 for 512 B sectors
+        ulong start = alignment;
+
+
+
+        StorageManager.RescanPartitions(selectedDisk);
+        foreach (Partition p in StorageManager.Partitions)
+        {
+            // Assumes these expose start + length; adjust names to the real API.
+            ulong end = p.StartSector + p.BlockCount;
+            if (end > start)
+                start = (end + alignment - 1) / alignment * alignment;
+        }
+
+        // The last ~34 sectors are reserved for the backup GPT.
+        ulong usable = selectedDisk.BlockCount - 34;
+        if (  + sectorCount > usable)
+        {
+            context.WriteLine("Not enough free space.");
+            return;
+        }
+
+        if (!PartitionManager.Create(selectedDisk, start, sectorCount, 0x0C, Gpt.BasicDataPartitionType))
+        {
+            context.WriteLine("Failed to create partition.");
+            return;
+        }
+
+        StorageManager.RescanPartitions(selectedDisk);
+        context.WriteLine($"Created {sizeMb} MB partition on {selectedDisk.Name}");
     }
 
     private void DeletePartition(CommandContext context, string[] args)
     {
-        if (selectedPartition == null) 
-        { 
-            context.WriteLine("No partition selected."); 
-            return; 
+        if (selectedPartition == null)
+        {
+            context.WriteLine("No partition selected.");
+            return;
         }
         context.WriteLine("Deleted partition " + selectedPartition.Name);
         selectedPartition = null;
@@ -108,10 +154,10 @@ public sealed class DiskPart : InteractiveShellCommand
     {
         if (args[0].Equals("disk", StringComparison.OrdinalIgnoreCase))
         {
-            if (selectedDisk == null) 
-            { 
-                context.WriteLine("No disk selected."); 
-                return; 
+            if (selectedDisk == null)
+            {
+                context.WriteLine("No disk selected.");
+                return;
             }
             context.WriteLine($"Name: {selectedDisk.Name}");
             context.WriteLine($"Total size: {ByteFormat.FormatBytes(selectedDisk.BlockSize * selectedDisk.BlockCount)}");

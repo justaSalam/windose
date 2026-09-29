@@ -1,5 +1,6 @@
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
+using Windose.System.Kernel.Subsystem;
 
 public sealed class CommandPrompt : Window
 {
@@ -26,6 +27,7 @@ public sealed class CommandPrompt : Window
             horizontalAlignment = HorizontalAlignment.Stretch,
             verticalAlignment = VerticalAlignment.Stretch,
             Margin = new Thickness(0),
+
             /* 
             Every command call goes through here. Executing directly on this
             callback would run on whatever thread delivers keyboard events —
@@ -50,7 +52,8 @@ public sealed class CommandPrompt : Window
             // working elsewhere) — I don't have that API, so this is a stand-in.
             new Thread(() => CommandRegistry.Execute(context, line)).Start();
         };
-        
+
+        output.PromptProvider = () => $"windose@user: {context.CurrentDirectory} ";
 
         root.AddDockChild(output, Dock.Fill);
         AddChild(root);

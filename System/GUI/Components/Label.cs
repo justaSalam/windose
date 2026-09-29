@@ -88,7 +88,7 @@ public class Label : Component
 
             if (font != null)
             {
-                DrawString(line, font, fontSize,textColor, x, y);
+                DrawString(line, font, fontSize, textColor, x, y);
             }
         }
     }

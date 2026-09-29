@@ -34,6 +34,14 @@ public sealed class TerminalView : Component
     // still blocks this input-delivery thread.
     public Action<string>? OnTopLevelSubmit;
 
+    // Supplies the prompt text for normal top-level input, re-evaluated every
+    // draw and every submit, so it always reflects live state such as the
+    // current directory. Not used while a command is inside ReadLineSync;
+    // that command's own prompt (e.g. "DISKPART> ") wins.
+    public Func<string>? PromptProvider;
+
+    private string CurrentPrompt() => isReadingLine ? activePrompt : (PromptProvider?.Invoke() ?? "> ");
+
     private TrueTypeFont font = SystemFonts.msSansSerif;
 
     public TerminalView(int x, int y, int width, int height) : base(x, y, width, height)
@@ -113,7 +121,7 @@ public sealed class TerminalView : Component
 
     private void DrawInputLine(int y)
     {
-        string prefix = activePrompt;
+        string prefix = CurrentPrompt();
         int prefixWidth = font.MeasureString(prefix);
         DrawString(prefix, font, fontSize, Color.FromArgb(128, 255, 128), 4, y);
 
@@ -204,7 +212,7 @@ public sealed class TerminalView : Component
 
         // Echo what was typed into the scrollback — this is the part the
         // old two-widget setup never did.
-        WriteLine(activePrompt + submitted);
+        WriteLine(CurrentPrompt() + submitted);
 
         if (isReadingLine)
         {
@@ -249,6 +257,11 @@ public sealed class TerminalView : Component
     public override void Dispose()
     {
         TimerManager.Cancel(cursorTimer);
+        // Unblocks any thread currently sitting in ReadLineSync (e.g. a
+        // diskpart session left open when the window closes) with a clean
+        // exception instead of leaving it blocked forever after this object
+        // is gone.
+        pendingInput.CompleteAdding();
         pendingInput.Dispose();
         base.Dispose();
     }
