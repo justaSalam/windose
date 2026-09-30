@@ -1,5 +1,10 @@
 using Windose.System.Kernel;
+using Windose.System.Kernel.Attributes;
 
+
+[Program("Windose.BreezeEditor", "Breeze Editor")]
+[FileAssociation(".breeze")]
+[FileAssociation(".txt")]
 public class BreezeEditor : Window
 {
     private sealed class EditorDocument

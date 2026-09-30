@@ -4,6 +4,7 @@ using System.Drawing;
 using Windose;
 using Windose.System.Kernel;
 using Windose.System.Kernel.FileSystem;
+using Windose.System.Kernel.Subsystem;
 using Windose.System.System_Calls;
 
 public class FileExplorer : Window
@@ -363,6 +364,16 @@ public class FileExplorer : Window
         if (string.IsNullOrEmpty(path)) return;
 
         string ext = Path.GetExtension(path).ToLowerInvariant();
+
+
+        if(!FileAssociations.TryGetApplication(ext, out Type program))
+        {
+            return;
+        }
+        Window wnd = (Window)Activator.CreateInstance(program)!;
+        LaunchTracker.Start(() => wnd);
+
+        /*
         switch (ext)
         {
             case ".txt":
@@ -384,7 +395,7 @@ public class FileExplorer : Window
             default:
                 BreezeHost.RunFile(path);
                 break;
-        }
+        }*/
 
     }
 

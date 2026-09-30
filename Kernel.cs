@@ -7,6 +7,7 @@ using Wacs.Core.Runtime;
 using Windose.Drivers;
 using Windose.Programs.Breeze;
 using Windose.System.ABI.WIN;
+using Windose.System.Kernel.Subsystem;
 using Windose.System.System_Calls;
 using Sys = Cosmos.Kernel.System;
 
@@ -102,6 +103,7 @@ public class Kernel : Sys.Kernel
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
+        FileAssociations.DiscoverPrograms(typeof(Kernel).Assembly);
 
     }
 
