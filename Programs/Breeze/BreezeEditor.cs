@@ -9,7 +9,7 @@ public class BreezeEditor : Window
 {
     private sealed class EditorDocument
     {
-        public string Path;
+        public string Path = "/mnt";
         public string Source;
         public bool Dirty;
     }

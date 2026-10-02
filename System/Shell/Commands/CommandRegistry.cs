@@ -1,17 +1,13 @@
-using Cosmos.Kernel.HAL.Interfaces.Devices;
-using Cosmos.Kernel.HAL.Vfs;
-using Cosmos.Kernel.System;
-using Cosmos.Kernel.System.Diagnostics;
-using Cosmos.Kernel.System.Filesystems.Fat;
-using Cosmos.Kernel.System.Storage;
-using Cosmos.Kernel.System.Vfs;
-using Windose.System.Kernel.Subsystem;
+using Cosmos.Executable.Lua;
+using Windose.System.Kernel.FileSystem;
+using Windose.System.Shell.Commands;
 
 public delegate void CommandHandler(CommandContext context, string[] arguments);
 
 
 public static class CommandRegistry
 {
+    
     private static readonly Dictionary<string, IShellCommand> commands =
         new Dictionary<string, IShellCommand>(StringComparer.OrdinalIgnoreCase);
     private static readonly List<IShellCommand> orderedCommands = new List<IShellCommand>();
@@ -50,7 +46,36 @@ public static class CommandRegistry
 
         if (!commands.TryGetValue(parts[0], out IShellCommand command))
         {
-            context.WriteLine("Bad command or file name: " + parts[0]);
+            string[] files = Directory.GetFiles(SystemPaths.SystemLua, "*.lua");
+
+            if (files.Any(f => Path.GetFileName(f).Equals(parts[0], StringComparison.OrdinalIgnoreCase)))
+            {
+                LuaInterpreter lua = new()
+                {
+                    WorkingDirectory = context.CurrentDirectory, // where dofile, require and io.open start relative paths from
+                };
+                LuaBindings.RegisterBindings(lua, context);
+
+                try
+                {
+                    lua.DoFile($"{SystemPaths.SystemLua}/{parts[0]}");
+                }
+                catch (LuaException e)
+                {
+                    // A syntax error, or a runtime error no pcall caught
+                    context.WriteLine(e.Message);
+                    context.WriteLine(e.LuaStackTrace);
+                }
+                catch (LuaExitException e)
+                {
+                    context.WriteLine($"Lua script exited with code {e.ExitCode}");
+                    // The script called os.exit(e.ExitCode)
+                }
+            }
+            else
+            {
+                context.WriteLine("Bad command or file name: " + parts[0]);
+            }
             return;
         }
 

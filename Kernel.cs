@@ -2,8 +2,6 @@ using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Keyboard;
 using Cosmos.Kernel.System.Mouse;
-using System.Drawing;
-using Wacs.Core.Runtime;
 using Windose.Drivers;
 using Windose.Programs.Breeze;
 using Windose.System.ABI.WIN;
@@ -11,7 +9,9 @@ using Windose.System.Kernel.Subsystem;
 using Windose.System.System_Calls;
 using Sys = Cosmos.Kernel.System;
 
-
+///TODO Implement lua scripts instead of hardcoded programs for terminal;
+using Cosmos.Executable.Lua;
+using Windose.System.Kernel.FileSystem;
 namespace Windose;
 
 /// <summary>
@@ -35,7 +35,6 @@ public class Kernel : Sys.Kernel
             SystemLogger.WriteLine("BOOT", "BeforeRun starting", ConsoleMessageType.Log);
 
             InitializeKernel();
-
         }
         catch (Exception exception)
         {
@@ -93,6 +92,8 @@ public class Kernel : Sys.Kernel
 
         Directory.CreateDirectory("/mnt/Programs");
         Directory.CreateDirectory("/mnt/Apps");
+        Directory.CreateDirectory(SystemPaths.SystemLua);
+        File.WriteAllText(SystemPaths.SystemLua + "/init.lua", "terminal.write('Hello From Lua!')\nterminal.write('Running From: ' .. terminal.currentDirectory())\n ");
         File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
 
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze", "service.control");

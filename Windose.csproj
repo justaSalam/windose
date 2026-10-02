@@ -11,8 +11,8 @@
   <ItemGroup>
     <PackageReference Include="Cosmos.Kernel" Version="3.0.89" />
     <PackageReference Include="Cosmos.Kernel.System" Version="3.0.89" />
+	  <PackageReference Include="Cosmos.Executable.Lua" Version="4.0.1" />
     <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
-    <PackageReference Include="WACS" Version="0.16.14" />
   </ItemGroup>
 
     <ItemGroup>
