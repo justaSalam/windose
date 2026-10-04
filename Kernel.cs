@@ -93,7 +93,7 @@ public class Kernel : Sys.Kernel
         Directory.CreateDirectory("/mnt/Programs");
         Directory.CreateDirectory("/mnt/Apps");
         Directory.CreateDirectory(SystemPaths.SystemLua);
-        File.WriteAllText(SystemPaths.SystemLua + "/init.lua", "terminal.write('Hello From Lua!')\nterminal.write('Running From: ' .. terminal.currentDirectory())\n ");
+        File.WriteAllText(SystemPaths.SystemLua + "/init.lua", "terminal.write('^blueHello From Lua!')\nterminal.write('Running From: ' .. terminal.currentDirectory())\n ");
         File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
 
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze", "service.control");
