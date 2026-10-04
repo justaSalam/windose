@@ -290,7 +290,7 @@ public class ScrollView : Component
                 ApplyContentOffset();
             }
         }
-        else if (content is ListView listView)
+        else if (content is FileListView listView)
         {
             int newHeight = Math.Max(GetViewportHeight(), listView.GetContentHeight());
 

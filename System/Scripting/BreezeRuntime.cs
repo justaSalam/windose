@@ -841,7 +841,7 @@ public sealed class BreezeRuntime
                     RequireCount(name, args, 1);
                     ListViewMode mode = ParseListViewMode(ToText(args[0]));
                     if (HasError) return null;
-                    return new ListView(0, 0, 100, 100)
+                    return new FileListView(0, 0, 100, 100)
                     {
                         viewMode = mode,
                         useBackground = true,
@@ -853,9 +853,9 @@ public sealed class BreezeRuntime
             case "listItem":
                 {
                     RequireCount(name, args, 4);
-                    ListView list = Require<ListView>(name, args[0]);
+                    FileListView list = Require<FileListView>(name, args[0]);
                     if (list == null) return null;
-                    ListViewItem item = list.AddItem(ToText(args[1]), tag: args[2]);
+                    FileListViewItem item = list.AddItem(ToText(args[1]), tag: args[2]);
                     item.isFolder = ToBool(args[3]);
                     item.type = item.isFolder ? "File Folder" : "File";
                     return item;
@@ -864,7 +864,7 @@ public sealed class BreezeRuntime
             case "listClear":
                 RequireCount(name, args, 1);
                 {
-                    ListView list = Require<ListView>(name, args[0]);
+                    FileListView list = Require<FileListView>(name, args[0]);
                     if (list == null) return null;
                     list.ClearItems();
                     return args[0];
@@ -873,7 +873,7 @@ public sealed class BreezeRuntime
             case "listMode":
                 RequireCount(name, args, 2);
                 {
-                    ListView list = Require<ListView>(name, args[0]);
+                    FileListView list = Require<FileListView>(name, args[0]);
                     if (list == null) return null;
                     ListViewMode mode = ParseListViewMode(ToText(args[1]));
                     if (HasError) return null;
@@ -888,7 +888,7 @@ public sealed class BreezeRuntime
                     if (content == null) return null;
                     ScrollView scroll = new ScrollView(0, 0, 100, 100) { clampSize = false, Margin = new Thickness(0) };
                     int contentHeight = content is TreeView tree ? tree.GetContentHeight()
-                        : content is ListView list ? list.GetContentHeight()
+                        : content is FileListView list ? list.GetContentHeight()
                         : content.Height;
                     scroll.SetContent(content, Math.Max(100, content.Width), Math.Max(1, contentHeight));
                     return scroll;
@@ -897,7 +897,7 @@ public sealed class BreezeRuntime
             case "loadDirectory":
                 RequireCount(name, args, 2);
                 {
-                    ListView list = Require<ListView>(name, args[0]);
+                    FileListView list = Require<FileListView>(name, args[0]);
                     if (list == null) return null;
                     LoadDirectory(list, ToText(args[1]));
                     return args[0];
@@ -1281,7 +1281,7 @@ public sealed class BreezeRuntime
                 return;
             }
         }
-        if (target is ListView list)
+        if (target is FileListView list)
         {
             if (eventName == "select")
             {
@@ -1458,7 +1458,7 @@ public sealed class BreezeRuntime
             }
         }
 
-        if (target is ListViewItem listItem)
+        if (target is FileListViewItem listItem)
         {
             switch (property)
             {
@@ -1995,7 +1995,7 @@ public sealed class BreezeRuntime
         }
     }
 
-    private void LoadDirectory(ListView list, string path)
+    private void LoadDirectory(FileListView list, string path)
     {
         if (!Directory.Exists(path))
         {
@@ -2008,7 +2008,7 @@ public sealed class BreezeRuntime
         for (int i = 0; i < directories.Length; i++)
         {
             string directory = directories[i];
-            ListViewItem item = list.AddItem(FileSystemManager.GetName(directory), tag: directory);
+            FileListViewItem item = list.AddItem(FileSystemManager.GetName(directory), tag: directory);
             item.isFolder = true;
             item.type = "File Folder";
         }
@@ -2017,7 +2017,7 @@ public sealed class BreezeRuntime
         for (int i = 0; i < files.Length; i++)
         {
             string file = files[i];
-            ListViewItem item = list.AddItem(FileSystemManager.GetName(file), tag: file);
+            FileListViewItem item = list.AddItem(FileSystemManager.GetName(file), tag: file);
             item.isFolder = false;
             item.type = string.Equals(FileSystemManager.GetExtension(file), ".breeze", StringComparison.OrdinalIgnoreCase)
                 ? "Breeze Script"

@@ -43,28 +43,24 @@ public class Component : IDisposable
 
     public bool Visible
     {
-        get
-        {
-            return visible;
-        }
+        get { return visible; }
         set
         {
-            if (visible != value)
+            if (visible == value) return;
+
+            visible = value;
+            dirty = true;
+            WindowManager.Invalidate(this);
+
+            if (!isRoot && parent != null)
             {
-                visible = value;
-                dirty = true;
-                WindowManager.Invalidate(this);
-                if (!isRoot && parent != null)
-                    parent.MarkChildDirty();
-
-                foreach (Component component in children)
-                {
-                    component.Visible = value;
-                }
+                parent.MarkChildDirty();
+                parent.OnChildVisibilityChanged(this);
             }
-
         }
     }
+
+    protected virtual void OnChildVisibilityChanged(Component child) { }
     public int AbsoluteX
     {
         get
@@ -140,7 +136,8 @@ public class Component : IDisposable
     public Rectangle rectangle;
     public Rectangle clampedBounds = new Rectangle(0, 0, 50, 50);
     public State state;
-
+    public Dock dock;
+    public static Component? MouseCapture;
     public bool capturesInput = true;
     protected bool dirty;
     protected bool childrenDirty;
@@ -316,6 +313,7 @@ public class Component : IDisposable
     }
     public virtual bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (MouseCapture != null && MouseCapture.parent == this) return MouseCapture.HandleInput(mouseX, mouseY, mouse);
         if (IsInsideAbsolute(mouseX, mouseY))
         {
             if (mouse.left == MouseEvents.Release) leftClickAction?.Invoke();
@@ -416,9 +414,28 @@ public class Component : IDisposable
     {
     }
 
+    public void SetBounds(int x, int y, int width, int height)
+    {
+        if (width % 2 != 0) width++;
+        if (X == x && Y == y && Width == width && Height == height) return;
 
+        Rectangle oldAbsolute = AbsoluteRectangle;
+
+        bool clamp = clampSize;
+        clampSize = false;              // layout is not a user resize
+        Resize(width, height);
+        clampSize = clamp;
+
+        X = x;
+        Y = y;
+
+        WindowManager.Invalidate(oldAbsolute);
+        WindowManager.Invalidate(this);
+        MarkDirty();
+    }
     public virtual void ResolveHorizontalAnchor()
     {
+        if (dock != Dock.None) return;   // DockPanel owns X/width
         if (isRoot || parent == null) return;
 
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
@@ -450,6 +467,8 @@ public class Component : IDisposable
     }
     public virtual void ResolveVerticalAnchor()
     {
+        if (dock != Dock.None) return;   // DockPanel owns X/width
+
         if (isRoot || parent == null) return;
 
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
@@ -508,41 +527,13 @@ public class Component : IDisposable
 
         DrawToScreen();
     }
+    public bool IsInsideAbsolute(int x, int y) => x >= AbsoluteX && x < AbsoluteX + Width && y >= AbsoluteY && y < AbsoluteY + Height;
+
+    public bool IsInsideLocal(int x, int y) => x >= X && x < X + Width && y >= Y && y < Y + Height;
+
+    public bool Contains(int x, int y, Rectangle reference) => x >= reference.X && x < reference.X + reference.Width && y >= reference.Y && y < reference.Y + reference.Height;
 
 
-    /// <summary>
-    /// Screen space coordinates
-    /// </summary>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <returns></returns>
-    public bool IsInsideAbsolute(int x, int y)
-    {
-        return x >= AbsoluteX && x <= AbsoluteX + Width && y >= AbsoluteY && y <= AbsoluteY + Height;
-    }
-
-    /// <summary>
-    /// Window Space coordinates
-    /// </summary>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <returns></returns>
-    public bool IsInsideLocal(int x, int y)
-    {
-        return x >= X && x <= X + Width && y >= Y && y <= Y + Height;
-    }
-
-    /// <summary>
-    /// Checks for a point within reference
-    /// </summary>
-    /// <param name="x"></param>
-    /// <param name="y"></param>
-    /// <param name="reference"></param>
-    /// <returns>If a point in space is within reference</returns>
-    public bool Contains(int x, int y, Rectangle reference)
-    {
-        return x >= reference.X && x <= reference.X + reference.Width && y >= reference.Y && y <= rectangle.Y + reference.Height;
-    }
 
     /// <summary>
     /// Returns a child component at given absolute coordinates
@@ -684,41 +675,43 @@ public class Component : IDisposable
 
     public virtual Component AddChild(Component child)
     {
+        lock (children)
+        {
+            if (children.Contains(child)) return child;
+        }
+
         child.canRender = true;
         child.isRoot = false;
         child.parent = this;
+        child.ComputeAbsoluteCoordinates();   // recurses into the child's subtree
         zIndex++;
 
+        child.BindRenderSurface(buffer, false);
         child.ResolveHorizontalAnchor();
         child.ResolveVerticalAnchor();
-        child.BindRenderSurface(buffer, false);
 
-        lock (components)
-        {
-            components.Remove(child);
-        }
-        lock (children)
-        {
-            children.Add(child);
-        }
+        lock (components) { components.Remove(child); }
+        lock (children) { children.Add(child); }
+
         MarkDirty();
-
         return child;
     }
 
     public virtual void RemoveChild(Component child)
     {
-        lock (components)
-        {
-            if (!children.Remove(child)) return;
+        bool removed;
+        lock (children) { removed = children.Remove(child); }
+        if (!removed) return;
 
-            WindowManager.Invalidate(child.AbsoluteRectangle);
-            child.isRoot = true;
-            components.Remove(child);
-            MarkDirty();
-        }
+        WindowManager.Invalidate(child.AbsoluteRectangle);
+
+        child.parent = null;
+        child.isRoot = true;
+        child.ComputeAbsoluteCoordinates();
+
+        lock (components) { components.Remove(child); }
+        MarkDirty();
     }
-
     public void Clear(Color color)
     {
         buffer.Clear(color);
@@ -835,14 +828,22 @@ public class Component : IDisposable
 
     public virtual void MarkDirty(bool invalidate = true)
     {
-        if (invalidate)
-            WindowManager.Invalidate(this);
-
+        if (invalidate) WindowManager.Invalidate(this);
         dirty = true;
+        if (!isRoot && parent != null) parent.MarkChildDirty();
+    }
 
-        if (!isRoot)
-            parent.MarkChildDirty();
+    protected virtual void MarkChildDirty()
+    {
+        childrenDirty = true;
+        if (!isRoot && parent != null) parent.MarkChildDirty();
+    }
 
+    public virtual void ForceDirty()
+    {
+        forceDirty = true;
+        WindowManager.Invalidate(this);
+        if (!isRoot && parent != null) parent.MarkChildDirty();
     }
 
     protected void InvalidateLocalRegion(Rectangle localRegion)
@@ -861,13 +862,6 @@ public class Component : IDisposable
             parent.MarkChildDirty();
     }
 
-    protected virtual void MarkChildDirty()
-    {
-        childrenDirty = true;
-
-        if (!isRoot)
-            parent.MarkChildDirty();
-    }
 
     public virtual void DrawDirtyLocal(Rectangle dirtyRect)
     {
@@ -985,15 +979,6 @@ public class Component : IDisposable
             destinationY,
             width,
             height);
-    }
-
-    public virtual void ForceDirty()
-    {
-        forceDirty = true;
-        WindowManager.Invalidate(this);
-
-        if (!isRoot)
-            parent.MarkChildDirty();
     }
 
 

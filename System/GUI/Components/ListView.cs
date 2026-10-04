@@ -1,38 +1,23 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
-using Mono.Cecil;
 using Windose.System.Features;
-using Windose.System.Kernel;
-using Windose.System.Kernel.Subsystem;
 
 public class ListView : Component
 {
     public List<ListViewItem> items = new List<ListViewItem>();
     public ListViewItem selectedItem;
-    public ListViewMode viewMode = ListViewMode.LargeIcon;
 
-    public int largeCellWidth = 92;
-    public int largeCellHeight = 76;
-    public int smallRowHeight = 20;
+
     public int detailsRowHeight = 20;
     public int headerHeight = 20;
-    public int iconSize = 32;
-    public int smallIconSize = 12;
     public int fontSize = 16;
     public bool useBackground = true;
-    public Color backgroundColor = Palette.ControlWhite;
-    public Color textColor = Palette.ControlBlack;
-    public string[] headers;
-    public int[] headerWidths;
 
-    //public string nameHeader = "Name";
-    //public string sizeHeader = "Size";
-    //public string typeHeader = "Type";
-    //public string modifiedHeader = "Modified";
+    public List<ListViewColumn> columns = new List<ListViewColumn>();
 
-    //public int nameColumnWidth = 180;
-    //public int sizeColumnWidth = 80;
-    //public int typeColumnWidth = 120;
+    public int iconSize = 16;
+    private const int IconSlot = 22;
+
 
     public Action<ListViewItem> selectedChanged;
     public Action<ListViewItem> itemDoubleClick;
@@ -43,43 +28,25 @@ public class ListView : Component
     private int lastClickIndex = -1;
     private int lastClickTick;
     public int doubleClickInterval = 1200;
-    private Png itemIcon;
-
-    private Png folderIcon;
-
-
-
 
 
     public ListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
-        itemIcon = new Png("/mnt/System/Icons/file_lines.png");
-        folderIcon = new Png("/mnt/System/Icons/directory_closed.png");
     }
 
-    public ListViewItem AddItem(string text, Image icon = null, object tag = null)
+    public ListViewItem AddItem(string[] text, Image? icon = null, object? tag = null)
     {
-        ListViewItem item = new ListViewItem(text, icon, tag);
+        var item = new ListViewItem(text, icon, tag);
         items.Add(item);
         MarkDirty();
         return item;
     }
 
-    public ListViewItem AddItem(FileEntry fileEntry, Image icon = null)
+    public void AddColumn(string header, int width)
     {
-        ListViewItem item = new ListViewItem(fileEntry, icon);
-        items.Add(item);
+        columns.Add(new ListViewColumn { Header = header, Width = width });
         MarkDirty();
-        return item;
-    }
-
-    public ListViewItem AddFolder(string text, Bitmap icon = null, object tag = null)
-    {
-        ListViewItem item = AddItem(text, icon, tag);
-        item.isFolder = true;
-        item.type = "File Folder";
-        return item;
     }
 
     public void ClearItems()
@@ -89,248 +56,68 @@ public class ListView : Component
         MarkDirty();
     }
 
-    public void SetViewMode(ListViewMode mode)
-    {
-        if (viewMode == mode) return;
-
-        viewMode = mode;
-        MarkDirty();
-    }
-
-    public override void Draw()
-    {
-        base.Draw();
-    }
-
     public override void DrawLocal()
     {
         if (useBackground)
-            DrawFilledRectangle(backgroundColor, 0, 0, Width, Height);
+            DrawFilledRectangle(Palette.ControlWhite, 0, 0, Width, Height);
 
-        switch (viewMode)
-        {
-            case ListViewMode.LargeIcon:
-                DrawLargeIcons();
-                break;
-
-            case ListViewMode.SmallIcon:
-                DrawSmallIcons();
-                break;
-
-            case ListViewMode.List:
-                DrawList();
-                break;
-
-            case ListViewMode.Details:
-                DrawDetails();
-                break;
-        }
-    }
-
-    private void DrawLargeIcons()
-    {
-        int columns = Math.Max(1, Width / Math.Max(1, largeCellWidth));
-
-        for (int i = 0; i < items.Count; i++)
-        {
-            int column = i % columns;
-            int row = i / columns;
-            int x = column * largeCellWidth;
-            int y = row * largeCellHeight;
-
-            if (y >= Height) continue;
-
-            DrawItemLarge(items[i], x, y, largeCellWidth, largeCellHeight);
-        }
-    }
-
-    private void DrawItemLarge(ListViewItem item, int x, int y, int width, int height)
-    {
-        int iconX = x + (width - iconSize) / 2;
-        int iconY = y + 6;
-        int textWidth = Math.Max(1, width - 6);
-        int textX = x + 3;
-        int textY = y + iconSize + 12;
-
-        DrawItemIcon(item, iconX, iconY, iconSize);
-
-        if (item == selectedItem || item.selected)
-        {
-            DrawFilledRectangle(Palette.Highlight, textX, textY - 1, textWidth, fontSize + 2);
-            DrawCenteredText(item.text, Palette.HighlightText, textX, textY, textWidth, fontSize);
-        }
-        else
-        {
-            DrawCenteredText(item.text, textColor, textX, textY, textWidth, fontSize);
-        }
-    }
-
-    private void DrawSmallIcons()
-    {
-        int rowHeight = smallRowHeight;
-        int columns = Math.Max(1, Width / 180);
-
-        for (int i = 0; i < items.Count; i++)
-        {
-            int column = i % columns;
-            int row = i / columns;
-            int x = column * 180 + 4;
-            int y = row * rowHeight;
-
-            DrawItemRow(items[i], x, y, 176, rowHeight, true);
-        }
-    }
-
-    private void DrawList()
-    {
-        for (int i = 0; i < items.Count; i++)
-        {
-            int y = i * smallRowHeight;
-            DrawItemRow(items[i], 4, y, Width - 8, smallRowHeight, true);
-        }
-    }
-
-    private void DrawDetails()
-    {
-        DrawDetailsHeader();
+        DrawHeader();
 
         for (int i = 0; i < items.Count; i++)
         {
             int y = headerHeight + i * detailsRowHeight;
             if (y >= Height) continue;
 
-            DrawDetailsRow(items[i], y);
+            DrawRow(items[i], y);
         }
+
     }
 
-    private void DrawDetailsHeader()
+    private void DrawHeader()
     {
         DrawFilledRectangle(Palette.ControlFace, 0, 0, Width, headerHeight);
 
-        int currentX = 0;
-        for (int i = 0; i < headerWidths.Length; i++)
+        int x = 0;
+        foreach (ListViewColumn c in columns)
         {
-
-            DrawSunkenRectangle(currentX, 0, headerWidths[i], headerHeight);
-            DrawString(headers[i], Palette.ControlBlack, currentX + 4, 2, fontSize);
-            currentX += headerWidths[i];
+            DrawSunkenRectangle(x, 0, c.Width, headerHeight);
+            DrawString(Clip(c.Header, c.Width - 8), Palette.ControlBlack, x + 4, 2, fontSize);
+            x += c.Width;
         }
     }
 
 
 
-    private void DrawDetailsRow(ListViewItem item, int y)
+    private void DrawRow(ListViewItem item, int y)
     {
-        bool selected = item == selectedItem || item.selected;
+        bool selected = item == selectedItem;
 
         if (selected)
             DrawFilledRectangle(Palette.Highlight, 2, y + 1, Width - 4, detailsRowHeight - 2);
 
-        Color color = selected ? Palette.HighlightText : textColor;
+        Color color = selected ? Palette.HighlightText : Palette.ControlBlack;
 
-        DrawItemIcon(item, 4, y + 2, smallIconSize);
+        if (item.Icon != null)
+            DrawImageStretch(item.Icon, new Rectangle(4, y + (detailsRowHeight - iconSize) / 2, iconSize, iconSize));
 
-        DrawString($"{TextFeatures.Fill(item.text, 20)}    {ByteFormat.FormatBytes(item.fileEntry.SizeBytes)}     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
-
-        int currentX = 0;
-        for (int i = 0; i < headerWidths.Length; i++)
+        int x = 0;
+        for (int c = 0; c < columns.Count; c++)
         {
-            DrawString(headers[i], Palette.ControlBlack, currentX + 4, 2, fontSize);
-            currentX += headerWidths[i];
+            string s = c < item.Text.Length ? item.Text[c] : "";
+            int textX = x + 4 + (c == 0 ? IconSlot : 0);
+            int avail = columns[c].Width - (textX - x) - 4;
+
+            DrawString(Clip(s, avail), color, textX, y + 2, fontSize);
+            x += columns[c].Width;
         }
     }
 
-    private void DrawItemRow(ListViewItem item, int x, int y, int width, int height, bool drawIcon)
+    private string Clip(string s, int pixelWidth)
     {
-        if (y >= Height) return;
+        int glyph = Math.Max(1, fontSize / 2);   // same 8px-at-16 assumption as before; swap in a real measure if you have one
+        int max = Math.Max(0, pixelWidth / glyph);
 
-        bool selected = item == selectedItem || item.selected;
-
-        if (selected)
-            DrawFilledRectangle(Palette.Highlight, x, y + 1, width, height - 2);
-
-        if (drawIcon)
-            DrawItemIcon(item, x + 2, y + 2, smallIconSize);
-
-        DrawString(item.text, selected ? Palette.HighlightText : textColor, x + 24, y + 2, fontSize);
-    }
-
-    private void DrawItemIcon(ListViewItem item, int x, int y, int size)
-    {
-        if (item.icon != null)
-        {
-            DrawImageStretch(item.icon, new Rectangle(x, y - 2, 19, 19));
-            return;
-        }
-
-        if(!item.hasFileEntry)
-        {
-            return;
-        }
-        
-
-        if (item.isFolder)
-            DrawFolderIcon(x, y, size);
-        else
-            DrawFileIcon(item, x, y);
-    }
-
-    private void DrawFolderIcon(int x, int y, int size)
-    {
-        switch (viewMode)
-        {
-            case ListViewMode.List:
-                DrawImageStretch(folderIcon, new Rectangle(x, y, 18, 18));
-                break;
-
-            case ListViewMode.Details:
-                DrawImageStretch(folderIcon, new Rectangle(x, y, 16, 16));
-                break;
-
-            default:
-                DrawImage(folderIcon, x, y);
-                break;
-        }
-    }
-
-    private static readonly Dictionary<string, Png> iconCache = new Dictionary<string, Png>(StringComparer.OrdinalIgnoreCase);
-
-    private void DrawFileIcon(ListViewItem item, int x, int y)
-    {
-        string ext = Path.GetExtension(item.fileEntry.FileName);
-        Png icon = GetCachedIcon(ext);
-
-        switch (viewMode)
-        {
-            case ListViewMode.List:
-                DrawImageStretch(icon, new Rectangle(x, y, 18, 18));
-                break;
-
-            case ListViewMode.Details:
-                DrawImageStretch(icon, new Rectangle(x, y, 16, 16));
-                break;
-
-            default:
-                DrawImage(icon, x, y);
-                break;
-        }
-    }
-
-    private static Png GetCachedIcon(string extension)
-    {
-        if (iconCache.TryGetValue(extension, out Png cached)) return cached;
-
-        string iconPath = Registry.GetString($"{StaticRegistry.FileAssociation}/{extension}", "/mnt/System/Icons/file_question.png");
-        Png icon = new Png(iconPath);
-        iconCache[extension] = icon;
-        return icon;
-    }
-
-    private void DrawCenteredText(string text, Color color, int x, int y, int width, int size)
-    {
-        int textWidth = text.Length * 8;
-        int textX = x + Math.Max(0, (width - textWidth) / 2);
-        DrawString(text, color, textX, y, size);
+        return s.Length <= max ? s : s.Substring(0, max);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
@@ -392,13 +179,7 @@ public class ListView : Component
 
     public void SelectItem(ListViewItem item)
     {
-        if (selectedItem != null)
-            selectedItem.selected = false;
-
         selectedItem = item;
-
-        if (selectedItem != null)
-            selectedItem.selected = true;
 
         selectedChanged?.Invoke(selectedItem);
         MarkDirty();
@@ -406,60 +187,24 @@ public class ListView : Component
 
     public int GetItemIndexAt(int localX, int localY)
     {
-        switch (viewMode)
-        {
-            case ListViewMode.LargeIcon:
-                int columns = Math.Max(1, Width / Math.Max(1, largeCellWidth));
-                int column = localX / largeCellWidth;
-                int row = localY / largeCellHeight;
-                int index = row * columns + column;
-                return index >= 0 && index < items.Count ? index : -1;
 
-            case ListViewMode.SmallIcon:
-                int smallColumns = Math.Max(1, Width / 180);
-                int smallColumn = localX / 180;
-                int smallRow = localY / smallRowHeight;
-                int smallIndex = smallRow * smallColumns + smallColumn;
-                return smallIndex >= 0 && smallIndex < items.Count ? smallIndex : -1;
+        if (localY < headerHeight) return -1;
+        int detailsIndex = (localY - headerHeight) / detailsRowHeight;
+        return detailsIndex >= 0 && detailsIndex < items.Count ? detailsIndex : -1;
 
-            case ListViewMode.List:
-                int listIndex = localY / smallRowHeight;
-                return listIndex >= 0 && listIndex < items.Count ? listIndex : -1;
-
-            case ListViewMode.Details:
-                if (localY < headerHeight) return -1;
-                int detailsIndex = (localY - headerHeight) / detailsRowHeight;
-                return detailsIndex >= 0 && detailsIndex < items.Count ? detailsIndex : -1;
-        }
-
-        return -1;
     }
 
     public int GetContentHeight()
     {
-        switch (viewMode)
-        {
-            case ListViewMode.LargeIcon:
-                int columns = Math.Max(1, Width / Math.Max(1, largeCellWidth));
-                int rows = (items.Count + columns - 1) / columns;
-                return Math.Max(largeCellHeight, rows * largeCellHeight);
-
-            case ListViewMode.SmallIcon:
-                int smallColumns = Math.Max(1, Width / 180);
-                int smallRows = (items.Count + smallColumns - 1) / smallColumns;
-                return Math.Max(smallRowHeight, smallRows * smallRowHeight);
-
-            case ListViewMode.List:
-                return Math.Max(smallRowHeight, items.Count * smallRowHeight);
-
-            case ListViewMode.Details:
-                return Math.Max(headerHeight + detailsRowHeight, headerHeight + items.Count * detailsRowHeight);
-        }
-
-        return Height;
+        return Math.Max(headerHeight + detailsRowHeight, headerHeight + items.Count * detailsRowHeight);
     }
 
     public override bool IsOpaqueForCopy() => useBackground;
 
     public override string GetComponentName() => "ListView";
+}
+public class ListViewColumn
+{
+    public string Header;
+    public int Width;
 }

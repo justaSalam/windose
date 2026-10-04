@@ -1,8 +1,1 @@
-public enum Dock
-{
-    Left,
-    Top,
-    Right,
-    Bottom,
-    Fill
-}
+public enum Dock { None, Top, Bottom, Left, Right, Fill }

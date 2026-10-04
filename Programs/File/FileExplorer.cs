@@ -20,12 +20,12 @@ public class FileExplorer : Window
     private ScrollView treeScroll;
     private ScrollView fileScroll;
     private TreeView tree;
-    private ListView files;
+    private FileListView files;
     private readonly MenuPopup fileContextMenu;
     private readonly MenuPopup viewportContextMenu;
     private readonly MenuItem openContextItem;
     private readonly MenuItem editContextItem;
-    private ListViewItem? contextItem;
+    private FileListViewItem? contextItem;
     private string currentLocation = "/mnt";
 
     public FileExplorer(int x, int y, int width, int height, string title, string rootPath = "/mnt") : base(x, y, width, height, title, true)
@@ -80,7 +80,7 @@ public class FileExplorer : Window
             Margin = new Thickness(0),
         };
 
-        files = new ListView(0, 0, Width, Height)
+        files = new FileListView(0, 0, Width, Height)
         {
             viewMode = ListViewMode.LargeIcon,
             useBackground = true,
@@ -252,7 +252,7 @@ public class FileExplorer : Window
 
     private void DeleteFile()
     {
-        if (!IsItemValid(out ListViewItem item))
+        if (!IsItemValid(out FileListViewItem item))
         {
             return;
         }
@@ -344,7 +344,7 @@ public class FileExplorer : Window
         Refresh();
     }
 
-    private void OpenFolderItem(ListViewItem item)
+    private void OpenFolderItem(FileListViewItem item)
     {
         string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : (string)item.tag;
         if (path == null) return;
@@ -358,7 +358,7 @@ public class FileExplorer : Window
 
 
     //TODO: Registry file associations
-    private void OpenFileItem(ListViewItem item)
+    private void OpenFileItem(FileListViewItem item)
     {
         string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : (string)item.tag;
         if (string.IsNullOrEmpty(path)) return;
@@ -399,7 +399,7 @@ public class FileExplorer : Window
 
     }
 
-    private void ShowFileContextMenu(ListViewItem item, int mouseX, int mouseY)
+    private void ShowFileContextMenu(FileListViewItem item, int mouseX, int mouseY)
     {
         contextItem = item;
         openContextItem.enabled = item != null;
@@ -415,7 +415,7 @@ public class FileExplorer : Window
 
     private void OpenContextItem()
     {
-        ListViewItem item = contextItem;
+        FileListViewItem item = contextItem;
         contextItem = null;
         if (item == null) return;
 
@@ -427,7 +427,7 @@ public class FileExplorer : Window
 
     private void EditContextItem()
     {
-        ListViewItem item = contextItem;
+        FileListViewItem item = contextItem;
         contextItem = null;
         if (item == null || item.isFolder || !item.hasFileEntry) return;
 
@@ -438,10 +438,10 @@ public class FileExplorer : Window
 
     private void ShowContextProperties()
     {
-        if (!IsItemValid(out ListViewItem item)) return;
+        if (!IsItemValid(out FileListViewItem item)) return;
         LaunchTracker.Start(() => new FileProperties(X + 40, Y + 40, item.fileEntry));
     }
-    private bool IsItemValid(out ListViewItem item)
+    private bool IsItemValid(out FileListViewItem item)
     {
         item = contextItem;
         contextItem = null;
@@ -526,7 +526,7 @@ public class FileExplorer : Window
             {
                 return;
             }
-            ListViewItem item = files.AddItem(entry);
+            FileListViewItem item = files.AddItem(entry);
 
             //TODO: Replace with system registry association instead
             item.type = string.Equals(FileSystemManager.GetExtension(file.FullName), ".breeze", StringComparison.OrdinalIgnoreCase)
@@ -553,23 +553,23 @@ public class FileExplorer : Window
             string fileName = FileSystemManager.GetName(path);
             string displayName = fileName.Substring(0, fileName.Length - extension.Length);
             FileEntry entry = new FileEntry(displayName, FileType.File, path, 0);
-            ListViewItem item = files.AddItem(entry);
+            FileListViewItem item = files.AddItem(entry);
             item.type = "Control Panel Applet";
         }
     }
 
-    private ListViewItem AddFolder(string name, string path)
+    private FileListViewItem AddFolder(string name, string path)
     {
         FileEntry entry = new FileEntry(name, FileType.Directory, path, 0, "");
-        ListViewItem item = files.AddItem(entry);
+        FileListViewItem item = files.AddItem(entry);
         item.type = "File Folder";
         return item;
     }
 
-    private ListViewItem AddFile(string name, long sizeBytes, string type)
+    private FileListViewItem AddFile(string name, long sizeBytes, string type)
     {
         FileEntry entry = new FileEntry(name, FileType.File, GetChildLocation(currentLocation, name), sizeBytes);
-        ListViewItem item = files.AddItem(entry);
+        FileListViewItem item = files.AddItem(entry);
         item.type = type;
         return item;
     }

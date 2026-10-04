@@ -4,16 +4,52 @@ using System.Drawing;
 
 public sealed class ControlEnv : Window
 {
-
-    public ControlEnv(int x, int y) : base(x, y, 400, 250, "Control Test Environment", true)
+    private DockPanel dock;
+    public ControlEnv(int x, int y) : base(x, y, 400, 250, "Winver", true)
     {
-        AddChild(new Toolbar(0, 0, 100));
-        AddChild(new Label(0, 20, 100, 20));
-        AddChild(new TextField(0, 40, 100, 20));
-        AddChild(new Checkbox(0, 60));
-        AddChild(new ComboBox(0, 80, 100));
-        AddChild(new StatusBar(0, 100, 100));
-        AddChild(new TreeView(0, 120, 100, 100));
+        dock = new DockPanel(0,0,Width, Height)
+        {
+            verticalAlignment = VerticalAlignment.Stretch,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0),
+            Padding = new Thickness(4),
+        };
+
+        AddChild(dock);
+
+        dock.AddDockChild(new Label(0, 0, 100, 20)
+        {
+            useBackground = false,
+            horizontalAlignment = HorizontalAlignment.Center,
+            verticalTextAlignment = VerticalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Stretch,
+            text = "Windose NativeAoT",
+        }, Dock.Top);
+        dock.AddDockChild(new Label(0, 0, 100, 20)
+        {
+            useBackground = false,
+
+            horizontalAlignment = HorizontalAlignment.Center,
+            verticalTextAlignment = VerticalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Stretch,
+
+            text = "Version 3.0.89",
+        }, Dock.Top);
+        dock.AddDockChild(new Label(0, 0, 100, 20)
+        {
+            useBackground = false,
+
+            horizontalAlignment = HorizontalAlignment.Center,
+            verticalTextAlignment = VerticalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Stretch,
+
+            text = "Cyberialyr all rights reserved",
+        }, Dock.Top);
+        dock.AddDockChild(new Button("Ok", 0, 0, 100, 20)
+        {
+            horizontalAlignment = HorizontalAlignment.Right,
+            
+        }, Dock.Bottom);
 
     }
 

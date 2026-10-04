@@ -23,7 +23,7 @@ public sealed class FileDialog : Window
     private readonly FileDialogOptions options;
     private readonly Action<string> accepted;
     private readonly AddressBar addressBar;
-    private readonly ListView files;
+    private readonly FileListView files;
     private readonly ScrollView fileScroll;
     private readonly TextField fileName;
     private readonly Panel status;
@@ -55,7 +55,7 @@ public sealed class FileDialog : Window
         addressBar = new AddressBar(0, 0, Width);
         addressBar.label.text = "Look in";
 
-        files = new ListView(0, 0, Width, Height)
+        files = new FileListView(0, 0, Width, Height)
         {
             viewMode = ListViewMode.Details,
             useBackground = true,
@@ -136,7 +136,7 @@ public sealed class FileDialog : Window
         NavigateTo(initialDirectory);
     }
 
-    private void SelectItem(ListViewItem item)
+    private void SelectItem(FileListViewItem item)
     {
         if (item == null) return;
         if (!item.isFolder) fileName.text = item.text;
@@ -145,7 +145,7 @@ public sealed class FileDialog : Window
         status.MarkDirty();
     }
 
-    private void OpenItem(ListViewItem item)
+    private void OpenItem(FileListViewItem item)
     {
         if (item == null || item.tag == null) return;
         if (item.isFolder)
@@ -185,7 +185,7 @@ public sealed class FileDialog : Window
         for (int i = 0; i < directories.Length; i++)
         {
             string directory = directories[i];
-            ListViewItem item = files.AddFolder(directory, tag: directory);
+            FileListViewItem item = files.AddFolder(directory, tag: directory);
             item.type = "File Folder";
         }
 
@@ -194,7 +194,7 @@ public sealed class FileDialog : Window
         {
             string file = paths[i];
             if (!MatchesFilter(file)) continue;
-            ListViewItem item = files.AddItem(Path.GetFileName(file), tag: file);
+            FileListViewItem item = files.AddItem(Path.GetFileName(file), tag: file);
             item.type = options.FilterDescription;
         }
 

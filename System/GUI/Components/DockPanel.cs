@@ -5,22 +5,18 @@ public class DockPanel : Component
     public bool useBackground = false;
     public Color backgroundColor = Palette.ControlFace;
 
-    private readonly List<Component> dockChildren = new List<Component>();
-    private readonly List<Dock> docks = new List<Dock>();
+    private readonly List<Component> scratch = new List<Component>();
 
     public DockPanel(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
-        Margin = new Thickness(28, 2, 2, 2);  //Default Panel spanning the window leaving space for the title bar 
     }
 
-    public Component AddDockChild(Component child, Dock dock)
+    public Component AddDockChild(Component child, Dock dockStyle)
     {
-        dockChildren.Add(child);
-        docks.Add(dock);
+        child.dock = dockStyle;     // must be set before AddChild so the anchor methods skip it
         AddChild(child);
         ResolveDockLayout();
-
         return child;
     }
 
@@ -32,86 +28,95 @@ public class DockPanel : Component
 
     public void ResolveDockLayout()
     {
+        // Snapshot under the same lock AddChild uses
+        scratch.Clear();
+        lock (children)
+        {
+            scratch.AddRange(children);
+        }
+
+        // Console.WriteLine($"Dock layout: {GetComponentName()} children={scratch.Count} size={Width}x{Height}");
+
         int left = Padding.left;
         int top = Padding.top;
         int right = Width - Padding.right;
         int bottom = Height - Padding.bottom;
 
-        // Pass 1: Count how many visible components are set to Fill
-        int fillCount = 0;
-        for (int i = 0; i < dockChildren.Count; i++)
+        // Pass 1: edge docks, in child order
+        for (int i = 0; i < scratch.Count; i++)
         {
-            if (dockChildren[i].Visible && docks[i] == Dock.Fill)
-            {
-                fillCount++;
-            }
-        }
+            Component c = scratch[i];
+            if (!c.Visible || c.dock == Dock.None || c.dock == Dock.Fill) continue;
 
-        // Pass 2: Layout the components
-        for (int i = 0; i < dockChildren.Count; i++)
-        {
-            Component child = dockChildren[i];
-            if (!child.Visible) continue;
+            Thickness m = c.Margin;
+            int availW = Math.Max(0, right - left);
+            int availH = Math.Max(0, bottom - top);
 
-            switch (docks[i])
+            switch (c.dock)
             {
                 case Dock.Top:
-                    child.X = left;
-                    child.Y = top;
-                    child.Resize(Math.Max(1, right - left), child.Height);
-                    top += child.Height + child.Margin.bottom;
-                    break;
-
+                    {
+                        int h = Math.Min(c.Height, Math.Max(0, availH - m.top - m.bottom));
+                        Place(c, left + m.left, top + m.top, availW - m.left - m.right, h);
+                        top += h + m.top + m.bottom;
+                        break;
+                    }
                 case Dock.Bottom:
-                    child.X = left;
-                    child.Y = bottom - child.Height;
-                    child.Resize(Math.Max(1, right - left), child.Height);
-                    bottom -= child.Height + child.Margin.top;
-                    break;
-
+                    {
+                        int h = Math.Min(c.Height, Math.Max(0, availH - m.top - m.bottom));
+                        Place(c, left + m.left, bottom - m.bottom - h, availW - m.left - m.right, h);
+                        bottom -= h + m.top + m.bottom;
+                        break;
+                    }
                 case Dock.Left:
-                    child.X = left;
-                    child.Y = top;
-                    child.Resize(child.Width, Math.Max(1, bottom - top));
-                    left += child.Width + child.Margin.right;
-                    break;
-
+                    {
+                        int w = Math.Min(c.Width, Math.Max(0, availW - m.left - m.right));
+                        Place(c, left + m.left, top + m.top, w, availH - m.top - m.bottom);
+                        left += w + m.left + m.right;
+                        break;
+                    }
                 case Dock.Right:
-                    child.X = right - child.Width;
-                    child.Y = top;
-                    child.Resize(child.Width, Math.Max(1, bottom - top));
-                    right -= child.Width + child.Margin.left;
-                    break;
-
-                case Dock.Fill:
-                    // Calculate total height left for all filling elements
-                    int totalRemainingHeight = Math.Max(1, bottom - top);
-
-                    // Divide the remaining height by the number of remaining fill components
-                    int currentFillHeight = totalRemainingHeight / fillCount;
-
-                    child.X = left;
-                    child.Y = top;
-                    child.Resize(Math.Max(1, right - left), currentFillHeight);
-
-                    // Advance the top boundary down for the next Fill component
-                    top += currentFillHeight;
-
-                    // Decrement the count since this one is allocated
-                    fillCount--;
-                    break;
+                    {
+                        int w = Math.Min(c.Width, Math.Max(0, availW - m.left - m.right));
+                        Place(c, right - m.right - w, top + m.top, w, availH - m.top - m.bottom);
+                        right -= w + m.left + m.right;
+                        break;
+                    }
             }
-
-            child.MarkDirty();
         }
 
+        // Pass 2: fills share what's left (stacked vertically)
+        int fills = 0;
+        for (int i = 0; i < scratch.Count; i++)
+            if (scratch[i].Visible && scratch[i].dock == Dock.Fill) fills++;
+
+        for (int i = 0; i < scratch.Count; i++)
+        {
+            Component c = scratch[i];
+            if (!c.Visible || c.dock != Dock.Fill) continue;
+
+            Thickness m = c.Margin;
+            int slice = Math.Max(0, bottom - top) / fills;
+            Place(c, left + m.left, top + m.top,
+                  right - left - m.left - m.right,
+                  slice - m.top - m.bottom);
+            top += slice;
+            fills--;
+        }
+
+        scratch.Clear();
         MarkDirty();
     }
 
-    public override void Draw()
+    private static void Place(Component c, int x, int y, int w, int h)  => c.SetBounds(x, y, Math.Max(1, w), Math.Max(1, h));
+
+    public override void RemoveChild(Component child)
     {
-        base.Draw();
+        base.RemoveChild(child);
+        ResolveDockLayout();
     }
+
+    protected override void OnChildVisibilityChanged(Component child) => ResolveDockLayout();
 
     public override void DrawLocal()
     {
@@ -121,7 +126,6 @@ public class DockPanel : Component
         foreach (Component child in children)
         {
             if (!child.Visible) continue;
-
             DrawChild(child);
         }
     }

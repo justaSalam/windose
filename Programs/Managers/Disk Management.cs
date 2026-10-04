@@ -1,235 +1,241 @@
 using Cosmos.Kernel.HAL.Interfaces.Devices;
-using Cosmos.Kernel.HAL.Vfs;
-using Cosmos.Kernel.System.Filesystems.Fat;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
-using Windose.System.Kernel;
+using System.Drawing;
 
 public sealed class DiskManagement : Window
 {
+    private const int TitleBar = 28;
 
-    private DockPanel root;
-    private MenuBar menuBar;
-    private GroupBox devices;
-    private GroupBox partitions;
+    private readonly DockPanel root;
+    private readonly ListView partitionListView;
+    private readonly PartitionBar partitionBar;
+    private readonly Label statusLabel;
+    private readonly ComboBox diskCombo;
 
-    private ListView partitionListView;
-    private ListView deviceListView;
+    // Action pane
+    private readonly DockPanel actionPane;
+    private readonly Label formatTitle;
+    private readonly ComboBox fsCombo;
+    private readonly TextField labelBox;
+    private readonly Button formatButton;
+    private readonly Button cancelButton;
 
-    private StatusBar status;
+    // Toolbar buttons that need a selection
+    private readonly List<Button> needsSelection = new List<Button>();
 
+    private readonly Png partitionIcon = new Png("/mnt/System/Icons/hard_disk_drive_pie.png");
 
+    private readonly List<IBlockDevice> devices = new List<IBlockDevice>();
+    private IBlockDevice? selectedDevice;
+    private Partition? selectedPartition;
 
-    private ListViewItem contextItem;
-    private readonly MenuPopup fileContextMenu;
-    private readonly MenuItem openContextItem;
-    private readonly MenuItem changeDriveLetterItem;
-
-    private IBlockDevice selectedDevice;
-    private Partition selectedPartition;
-
-
-    public DiskManagement(int x, int y, int width, int height) : base(x, y, width, height, "Disk Management", true)
+    public DiskManagement(int x, int y, int width, int height)
+        : base(x, y, width, height, "Disk Management", true)
     {
-        root = new DockPanel(0, 0, Width, Height)
+        root = new DockPanel(0, TitleBar, Width, Height - TitleBar) { useBackground = true };
+        AddChild(root);                                     // attach first
+
+        // ---- Toolbar ----
+        var toolbar = new DockPanel(0, 0, Width, 30);
+        AddToolbarButton(toolbar, "Refresh", 80, false, RescanDisks);
+        AddToolbarButton(toolbar, "Format", 80, true, ShowFormatPane);
+        // Add New / Delete / Resize / Label here the same way once the StorageManager calls exist.
+
+        // ---- Disk row ----
+        var diskRow = new DockPanel(0, 0, Width, 26);
+        diskRow.AddDockChild(new Label(0, 0, 40, 20) { text = "Disk:", useBackground = false }, Dock.Left);
+        diskCombo = new ComboBox(0, 0, 200);                // ASSUMPTION: (x, y, width)
+        diskRow.AddDockChild(diskCombo, Dock.Fill);
+
+        // ---- Partition bar ----
+        partitionBar = new PartitionBar(0, 0, Width, 50)
         {
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(28, 10, 10, 10),
-            Padding = new Thickness(0),
-            useBackground = true
+            segmentClicked = seg => SelectPartition(seg?.Tag as Partition, fromBar: true)
         };
 
-        devices = new GroupBox(0, 0, Width, Height)
+        // ---- Status ----
+        statusLabel = new Label(0, 0, Width, 20) { text = "", useBackground = false };
+
+        // ---- List ----
+        partitionListView = new ListView(0, 0, 300, 200)
         {
-            text = "Devices",
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            useBackground = true,
-            Margin = new Thickness(10, 35, 10, 10),
-        };
-
-        partitions = new GroupBox(0, 0, Width, Height)
-        {
-            text = "Partitions",
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            useBackground = true,
-            Margin = new Thickness(10, 35, 10, 10),
-        };
-
-        menuBar = new MenuBar(0, 0, Width, 30)
-        {
-            verticalAlignment = VerticalAlignment.Top,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(0),
-            Padding = new Thickness(0),
-        };
-
-        partitionListView = new ListView(0, 0, Width - 20, Height - 80)
-        {
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(10),
-            Padding = new Thickness(0),
-            useBackground = true,
-            viewMode = ListViewMode.Details,
-            headers = ["Name", "Drive Size"],
-            headerWidths = [180, 200],
-            itemRightClick = ShowDriveContextMenu
-        };
-
-        deviceListView = new ListView(0, 0, Width - 20, Height - 80)
-        {
-            verticalAlignment = VerticalAlignment.Stretch,
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            Margin = new Thickness(10),
-            Padding = new Thickness(0),
-            useBackground = true,
-            viewMode = ListViewMode.Details,
-            headers = ["Name", "Drive Size"],
-            headerWidths = [180, 200],
-            itemRightClick = ShowDriveContextMenu
-        };
-
-        status = new StatusBar(0, 0, Width);
-        status.AddPanel("Select a drive to continute", 300);
-
-
-        MenuPage File = menuBar.AddMenuPage("File");
-        File.AddItem("Options", Options);
-        File.AddItem("Exit", () =>
-        {
-            WindowManager.PostClose(this);
-        });
-
-        MenuPage Action = menuBar.AddMenuPage("Action");
-        Action.AddItem("Refresh", Refresh);
-        Action.AddItem("Rescan Disks", RescanDisks);
-        Action.AddItem("Create Volume", CreateVolume);
-        Action.AddItem("Attach Volume", RescanDisks);
-
-
-        fileContextMenu = new MenuPopup(180, 24 * 3);
-
-        openContextItem = fileContextMenu.AddItem("Explore", null);
-        fileContextMenu.AddSeparator();
-
-        changeDriveLetterItem = fileContextMenu.AddItem("Change Drive Letter", ShowContextProperties);
-        fileContextMenu.AddItem("Format", () =>
-        {
-            DriveUtils.FAT32FormatDrive(selectedDevice.Name, "1", new FatFormatOptions()
+            Margin = new Thickness(0, 4, 4, 0),
+            columns = new List<ListViewColumn>
             {
-                Type = FatType.Fat32,
-                VolumeLabel = "ComosFat32Format"
-            });
+                new() { Header = "Partition",   Width = 100 },
+                new() { Header = "File system", Width = 90 },
+                new() { Header = "Mount",       Width = 70 },
+                new() { Header = "Label",       Width = 100 },
+                new() { Header = "Size",        Width = 80 },
+                new() { Header = "Used",        Width = 70 },
+                new() { Header = "Unused",      Width = 70 },
+            },
+            selectedChanged = item => SelectPartition(item?.Tag as Partition, fromBar: false)
+        };
 
-        });
-        fileContextMenu.AddSeparator();
+        // ---- Action pane (fixed positions inside, dock = None) ----
+        actionPane = new DockPanel(0, 0, 250, 100) { useBackground = true };
+        formatTitle = new Label(10, 10, 230, 20) { text = "Format", useBackground = false };
+        var fsLabel = new Label(10, 40, 80, 20) { text = "File system:", useBackground = false };
+        fsCombo = new ComboBox(95, 38, 140);
+        var lblLabel = new Label(10, 70, 80, 20) { text = "Label:", useBackground = false };
+        labelBox = new TextField(95, 68, 140, 22);            // ASSUMPTION: (x, y, w, h)
+        var warn1 = new Label(10, 100, 230, 20) { text = "Everything on the partition", useBackground = false };
+        var warn2 = new Label(10, 118, 230, 20) { text = "will be lost.", useBackground = false };
+        formatButton = new Button("Format", 10, 150, 100, 26);
+        cancelButton = new Button("Cancel", 120, 150, 100, 26);
+        formatButton.leftClickAction = DoFormat;            // ASSUMPTION: Button fires leftClickAction
+        cancelButton.leftClickAction = () => actionPane.Visible = false;
 
-        fileContextMenu.AddItem("Mount Volume", CreateVolume);
-        fileContextMenu.AddItem("Extend Volume", ShowContextProperties);
-        fileContextMenu.AddItem("Shrink Volume", ShowContextProperties);
-        fileContextMenu.AddItem("Delete Volume", DeleteVolume);
+        foreach (Component c in new Component[] { formatTitle, fsLabel, fsCombo, lblLabel, labelBox, warn1, warn2, formatButton, cancelButton })
+        {
+            actionPane.AddChild(c);
+        }
 
-        fileContextMenu.AddSeparator();
-        fileContextMenu.AddItem("Properties", ShowContextProperties);
+        fsCombo.AddItem("FAT32"); 
+        fsCombo.AddItem("ext2");
+        actionPane.Visible = false;
 
-        devices.AddGroupChild(deviceListView);
-        partitions.AddGroupChild(partitionListView);
+        
+        root.AddDockChild(toolbar, Dock.Top);
+        root.AddDockChild(diskRow, Dock.Top);
+        root.AddDockChild(partitionBar, Dock.Top);
+        root.AddDockChild(statusLabel, Dock.Bottom);
+        root.AddDockChild(actionPane, Dock.Right);
+        root.AddDockChild(partitionListView, Dock.Fill);
 
-        root.AddDockChild(menuBar, Dock.Top);
-        root.AddDockChild(devices, Dock.Fill);
-        root.AddDockChild(partitions, Dock.Fill);
-        root.AddDockChild(status, Dock.Bottom);
+        diskCombo.SelectedIndexChanged += OnDiskChanged;
 
-        AddChild(root);
-
-
+        root.ResolveDockLayout();
         RescanDisks();
     }
 
-    private void DeleteVolume()
+    public override void Resize(int w, int h)
     {
-        DriveUtils.DeleteMBRPartition(selectedDevice, 0);
+        base.Resize(w, h);
+        root.X = 0;
+        root.Y = TitleBar;
+        root.Resize(w, h - TitleBar);
     }
 
-    private void CreateVolume()
-    {
-        LaunchTracker.Start(() => new DiskmgrNewVolume(200, 200, selectedDevice));
-        //DriveUtils.CreateMBR(selectedDevice);
-        //DriveUtils.CreateMbrPartition(selectedDevice);
-        //DriveUtils.FAT32MountDrive("fatmount", "1", MountFlags.None, "/mnt", out VfsManager.VfsMount? mount);
 
+    private void AddToolbarButton(DockPanel bar, string text, int width, bool needsPartition, Action click)
+    {
+        var button = new Button(text, 0, 0, width, 26) { Margin = new Thickness(0, 2, 4, 2) };
+        button.leftClickAction = click;
+        bar.AddDockChild(button, Dock.Left);
+
+        if (needsPartition) needsSelection.Add(button);
     }
 
     private void RescanDisks()
     {
+        devices.Clear();
+        diskCombo.ClearItems();
+
         for (int i = 0; i < StorageManager.DeviceCount; i++)
         {
-            IBlockDevice? device = StorageManager.GetDevice(i);
-            StorageManager.RescanPartitions(device);
+            IBlockDevice? devicee = StorageManager.GetDevice(i);
+            if (devicee == null) continue;
 
+            StorageManager.RescanPartitions(devicee);
+            devices.Add(devicee);
+
+            string format = "Unknown";
+            if (Gpt.IsGpt(devicee))
+            {
+                format = "GPT";
+            }
+            else if (Mbr.IsMbr(devicee))
+            {
+                format = "MBR";
+            }
+            diskCombo.AddItem($"{devicee.Name} ({ByteFormat.FormatBytes(devicee.BlockSize * devicee.BlockCount)}, {format})");
         }
 
-        Refresh();
+        selectedDevice = devices.Count > 0 ? devices[0] : null;
+        RefreshPartitions();
     }
 
-    private void Options()
+    private void OnDiskChanged(int index)
     {
-        throw new NotImplementedException();
+        selectedDevice = index >= 0 && index < devices.Count ? devices[index] : null;
+        RefreshPartitions();
     }
 
-    private void Refresh()
+    private void RefreshPartitions()
     {
-        deviceListView.ClearItems();
         partitionListView.ClearItems();
-
-        for (int i = 0; i < StorageManager.DeviceCount; i++)
+        var segs = new List<PartitionBar.Segment>();
+     
+        foreach (Partition p in StorageManager.Partitions)
         {
-            IBlockDevice? device = StorageManager.GetDevice(i);
-            ListViewItem deviceItem = deviceListView.AddItem($"{device?.Name} - {device?.BlockSize * device?.BlockCount / 1024} KB");
-            deviceItem.tag = device;
-            deviceItem.icon = new Png("/mnt/System/Icons/hard_disk_drive.png");
+            
+            if (p == null) continue;
+            // TODO: when selectedDevice is set, skip partitions that belong to other devices
+            //       (needs a Partition -> device property; I haven't seen one).
 
+            ulong size = p.BlockSize * p.BlockCount;
+            string name = p.Name ?? "";
+
+            
+            
+            partitionListView.AddItem([name, "", "", "", ByteFormat.FormatBytes(size), "", ""],   // fs/mount/label/used: fill from Partition
+                partitionIcon,
+                tag: p);
+
+            segs.Add(new PartitionBar.Segment { Name = name, Size = size, Tag = p });
         }
 
-        foreach (Partition partition in StorageManager.Partitions)
+        partitionBar.SetSegments(segs);
+        SelectPartition(null, fromBar: false);
+    }
+
+    private void SelectPartition(Partition? p, bool fromBar)
+    {
+        selectedPartition = p;
+
+        if (fromBar)
         {
-            ListViewItem partitionItem = partitionListView.AddItem($"{partition?.Name} - {partition?.BlockSize * partition?.BlockCount / 1024} KB - {partition?.Host.Name}");
-            partitionItem.tag = partition;
-            partitionItem.icon = new Png("/mnt/System/Icons/hard_disk_drive_pie.png");
-
+            foreach (var item in partitionListView.items)
+                if (ReferenceEquals(item.Tag, p)) { partitionListView.SelectItem(item); return; }  // re-enters with fromBar=false
         }
+        else
+        {
+            partitionBar.SelectByTag(p);
+        }
+
+        foreach (var b in needsSelection) b.Visible = p != null;
+
+        if (p == null)
+        {
+            statusLabel.text = "";
+            actionPane.Visible = false;
+        }
+        else
+        {
+            ulong size = (ulong)p.BlockSize * (ulong)p.BlockCount;
+            statusLabel.text = $"{p.Name}: {ByteFormat.FormatBytes(size)}";
+            formatTitle.text = $"Format {p.Name}";
+        }
+        statusLabel.MarkDirty();
     }
 
-    private void ShowDriveContextMenu(ListViewItem item, int mouseX, int mouseY)
+    private void ShowFormatPane()
     {
-        contextItem = item;
-        openContextItem.enabled = item != null;
-        changeDriveLetterItem.enabled = item != null && !item.isFolder && item.hasFileEntry;
-
-        selectedDevice = item?.tag as IBlockDevice;
-        selectedPartition = item?.tag as Partition;
-
-        int x = Math.Min(mouseX, Math.Max(0, Global.screenWidth - fileContextMenu.Width));
-        int y = Math.Min(mouseY, Math.Max(0, Global.screenHeight - fileContextMenu.Height));
-        fileContextMenu.ShowAt(x, y);
-
-        RefreshDriveVisuals();
+        if (selectedPartition == null) return;
+        actionPane.Visible = true;                           // DockPanel re-flows via OnChildVisibilityChanged
     }
 
-
-    private void RefreshDriveVisuals()
+    private void DoFormat()
     {
-        deviceListView.MarkDirty(false);
-        ForceDirty();
+        if (selectedPartition == null) return;
+
+        // TODO: call your actual format routine here, with fsCombo's selection and labelBox.text.
+        // Deliberately not guessed: a wrong call here wipes a disk.
+        statusLabel.text = $"Format of {selectedPartition.Name} not implemented yet";
+        statusLabel.MarkDirty();
     }
-
-    private void ShowContextProperties()
-    {
-
-    }
-
 }

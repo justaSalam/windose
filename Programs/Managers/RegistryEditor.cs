@@ -5,7 +5,7 @@ using Windose.System.Kernel;
 public sealed class RegistryEditor : Window
 {
     private readonly TreeView keyTree;
-    private readonly ListView valueList;
+    private readonly FileListView valueList;
     private readonly ScrollView treeScroll;
     private readonly ScrollView valueScroll;
     private readonly AddressBar addressBar;
@@ -85,7 +85,7 @@ public sealed class RegistryEditor : Window
             Margin = new Thickness(0),
         };
 
-        valueList = new ListView(0, 0, Width, Height)
+        valueList = new FileListView(0, 0, Width, Height)
         {
             viewMode = ListViewMode.Details,
             useBackground = true,
@@ -170,7 +170,7 @@ public sealed class RegistryEditor : Window
             RegistryEntry entry = Registry.GetEntry(keys[i]);
             if (entry == null) continue;
 
-            ListViewItem item = valueList.AddItem(GetLeafName(entry.Key), tag: entry);
+            FileListViewItem item = valueList.AddItem(GetLeafName(entry.Key), tag: entry);
             item.icon = new Png("/mnt/System/Icons/regedit_binary.png");
             item.size = GetValueType(entry.Value);
             item.type = FormatValue(entry.Value);
@@ -183,7 +183,7 @@ public sealed class RegistryEditor : Window
         ForceDirty();
     }
 
-    private void SelectValue(ListViewItem item)
+    private void SelectValue(FileListViewItem item)
     {
         if (item?.tag is not RegistryEntry entry) return;
         status.text = entry.Key + (entry.IsBuiltIn ? " (system)" : " (custom)");
