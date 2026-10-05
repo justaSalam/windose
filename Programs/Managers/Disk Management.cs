@@ -1,4 +1,5 @@
 using Cosmos.Kernel.HAL.Interfaces.Devices;
+using Cosmos.Kernel.HAL.Vfs;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Storage;
 using Cosmos.Kernel.System.Vfs;
@@ -65,12 +66,12 @@ public sealed class DiskManagement : Window
             columns = new List<ListViewColumn>
             {
                 new() { Header = "Partition",   Width = 100 },
-                new() { Header = "File system", Width = 90 },
+                new() { Header = "File system", Width = 100 },
                 new() { Header = "Mount",       Width = 70 },
                 new() { Header = "Label",       Width = 100 },
                 new() { Header = "Size",        Width = 80 },
-                new() { Header = "Used",        Width = 70 },
-                new() { Header = "Unused",      Width = 70 },
+                new() { Header = "Used",        Width = 80 },
+                new() { Header = "Unused",      Width = 80 },
             },
             selectedChanged = item => SelectPartition(item?.Tag as Partition, fromBar: false)
         };
@@ -94,11 +95,11 @@ public sealed class DiskManagement : Window
             actionPane.AddChild(c);
         }
 
-        fsCombo.AddItem("FAT32"); 
+        fsCombo.AddItem("FAT32");
         fsCombo.AddItem("ext2");
         actionPane.Visible = false;
 
-        
+
         root.AddDockChild(toolbar, Dock.Top);
         root.AddDockChild(diskRow, Dock.Top);
         root.AddDockChild(partitionBar, Dock.Top);
@@ -156,43 +157,162 @@ public sealed class DiskManagement : Window
         }
 
         selectedDevice = devices.Count > 0 ? devices[0] : null;
-        RefreshPartitions();
+        RefreshSelectedDrive();
     }
 
     private void OnDiskChanged(int index)
     {
         selectedDevice = index >= 0 && index < devices.Count ? devices[index] : null;
-        RefreshPartitions();
+        RefreshSelectedDrive();
     }
 
-    private void RefreshPartitions()
+    private void RefreshSelectedDrive()
     {
         partitionListView.ClearItems();
-        var segs = new List<PartitionBar.Segment>();
-        VfsManager.TryGetMount("", out var rootMount);  // root mount is used to get the mount point of partitions)
-        foreach (Partition p in StorageManager.Partitions)
+
+        List<PartitionBar.Segment> segs = new();
+
+        if (selectedDevice == null)
         {
-            
-            if (p == null) continue;
-            // TODO: when selectedDevice is set, skip partitions that belong to other devices
-            //       (needs a Partition -> device property; I haven't seen one).
+            partitionBar.SetSegments(segs);
+            SelectPartition(null, false);
+            return;
+        }
 
-            ulong size = p.BlockSize * p.BlockCount;
-            string name = p.Name ?? "";
+        foreach (Partition partition in StorageManager.GetPartitions(selectedDevice))
+        {
+            ulong size = partition.BlockSize * partition.BlockCount;
 
-            
-            
-            partitionListView.AddItem([name, "FAT32", rootMount.MountPoint, "", ByteFormat.FormatBytes(size), "", ""],   // fs/mount/label/used: fill from Partition
-                partitionIcon,
-                tag: p);
+            string partitionName = partition.Name ?? "";
 
-            segs.Add(new PartitionBar.Segment { Name = name, Size = size, Tag = p });
+            string filesystem = "";
+            FsKind fsKind = FsKind.Unknown;
+            string mountPoint = "UNMOUNTED";
+            string label = "";
+
+            string used = "";
+            string unused = "";
+
+            // Find the VFS mount belonging to this partition.
+            VfsManager.VfsMount? mount = GetMount(partition);
+
+            if (mount != null)
+            {
+                byte[] b = ReadBytes(partition, 0, 2048)!;
+                fsKind = Probe(partition, out string labelFromProbe);
+                mountPoint = mount.MountPoint;
+                label = labelFromProbe;
+
+                if (TryGetSpace(mount.MountPoint, out ulong total, out ulong usedBytes, out ulong freeBytes))
+                {
+                    used = ByteFormat.FormatBytes(usedBytes);
+                    unused = ByteFormat.FormatBytes(freeBytes);
+                }
+            }
+
+            partitionListView.AddItem([partitionName, fsKind.ToString(), mountPoint, label, ByteFormat.FormatBytes(size), used, unused], partitionIcon, tag: partition);
+
+            segs.Add(new PartitionBar.Segment
+            {
+                Name = partitionName,
+                Size = size,
+                Tag = partition
+            });
         }
 
         partitionBar.SetSegments(segs);
-        SelectPartition(null, fromBar: false);
+        SelectPartition(null, false);
+    }
+    private enum FsKind { Unknown, Fat12, Fat16, Fat32, Ext2 }
+    static FsKind Probe(Partition p, out string label)
+    {
+        label = "";
+
+        // Read the first 2 KiB: boot sector (FAT) + ext2 superblock at byte 1024
+        byte[] buf = ReadBytes(p, 0, 2048);
+        if (buf == null) return FsKind.Unknown;
+
+        // ext2/3/4: superblock at 1024, magic 0xEF53 at superblock offset 56
+        if (buf[1024 + 56] == 0x53 && buf[1024 + 57] == 0xEF)
+        {
+            label = Ascii(buf, 1024 + 120, 16);   // s_volume_name
+            return FsKind.Ext2;
+        }
+
+        // FAT: 0x55AA at 510, then check type strings
+        if (buf[510] == 0x55 && buf[511] == 0xAA)
+        {
+            if (Ascii(buf, 82, 8).StartsWith("FAT32"))
+            {
+                if (buf[66] == 0x29) label = Ascii(buf, 71, 11);
+                if (label == "NO NAME") label = "";
+                return FsKind.Fat32;
+            }
+            string t = Ascii(buf, 54, 8);
+            if (t.StartsWith("FAT16") || t.StartsWith("FAT12"))
+            {
+                if (buf[38] == 0x29) label = Ascii(buf, 43, 11);
+                if (label == "NO NAME") label = "";
+                return t.StartsWith("FAT16") ? FsKind.Fat16 : FsKind.Fat12;
+            }
+        }
+
+        return FsKind.Unknown;
     }
 
+    static string Ascii(byte[] b, int off, int len)
+        => System.Text.Encoding.ASCII.GetString(b, off, len).TrimEnd(' ', '\0');
+
+    // Handles any block size, so byte offsets stay correct
+    static byte[]? ReadBytes(Partition p, int byteOffset, int count)
+    {
+        int bs = (int)p.BlockSize;
+        int firstLba = byteOffset / bs;
+        int blocks = (byteOffset % bs + count + bs - 1) / bs;
+        byte[] raw = new byte[blocks * bs];
+
+        p.ReadBlock((ulong)firstLba, (ulong)blocks, raw);
+
+        byte[] result = new byte[count];
+        Array.Copy(raw, byteOffset % bs, result, 0, count);
+        return result;
+    }
+
+    private VfsManager.VfsMount? GetMount(Partition partition)
+    {
+        foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
+        {
+
+            if (mount.Partition == null) 
+            { 
+                continue; 
+            }
+
+            if (mount.Partition.Name == partition.Name)     
+            { 
+                return mount; 
+            }
+        }
+
+        return null;
+    }
+    private bool TryGetSpace(string mountPoint, out ulong total, out ulong used, out ulong free)
+    {
+        total = 0;
+        used = 0;
+        free = 0;
+
+        if (!VfsManager.TryStatFs(mountPoint, out VfsStatFs stats))
+        {
+            return false;
+        }
+
+        total = stats.Blocks * stats.BlockSize;
+        free = stats.Bavail * stats.BlockSize;
+        used = total - free;
+
+        return true;
+    }
     private void SelectPartition(Partition? p, bool fromBar)
     {
         selectedPartition = p;

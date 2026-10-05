@@ -12,6 +12,7 @@
     <PackageReference Include="Cosmos.Kernel" Version="3.0.89" />
     <PackageReference Include="Cosmos.Kernel.System" Version="3.0.89" />
 	  <PackageReference Include="Cosmos.Executable.Lua" Version="4.0.1" />
+	  <!-- <PackageReference Include="Cosmos.Network.Http" Version="3.0.0" /> -->
     <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
   </ItemGroup>
 

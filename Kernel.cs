@@ -77,7 +77,7 @@ public class Kernel : Sys.Kernel
         Registry.SetRuntimeValue("System/Display/CurrentWidth", (long)canvas.Width);
         Registry.SetRuntimeValue("System/Display/CurrentHeight", (long)canvas.Height);
 
-
+        
         Explorer explorer = new Explorer(canvas);
         windowManager = new WindowManager();
 

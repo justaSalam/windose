@@ -1,6 +1,7 @@
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.Core.Memory.Heap;
+using Cosmos.Kernel.System.Diagnostics;
 
 public static class ProcessManger
 {
@@ -167,6 +168,7 @@ public static class ProcessManger
         if (gcFrameCounter >= gcMaxFramesBetweenCollections)
         {
             gcFrameCounter = 0;
+            MemoryInfo.Collect();
         }
     }
 
