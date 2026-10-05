@@ -1,1 +1,0 @@
-public enum Dock { None, Top, Bottom, Left, Right, Fill }

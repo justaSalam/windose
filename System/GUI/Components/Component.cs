@@ -47,11 +47,9 @@ public class Component : IDisposable
         set
         {
             if (visible == value) return;
-
             visible = value;
             dirty = true;
             WindowManager.Invalidate(this);
-
             if (!isRoot && parent != null)
             {
                 parent.MarkChildDirty();
@@ -61,21 +59,15 @@ public class Component : IDisposable
     }
 
     protected virtual void OnChildVisibilityChanged(Component child) { }
+
     public int AbsoluteX
     {
-        get
-        {
-            return _absoluteX;
-        }
+        get { int a = 0; for (Component? c = this; c != null; c = c.parent) { a += c.X; if (c.isRoot) break; } return a; }
     }
     public int AbsoluteY
     {
-        get
-        {
-            return _absoluteY;
-        }
+        get { int a = 0; for (Component? c = this; c != null; c = c.parent) { a += c.Y; if (c.isRoot) break; } return a; }
     }
-
     public Rectangle AbsoluteRectangle
     {
         get
@@ -145,6 +137,7 @@ public class Component : IDisposable
     public bool clampSize = true;
     public bool forceDirty { get; private set; }
     protected bool visible;
+    public string designType = "";
 
     //Should not render until added as a child or is a parent
     protected bool canRender = false;
@@ -246,6 +239,16 @@ public class Component : IDisposable
         }
     }
 
+    public string name = "";
+
+    public Component? Find(string n)
+    {
+        if (name == n) return this;
+        lock (children)
+            foreach (var c in children)
+                if (c.Find(n) is Component r) return r;
+        return null;
+    }
 
 
     public virtual void Update()
@@ -321,6 +324,8 @@ public class Component : IDisposable
             if (mouse.middle == MouseEvents.Release) middleClickAction?.Invoke();
         }
 
+        if (MouseCapture != null && MouseCapture.parent == this)
+            return MouseCapture.HandleInput(mouseX, mouseY, mouse);
 
         for (int i = children.Count - 1; i >= 0; i--)
         {
@@ -419,20 +424,18 @@ public class Component : IDisposable
         if (width % 2 != 0) width++;
         if (X == x && Y == y && Width == width && Height == height) return;
 
-        Rectangle oldAbsolute = AbsoluteRectangle;
-
+        Rectangle old = AbsoluteRectangle;
         bool clamp = clampSize;
-        clampSize = false;              // layout is not a user resize
+        clampSize = false;                       // layout is not a user resize
         Resize(width, height);
         clampSize = clamp;
-
         X = x;
         Y = y;
-
-        WindowManager.Invalidate(oldAbsolute);
+        WindowManager.Invalidate(old);
         WindowManager.Invalidate(this);
         MarkDirty();
     }
+
     public virtual void ResolveHorizontalAnchor()
     {
         if (dock != Dock.None) return;   // DockPanel owns X/width
@@ -673,17 +676,15 @@ public class Component : IDisposable
         }
     }
 
+    // ---- replace AddChild / RemoveChild ----
     public virtual Component AddChild(Component child)
     {
-        lock (children)
-        {
-            if (children.Contains(child)) return child;
-        }
+        lock (children) { if (children.Contains(child)) return child; }
 
         child.canRender = true;
         child.isRoot = false;
         child.parent = this;
-        child.ComputeAbsoluteCoordinates();   // recurses into the child's subtree
+        child.ComputeAbsoluteCoordinates();
         zIndex++;
 
         child.BindRenderSurface(buffer, false);
@@ -692,7 +693,6 @@ public class Component : IDisposable
 
         lock (components) { components.Remove(child); }
         lock (children) { children.Add(child); }
-
         MarkDirty();
         return child;
     }
@@ -704,11 +704,9 @@ public class Component : IDisposable
         if (!removed) return;
 
         WindowManager.Invalidate(child.AbsoluteRectangle);
-
         child.parent = null;
         child.isRoot = true;
         child.ComputeAbsoluteCoordinates();
-
         lock (components) { components.Remove(child); }
         MarkDirty();
     }

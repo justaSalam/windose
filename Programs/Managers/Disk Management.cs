@@ -169,7 +169,7 @@ public sealed class DiskManagement : Window
     {
         partitionListView.ClearItems();
         var segs = new List<PartitionBar.Segment>();
-     
+        VfsManager.TryGetMount("", out var rootMount);  // root mount is used to get the mount point of partitions)
         foreach (Partition p in StorageManager.Partitions)
         {
             
@@ -182,7 +182,7 @@ public sealed class DiskManagement : Window
 
             
             
-            partitionListView.AddItem([name, "", "", "", ByteFormat.FormatBytes(size), "", ""],   // fs/mount/label/used: fill from Partition
+            partitionListView.AddItem([name, "FAT32", rootMount.MountPoint, "", ByteFormat.FormatBytes(size), "", ""],   // fs/mount/label/used: fill from Partition
                 partitionIcon,
                 tag: p);
 

@@ -1,11 +1,12 @@
 using System.Drawing;
 
+public enum Dock { None, Top, Bottom, Left, Right, Fill }
+
 public class DockPanel : Component
 {
     public bool useBackground = false;
     public Color backgroundColor = Palette.ControlFace;
-
-    private readonly List<Component> scratch = new List<Component>();
+    public int gridDots = 0;                       // designer aid, 0 = off
 
     public DockPanel(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -14,7 +15,7 @@ public class DockPanel : Component
 
     public Component AddDockChild(Component child, Dock dockStyle)
     {
-        child.dock = dockStyle;     // must be set before AddChild so the anchor methods skip it
+        child.dock = dockStyle;                    // before AddChild so the anchors skip it
         AddChild(child);
         ResolveDockLayout();
         return child;
@@ -26,26 +27,25 @@ public class DockPanel : Component
         ResolveDockLayout();
     }
 
+    public override void RemoveChild(Component child)
+    {
+        base.RemoveChild(child);
+        ResolveDockLayout();
+    }
+
+    protected override void OnChildVisibilityChanged(Component child) => ResolveDockLayout();
+
     public void ResolveDockLayout()
     {
-        // Snapshot under the same lock AddChild uses
-        scratch.Clear();
-        lock (children)
+        List<Component> list;
+        lock (children) { list = new List<Component>(children); }
+
+        int left = Padding.left, top = Padding.top;
+        int right = Width - Padding.right, bottom = Height - Padding.bottom;
+
+        // Pass 1: edges, in child order
+        foreach (Component c in list)
         {
-            scratch.AddRange(children);
-        }
-
-        // Console.WriteLine($"Dock layout: {GetComponentName()} children={scratch.Count} size={Width}x{Height}");
-
-        int left = Padding.left;
-        int top = Padding.top;
-        int right = Width - Padding.right;
-        int bottom = Height - Padding.bottom;
-
-        // Pass 1: edge docks, in child order
-        for (int i = 0; i < scratch.Count; i++)
-        {
-            Component c = scratch[i];
             if (!c.Visible || c.dock == Dock.None || c.dock == Dock.Fill) continue;
 
             Thickness m = c.Margin;
@@ -85,52 +85,43 @@ public class DockPanel : Component
             }
         }
 
-        // Pass 2: fills share what's left (stacked vertically)
+        // Pass 2: fills share what is left (stacked vertically)
         int fills = 0;
-        for (int i = 0; i < scratch.Count; i++)
-            if (scratch[i].Visible && scratch[i].dock == Dock.Fill) fills++;
+        foreach (Component c in list)
+            if (c.Visible && c.dock == Dock.Fill) fills++;
 
-        for (int i = 0; i < scratch.Count; i++)
+        foreach (Component c in list)
         {
-            Component c = scratch[i];
-            if (!c.Visible || c.dock != Dock.Fill) continue;
+            if (!c.Visible || c.dock != Dock.Fill || fills == 0) continue;
 
             Thickness m = c.Margin;
             int slice = Math.Max(0, bottom - top) / fills;
             Place(c, left + m.left, top + m.top,
-                  right - left - m.left - m.right,
-                  slice - m.top - m.bottom);
+                  right - left - m.left - m.right, slice - m.top - m.bottom);
             top += slice;
             fills--;
         }
 
-        scratch.Clear();
         MarkDirty();
     }
 
-    private static void Place(Component c, int x, int y, int w, int h)  => c.SetBounds(x, y, Math.Max(1, w), Math.Max(1, h));
-
-    public override void RemoveChild(Component child)
-    {
-        base.RemoveChild(child);
-        ResolveDockLayout();
-    }
-
-    protected override void OnChildVisibilityChanged(Component child) => ResolveDockLayout();
+    private static void Place(Component c, int x, int y, int w, int h)
+        => c.SetBounds(x, y, Math.Max(2, w), Math.Max(1, h));
 
     public override void DrawLocal()
     {
         if (useBackground)
             DrawFilledRectangle(backgroundColor, 0, 0, Width, Height);
 
+        if (gridDots > 1)
+            for (int gy = gridDots; gy < Height; gy += gridDots)
+                for (int gx = gridDots; gx < Width; gx += gridDots)
+                    DrawFilledRectangle(Color.Gray, gx, gy, 1, 1);
+
         foreach (Component child in children)
-        {
-            if (!child.Visible) continue;
-            DrawChild(child);
-        }
+            if (child.Visible) DrawChild(child);
     }
 
     public override string GetComponentName() => "DockPanel";
-
     public override bool IsOpaqueForCopy() => useBackground;
 }
