@@ -5,6 +5,7 @@ A hobby desktop operating system written in C# on [Cosmos](https://github.com/Co
 
 ## Features
 
+- **Install to disk using the [Windose Installer](https://github.com/justaSalam/Windose-Installer)**
 - **Desktop shell:** window manager with a taskbar, Start menu, desktop icons, draggable and resizable windows, focus handling and per-window threading
 - **Compositor:** double-buffered rendering through a `DirectBitmap` pipeline with dirty-flag redraw
 - **GUI toolkit:** `Component` / `Window` hierarchy with docking and stack layouts, buttons, text fields, list and tree views, menus, toolbars, status bars and scroll views
@@ -31,12 +32,12 @@ Kernel.cs                  entry point (Windose.Kernel)
 
 ## Repository layout
 
-| Path | Contents |
+| Path | Contents
 | --- | --- |
 | `Kernel.cs` | Kernel entry point |
 | `System/` | Core system code |
 | `Programs/` | Built-in programs |
-| `Resources/` | Embedded fonts, icons, cursors and wallpapers See [Installer](https://github.com/justaSalam/Windose-Installer)
+| `Resources/` | Embedded fonts, icons, cursors and wallpapers, See: [Installer](https://github.com/justaSalam/Windose-Installer)
 | `BREEZE.md`, `BREEZE_API.html` | Breeze language guide and API reference |
 
 ## Building
@@ -45,6 +46,7 @@ Requirements:
 
 - .NET 10 SDK
 - Cosmos SDK 3.0.89 (restored through NuGet, see `NuGet.Config`)
+- [Windose Installer](https://github.com/justaSalam/Windose-Installer) (Boot from disk available)
 
 ```sh
 cosmos build
