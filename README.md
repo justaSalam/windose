@@ -21,12 +21,11 @@ Every program in Windose is a `Window`. The desktop window manager draws windows
 
 ```
 Kernel.cs                  entry point (Windose.Kernel)
- ├─ Compositor / DWM       window drawing, input, focus, taskbar
- ├─ GUI toolkit            Component, Panel, Window, DockPanel, ListView, ...
+ ├─ Compositor / DWM       window drawing, input, focus
+ ├─ GUI toolkit            Component, Window
  ├─ Process manager        window updates, processes, services, Task Manager
  ├─ Breeze runtime         lexer, parser, interpreter, capability policy
- ├─ Virtual CPU            bytecode VM, .kexe loader, INT 0x80 syscalls
- ├─ VFS / storage          Cosmos VFS, partitions, GPT/MBR, FAT32
+ ├─ VFS / storage          Cosmos VFS, partitions, GPT, FAT32
  └─ System services        registry, accounts, file associations
 ```
 
