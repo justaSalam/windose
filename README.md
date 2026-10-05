@@ -36,7 +36,7 @@ Kernel.cs                  entry point (Windose.Kernel)
 | `Kernel.cs` | Kernel entry point |
 | `System/` | Core system code |
 | `Programs/` | Built-in programs |
-| `Resources/` | Embedded fonts, icons, cursors and wallpapers `See [Installer](https://github.com/justaSalam/Windose-Installer)`
+| `Resources/` | Embedded fonts, icons, cursors and wallpapers See [Installer](https://github.com/justaSalam/Windose-Installer)
 | `BREEZE.md`, `BREEZE_API.html` | Breeze language guide and API reference |
 
 ## Building
