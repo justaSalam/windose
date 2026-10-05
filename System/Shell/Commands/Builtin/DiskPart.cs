@@ -106,26 +106,21 @@ public sealed class DiskPart : InteractiveShellCommand
 
 
 
-        // First free, 1 MiB-aligned sector after existing partitions.
-        ulong alignment = 1024 * 1024 / selectedDisk.BlockSize; // 2048 for 512 B sectors
+        ulong alignment = 1024 * 1024 / selectedDisk.BlockSize;
         ulong start = alignment;
 
-
-
         StorageManager.RescanPartitions(selectedDisk);
-        foreach (Partition p in StorageManager.Partitions)
+        foreach (Partition p in StorageManager.GetPartitions(selectedDisk))
         {
-            // Assumes these expose start + length; adjust names to the real API.
             ulong end = p.StartSector + p.BlockCount;
             if (end > start)
                 start = (end + alignment - 1) / alignment * alignment;
         }
 
-        // The last ~34 sectors are reserved for the backup GPT.
-        ulong usable = selectedDisk.BlockCount - 34;
-        if (  + sectorCount > usable)
+        ulong usable = selectedDisk.BlockCount - 34;   // last usable LBA, backup GPT lives after it
+        if (start + sectorCount > usable)
         {
-            context.WriteLine("Not enough free space.");
+            context.WriteLine($"Not enough free space (start={start}, need={sectorCount}, disk={selectedDisk.BlockCount}).");
             return;
         }
 
