@@ -47,7 +47,7 @@ Requirements:
 - Cosmos SDK 3.0.89 (restored through NuGet, see `NuGet.Config`)
 
 ```sh
-dotnet build Windose.csproj
+cosmos build
 ```
 
 ## Writing apps with Breeze
