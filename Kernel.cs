@@ -12,6 +12,8 @@ using Sys = Cosmos.Kernel.System;
 ///TODO Implement lua scripts instead of hardcoded programs for terminal;
 using Cosmos.Executable.Lua;
 using Windose.System.Kernel.FileSystem;
+using Cosmos.Kernel.Core.Scheduler;
+using Windose.System.Scheduling;
 namespace Windose;
 
 /// <summary>
@@ -30,6 +32,7 @@ public class Kernel : Sys.Kernel
     public CosmosDisplayDriver displayDriver = null!;
     protected override void BeforeRun()
     {
+        SchedulerManager.SetScheduler(new MlfqScheduler());
         try
         {
             SystemLogger.WriteLine("BOOT", "BeforeRun starting", ConsoleMessageType.Log);

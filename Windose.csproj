@@ -4,7 +4,7 @@
     <CosmosKernelClass>Windose.Kernel</CosmosKernelClass>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
-    
+	  <NoWarn>$(NoWarn);COSMOS0001</NoWarn>
   </PropertyGroup>
 
   <!-- Core kernel packages -->
