@@ -12,6 +12,7 @@ public class Button : Component
     public bool useBackground = true;
     public bool useBorders = false;
     private bool isPressed = false;
+    private bool isSelected;
 
 
     public Color borderColor = Palette.ControlHighlight;
@@ -77,11 +78,10 @@ public class Button : Component
 
         if (useBackground)
         {
-            if (isPressed) DrawSunkenRectangle(0, 0, Width, Height);
+            if (isPressed || isSelected) DrawSunkenRectangle(0, 0, Width, Height);
             else DrawRaisedRectangle(0, 0, Width, Height);
 
         }
-
 
         Rectangle content = GetContentBounds();
         if (image != null && label != null && !string.IsNullOrEmpty(label.text))
@@ -97,6 +97,14 @@ public class Button : Component
             label.SetBounds(0, 0, Width, Height);
             DrawChild(label);
         }
+    }
+
+    public void SetSelected(bool selected)
+    {
+        if (isSelected == selected) return;
+
+        isSelected = selected;
+        MarkDirty();
     }
 
     private void DrawImageAndLabel(Rectangle content)

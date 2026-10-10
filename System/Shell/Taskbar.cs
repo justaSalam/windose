@@ -1,9 +1,11 @@
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Windose.System.Kernel;
 
 public class Taskbar : Component
 {
+    private const int TrayWidth = 120;
     public Color borderColor = Color.White;
 
     public List<Button> windows = new List<Button>();
@@ -14,6 +16,8 @@ public class Taskbar : Component
     private Label timeLabel;
 
     private Button trayButton;
+    private int contextX;
+    private int contextY;
 
     public static Tray tray;
     private readonly MenuPopup contextMenu;
@@ -22,32 +26,31 @@ public class Taskbar : Component
     public Taskbar(int x, int y, int width, int height) : base(x, y, width, height)
     {
         zLayer = DrawLayer.Taskbar;
-
-
-
-
-        bar = new StackPanel(Palette.ControlFace, 0, 0, Width - 250, Height)
+        int trayWidth = Math.Min(TrayWidth, Width);
+        bar = new StackPanel(Palette.ControlFace, 0, 0, Width - trayWidth, Height)
         {
             useBackground = false,
             useBorders = false,
             horizontalAlignment = HorizontalAlignment.Left,
             verticalAlignment = VerticalAlignment.Stretch,
             orientation = StackOrientation.Horizontal,
+            spacing = 4,
             Margin = new Thickness(0),
-            Padding = new Thickness(0),
+            Padding = new Thickness(3),
             rightClickAction = ShowContextMenu
         };
 
 
-        trayPanel = new StackPanel(Palette.ControlFace, 0, 0, 250, Height)
+        trayPanel = new StackPanel(Palette.ControlFace, Width - trayWidth, 0, trayWidth, Height)
         {
             useBackground = false,
             useBorders = false,
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Stretch,
             orientation = StackOrientation.Horizontal,
+            spacing = 2,
             Margin = new Thickness(0),
-            Padding = new Thickness(0),
+            Padding = new Thickness(2),
             rightClickAction = ShowContextMenu
         };
 
@@ -60,19 +63,22 @@ public class Taskbar : Component
         };
         contextMenu.AddItem("Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
         contextMenu.AddSeparator();
-        contextMenu.AddItem("Minimize All Windows");
-        contextMenu.AddItem("Properties");
+        contextMenu.AddItem("Minimize All Windows", WindowManager.MinimizeAllWindows);
+        contextMenu.AddItem("Properties", () => LaunchTracker.Start(() => new DisplaySettings(contextX, contextY)));
 
 
 
-        startButton = new Button("Start", 0, 0, 50, Height)
+        startButton = new Button(new Png("/mnt/System/Icons/start_menu_xp.png"), "Start", 0, 0, 72, Height - 6)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Left,
+            contentAlignment = HorizontalAlignment.Left,
+            iconSize = 18,
+            iconTextGap = 4,
             textColor = Color.Black,
             useBorders = true,
-            Margin = new Thickness(1),
-            Padding = new Thickness(2),
+            Margin = new Thickness(1, 1, 2, 2),
+            Padding = new Thickness(3),
             leftClickAction = () =>
             {
                 Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
@@ -80,30 +86,35 @@ public class Taskbar : Component
         };
         bar.AddStackChild(startButton);
 
-        timeLabel = new Label(0, 0, 75, Height)
+        timeLabel = new Label(0, 0, 82, Height - 8)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
-            text = DateTime.Now.ToString("HH:mm:ss"),
-            Margin = new Thickness(2),
+            horizontalTextAlignment = HorizontalAlignment.Center,
+            verticalTextAlignment = VerticalAlignment.Center,
+            text = DateTime.Now.ToString("hh:mm tt"),
+            fontSize = 14,
+            Margin = new Thickness(2, 2, 2, 2),
             Padding = new Thickness(2),
-            useBackground = false,
-            useForeground = true
+            useBackground = true,
+            useForeground = false
         };
         trayPanel.AddStackChild(timeLabel);
 
-        trayButton = new Button("^", 0, 0, Height, Height)
+        trayButton = new Button(new Png("/mnt/System/Icons/computer_sound.png"), 0, 0, 24, Height - 8)
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
+            useBorders = true,
+            iconSize = 18,
             leftClickAction = ToggleTray
         };
 
         trayPanel.AddStackChild(trayButton);
 
 
-        int trayX = (int)Registry.GetInteger("System/Display/Width", 1920) - 250;
-        int trayY = (int)Registry.GetInteger("System/Display/Heigth", 1080) - 160 - Height;
+        int trayX = Math.Max(0, Global.screenWidth - 160);
+        int trayY = Math.Max(0, Global.screenHeight - 160 - Height);
         tray = new Tray(trayX,trayY);
         LaunchTracker.Start(() => tray);
 
@@ -114,29 +125,25 @@ public class Taskbar : Component
     {
         tray.Visible = !tray.Visible;
 
-        trayButton.label!.text = tray.Visible ? "v" : "^";
         trayButton.MarkDirty();
     }
 
     public override void Update()
     {
         base.Update();
-        timeLabel.text = DateTime.Now.ToString("HH:mm:ss");
-        timeLabel.MarkDirty();
-    }
-
-    public override void Draw()
-    {
-        base.Draw();
-        timeLabel.MarkDirty();
-
+        string time = DateTime.Now.ToString("hh:mm tt");
+        if (timeLabel.text != time)
+        {
+            timeLabel.text = time;
+        }
     }
 
     public override void DrawLocal()
     {
 
         DrawRaisedRectangle(0, 0, Width, Height);
-
+        DrawLine(Color.Black, 0, 0, Width - 1, 0);
+        DrawLine(Palette.ControlWhite, 0, 1, Width - 1, 1);
 
         foreach (Component child in children)
         {
@@ -152,6 +159,8 @@ public class Taskbar : Component
     {
         int x = Math.Min(MouseManager.X, Math.Max(0, Global.screenWidth - contextMenu.Width));
         int y = Math.Min(MouseManager.Y, Math.Max(0, Global.screenHeight - contextMenu.Height));
+        contextX = x;
+        contextY = y;
         contextMenu.ShowAt(x, y);
 
         MarkDirty();

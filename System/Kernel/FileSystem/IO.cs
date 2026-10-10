@@ -145,7 +145,6 @@ namespace Windose.System.Kernel.FileSystem
                 try
                 {
                     callback(Directory.GetDirectories(path), true);
-
                 }
                 catch
                 {

@@ -26,6 +26,7 @@ public class Window : Component
 
 
 
+    private const int WindowFrameInset = 2;
     public int resizeMargin = 10;
 
     private Point offset;
@@ -35,7 +36,7 @@ public class Window : Component
 
     private Component? focusedComponent;
 
-    private Png? Icon;
+    public Png? Icon;
     private StackPanel titlebar;
     private bool hasTitleBar;
     private bool windowFocused;
@@ -92,7 +93,6 @@ public class Window : Component
     /// </summary>
     public override void DrawLocal()
     {
-
         DrawRaisedRectangle(0, 0, Width, Height);
 
 
@@ -105,8 +105,12 @@ public class Window : Component
 
         if (Icon != null)
         {
-            DrawImageStretch(Icon, new(2, 2, 18, 18));
+            DrawImageStretch(Icon, new(WindowFrameInset + 2, WindowFrameInset + 2, 16, 16));
         }
+
+        //if (Width > WindowFrameInset * 2 && Height > WindowFrameInset * 2)
+          //  DrawRaisedRectangle(WindowFrameInset, WindowFrameInset,
+            //    Width - WindowFrameInset * 2, Height - WindowFrameInset * 2);
     }
 
 

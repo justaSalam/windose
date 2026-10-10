@@ -75,8 +75,8 @@ public class ApiDocumentView : Component
                 break;
 
             case 2:
-                DrawFilledRectangle(Color.FromArgb(232, 232, 232), 12, y, Math.Max(1, width - 22), line.height - 2);
-                DrawString(line.text, Color.FromArgb(0, 0, 128), 18, y + 2, fontSize);
+                DrawFilledRectangle(Color.FromArgb(235, 228, 207), 12, y, Math.Max(1, width - 22), line.height - 2);
+                DrawString(line.text, Palette.ActiveTitle, 18, y + 2, fontSize);
                 break;
 
             case 3:

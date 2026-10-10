@@ -1,4 +1,5 @@
 using Cosmos.Kernel.System.Diagnostics;
+using Cosmos.Kernel.System.Graphics;
 
 public class DeviceManager : Window
 {
@@ -18,7 +19,7 @@ public class DeviceManager : Window
     private readonly TreeView tree;
     private int deviceCount;
 
-    public DeviceManager(int x, int y, int width, int height) : base(x, y, width, height, "Device Manager", true)
+    public DeviceManager(int x, int y, int width, int height) : base(x, y, width, height, "Device Manager", true, new Png("/mnt/System/Icons/mci_devices.png"))
     {
         root = new DockPanel(0, 0, Width, Height)
         {

@@ -49,13 +49,15 @@ public sealed class DiskManagement : Window
     }
 
     public DiskManagement(int x, int y, int width, int height)
-        : base(x, y, width, height, "Disk Management", true)
+        : base(x, y, width, height, "Disk Management", true, new Png("/mnt/System/Icons/hard_disk_drive_pie.png"))
     {
-        root = new DockPanel(0, TitleBar, Width, Height - TitleBar)
+        root = new DockPanel(0, 0, Width, Height)
         {
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Stretch,
             useBackground = true,
             backgroundColor = Palette.ControlFace,
-            Margin = new Thickness(0),
+            Margin = new Thickness(TitleBar, 2, 2, 2),
             Padding = new Thickness(4),
         };
         AddChild(root);                                     // attach first
@@ -169,15 +171,6 @@ public sealed class DiskManagement : Window
         root.ResolveDockLayout();
         RescanDisks();
     }
-
-    public override void Resize(int w, int h)
-    {
-        base.Resize(w, h);
-        root.X = 0;
-        root.Y = TitleBar;
-        root.Resize(w, h - TitleBar);
-    }
-
 
     private static Panel CreateDetailRow(string text, System.Drawing.Color color, int height)
     {

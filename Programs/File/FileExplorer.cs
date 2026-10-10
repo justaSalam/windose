@@ -282,34 +282,10 @@ public class FileExplorer : Window
         PopulateFilesystemLocation(path);
 
         TreeViewItem treeRoot = tree.AddRoot(path, path);
-        //TreeViewItem bootTree = tree.AddRoot("/boot", "/boot");
+        PopulateTreeItem(treeRoot);
 
-
-        IO.TryGetDirectoriesAsync(path, (directories, success) =>
-        {
-            if (!success)
-            {
-                return;
-            }
-            foreach (string dir in directories)
-            {
-                TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
-                PopulateTreeItem(treeItem);
-            }
-        });
-
-        /*IO.TryGetDirectoriesAsync("/boot", (directories, success) =>
-        {
-            if (!success)
-            {
-                return;
-            }
-            foreach (string dir in directories)
-            {
-                TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
-                PopulateTreeItem(treeItem);
-            }
-        });*/
+        TreeViewItem bootRoot = tree.AddRoot("/boot", "/boot");
+        PopulateTreeItem(bootRoot);
     }
 
     private void PopulateTreeItem(TreeViewItem item)
@@ -321,16 +297,17 @@ public class FileExplorer : Window
         if (string.IsNullOrEmpty(path)) return;
         item.children.Clear();
 
-        IO.TryGetDirectoriesAsync(path, (directories, success) =>
+        try
         {
-            foreach (string dir in directories)
+            foreach (string dir in Directory.GetDirectories(path))
             {
                 TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), dir);
                 PopulateTreeItem(childItem);
             }
-        });
-
-
+        }
+        catch
+        {
+        }
     }
 
     private void OpenLocation(TreeViewItem item)
@@ -487,34 +464,41 @@ public class FileExplorer : Window
             AddFile("Empty Folder", 0, "Folder");
             return;
         }
-        DirectoryInfo directoryInfo = new DirectoryInfo(location);
 
-
-        foreach (DirectoryInfo dir in directoryInfo.GetDirectories())
+        try
         {
-            AddFolder(dir.Name, dir.FullName);
-        }
+            DirectoryInfo directoryInfo = new DirectoryInfo(location);
 
-
-        FileInfo[] fileInfo = directoryInfo.GetFiles();
-
-        foreach (FileInfo file in fileInfo)
-        {
-            FileEntry entry = new FileEntry(file.Name, FileType.File, file.FullName, file.Length);
-
-            if (!entry.displayInExplorer)
+            foreach (DirectoryInfo dir in directoryInfo.GetDirectories())
             {
-                return;
+                AddFolder(dir.Name, dir.FullName);
             }
-            FileListViewItem item = files.AddItem(entry);
 
-            //TODO: Replace with system registry association instead
-            item.type = string.Equals(FileSystemManager.GetExtension(file.FullName), ".breeze", StringComparison.OrdinalIgnoreCase)
-                ? "Breeze Script"
-                : "File";
+            FileInfo[] fileInfo = directoryInfo.GetFiles();
+
+            foreach (FileInfo file in fileInfo)
+            {
+                FileEntry entry = new FileEntry(file.Name, FileType.File, file.FullName, file.Length);
+
+                if (!entry.displayInExplorer)
+                {
+                    return;
+                }
+                FileListViewItem item = files.AddItem(entry);
+
+                //TODO: Replace with system registry association instead
+                item.type = string.Equals(FileSystemManager.GetExtension(file.FullName), ".breeze", StringComparison.OrdinalIgnoreCase)
+                    ? "Breeze Script"
+                    : "File";
+            }
         }
-
-
+        catch (UnauthorizedAccessException ex)
+        {
+            files.ClearItems();
+            FileListViewItem item = files.AddItem("Access denied");
+            item.type = "Folder";
+            SystemLogger.WriteLine("FileExplorer", $"Access denied reading {location}: {ex.Message}", ConsoleMessageType.Warning);
+        }
     }
 
     private void PopulateControlPanel()

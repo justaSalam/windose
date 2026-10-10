@@ -13,7 +13,7 @@ public sealed class RegistryEditor : Window
     private string selectedPath = "";
 
     public RegistryEditor(int x = 150, int y = 100, int width = 850, int height = 540)
-        : base(x, y, width, height, "Registry Editor", true)
+        : base(x, y, width, height, "Registry Editor", true, new Png("/mnt/System/Icons/scanregw.png"))
     {
         DockPanel root = new DockPanel(0, 0, Width, Height)
         {

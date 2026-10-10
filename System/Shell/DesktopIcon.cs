@@ -67,7 +67,7 @@ namespace Windose.System.Shell
             int iconX = Math.Max(0, (Width - IconSize) / 2);
 
             if (isPressed)
-                DrawRectangle(Color.Blue, iconX - 2, IconTop - 2, IconSize + 4, IconSize + 4);
+                DrawRectangle(Palette.Highlight, iconX - 2, IconTop - 2, IconSize + 4, IconSize + 4);
 
             DrawImage(icon, iconX, IconTop);
 
@@ -272,12 +272,12 @@ namespace Windose.System.Shell
             int labelHeight = lines.Length * LabelLineHeight;
 
             if (isPressed)
-                DrawFilledRectangle(Color.Blue, 0, LabelTop, Width, labelHeight);
+                DrawFilledRectangle(Palette.Highlight, 0, LabelTop, Width, labelHeight);
 
             if (renaming)
             {
                 DrawFilledRectangle(Color.White, 0, LabelTop, Width, labelHeight);
-                DrawRectangle(Color.Blue, 0, LabelTop, Width - 1, labelHeight);
+                DrawRectangle(Palette.Highlight, 0, LabelTop, Width - 1, labelHeight);
             }
 
             for (int i = 0; i < lines.Length; i++)

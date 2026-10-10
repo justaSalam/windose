@@ -506,7 +506,13 @@ public class WindowManager : SingleThreadedProcess
 
         focusedWindow = window;
         focusedWindow.SetFocused(true);
+        RefreshTaskbarButtons();
+    }
 
+    private static void RefreshTaskbarButtons()
+    {
+        foreach (KeyValuePair<Window, Button> entry in taskbarButtons)
+            entry.Value.SetSelected(entry.Key == focusedWindow && entry.Key.Visible && !entry.Key.isMinimized);
     }
 
     public static void ClearFocusedWindow()
@@ -515,6 +521,7 @@ public class WindowManager : SingleThreadedProcess
 
         focusedWindow.SetFocused(false);
         focusedWindow = null;
+        RefreshTaskbarButtons();
     }
 
     public static void SwapFocusedWindow()
@@ -639,10 +646,20 @@ public class WindowManager : SingleThreadedProcess
 
             if (!window.showInTaskbar || Explorer.taskbar == null) return;
 
-            Button taskbarButton = new Button(window.text, 0, 0, 75, 25)
+            int taskbarButtonWidth = Math.Max(84, window.text.Length * 7 + (window.Icon == null ? 18 : 38));
+            taskbarButtonWidth = Math.Min(taskbarButtonWidth, 180);
+            int taskbarButtonHeight = Math.Max(20, Explorer.taskbar.Height - 10);
+
+            Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
             {
                 verticalAlignment = VerticalAlignment.Center,
+                contentAlignment = HorizontalAlignment.Left,
+                iconSize = 16,
+                iconTextGap = 4,
+                Padding = new Thickness(3),
+                Margin = new Thickness(2, 2, 0, 0),
                 useBorders = true,
+                image = window.Icon,
 
                 leftClickAction = () =>
                 {
@@ -664,6 +681,7 @@ public class WindowManager : SingleThreadedProcess
             taskbarButtons[window] = taskbarButton;
             Explorer.taskbar.windows.Add(taskbarButton);
             Explorer.taskbar.bar.AddStackChild(taskbarButton);
+            RefreshTaskbarButtons();
             Explorer.taskbar.ForceDirty();
             Invalidate(Explorer.taskbar.AbsoluteRectangle);
         }
@@ -681,6 +699,17 @@ public class WindowManager : SingleThreadedProcess
         MinimizeImmediate(window);
     }
 
+    public static void MinimizeAllWindows()
+    {
+        Window[] windowsToMinimize = windows.ToArray();
+        for (int i = 0; i < windowsToMinimize.Length; i++)
+        {
+            Window window = windowsToMinimize[i];
+            if (window.showInTaskbar && window.Visible && !window.isMinimized)
+                MinimizeImmediate(window);
+        }
+    }
+
     internal static void MinimizeImmediate(Window window)
     {
         if (window == null || !window.canMinimize || window.isMinimized) return;
@@ -693,24 +722,14 @@ public class WindowManager : SingleThreadedProcess
             focusedWindow = null;
 
         FocusTopVisibleWindow(window);
+        RefreshTaskbarButtons();
         Explorer.taskbar.MarkDirty();
     }
 
     public static void Restore(Window window)
     {
         if (window == null) return;
-
-        if (window.isMinimized)
-        {
-            window.RestoreFromTaskbar();
-            window.SetFocused(true);
-            window.zIndex = nextZIndex++;
-            Invalidate(window.bounds);
-        }
-        else
-        {
-            Activate(window);
-        }
+        Activate(window);
     }
 
     public static Rectangle GetTaskbarButtonBounds(Window window)
@@ -893,6 +912,7 @@ public class WindowManager : SingleThreadedProcess
             failedWindows.Remove(window);
 
             FocusTopVisibleWindow(window);
+            RefreshTaskbarButtons();
             window.Stop();
         }
     }

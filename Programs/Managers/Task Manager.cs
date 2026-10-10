@@ -1,6 +1,7 @@
-using System.Drawing;
 using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.System.Diagnostics;
+using Cosmos.Kernel.System.Graphics;
+using System.Drawing;
 using Windose;
 
 public class PerformanceMonitor : Window
@@ -25,7 +26,7 @@ public class PerformanceMonitor : Window
     private const int SampleIntervalMs = 250;
 
     public PerformanceMonitor(int x, int y, int width = 720, int height = 560)
-        : base(x, y, width, height, "Task Manager", true)
+        : base(x, y, width, height, "Process Manager", true, new Png("/mnt/System/Icons/computer_taskmgr.png"))
     {
         root = new DockPanel(0, 0, Width, Height)
         {
@@ -175,7 +176,8 @@ public class PerformanceMonitor : Window
         frameGraph.AddSample((float)Kernel.DeltaTimeMs, 16.7f);
 
 
-        memoryGraph.AddSample(MemoryDiagnostics.TotalPages * MemoryDiagnostics.PageSizeBytes);
+        memoryGraph.AddSample(MemoryDiagnostics.TotalPages * MemoryDiagnostics.PageSizeBytes, MemoryDiagnostics.RamSizeBytes);
+        memoryGraph.MarkDirty();
     }
 
     public override string GetComponentName() => "PerformanceMonitor";

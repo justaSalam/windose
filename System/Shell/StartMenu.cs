@@ -65,7 +65,6 @@ public class StartMenu : Window
 
         programs.AddSubmenuSeparator();
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/gears_tweakui_a.png"), "SYSDUMP", SystemLogger.Dump);
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/gears_tweakui_a.png"), "ENV", () => LaunchTracker.Start(() => new ControlEnv(180, 120)));
 
 
         MenuItem breeze = programs.AddSubmenuItem("Breeze");

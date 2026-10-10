@@ -55,11 +55,7 @@ public class DirectBitmap : Canvas
         contextDepth++;
 
         Rectangle componentBounds = new Rectangle(originX + x, originY + y, width, height);
-        Rectangle requestedClip = new Rectangle(
-            originX + parentLocalClip.X,
-            originY + parentLocalClip.Y,
-            parentLocalClip.Width,
-            parentLocalClip.Height);
+        Rectangle requestedClip = new Rectangle(originX + parentLocalClip.X, originY + parentLocalClip.Y, parentLocalClip.Width, parentLocalClip.Height);
 
         originX += x;
         originY += y;
