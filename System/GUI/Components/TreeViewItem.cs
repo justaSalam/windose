@@ -1,5 +1,9 @@
+using Cosmos.Kernel.System.Graphics;
+
 public class TreeViewItem
 {
+
+    public Image image;
     public string text;
     public object tag;
     public TreeViewItem parent;
@@ -20,6 +24,18 @@ public class TreeViewItem
         TreeViewItem item = new TreeViewItem(text, tag)
         {
             parent = this
+        };
+
+        children.Add(item);
+        return item;
+    }
+
+    public TreeViewItem AddChild(string text, string icon, object tag = null)
+    {
+        TreeViewItem item = new TreeViewItem(text, tag)
+        {
+            parent = this,
+            image = new Png(icon)
         };
 
         children.Add(item);

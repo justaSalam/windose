@@ -1,28 +1,22 @@
-using Cosmos.Kernel.System;
-using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Input;
-using System.Drawing;
-using Windose;
-using Windose.System.Kernel;
-using Windose.System.Kernel.FileSystem;
-using Windose.System.Kernel.Subsystem;
-using Windose.System.System_Calls;
+using Cosmos.Kernel.System.Diagnostics;
 
 public class DeviceManager : Window
 {
-    private DockPanel root;
-    private DockPanel explorerBody;
-    private MenuBar menuBar;
-    private Toolbar toolbar;
-    private Panel objectCountPanel;
-    private Panel selectedPanel;
-    private ScrollView treeScroll;
-    private TreeView tree;
-    private readonly MenuPopup fileContextMenu;
-    private readonly MenuPopup viewportContextMenu;
-    private readonly MenuItem openContextItem;
-    private readonly MenuItem editContextItem;
-    private FileListViewItem? contextItem;
+    private readonly DockPanel root;
+    private readonly DockPanel deviceListPane;
+    private readonly DockPanel detailsPane;
+    private readonly MenuBar menuBar;
+    private readonly Toolbar toolbar;
+    private readonly Panel statusPanel;
+    private readonly Panel detailsHeader;
+    private readonly Panel nameDetail;
+    private readonly Panel kindDetail;
+    private readonly Panel driverDetail;
+    private readonly Panel nodePathDetail;
+    private readonly Panel detailsHint;
+    private readonly ScrollView treeScroll;
+    private readonly TreeView tree;
+    private int deviceCount;
 
     public DeviceManager(int x, int y, int width, int height) : base(x, y, width, height, "Device Manager", true)
     {
@@ -33,11 +27,14 @@ public class DeviceManager : Window
             Margin = new Thickness(28, 2, 2, 2),
             Padding = new Thickness(0),
             useBackground = true,
+            backgroundColor = Palette.ControlFace,
         };
+
         menuBar = new MenuBar(0, 0, Width);
         toolbar = new Toolbar(0, 0, Width);
+        toolbar.AddButton("Refresh", Refresh);
 
-        explorerBody = new DockPanel(0, 0, Width, Height)
+        deviceListPane = new DockPanel(0, 0, Width, Height)
         {
             clampSize = false,
             useBackground = true,
@@ -45,21 +42,19 @@ public class DeviceManager : Window
             Padding = new Thickness(0),
         };
 
-        treeScroll = new ScrollView(0, 0, 180, Height)
+        treeScroll = new ScrollView(0, 0, 220, Height)
         {
             showHorizontalScrollbar = false,
             clampSize = false,
             Margin = new Thickness(0),
         };
 
-        tree = new TreeView(0, 0, 180, Height)
+        tree = new TreeView(0, 0, 220, Height)
         {
             useBackground = true,
             backgroundColor = Palette.ControlWhite,
         };
-
-        //TODO Tree item right click (proper version)
-        tree.itemRightClick += ctx => viewportContextMenu.ShowAt(MouseManager.X, MouseManager.Y);
+        tree.selectedChanged += ShowDeviceDetails;
 
         Splitter splitter = new Splitter(0, 0, 4, Height)
         {
@@ -68,115 +63,158 @@ public class DeviceManager : Window
             Margin = new Thickness(0),
         };
 
+        detailsPane = new DockPanel(0, 0, Width, Height)
+        {
+            clampSize = false,
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+            Padding = new Thickness(8),
+        };
 
-        fileContextMenu = new MenuPopup(160, 24 * 3);
-        viewportContextMenu = new MenuPopup(160, 24 * 3);
+        detailsHeader = CreateDetailRow("Device details", Palette.ControlFace, 30, 18);
+        nameDetail = CreateDetailRow("Name: —", Palette.ControlWhite, 26, 16);
+        kindDetail = CreateDetailRow("Type: —", Palette.ControlWhite, 26, 16);
+        driverDetail = CreateDetailRow("Driver: —", Palette.ControlWhite, 26, 16);
+        nodePathDetail = CreateDetailRow("Node path: —", Palette.ControlWhite, 56, 16);
+        detailsHint = CreateDetailRow("Select a device to view its reported details.", Palette.ControlWhite, 60, 16);
 
-        MenuItem sortContext = viewportContextMenu.AddItem("Sort");
-        sortContext.AddSubmenuItem("Name");
-        sortContext.AddSubmenuItem("Date");
-        sortContext.AddSubmenuItem("Type");
-        sortContext.AddSubmenuItem("Size");
-        sortContext.AddSubmenuSeparator();
-        sortContext.AddSubmenuItem("Ascending");
-        sortContext.AddSubmenuItem("Descending");
+        detailsPane.AddDockChild(detailsHeader, Dock.Top);
+        detailsPane.AddDockChild(nameDetail, Dock.Top);
+        detailsPane.AddDockChild(kindDetail, Dock.Top);
+        detailsPane.AddDockChild(driverDetail, Dock.Top);
+        detailsPane.AddDockChild(nodePathDetail, Dock.Top);
+        detailsPane.AddDockChild(detailsHint, Dock.Fill);
 
-        viewportContextMenu.AddSeparator();
+        statusPanel = new Panel(Palette.ControlFace, 0, 0, Width, 22)
+        {
+            useBackground = true,
+            fontSize = 14,
+            textColor = Palette.ControlBlack,
+            textOffsetX = 6,
+            wrapText = false,
+            clampSize = false,
+            Margin = new Thickness(0),
+            text = "Devices: 0",
+        };
 
-        viewportContextMenu.AddItem("Paste");
-        viewportContextMenu.AddSeparator();
-
-        viewportContextMenu.AddItem("Refresh", Refresh);
-        viewportContextMenu.AddSeparator();
-
-        MenuItem newFileContext = viewportContextMenu.AddItem("File");
-        newFileContext.AddSubmenuItem("Exit");
-
-
-        viewportContextMenu.AddSeparator();
-        viewportContextMenu.AddItem("Properties", ShowContextProperties);
-
-        root.AddDockChild(menuBar, Dock.Top);
-        root.AddDockChild(toolbar, Dock.Top);
-        root.AddDockChild(explorerBody, Dock.Fill);
-
-        treeScroll.SetContent(tree, 180, tree.GetContentHeight());
-
-        explorerBody.AddDockChild(treeScroll, Dock.Left);
-        explorerBody.AddDockChild(splitter, Dock.Left);
-
-
-        MenuPage editMenu = menuBar.AddMenuPage("Edit");
-        editMenu.AddItem("Cut").enabled = false;
-        editMenu.AddItem("Copy").enabled = false;
-        editMenu.AddItem("Paste").enabled = false;
-        editMenu.AddSeparator();
-        editMenu.AddItem("Delete").enabled = false;
+        MenuPage deviceMenu = menuBar.AddMenuPage("Device");
+        deviceMenu.AddItem("Refresh", Refresh);
 
         MenuPage viewMenu = menuBar.AddMenuPage("View");
         viewMenu.AddItem("Refresh", Refresh);
 
-        MenuPage helpMenu = menuBar.AddMenuPage("Help");
-        helpMenu.AddItem("Windose File Explorer").enabled = false;
+        root.AddDockChild(menuBar, Dock.Top);
+        root.AddDockChild(toolbar, Dock.Top);
+        root.AddDockChild(statusPanel, Dock.Bottom);
+        root.AddDockChild(deviceListPane, Dock.Fill);
 
-
+        deviceListPane.AddDockChild(treeScroll, Dock.Left);
+        deviceListPane.AddDockChild(splitter, Dock.Left);
+        deviceListPane.AddDockChild(detailsPane, Dock.Fill);
 
         BuildTree();
-
-        //tree.selectedChanged = OpenLocation;
-
-        //tree.itemDoubleClick = OpenLocation;
-
-
-
-
+        treeScroll.SetContent(tree, 220, tree.GetContentHeight());
         AddChild(root);
     }
 
+    private static Panel CreateDetailRow(string text, System.Drawing.Color background, int height, int fontSize)
+    {
+        return new Panel(background, 0, 0, 100, height)
+        {
+            useBackground = background != Palette.ControlWhite,
+            text = text,
+            fontSize = fontSize,
+            textColor = Palette.ControlBlack,
+            textOffsetX = 4,
+            wrapText = true,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+    }
 
     private void BuildTree()
     {
         tree.ClearItems();
+        deviceCount = 0;
 
-       
+        TreeViewItem keyboard = tree.AddRoot("Keyboard", "/mnt/System/Icons/keyboard.png");
+        TreeViewItem pointer = tree.AddRoot("Pointer", "/mnt/System/Icons/mouse_ms.png");
+        TreeViewItem network = tree.AddRoot("Network", "/mnt/System/Icons/network_drive.png");
+        TreeViewItem block = tree.AddRoot("Block", "/mnt/System/Icons/removable_disk_drive_alt.png");
+        TreeViewItem display = tree.AddRoot("Display", "/mnt/System/Icons/display_properties.png");
+        TreeViewItem other = tree.AddRoot("Other devices", "/mnt/System/Icons/hardware.png");
 
+        for (int i = 0; i < DriverDiagnostics.DeviceCount; i++)
+        {
+            if (!DriverDiagnostics.TryGetDevice(i, out PublishedDeviceInfo info))
+                continue;
 
-        TreeViewItem bootTree = tree.AddRoot("/boot", "/boot");
+            TreeViewItem category = info.Kind switch
+            {
+                PublishedDeviceKind.Keyboard => keyboard,
+                PublishedDeviceKind.Pointer => pointer,
+                PublishedDeviceKind.Network => network,
+                PublishedDeviceKind.Block => block,
+                PublishedDeviceKind.Display => display,
+                _ => other,
+            };
+
+            string name = string.IsNullOrWhiteSpace(info.Name) ? "Unnamed device" : info.Name;
+            category.AddChild(name, info);
+            deviceCount++;
+        }
+
+        statusPanel.text = $"Devices: {deviceCount}";
+        statusPanel.MarkDirty();
+        ShowDeviceDetails(null);
+        tree.MarkDirty();
     }
 
-
-    private void ShowContextProperties()
+    private void ShowDeviceDetails(TreeViewItem item)
     {
-        if (!IsItemValid(out FileListViewItem item)) return;
-        LaunchTracker.Start(() => new FileProperties(X + 40, Y + 40, item.fileEntry));
+        if (item?.tag is PublishedDeviceInfo info)
+        {
+            nameDetail.text = $"Name: {DisplayValue(info.Name)}";
+            kindDetail.text = $"Type: {info.Kind}";
+            driverDetail.text = $"Driver: {DisplayValue(info.DriverName)}";
+            nodePathDetail.text = $"Node path: {DisplayValue(info.NodePath)}";
+            detailsHint.text = "Device is published by the active driver system.";
+        }
+        else if (item != null)
+        {
+            nameDetail.text = $"Category: {item.text}";
+            kindDetail.text = $"Devices: {item.children.Count}";
+            driverDetail.text = string.Empty;
+            nodePathDetail.text = string.Empty;
+            detailsHint.text = "Select a device to view its reported details.";
+        }
+        else
+        {
+            nameDetail.text = "Name: —";
+            kindDetail.text = "Type: —";
+            driverDetail.text = "Driver: —";
+            nodePathDetail.text = "Node path: —";
+            detailsHint.text = deviceCount == 0
+                ? "No published devices are currently available."
+                : "Select a device to view its reported details.";
+        }
+
+        nameDetail.MarkDirty();
+        kindDetail.MarkDirty();
+        driverDetail.MarkDirty();
+        nodePathDetail.MarkDirty();
+        detailsHint.MarkDirty();
     }
-    private bool IsItemValid(out FileListViewItem item)
+
+    private static string DisplayValue(string value)
     {
-        item = contextItem;
-        contextItem = null;
-
-        return item != null && item.hasFileEntry;
+        return string.IsNullOrWhiteSpace(value) ? "Not reported" : value;
     }
-
-
 
     private void Refresh()
     {
         BuildTree();
     }
 
-
-    private void RefreshExplorerVisuals()
-    {
-        // Explorer contains several cached layout buffers. Redraw the explorer after interaction so those updated buffers reach the screen.
-        ForceDirty();
-    }
-
-
-    public override void Dispose()
-    {
-        fileContextMenu.Hide();
-        fileContextMenu.Dispose();
-        base.Dispose();
-    }
+    public override string GetComponentName() => "DeviceManager";
 }

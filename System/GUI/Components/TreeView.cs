@@ -1,7 +1,12 @@
+using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 
 public class TreeView : Component
 {
+    private const int ExpandBoxSize = 9;
+    private const int IconSize = 16;
+    private const int IconOffset = 12;
+
     public List<TreeViewItem> roots = new List<TreeViewItem>();
     public TreeViewItem selectedItem;
 
@@ -30,6 +35,17 @@ public class TreeView : Component
     public TreeViewItem AddRoot(string text, object tag = null)
     {
         TreeViewItem item = new TreeViewItem(text, tag);
+        roots.Add(item);
+        MarkDirty();
+        return item;
+    }
+
+    public TreeViewItem AddRoot(string text, string image, object tag = null)
+    {
+        TreeViewItem item = new TreeViewItem(text, tag)
+        {
+            image = new Png(image)
+        };
         roots.Add(item);
         MarkDirty();
         return item;
@@ -66,18 +82,22 @@ public class TreeView : Component
         int x = 4 + depth * indentWidth;
         bool selected = item == selectedItem || item.selected;
 
-        if (selected)
-        {
-            DrawFilledRectangle(Palette.Highlight, x + 14, y + 1, Math.Max(1, Width - x - 16), rowHeight - 2);
-            DrawString(item.text, Palette.HighlightText, x + 18, y + 1, fontSize);
-        }
-        else
-        {
-            DrawString(item.text, textColor, x + 18, y + 1, fontSize);
-        }
-
         if (item.HasChildren())
             DrawExpandBox(item, x, y);
+
+        if (selected)
+        {
+            DrawFilledRectangle(Palette.Highlight, x + IconOffset, y + 1, Math.Max(1, Width - x - IconOffset - 2), rowHeight - 2);
+        }
+
+        int textX = x + 18;
+        if (item.image != null)
+        {
+            DrawImageStretch(item.image, new Rectangle(x + IconOffset, y + Math.Max(0, (rowHeight - IconSize) / 2), IconSize, IconSize));
+            textX += IconOffset + IconSize + 4 - 18;
+        }
+
+        DrawString(item.text, selected ? Palette.HighlightText : textColor, textX, y + 1, fontSize);
 
         row++;
 
@@ -91,10 +111,10 @@ public class TreeView : Component
     private void DrawExpandBox(TreeViewItem item, int x, int y)
     {
         int boxX = x;
-        int boxY = y + Math.Max(0, (rowHeight - 9) / 2);
+        int boxY = y + Math.Max(0, (rowHeight - ExpandBoxSize) / 2);
 
-        DrawFilledRectangle(Palette.ControlWhite, boxX, boxY, 9, 9);
-        DrawRectangle(Palette.ControlShadow, boxX, boxY, 9, 9);
+        DrawFilledRectangle(Palette.ControlWhite, boxX, boxY, ExpandBoxSize, ExpandBoxSize);
+        DrawRectangle(Palette.ControlShadow, boxX, boxY, ExpandBoxSize, ExpandBoxSize);
 
         DrawLine(Palette.ControlBlack, boxX + 2, boxY + 4, boxX + 6, boxY + 4);
 
@@ -146,7 +166,7 @@ public class TreeView : Component
         int depth = GetDepth(item);
         int expandX = 4 + depth * indentWidth;
 
-        if (item.HasChildren() && localX >= expandX && localX <= expandX + 10)
+        if (item.HasChildren() && localX >= expandX && localX < expandX + ExpandBoxSize)
         {
             item.expanded = !item.expanded;
             MarkDirty();

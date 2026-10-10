@@ -239,6 +239,25 @@ public class DirectBitmap : Canvas
                 BlendTargetPixel(x, y, argb);
     }
 
+    public new void DrawRectangle(Color color, int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+            return;
+
+        DrawFilledRectangle(color, x, y, width, 1);
+
+        if (height > 1)
+            DrawFilledRectangle(color, x, y + height - 1, width, 1);
+
+        if (height > 2)
+        {
+            DrawFilledRectangle(color, x, y + 1, 1, height - 2);
+
+            if (width > 1)
+                DrawFilledRectangle(color, x + width - 1, y + 1, 1, height - 2);
+        }
+    }
+
     public virtual void DrawArrayClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
         if (colors == null || sourceWidth <= 0) return;

@@ -64,11 +64,6 @@ public class ScrollView : Component
         }
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
-
     public override void DrawLocal()
     {
         RefreshContentSize();
@@ -273,6 +268,7 @@ public class ScrollView : Component
         content.Y = 2 - scrollY;
     }
 
+   
     private void RefreshContentSize()
     {
         if (content == null)
