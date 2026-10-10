@@ -15,21 +15,21 @@ public sealed class SchedulerInfoCommand : IShellCommand
 
     public void Execute(CommandContext context, string[] args)
     {
-        context.WriteLine($"Scheduler: {SchedulerInfo.SchedulerName}");
+        context.WriteLine($"Scheduler: {SchedulerDiagnostics.SchedulerName}");
         context.WriteLine($"Scheduler Status:");
-        context.WriteLine($"          Supported:    {SchedulerInfo.IsSupported}");
-        context.WriteLine($"          Initialized:  {SchedulerInfo.IsInitialized}");
-        context.WriteLine($"          Running:      {SchedulerInfo.IsRunning}");
+        context.WriteLine($"          Supported:    {SchedulerDiagnostics.IsSupported}");
+        context.WriteLine($"          Initialized:  {SchedulerDiagnostics.IsInitialized}");
+        context.WriteLine($"          Running:      {SchedulerDiagnostics.IsRunning}");
         context.WriteLine();
-        context.WriteLine($"Managed CPU Count: {SchedulerInfo.CpuCount}");
-        context.WriteLine($"Live Thread Count: {SchedulerInfo.ThreadCount}");
-        context.WriteLine($"Number of slots in the thread registry: {SchedulerInfo.ThreadSlotCount}");
+        context.WriteLine($"Managed CPU Count: {SchedulerDiagnostics.CpuCount}");
+        context.WriteLine($"Live Thread Count: {SchedulerDiagnostics.ThreadCount}");
+        context.WriteLine($"Number of slots in the thread registry: {SchedulerDiagnostics.ThreadSlotCount}");
 
-        for (uint i = 0; i < SchedulerInfo.CpuCount; i++)
+        for (uint i = 0; i < SchedulerDiagnostics.CpuCount; i++)
         {
-            for (int x = 0; x < SchedulerInfo.GetRunQueueCount(i); x++)
+            for (int x = 0; x < SchedulerDiagnostics.GetRunQueueCount(i); x++)
             {
-                if(SchedulerInfo.TryGetRunQueueThread(i, x, out var thread))
+                if(SchedulerDiagnostics.TryGetRunQueueThread(i, x, out var thread))
                 {
                     context.WriteLine($"Thread {thread.Id} on CPU {i}:");
                     context.WriteLine($" Id:          {thread.Id}");

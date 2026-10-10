@@ -1,8 +1,7 @@
-using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.System.Graphics.Fonts;
-using Cosmos.Kernel.System.Keyboard;
-using Cosmos.Kernel.System.Timer;
+using Cosmos.Kernel.System.Input;
 using System.Collections.Concurrent;
+using Cosmos.Kernel.System.Timers;
 using System.Drawing;
 
 public sealed class TerminalView : Component
@@ -241,9 +240,9 @@ public sealed class TerminalView : Component
 
         if (isControlPressed)
         {
-            if (keyEvent.Key == ConsoleKeyEx.C)
+            if (keyEvent.Key == Key.C)
                 WindoseClipboard.SetText(inputText ?? "");
-            else if (keyEvent.Key == ConsoleKeyEx.V && WindoseClipboard.HasText)
+            else if (keyEvent.Key == Key.V && WindoseClipboard.HasText)
                 inputText += WindoseClipboard.Text.Replace("\r", "").Replace("\n", " ");
 
             MarkDirty();
@@ -252,16 +251,16 @@ public sealed class TerminalView : Component
 
         switch (keyEvent.Key)
         {
-            case ConsoleKeyEx.Enter:
+            case Key.Enter:
                 Submit();
                 return;
 
-            case ConsoleKeyEx.Backspace:
+            case Key.Backspace:
                 if (!string.IsNullOrEmpty(inputText)) inputText = inputText.Substring(0, inputText.Length - 1);
                 MarkDirty();
                 return;
 
-            case ConsoleKeyEx.UpArrow:
+            case Key.UpArrow:
                 if (history.Count > 0)
                 {
                     historyIndex = Math.Max(0, historyIndex - 1);
@@ -270,7 +269,7 @@ public sealed class TerminalView : Component
                 }
                 return;
 
-            case ConsoleKeyEx.DownArrow:
+            case Key.DownArrow:
                 if (history.Count > 0)
                 {
                     historyIndex = Math.Min(history.Count, historyIndex + 1);

@@ -1,4 +1,6 @@
-﻿using Cosmos.Kernel.System.Keyboard;
+﻿
+
+using Cosmos.Kernel.System.Input;
 
 namespace Windose.System.Drivers
 {

@@ -1,4 +1,5 @@
-﻿using Windose.System.System_Calls;
+﻿using Cosmos.Kernel.Core.Scheduler;
+using Windose.System.System_Calls;
 
 namespace Windose.System.Kernel
 {

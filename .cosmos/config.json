@@ -5,7 +5,7 @@
     "machineType": "q35",
     "cpuModel": "max",
     "serialMode": "stdio",
-    "networkCard": "e1000e",
+    "networkCard": "virtio-net-pci",
     "keyboard": "virtio-keyboard-pci",
     "mouse": "virtio-mouse-pci",
     "enableNetwork": false,
@@ -16,7 +16,13 @@
         "path": "disk.img",
         "type": "nvme",
         "size": "512"
+      },
+      {
+        "path": "disk1.img",
+        "type": "nvme",
+        "size": "128"
       }
-    ]
+    ],
+    "audio": "intel-hda"
   }
 }

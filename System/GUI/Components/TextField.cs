@@ -1,8 +1,7 @@
 using System.Drawing;
-using Cosmos.Kernel.HAL.Interfaces.Devices;
 using Cosmos.Kernel.System.Graphics.Fonts;
-using Cosmos.Kernel.System.Keyboard;
-using Cosmos.Kernel.System.Timer;
+using Cosmos.Kernel.System.Input;
+using Cosmos.Kernel.System.Timers;
 
 
 /// <summary>
@@ -76,12 +75,12 @@ public class TextField : Component
 
         if (isControlPressed)
         {
-            if (keyEvent.Key == ConsoleKeyEx.C)
+            if (keyEvent.Key == Key.C)
             {
                 WindoseClipboard.SetText(text);
                 return;
             }
-            if (keyEvent.Key == ConsoleKeyEx.X)
+            if (keyEvent.Key == Key.X)
             {
                 WindoseClipboard.SetText(text);
                 if (text.Length == 0) return;
@@ -89,7 +88,7 @@ public class TextField : Component
                 MarkDirty();
                 return;
             }
-            if (keyEvent.Key == ConsoleKeyEx.V)
+            if (keyEvent.Key == Key.V)
             {
                 if (!WindoseClipboard.HasText) return;
                 text += WindoseClipboard.Text;
@@ -102,7 +101,7 @@ public class TextField : Component
         bool changed = false;
         switch (keyEvent.Key)
         {
-            case ConsoleKeyEx.Backspace:
+            case Key.Backspace:
                 if (text.Length != 0)
                 {
                     text = text.Substring(0, text.Length - 1);

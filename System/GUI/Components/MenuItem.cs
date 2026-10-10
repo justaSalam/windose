@@ -52,7 +52,7 @@ public class MenuItem : Component
         }
 
         bool hasSubmenu = submenu != null;
-        bool highlighted = enabled && (IsInsideAbsolute(Cosmos.Kernel.System.Mouse.MouseManager.X, Cosmos.Kernel.System.Mouse.MouseManager.Y) || (hasSubmenu && submenu.Visible));
+        bool highlighted = enabled && (IsInsideAbsolute(Cosmos.Kernel.System.Input.MouseManager.X, Cosmos.Kernel.System.Input.MouseManager.Y) || (hasSubmenu && submenu.Visible));
         int textX = isPressed ? 9 : 8;
         int textY = Math.Max(0, (Height - MeasureStringHeight(fontSize)) / 2);
 

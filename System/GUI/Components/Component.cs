@@ -1,8 +1,7 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
-using Cosmos.Kernel.System.Keyboard;
-using Cosmos.Kernel.System.Mouse;
+using Cosmos.Kernel.System.Input;
 using Windose;
 
 
@@ -364,19 +363,19 @@ public class Component : IDisposable
     {
         switch (keyEvent.Key)
         {
-            case ConsoleKeyEx.LeftArrow:
-            case ConsoleKeyEx.RightArrow:
-            case ConsoleKeyEx.UpArrow:
-            case ConsoleKeyEx.DownArrow:
-            case ConsoleKeyEx.Home:
-            case ConsoleKeyEx.End:
-            case ConsoleKeyEx.PageUp:
-            case ConsoleKeyEx.PageDown:
-            case ConsoleKeyEx.Backspace:
-            case ConsoleKeyEx.Delete:
-            case ConsoleKeyEx.Enter:
-            case ConsoleKeyEx.Tab:
-            case ConsoleKeyEx.Escape:
+            case Key.LeftArrow:
+            case Key.RightArrow:
+            case Key.UpArrow:
+            case Key.DownArrow:
+            case Key.Home:
+            case Key.End:
+            case Key.PageUp:
+            case Key.PageDown:
+            case Key.Backspace:
+            case Key.Delete:
+            case Key.Enter:
+            case Key.Tab:
+            case Key.Escape:
                 return '\0';
         }
 

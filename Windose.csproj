@@ -1,19 +1,20 @@
-<Project Sdk="Cosmos.Sdk/3.0.89">
+<Project Sdk="Cosmos.Sdk/3.0.94">
 
   <PropertyGroup>
     <CosmosKernelClass>Windose.Kernel</CosmosKernelClass>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+	  <CosmosEnableUsb>True</CosmosEnableUsb>
+	  <CosmosEnableAudio>True</CosmosEnableAudio>
 	  <NoWarn>$(NoWarn);COSMOS0001</NoWarn>
   </PropertyGroup>
 
   <!-- Core kernel packages -->
   <ItemGroup>
-    <PackageReference Include="Cosmos.Kernel" Version="3.0.89" />
-    <PackageReference Include="Cosmos.Kernel.System" Version="3.0.89" />
-	  <PackageReference Include="Cosmos.Executable.Lua" Version="4.0.1" />
-	  <!-- <PackageReference Include="Cosmos.Network.Http" Version="3.0.0" /> -->
-    <PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
+    <PackageReference Include="Cosmos.Kernel" Version="3.0.94" />
+    <PackageReference Include="Cosmos.Kernel.System" Version="3.0.94" />
+	  <PackageReference Include="Cosmos.Executable.Lua" Version="4.0.0" />
+	  <PackageReference Include="Cosmos.Network.Http" Version="3.0.0" />
   </ItemGroup>
 
     <ItemGroup>
@@ -229,5 +230,9 @@
     <EmbeddedResource Include=".\Resources\Fonts\lucida-10x16.psf" />
     <EmbeddedResource Include=".\Resources\Wallpapers\WRAMW.png" />
   </ItemGroup>
+
+    <ItemGroup>
+      <None Include=".github\copilot-instructions.md" />
+    </ItemGroup>
 
 </Project>

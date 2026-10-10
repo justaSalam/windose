@@ -1,8 +1,7 @@
-using Cosmos.Kernel.HAL.Interfaces.Devices;
-using Cosmos.Kernel.HAL.Vfs;
-using Cosmos.Kernel.System.Filesystems.Fat;
+using Cosmos.Kernel.HAL.Devices.Storage;
+using Cosmos.Kernel.System.FileSystem;
+using Cosmos.Kernel.System.FileSystem.Fat;
 using Cosmos.Kernel.System.Storage;
-using Cosmos.Kernel.System.Vfs;
 using System;
 using Windose.System.Kernel;
 using Windose.System.System_Calls;
@@ -19,8 +18,8 @@ using Windose.System.System_Calls;
 /// </summary>
 public static class FileSystemManager
 {
-    public static VfsManager.VfsMount? mount;
-    public static VfsManager.VfsMount? bootMount;
+    public static VfsMount? mount;
+    public static VfsMount? bootMount;
 
     /// <summary>EFI System Partition type GUID.</summary>
     private static readonly Guid EspType = Guid.Parse("C12A7328-F81F-11D2-BA4B-00A0C93EC93B");
@@ -45,8 +44,8 @@ public static class FileSystemManager
     public static void Setup()
     {
         Console.WriteLine("[fs] register fat");
-        FatFilesystemType fat = new FatFilesystemType();
-        VfsManager.RegisterFilesystem("fat", fat);
+        FatFileSystemType fat = new FatFileSystemType();
+        VfsManager.RegisterFileSystem("fat", fat);
 
         IBlockDevice? storageDevice = StorageManager.PrimaryDevice;
         if (storageDevice == null)
@@ -89,7 +88,7 @@ public static class FileSystemManager
         }
 
         Console.WriteLine($"[fs] mounting data LBA {dataPartition.StartSector} → {DataMount}");
-        if (!VfsManager.TryMount("fat", dataPartition, MountFlags.None, DataMount, out VfsManager.VfsMount? dataMount))
+        if (!VfsManager.TryMount("fat", dataPartition, MountFlags.None, DataMount, out VfsMount? dataMount))
         {
             SystemLogger.WriteLine("FileSystemManager", "Failed to mount data partition at /mnt", ConsoleMessageType.Error);
             return;
@@ -150,7 +149,7 @@ public static class FileSystemManager
             return false;
         }
 
-        if (!VfsManager.TryMount("fat", esp, MountFlags.None, BootMount, out VfsManager.VfsMount? espMount))
+        if (!VfsManager.TryMount("fat", esp, MountFlags.None, BootMount, out VfsMount? espMount))
         {
             return false;
         }

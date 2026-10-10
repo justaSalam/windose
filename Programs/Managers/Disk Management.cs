@@ -1,14 +1,13 @@
-using Cosmos.Kernel.HAL.Interfaces.Devices;
-using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.HAL.Devices.Storage;
+using Cosmos.Kernel.System.FileSystem;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Storage;
-using Cosmos.Kernel.System.Vfs;
-using System.Drawing;
+
 
 public sealed class DiskManagement : Window
 {
     private const int TitleBar = 28;
-
+ 
     private readonly DockPanel root;
     private readonly ListView partitionListView;
     private readonly PartitionBar partitionBar;
@@ -194,7 +193,7 @@ public sealed class DiskManagement : Window
             string unused = "";
 
             // Find the VFS mount belonging to this partition.
-            VfsManager.VfsMount? mount = GetMount(partition);
+            VfsMount? mount = GetMount(partition);
 
             if (mount != null)
             {
@@ -278,9 +277,9 @@ public sealed class DiskManagement : Window
         return result;
     }
 
-    private VfsManager.VfsMount? GetMount(Partition partition)
+    private VfsMount? GetMount(Partition partition)
     {
-        foreach (VfsManager.VfsMount mount in VfsManager.Mounts)
+        foreach (VfsMount mount in VfsManager.Mounts)
         {
 
             if (mount.Partition == null) 
@@ -308,7 +307,7 @@ public sealed class DiskManagement : Window
         }
 
         total = stats.Blocks * stats.BlockSize;
-        free = stats.Bavail * stats.BlockSize;
+        free = stats.AvailableBlocks * stats.BlockSize;
         used = total - free;
 
         return true;

@@ -1,4 +1,4 @@
-using Cosmos.Kernel.System.Mouse;
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Windose.System.Kernel;
 

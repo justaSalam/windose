@@ -1,4 +1,4 @@
-﻿using Cosmos.Kernel.HAL.Interfaces.Devices;
+﻿using Cosmos.Kernel.HAL.Devices.Storage;
 using Cosmos.Kernel.System.Storage;
 
 public sealed class DiskPart : InteractiveShellCommand

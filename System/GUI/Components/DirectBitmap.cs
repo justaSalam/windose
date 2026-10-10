@@ -145,7 +145,7 @@ public class DirectBitmap : Canvas
     }
 
 
-    public override void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
+    public void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
     {
         int croppedWidth = Math.Min(image.Width, maxWidth);
         int croppedHeigth = Math.Min(image.Height, maxHeight);

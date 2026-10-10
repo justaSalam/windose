@@ -1,6 +1,5 @@
-﻿using Cosmos.Kernel.System.Keyboard;
-
-
+﻿
+using Cosmos.Kernel.System.Input;
 
 public class SystemKeyEvent
 {

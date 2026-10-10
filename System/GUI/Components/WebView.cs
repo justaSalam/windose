@@ -1,6 +1,4 @@
 using System.Drawing;
-using HtmlAgilityPack;
-using Microsoft.VisualBasic;
 
 public class WebView : Component
 {
@@ -16,12 +14,8 @@ public class WebView : Component
 
 
 
-    private HtmlDocument document;
- 
     public WebView(int x, int y, int width, int height) : base(x, y, width, height)
     {
-        document = new HtmlDocument();
-        document.LoadHtml(test);
 
        
 
@@ -32,9 +26,7 @@ public class WebView : Component
     {
         try
         {
-            var button = document.GetElementbyId("test");
-            DrawString($"{button?.Name}", Color.Black, 0, 20);
-            DrawString($"{button?.InnerText}", Color.Black, 0, 0);
+
 
         }
         catch (Exception ex)

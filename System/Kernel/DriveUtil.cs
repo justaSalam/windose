@@ -1,7 +1,6 @@
-using Cosmos.Kernel.HAL.Interfaces.Devices;
-using Cosmos.Kernel.HAL.Vfs;
+using Cosmos.Kernel.HAL.Devices.Storage;
+using Cosmos.Kernel.System.FileSystem;
 using Cosmos.Kernel.System.Storage;
-using Cosmos.Kernel.System.Vfs;
 
 public static class DriveUtils
 {
@@ -96,7 +95,7 @@ public static class DriveUtils
         return VfsManager.TryFormat(name, source, vfsFormatOptions);
     }
 
-    public static bool FAT32MountDrive(string name, ReadOnlySpan<char> source, MountFlags mountFlags, string mountPoint, out VfsManager.VfsMount? mount)
+    public static bool FAT32MountDrive(string name, ReadOnlySpan<char> source, MountFlags mountFlags, string mountPoint, out VfsMount? mount)
     {
         return VfsManager.TryMount(name, source, mountFlags, mountPoint, out mount);
     }

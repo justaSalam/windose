@@ -1,4 +1,4 @@
-using Cosmos.Kernel.System.Keyboard;
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Windose.System.Kernel;
 
@@ -197,7 +197,7 @@ public class ProcessPerformanceList : Component
 
         if (!showFilter) return;
 
-        if (keyEvent.Key == ConsoleKeyEx.Backspace && filterText.Length > 0)
+        if (keyEvent.Key == Key.Backspace && filterText.Length > 0)
         {
             filterText = filterText.Substring(0, filterText.Length - 1);
             MarkDirty();

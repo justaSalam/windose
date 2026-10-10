@@ -1,4 +1,6 @@
-using Cosmos.Kernel.System.Mouse;
+
+
+using Cosmos.Kernel.System.Input;
 
 namespace Windose.Drivers;
 

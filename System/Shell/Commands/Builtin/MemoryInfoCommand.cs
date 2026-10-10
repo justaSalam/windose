@@ -16,14 +16,14 @@ public sealed class MemoryInfoCommand : IShellCommand
     public void Execute(CommandContext context, string[] args)
     {
         context.WriteLine($"Memory Information:");
-        context.WriteLine($"Total Memory: {ByteFormat.FormatBytes(MemoryInfo.RamSizeBytes)}");
-        context.WriteLine($"Used Memory:  {ByteFormat.FormatBytes(MemoryInfo.RamSizeBytes - (MemoryInfo.FreePages * MemoryInfo.PageSizeBytes))}");
-        context.WriteLine($"Free Memory:  {ByteFormat.FormatBytes(MemoryInfo.FreePages * MemoryInfo.PageSizeBytes)}");
+        context.WriteLine($"Total Memory: {ByteFormat.FormatBytes(MemoryDiagnostics.RamSizeBytes)}");
+        context.WriteLine($"Used Memory:  {ByteFormat.FormatBytes(MemoryDiagnostics.RamSizeBytes - (MemoryDiagnostics.FreePages * MemoryDiagnostics.PageSizeBytes))}");
+        context.WriteLine($"Free Memory:  {ByteFormat.FormatBytes(MemoryDiagnostics.FreePages * MemoryDiagnostics.PageSizeBytes)}");
         context.WriteLine();
         context.WriteLine($"GC Information:");
-        context.WriteLine($"Total Collections: {MemoryInfo.TotalCollections}");
-        context.WriteLine($"Total Objects Freed: {MemoryInfo.TotalObjectsFreed}");
-        context.WriteLine($"GC Time Percent: {MemoryInfo.GcTimePercent}%");
+        context.WriteLine($"Total Collections: {MemoryDiagnostics.TotalCollections}");
+        context.WriteLine($"Total Objects Freed: {MemoryDiagnostics.TotalObjectsFreed}");
+        context.WriteLine($"GC Time Percent: {MemoryDiagnostics.GcTimePercent}%");
 
 
     }

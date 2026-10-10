@@ -1,4 +1,5 @@
-﻿using Cosmos.Kernel.System.Keyboard;
+﻿
+using Cosmos.Kernel.System.Input;
 using Windose.System.Drivers;
 using Windose.System.Features;
 

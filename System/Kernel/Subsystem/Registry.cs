@@ -1,4 +1,4 @@
-using Cosmos.Kernel.System.Vfs;
+using Cosmos.Kernel.System.FileSystem;
 using System.Globalization;
 using System.Text;
 using Windose.System.Kernel.Subsystem;

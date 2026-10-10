@@ -1,5 +1,5 @@
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
-using Cosmos.Kernel.System.Mouse;
 using Windose;
 
 public class Tooltip : Component

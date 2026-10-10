@@ -1,6 +1,6 @@
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Keyboard;
-using Windose.System.Kernel.Subsystem;
+using Cosmos.Kernel.System.Input;
+
 
 public sealed class CommandPrompt : Window
 {

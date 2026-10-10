@@ -1,7 +1,6 @@
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Keyboard;
-using Cosmos.Kernel.System.Mouse;
+using Cosmos.Kernel.System.Input;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Drawing;
 using System.Globalization;

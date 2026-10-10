@@ -168,7 +168,7 @@ public static class ProcessManger
         if (gcFrameCounter >= gcMaxFramesBetweenCollections)
         {
             gcFrameCounter = 0;
-            MemoryInfo.Collect();
+            MemoryDiagnostics.Collect();
         }
     }
 

@@ -1,5 +1,5 @@
 using System.Drawing;
-using Cosmos.Kernel.System.Mouse;
+using Cosmos.Kernel.System.Input;
 using Windose;
 using Windose.System.Drivers;
 using Windose.System.System_Calls;

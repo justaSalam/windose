@@ -175,7 +175,7 @@ public class PerformanceMonitor : Window
         frameGraph.AddSample((float)Kernel.DeltaTimeMs, 16.7f);
 
 
-        memoryGraph.AddSample(MemoryInfo.TotalPages * MemoryInfo.PageSizeBytes);
+        memoryGraph.AddSample(MemoryDiagnostics.TotalPages * MemoryDiagnostics.PageSizeBytes);
     }
 
     public override string GetComponentName() => "PerformanceMonitor";

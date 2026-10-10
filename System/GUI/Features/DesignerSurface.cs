@@ -1,5 +1,5 @@
-﻿using System.Drawing;
-using Cosmos.Kernel.System.Mouse;
+﻿using Cosmos.Kernel.System.Input;
+using System.Drawing;
 
 public class DesignerSurface : Component
 {

@@ -1,7 +1,7 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Keyboard;
+using Cosmos.Kernel.System.Input;
 using Windose.System.System_Calls;
 
 public class Window : Component

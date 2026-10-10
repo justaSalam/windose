@@ -1,6 +1,5 @@
 using System.Drawing;
-using Cosmos.Kernel.System.Keyboard;
-
+using Cosmos.Kernel.System.Input;
 public class CodeEditor : Component
 {
     public readonly struct Diagnostic
@@ -367,12 +366,12 @@ public class CodeEditor : Component
         char printable = GetPrintableCharacter(keyEvent);
         if (isControlPressed)
         {
-            if (keyEvent.Key == ConsoleKeyEx.Z) { Undo(); return; }
-            if (keyEvent.Key == ConsoleKeyEx.Y) { Redo(); return; }
-            if (keyEvent.Key == ConsoleKeyEx.C) { CopySelection(); return; }
-            if (keyEvent.Key == ConsoleKeyEx.X) { CutSelection(); return; }
-            if (keyEvent.Key == ConsoleKeyEx.V) { PasteClipboard(); return; }
-            if (keyEvent.Key == ConsoleKeyEx.A)
+            if (keyEvent.Key == Key.Z) { Undo(); return; }
+            if (keyEvent.Key == Key.Y) { Redo(); return; }
+            if (keyEvent.Key == Key.C) { CopySelection(); return; }
+            if (keyEvent.Key == Key.X) { CutSelection(); return; }
+            if (keyEvent.Key == Key.V) { PasteClipboard(); return; }
+            if (keyEvent.Key == Key.A)
             {
                 HideCompletions();
                 selectionAnchorLine = 0;
@@ -392,24 +391,24 @@ public class CodeEditor : Component
 
         if (completionVisible)
         {
-            if (keyEvent.Key == ConsoleKeyEx.UpArrow)
+            if (keyEvent.Key == Key.UpArrow)
             {
                 completionSelection = completionSelection <= 0 ? completionMatches.Count - 1 : completionSelection - 1;
                 RedrawCompletionArea(completionBounds);
                 return;
             }
-            if (keyEvent.Key == ConsoleKeyEx.DownArrow)
+            if (keyEvent.Key == Key.DownArrow)
             {
                 completionSelection = (completionSelection + 1) % completionMatches.Count;
                 RedrawCompletionArea(completionBounds);
                 return;
             }
-            if (keyEvent.Key == ConsoleKeyEx.Tab || keyEvent.Key == ConsoleKeyEx.Enter)
+            if (keyEvent.Key == Key.Tab || keyEvent.Key == Key.Enter)
             {
                 AcceptCompletion();
                 return;
             }
-            if (keyEvent.Key == ConsoleKeyEx.Escape)
+            if (keyEvent.Key == Key.Escape)
             {
                 HideCompletions();
                 return;
@@ -425,12 +424,12 @@ public class CodeEditor : Component
         int oldFirstVisibleLine = firstVisibleLine;
         int oldFirstVisibleColumn = firstVisibleColumn;
 
-        bool navigationKey = IsNavigationKey(keyEvent.Key);
-        bool editingKey = keyEvent.Key == ConsoleKeyEx.Backspace || keyEvent.Key == ConsoleKeyEx.Delete
-            || keyEvent.Key == ConsoleKeyEx.Enter || keyEvent.Key == ConsoleKeyEx.Tab || printable != '\0';
+        bool navigationKey = false;
+        bool editingKey = keyEvent.Key == Key.Backspace || keyEvent.Key == Key.Delete
+            || keyEvent.Key == Key.Enter || keyEvent.Key == Key.Tab || printable != '\0';
         if (editingKey)
         {
-            string editKind = keyEvent.Key == ConsoleKeyEx.Backspace || keyEvent.Key == ConsoleKeyEx.Delete
+            string editKind = keyEvent.Key == Key.Backspace || keyEvent.Key == Key.Delete
                 ? "delete"
                 : printable != '\0' ? "typing" : "structure";
             RecordUndo(editKind, editKind == "typing" || editKind == "delete");
@@ -443,35 +442,35 @@ public class CodeEditor : Component
 
         switch (keyEvent.Key)
         {
-            case ConsoleKeyEx.LeftArrow:
+            case Key.LeftArrow:
                 MoveLeft();
                 break;
-            case ConsoleKeyEx.RightArrow:
+            case Key.RightArrow:
                 MoveRight();
                 break;
-            case ConsoleKeyEx.UpArrow:
+            case Key.UpArrow:
                 if (cursorLine > 0) cursorLine--;
                 cursorColumn = Math.Min(cursorColumn, lines[cursorLine].Length);
                 break;
-            case ConsoleKeyEx.DownArrow:
+            case Key.DownArrow:
                 if (cursorLine < lines.Count - 1) cursorLine++;
                 cursorColumn = Math.Min(cursorColumn, lines[cursorLine].Length);
                 break;
-            case ConsoleKeyEx.Home:
+            case Key.Home:
                 cursorColumn = 0;
                 break;
-            case ConsoleKeyEx.End:
+            case Key.End:
                 cursorColumn = lines[cursorLine].Length;
                 break;
-            case ConsoleKeyEx.PageUp:
+            case Key.PageUp:
                 cursorLine = Math.Max(0, cursorLine - VisibleLineCount());
                 cursorColumn = Math.Min(cursorColumn, lines[cursorLine].Length);
                 break;
-            case ConsoleKeyEx.PageDown:
+            case Key.PageDown:
                 cursorLine = Math.Min(lines.Count - 1, cursorLine + VisibleLineCount());
                 cursorColumn = Math.Min(cursorColumn, lines[cursorLine].Length);
                 break;
-            case ConsoleKeyEx.Backspace:
+            case Key.Backspace:
                 if (hasSelection)
                 {
                     lineStructureChanged = SelectionSpansLines();
@@ -483,7 +482,7 @@ public class CodeEditor : Component
                     modified = Backspace();
                 }
                 break;
-            case ConsoleKeyEx.Delete:
+            case Key.Delete:
                 if (hasSelection)
                 {
                     lineStructureChanged = SelectionSpansLines();
@@ -495,13 +494,13 @@ public class CodeEditor : Component
                     modified = Delete();
                 }
                 break;
-            case ConsoleKeyEx.Enter:
+            case Key.Enter:
                 if (hasSelection) DeleteSelection();
                 InsertNewLine();
                 modified = true;
                 lineStructureChanged = true;
                 break;
-            case ConsoleKeyEx.Tab:
+            case Key.Tab:
                 lineStructureChanged = SelectionSpansLines();
                 if (hasSelection) DeleteSelection();
                 InsertText("    ");
@@ -674,12 +673,6 @@ public class CodeEditor : Component
         endLine = anchorFirst ? cursorLine : selectionAnchorLine;
         endColumn = anchorFirst ? cursorColumn : selectionAnchorColumn;
     }
-
-    private static bool IsNavigationKey(ConsoleKeyEx key)
-        => key == ConsoleKeyEx.LeftArrow || key == ConsoleKeyEx.RightArrow
-        || key == ConsoleKeyEx.UpArrow || key == ConsoleKeyEx.DownArrow
-        || key == ConsoleKeyEx.Home || key == ConsoleKeyEx.End
-        || key == ConsoleKeyEx.PageUp || key == ConsoleKeyEx.PageDown;
 
     private void RefreshCompletions()
     {

@@ -1,7 +1,5 @@
 using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Keyboard;
-using Cosmos.Kernel.System.Mouse;
 using Windose.Drivers;
 using Windose.Programs.Breeze;
 using Windose.System.ABI.WIN;
@@ -14,6 +12,7 @@ using Cosmos.Executable.Lua;
 using Windose.System.Kernel.FileSystem;
 using Cosmos.Kernel.Core.Scheduler;
 using Windose.System.Scheduling;
+using Cosmos.Kernel.System.Input;
 namespace Windose;
 
 /// <summary>
@@ -43,6 +42,7 @@ public class Kernel : Sys.Kernel
         {
             SystemLogger.WriteLine("BOOT", "Error occurred while initializing kernel, " + exception.Message, ConsoleMessageType.Error);
             Log.WriteString("KERNEL FAILED TO INIT\n");
+            
         }
     }
     private void InitializeKernel()
@@ -102,9 +102,9 @@ public class Kernel : Sys.Kernel
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze", "service.control");
 
 
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Tab, Modifiers = ConsoleModifiers.Alt }, WindowManager.SwapFocusedWindow);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.E & ConsoleKeyEx.LWin }, () => WindowManager.PostRegister(new FileExplorer(100, 100, 800, 500, "File Explorer")));
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = ConsoleKeyEx.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.Tab, Modifiers = ConsoleModifiers.Alt }, WindowManager.SwapFocusedWindow);
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.E & Key.LWin }, () => WindowManager.PostRegister(new FileExplorer(100, 100, 800, 500, "File Explorer")));
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
         FileAssociations.DiscoverPrograms(typeof(Kernel).Assembly);
@@ -131,7 +131,7 @@ public class Kernel : Sys.Kernel
         try
         {
             startWall = Clock.Nanoseconds;
-            startBusy = SchedulerInfo.BusyCpuTimeNs;
+            startBusy = SchedulerDiagnostics.BusyCpuTimeNs;
 
             Mouse.Update();
             System.Drivers.Keyboard.BeginFrame();
@@ -149,12 +149,12 @@ public class Kernel : Sys.Kernel
 
 
             endWall = Clock.Nanoseconds;
-            endBusy = SchedulerInfo.BusyCpuTimeNs;
+            endBusy = SchedulerDiagnostics.BusyCpuTimeNs;
 
             wallDelta = endWall - startWall;
             busyDelta = endBusy - startBusy;
 
-            utilization = (double)busyDelta / (wallDelta * SchedulerInfo.CpuCount) * 100;
+            utilization = (double)busyDelta / (wallDelta * SchedulerDiagnostics.CpuCount) * 100;
 
         }
         catch (Exception ex)

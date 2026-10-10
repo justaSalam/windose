@@ -1,5 +1,5 @@
 ﻿using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Keyboard;
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 
 namespace Windose.System.Shell
@@ -178,7 +178,7 @@ namespace Windose.System.Shell
 
         public override void HandleKeyboard(KeyEvent keyEvent)
         {
-            if(keyEvent.Key == ConsoleKeyEx.F2)
+            if(keyEvent.Key == Key.F2)
             {
                 if (renaming)
                     CommitRename();
@@ -191,7 +191,7 @@ namespace Windose.System.Shell
             {
                 switch (keyEvent.Key)
                 {
-                    case ConsoleKeyEx.Backspace:
+                    case Key.Backspace:
                         if (renameAllSelected)
                         {
                             renameText = "";
@@ -205,11 +205,11 @@ namespace Windose.System.Shell
                         }
                         break;
 
-                    case ConsoleKeyEx.Enter:
+                    case Key.Enter:
                         CommitRename();
                         break;
 
-                    case ConsoleKeyEx.Escape:
+                    case Key.Escape:
                         CancelRename();
                         break;
 

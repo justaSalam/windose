@@ -1,4 +1,5 @@
-using Cosmos.Kernel.System.Mouse;
+
+using Cosmos.Kernel.System.Input;
 
 public static class Mouse
 {
