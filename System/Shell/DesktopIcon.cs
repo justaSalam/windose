@@ -1,4 +1,5 @@
 ﻿using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Input;
 using System.Drawing;
 
@@ -129,34 +130,43 @@ namespace Windose.System.Shell
             if (!renaming) return;
 
             string newName = (renameText ?? "").Trim();
-            if (newName != "")
+            if (string.IsNullOrWhiteSpace(newName) || newName == "." || newName == ".." ||
+                newName.IndexOfAny(new[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|' }) >= 0)
             {
-                string oldPath = fileEntry.AbsoluteLocation;
-                string newPath = ReplacePathName(oldPath, newName);
-
-                if (newName == renameOriginalText)
-                {
-                    CancelRename();
-                    return;
-                }
-
-                if (PathExists(newPath))
-                {
-                    MarkDirty();
-                    return;
-                }
-
-                if (PathExists(oldPath))
-                {
-                    if (fileEntry.FileType == FileType.Directory)
-                        Directory.Move(oldPath, newPath);
-                    else
-                        File.Move(oldPath, newPath);
-                }
-
-                fileEntry.FileName = newName;
-                fileEntry.AbsoluteLocation = newPath;
+                MarkDirty();
+                return;
             }
+
+            if (newName == renameOriginalText)
+            {
+                CancelRename();
+                return;
+            }
+
+            string oldPath = fileEntry.AbsoluteLocation;
+            string newPath = ReplacePathName(oldPath, newName);
+            if (!PathExists(oldPath) || PathExists(newPath))
+            {
+                MarkDirty();
+                return;
+            }
+
+            try
+            {
+                if (fileEntry.FileType == FileType.Directory)
+                    Directory.Move(oldPath, newPath);
+                else
+                    File.Move(oldPath, newPath);
+            }
+            catch
+            {
+                MarkDirty();
+                return;
+            }
+
+            fileEntry.FileName = newName;
+            fileEntry.AbsoluteLocation = newPath;
+            Desktop.SaveLayout();
 
             renameText = "";
             renameOriginalText = "";
@@ -249,7 +259,7 @@ namespace Windose.System.Shell
             WindowManager.Invalidate(AbsoluteRectangle);
             MarkDirty(false);
         }
-
+        private TrueTypeFont font = SystemFonts.msSansSerif;
         private void DrawLabel()
         {
             string name = renaming ? renameText : fileEntry.FileName;
@@ -272,7 +282,7 @@ namespace Windose.System.Shell
 
             for (int i = 0; i < lines.Length; i++)
             {
-                int lineWidth = MeasureStringWidth(lines[i], 6);
+                int lineWidth = font.MeasureString(lines[i]);
                 int x = Math.Max(0, (Width - lineWidth) / 2);
                 DrawString(lines[i], renaming ? Color.Black : Color.White, x, LabelTop + i * LabelLineHeight);
             }
@@ -365,9 +375,11 @@ namespace Windose.System.Shell
             if (lines.Length == 0) return;
 
             string lastLine = lines[lines.Length - 1];
-            int lineWidth = MeasureStringWidth(lastLine, 6);
+            int lineWidth = font.MeasureString(lastLine);
+
             int x = Math.Min(Width - 1, Math.Max(0, (Width - lineWidth) / 2 + lineWidth + 1));
             int y = LabelTop + (lines.Length - 1) * LabelLineHeight;
+
             DrawLine(Color.Black, x, y + 1, x, y + LabelLineHeight - 2);
         }
 

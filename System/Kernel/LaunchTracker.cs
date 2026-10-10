@@ -16,7 +16,7 @@ namespace Windose.System.Kernel
             {
                 try
                 {
-                    WindowManager.PostRegister(create());
+                    WindowManager.Register(create());
                 }
                 catch (Exception ex)
                 {

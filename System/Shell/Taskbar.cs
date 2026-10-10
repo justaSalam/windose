@@ -69,9 +69,10 @@ public class Taskbar : Component
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Left,
-            textColor = Color.White,
+            textColor = Color.Black,
             useBorders = true,
-            Margin = new Thickness(0),
+            Margin = new Thickness(1),
+            Padding = new Thickness(2),
             leftClickAction = () =>
             {
                 Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
@@ -84,7 +85,8 @@ public class Taskbar : Component
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
             text = DateTime.Now.ToString("HH:mm:ss"),
-            Margin = new Thickness(0),
+            Margin = new Thickness(2),
+            Padding = new Thickness(2),
             useBackground = false,
             useForeground = true
         };

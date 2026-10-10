@@ -282,7 +282,7 @@ public class FileExplorer : Window
         PopulateFilesystemLocation(path);
 
         TreeViewItem treeRoot = tree.AddRoot(path, path);
-        TreeViewItem bootTree = tree.AddRoot("/boot", "/boot");
+        //TreeViewItem bootTree = tree.AddRoot("/boot", "/boot");
 
 
         IO.TryGetDirectoriesAsync(path, (directories, success) =>
@@ -298,7 +298,7 @@ public class FileExplorer : Window
             }
         });
 
-        IO.TryGetDirectoriesAsync("/boot", (directories, success) =>
+        /*IO.TryGetDirectoriesAsync("/boot", (directories, success) =>
         {
             if (!success)
             {
@@ -309,7 +309,7 @@ public class FileExplorer : Window
                 TreeViewItem treeItem = treeRoot.AddChild(Path.GetFileName(dir), dir);
                 PopulateTreeItem(treeItem);
             }
-        });
+        });*/
     }
 
     private void PopulateTreeItem(TreeViewItem item)
@@ -357,46 +357,26 @@ public class FileExplorer : Window
 
 
 
-    //TODO: Registry file associations
     private void OpenFileItem(FileListViewItem item)
     {
         string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : (string)item.tag;
-        if (string.IsNullOrEmpty(path)) return;
+        OpenFilePath(path);
+    }
+
+    public static void OpenFilePath(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
 
         string ext = Path.GetExtension(path).ToLowerInvariant();
+        if (!FileAssociations.TryGetApplication(ext, out Type program)) return;
 
-
-        if(!FileAssociations.TryGetApplication(ext, out Type program))
+        if (program == typeof(BreezeEditor))
         {
+            LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, path));
             return;
         }
-        Window wnd = (Window)Activator.CreateInstance(program)!;
-        LaunchTracker.Start(() => wnd);
 
-        /*
-        switch (ext)
-        {
-            case ".txt":
-                LaunchTracker.Start(() => new BreezeEditor(X + 40, Y + 40, 900, 620, path));
-                break;
-
-            case ".log":
-                LaunchTracker.Start(() => new BreezeEditor(X + 40, Y + 40, 900, 620, path));
-                break;
-
-            case ".breeze":
-                BreezeHost.RunFile(path);
-                break;
-
-            case ".png":
-                LaunchTracker.Start(() => new ImageViewer(path, X + 40, Y + 40, 900, 620));
-                break;
-
-            default:
-                BreezeHost.RunFile(path);
-                break;
-        }*/
-
+        LaunchTracker.Start(() => (Window)Activator.CreateInstance(program)!);
     }
 
     private void ShowFileContextMenu(FileListViewItem item, int mouseX, int mouseY)
