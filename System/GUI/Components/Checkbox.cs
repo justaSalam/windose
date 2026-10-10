@@ -59,9 +59,10 @@ public class Checkbox : Component
         if (string.IsNullOrEmpty(text)) return;
 
         int effectiveFontSize = GetEffectiveFontSize();
-        int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
-
-        DrawString(text, textColor, BoxSize + TextGap, textY, effectiveFontSize);
+        Rectangle content = GetContentBounds();
+        Rectangle textBounds = new Rectangle(content.X + BoxSize + TextGap, content.Y,
+            Math.Max(0, content.Width - BoxSize - TextGap), content.Height);
+        DrawAlignedText(text, textColor, effectiveFontSize, textBounds);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
@@ -81,7 +82,7 @@ public class Checkbox : Component
     {
         if (string.IsNullOrEmpty(text)) return;
 
-        int desiredWidth = BoxSize + TextGap + MeasureStringWidth(text, GetEffectiveFontSize()) + 2;
+        int desiredWidth = Padding.left + Padding.right + BoxSize + TextGap + MeasureStringWidth(text, GetEffectiveFontSize());
         if (Width < desiredWidth)
             Resize(desiredWidth, Height);
     }

@@ -74,9 +74,11 @@ public class RadioButton : Component
 
         if (text != "")
         {
-            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
-            int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
-            DrawString(text, textColor, Width + 2, textY, effectiveFontSize);
+            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - Padding.top - Padding.bottom);
+            Rectangle content = GetContentBounds();
+            Rectangle textBounds = new Rectangle(Math.Max(content.X, Width + 2), content.Y,
+                Math.Max(0, content.Right - Math.Max(content.X, Width + 2)), content.Height);
+            DrawAlignedText(text, textColor, effectiveFontSize, textBounds);
         }
     }
 

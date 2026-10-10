@@ -21,7 +21,7 @@ public class TabPage : Panel
 
     public List<Component> Controls => children;
 
-    public void AddControl(Component control) => AddChild(control);
+    public T AddControl<T>(T control) where T : Component => AddChild(control);
 
     public void RemoveControl(Component control)
     {

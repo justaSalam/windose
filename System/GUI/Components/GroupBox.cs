@@ -29,11 +29,12 @@ public class GroupBox : Component
         AddChild(contentPanel);
     }
 
-    public void AddGroupChild(Component child)
+    public T AddGroupChild<T>(T child) where T : Component
     {
         contentPanel.orientation = stackOrientation;
         contentPanel.AddStackChild(child);
         MarkDirty();
+        return child;
     }
 
     public void RemoveGroupChild(Component child)
@@ -93,7 +94,8 @@ public class GroupBox : Component
         DrawEtchedLine(Width - 1, borderY, Width - 1, Height - 1);
 
         if (text != "")
-            DrawString(text, textColor, labelX, 0, fontSize);
+            DrawAlignedText(text, textColor, fontSize, new Rectangle(labelX, 0, Math.Max(0, Width - labelX - 4), fontSize),
+                HorizontalAlignment.Left, VerticalAlignment.Center);
     }
 
     private void DrawEtchedLine(int x1, int y1, int x2, int y2)

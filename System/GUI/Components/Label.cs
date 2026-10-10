@@ -41,9 +41,8 @@ public class Label : Component
         if (string.IsNullOrEmpty(text))
             return;
 
-        int effectiveFontSize = font.SizePx > 0
-            ? font.SizePx
-            : Math.Max(1, Height - 4);
+        int effectiveFontSize = fontSize > 0 ? fontSize : (font.SizePx > 0 ? font.SizePx : Math.Max(1, Height - Padding.top - Padding.bottom));
+        Rectangle content = GetContentBounds();
 
         string[] lines = text.Split("\n");
 
@@ -52,11 +51,11 @@ public class Label : Component
 
         int startY = verticalTextAlignment switch
         {
-            VerticalAlignment.Top => 0,
+            VerticalAlignment.Top => content.Y,
 
-            VerticalAlignment.Center => (Height - totalTextHeight) / 2,
+            VerticalAlignment.Center => content.Y + (content.Height - totalTextHeight) / 2,
 
-            VerticalAlignment.Bottom => Height - totalTextHeight,
+            VerticalAlignment.Bottom => content.Bottom - totalTextHeight,
 
             _ => 0
         };
@@ -65,30 +64,31 @@ public class Label : Component
         {
             string line = lines[i];
 
-            int textWidth = font.MeasureString(line, effectiveFontSize);
+            string displayLine = FitTextToWidth(line, content.Width, effectiveFontSize, font);
+            int textWidth = MeasureTextWidth(displayLine, effectiveFontSize, font);
 
             int x = horizontalTextAlignment switch
             {
                 HorizontalAlignment.Left =>
-                    2,
+                    content.X,
 
                 HorizontalAlignment.Center =>
-                    (Width - textWidth) / 2,
+                    content.X + (content.Width - textWidth) / 2,
 
                 HorizontalAlignment.Right =>
-                    Width - textWidth - 2,
+                    content.Right - textWidth,
 
                 _ => 2
             };
 
             int y = startY + (i * lineHeight);
 
-            x = Math.Max(0, x);
-            y = Math.Max(0, y);
+            x = Math.Max(content.X, x);
+            y = Math.Max(content.Y, y);
 
             if (font != null)
             {
-                DrawString(line, font, fontSize, textColor, x, y);
+                DrawString(displayLine, font, effectiveFontSize, textColor, x, y);
             }
         }
     }

@@ -69,8 +69,11 @@ public class StatusBar : Component
         for (int i = 0; i < panels.children.Count; i++)
         {
             Component child = panels.children[i];
+            if (!child.Visible) continue;
             DrawSunkenRectangle(child.X + panels.X, child.Y + panels.Y, child.Width, child.Height);
-            DrawString(child.text, Color.White, child.X + 3, child.Y + 1);
+            DrawAlignedText(child.text, Palette.ControlBlack, 14,
+                new Rectangle(child.X + panels.X + 3, child.Y + panels.Y,
+                    Math.Max(0, child.Width - 6), child.Height));
         }
     }
 

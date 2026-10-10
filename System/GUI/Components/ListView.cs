@@ -84,7 +84,9 @@ public class ListView : Component
             DrawSunkenRectangle(x, 0, c.Width, headerHeight);
             int iconOffset = columnIndex == 0 ? IconSlot : 0;
             int textX = x + 4 + iconOffset;
-            DrawString(Clip(c.Header, c.Width - iconOffset - 8), Palette.ControlBlack, textX, 2, fontSize);
+            DrawAlignedText(c.Header, Palette.ControlBlack, fontSize,
+                new Rectangle(textX, 0, Math.Max(0, c.Width - iconOffset - 8), headerHeight),
+                HorizontalAlignment.Left, VerticalAlignment.Center);
             x += c.Width;
             columnIndex++;
         }
@@ -111,7 +113,9 @@ public class ListView : Component
             int textX = x + 4 + (c == 0 ? IconSlot : 0);
             int avail = columns[c].Width - (textX - x) - 4;
 
-            DrawString(Clip(s, avail), color, textX, y + 2, fontSize);
+            DrawAlignedText(s, color, fontSize,
+                new Rectangle(textX, y, Math.Max(0, avail), detailsRowHeight),
+                HorizontalAlignment.Left, VerticalAlignment.Center);
             x += columns[c].Width;
         }
     }

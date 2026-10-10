@@ -59,6 +59,7 @@ public class StartMenu : Window
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/msie.png"), "Internet Explorer", () => LaunchTracker.Start(() => new InternetExplorer(200, 200)));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/document.png"), "Designer", () => LaunchTracker.Start(() => new DesignerWindow(200, 200, 800, 600)));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/computer_taskmgr.png"), "Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/appwizard.png"), "Control Test", () => LaunchTracker.Start(() => new ControlTestWindow()));
 
 
 

@@ -97,7 +97,9 @@ public class TreeView : Component
             textX += IconOffset + IconSize + 4 - 18;
         }
 
-        DrawString(item.text, selected ? Palette.HighlightText : textColor, textX, y + 1, fontSize);
+        DrawAlignedText(item.text, selected ? Palette.HighlightText : textColor, fontSize,
+            new Rectangle(textX, y, Math.Max(0, Width - textX - Padding.right), rowHeight),
+            HorizontalAlignment.Left, VerticalAlignment.Center);
 
         row++;
 

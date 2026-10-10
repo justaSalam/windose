@@ -144,9 +144,9 @@ public class ComboBox : Component
             : text;
         if (displayText != "")
         {
-            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, boxHeight - 8);
-            int textY = Math.Max(0, (boxHeight - MeasureStringHeight(effectiveFontSize)) / 2);
-            DrawString(displayText, textColor, 4, textY, effectiveFontSize);
+            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, boxHeight - Padding.top - Padding.bottom - 4);
+            Rectangle content = GetContentBounds(new Thickness(Padding.left + 4, Padding.top, Padding.right + arrowWidth + 2, Padding.bottom));
+            DrawAlignedText(displayText, textColor, effectiveFontSize, content, HorizontalAlignment.Left, VerticalAlignment.Center);
         }
     }
 

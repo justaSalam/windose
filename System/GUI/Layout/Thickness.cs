@@ -1,6 +1,6 @@
 public struct Thickness
 {
-    public int top, bottom, right, left = 5;
+    public int top, bottom, right, left;
 
     public Thickness(int value)
     {
@@ -14,4 +14,9 @@ public struct Thickness
         this.right = right;
         this.left = left;
     }
+
+    public static Thickness All(int value) => new Thickness(value);
+
+    public static Thickness FromLTRB(int left, int top, int right, int bottom)
+        => new Thickness(top, bottom, right, left);
 }

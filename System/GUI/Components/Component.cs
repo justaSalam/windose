@@ -460,7 +460,7 @@ public class Component : IDisposable
 
             case HorizontalAlignment.Stretch:
                 X = Margin.left;
-                Resize(parent.Width - Margin.left - Margin.right, Height);
+                Resize(Math.Max(1, parent.Width - Margin.left - Margin.right), Height);
                 break;
         }
 
@@ -483,7 +483,7 @@ public class Component : IDisposable
                 break;
 
             case VerticalAlignment.Center:
-                Y = ((parent.Height - Height) / 2) + Margin.top;
+                Y = (parent.Height - Height) / 2 + Margin.top;
 
                 break;
 
@@ -494,7 +494,7 @@ public class Component : IDisposable
 
             case VerticalAlignment.Stretch:
                 Y = Margin.top;
-                Resize(Width, parent.Height - Margin.top - Margin.bottom);
+                Resize(Width, Math.Max(1, parent.Height - Margin.top - Margin.bottom));
                 break;
         }
 
@@ -696,6 +696,12 @@ public class Component : IDisposable
         return child;
     }
 
+    public T AddChild<T>(T child) where T : Component
+    {
+        AddChild((Component)child);
+        return child;
+    }
+
     public virtual void RemoveChild(Component child)
     {
         bool removed;
@@ -735,15 +741,78 @@ public class Component : IDisposable
 
     }
 
+    protected Rectangle GetContentBounds(Thickness? padding = null)
+    {
+        Thickness inset = padding ?? Padding;
+        int x = Math.Clamp(inset.left, 0, Width);
+        int y = Math.Clamp(inset.top, 0, Height);
+        int right = Math.Clamp(Width - inset.right, x, Width);
+        int bottom = Math.Clamp(Height - inset.bottom, y, Height);
+        return new Rectangle(x, y, right - x, bottom - y);
+    }
+
+    protected int MeasureTextWidth(string value, int fontSize, TrueTypeFont? font = null)
+    {
+        if (string.IsNullOrEmpty(value)) return 0;
+        return (font ?? SystemFonts.msSansSerif).MeasureString(value, Math.Max(1, fontSize));
+    }
+
+    protected string FitTextToWidth(string value, int maxWidth, int fontSize, TrueTypeFont? font = null)
+    {
+        if (string.IsNullOrEmpty(value) || maxWidth <= 0) return string.Empty;
+
+        TrueTypeFont activeFont = font ?? SystemFonts.msSansSerif;
+        if (MeasureTextWidth(value, fontSize, activeFont) <= maxWidth) return value;
+
+        const string ellipsis = "...";
+        int ellipsisWidth = MeasureTextWidth(ellipsis, fontSize, activeFont);
+        if (ellipsisWidth > maxWidth) return string.Empty;
+
+        int length = value.Length;
+        while (length > 0 && MeasureTextWidth(value.Substring(0, length) + ellipsis, fontSize, activeFont) > maxWidth)
+            length--;
+
+        return value.Substring(0, length) + ellipsis;
+    }
+
+    protected void DrawAlignedText(string value, Color color, int fontSize, Rectangle bounds,
+        HorizontalAlignment horizontal = HorizontalAlignment.Left,
+        VerticalAlignment vertical = VerticalAlignment.Center, TrueTypeFont? font = null)
+    {
+        if (string.IsNullOrEmpty(value) || bounds.Width <= 0 || bounds.Height <= 0) return;
+
+        TrueTypeFont activeFont = font ?? SystemFonts.msSansSerif;
+        int size = Math.Max(1, fontSize);
+        string displayText = FitTextToWidth(value, bounds.Width, size, activeFont);
+        if (displayText.Length == 0) return;
+
+        int textWidth = MeasureTextWidth(displayText, size, activeFont);
+        int textHeight = Math.Min(size, bounds.Height);
+        int x = horizontal switch
+        {
+            HorizontalAlignment.Center => bounds.X + (bounds.Width - textWidth) / 2,
+            HorizontalAlignment.Right => bounds.Right - textWidth,
+            _ => bounds.X,
+        };
+        int y = vertical switch
+        {
+            VerticalAlignment.Center => bounds.Y + (bounds.Height - textHeight) / 2,
+            VerticalAlignment.Bottom => bounds.Bottom - textHeight,
+            _ => bounds.Y,
+        };
+
+        DrawString(displayText, activeFont, size, color, x, y);
+    }
+
     //TODO Replace with proper font measurement using TrueTypeFont
     public int MeasureStringWidth(string str, int fontSize)
     {
-        return str.Length * Math.Max(1, PCScreenFont.DefaultFont.Width * fontSize / PCScreenFont.DefaultFont.Height);
+        return MeasureTextWidth(str, fontSize);
     }
 
-    public int MeasureStringHeight(int fontSize)//TODO co presne????
+    public int MeasureStringHeight(int fontSize)
     {
-        return fontSize;
+        return Math.Max(1, fontSize);
     }
 
     public void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height)

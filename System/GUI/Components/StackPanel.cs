@@ -13,17 +13,31 @@ public class StackPanel : Panel
     {
     }
 
-    public void AddStackChild(Component child)
+    public T AddStackChild<T>(T child) where T : Component
     {
-        AddChild(child);
-        ResolveStackLayout();
+        AddChild((Component)child);
+        return child;
     }
 
     public void RemoveStackChild(Component child)
     {
         RemoveChild(child);
+    }
+
+    public override Component AddChild(Component child)
+    {
+        Component added = base.AddChild(child);
+        ResolveStackLayout();
+        return added;
+    }
+
+    public override void RemoveChild(Component child)
+    {
+        base.RemoveChild(child);
         ResolveStackLayout();
     }
+
+    protected override void OnChildVisibilityChanged(Component child) => ResolveStackLayout();
 
     public override void Resize(int width, int height)
     {
@@ -35,8 +49,8 @@ public class StackPanel : Panel
     {
         int cursorX = Padding.left;
         int cursorY = Padding.top;
-        int availableWidth = Width - Padding.left - Padding.right;
-        int availableHeight = Height - Padding.top - Padding.bottom;
+        int availableWidth = Math.Max(0, Width - Padding.left - Padding.right);
+        int availableHeight = Math.Max(0, Height - Padding.top - Padding.bottom);
 
         if (orientation == StackOrientation.Vertical)
         {
@@ -46,16 +60,19 @@ public class StackPanel : Panel
                 if (!child.Visible) continue;
                 child.PrepareLayout();
 
-                child.X = child.horizontalAlignment switch
+                int childWidth = child.horizontalAlignment == HorizontalAlignment.Stretch
+                    ? Math.Max(1, availableWidth - child.Margin.left - child.Margin.right)
+                    : child.Width;
+                int childX = child.horizontalAlignment switch
                 {
-                    HorizontalAlignment.Center => Padding.left + (availableWidth - child.Width) / 2,
-                    HorizontalAlignment.Right => Width - Padding.right - child.Margin.right - child.Width,
+                    HorizontalAlignment.Center => Padding.left + child.Margin.left + (availableWidth - child.Margin.left - child.Margin.right - childWidth) / 2,
+                    HorizontalAlignment.Right => Width - Padding.right - child.Margin.right - childWidth,
                     _ => cursorX + child.Margin.left,
                 };
-                if (child.horizontalAlignment == HorizontalAlignment.Stretch)
-                    child.Resize(availableWidth - child.Margin.left - child.Margin.right, child.Height);
+                childWidth = Math.Min(childWidth, Math.Max(1, Width - Padding.right - child.Margin.right - childX));
 
-                child.Y = cursorY + child.Margin.top;
+                int childY = cursorY + child.Margin.top;
+                child.SetBounds(childX, childY, childWidth, child.Height);
                 cursorY = child.Y + child.Height + child.Margin.bottom + spacing;
 
                 child.MarkDirty();
@@ -72,27 +89,31 @@ public class StackPanel : Panel
                 if (!child.Visible) continue;
                 child.PrepareLayout();
 
-                child.Y = child.verticalAlignment switch
+                int childHeight = child.verticalAlignment == VerticalAlignment.Stretch
+                    ? Math.Max(1, availableHeight - child.Margin.top - child.Margin.bottom)
+                    : child.Height;
+                int childY = child.verticalAlignment switch
                 {
-                    VerticalAlignment.Center => Padding.top + (availableHeight - child.Height) / 2,
-                    VerticalAlignment.Bottom => Height - Padding.bottom - child.Margin.bottom - child.Height,
+                    VerticalAlignment.Center => Padding.top + child.Margin.top + (availableHeight - child.Margin.top - child.Margin.bottom - childHeight) / 2,
+                    VerticalAlignment.Bottom => Height - Padding.bottom - child.Margin.bottom - childHeight,
                     _ => cursorY + child.Margin.top,
                 };
-                if (child.verticalAlignment == VerticalAlignment.Stretch)
-                    child.Resize(child.Width, availableHeight - child.Margin.top - child.Margin.bottom);
 
+                int childX;
                 if (child.horizontalAlignment == HorizontalAlignment.Right)
                 {
                     rightCursor -= child.Margin.right + child.Width;
-                    child.X = rightCursor;
+                    childX = rightCursor;
                     rightCursor -= child.Margin.left + spacing;
                 }
                 else
                 {
-                    child.X = leftCursor + child.Margin.left;
-                    leftCursor = child.X + child.Width + child.Margin.right + spacing;
+                    childX = leftCursor + child.Margin.left;
+                    leftCursor = childX + child.Width + child.Margin.right + spacing;
                 }
+                childX = Math.Max(Padding.left + child.Margin.left, Math.Min(childX, Width - Padding.right - child.Margin.right - child.Width));
 
+                child.SetBounds(childX, childY, child.Width, childHeight);
                 child.MarkDirty();
             }
         }

@@ -47,20 +47,23 @@ public class Panel : Component
 
         if (text != "")
         {
-            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
+            int effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - Padding.top - Padding.bottom);
             int lineHeight = MeasureStringHeight(effectiveFontSize);
-            int availableWidth = Math.Max(1, Width - 4 - textOffsetX);
+            Rectangle content = GetContentBounds();
+            int availableWidth = Math.Max(1, content.Width - textOffsetX);
 
             List<string> lines = wrapText
                 ? WrapText(text, effectiveFontSize, availableWidth)
                 : new List<string> { text };
 
             int totalTextHeight = lines.Count * lineHeight;
-            int startY = Math.Max(0, (Height - totalTextHeight) / 2);
+            int startY = content.Y + Math.Max(0, (content.Height - totalTextHeight) / 2);
 
             for (int i = 0; i < lines.Count; i++)
             {
-                DrawString(lines[i], textColor, 2 + textOffsetX, startY + i * lineHeight, effectiveFontSize);
+                DrawAlignedText(lines[i], textColor, effectiveFontSize,
+                    new Rectangle(content.X + textOffsetX, startY + i * lineHeight, availableWidth, lineHeight),
+                    HorizontalAlignment.Left, VerticalAlignment.Center);
             }
         }
 

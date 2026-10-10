@@ -38,26 +38,25 @@ public class TextField : Component
             DrawSunkenRectangle(0, 0, Width, Height);
         }
 
-        int effectiveFontSize = font.SizePx > 0 ? font.SizePx : Math.Max(1, Height - 4);
-        int textY = Math.Max(0, (Height - font.SizePx) / 2);
+        int effectiveFontSize = font.SizePx > 0 ? font.SizePx : Math.Max(1, Height - Padding.top - Padding.bottom);
+        Rectangle content = GetContentBounds();
+        int textY = content.Y + Math.Max(0, (content.Height - effectiveFontSize) / 2);
 
-        int stringWidth = font.MeasureString(text);
-
-
-        if (text != "")
+        string displayText = text;
+        if (displayText != "")
         {
-            if (stringWidth >= Width && truncate)
-            {
-                int maxCharacters = Math.Max(0, (Width - font.MeasureString("...", effectiveFontSize) - 4) / Math.Max(1, font.MeasureString("W", effectiveFontSize)));
+            if (truncate)
+                displayText = FitTextToWidth(displayText, content.Width, effectiveFontSize, font);
 
-                if (text.Length > maxCharacters)
-                    text = text.Substring(0, maxCharacters) + "...";
-            }
-            DrawString(text, textColor, 2, textY, effectiveFontSize);
+            DrawString(displayText, font, effectiveFontSize, textColor, content.X, textY);
         }
 
         if (!readOnly && cursorVisible && selected)
-            DrawString("_", Color.Black, font.MeasureString(text), textY);
+        {
+            int cursorX = content.X + Math.Min(content.Width, font.MeasureString(displayText, effectiveFontSize));
+            if (cursorX < content.Right)
+                DrawString("_", font, effectiveFontSize, Color.Black, cursorX, textY);
+        }
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)

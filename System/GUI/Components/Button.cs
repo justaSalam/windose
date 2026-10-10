@@ -7,6 +7,7 @@ public class Button : Component
     public ImageDisplayMode imageDisplayMode = ImageDisplayMode.None;
     public Label? label;
     public Image? image;
+    public string text = "";
 
     public bool useBackground = true;
     public bool useBorders = false;
@@ -15,15 +16,20 @@ public class Button : Component
 
     public Color borderColor = Palette.ControlHighlight;
     public Color textColor = Palette.ControlBlack;
+    public int iconSize = 16;
+    public int iconTextGap = 6;
+    public HorizontalAlignment contentAlignment = HorizontalAlignment.Center;
+    public bool imageOnRight;
 
     public Action leftMousePress;
     public Action leftMouseHold;
 
     public Button(string text, int x, int y, int width, int height) : base(x, y, width, height)
     {
+        this.text = text;
         label = new Label(0, 0, width, height)
         {
-            text = text,
+            text = this.text,
             useBackground = false,
             useForeground = false,
             textColor = textColor,
@@ -34,21 +40,40 @@ public class Button : Component
 
         AddChild(label);
 
-
     }
 
     public Button(Image image, int x, int y, int width, int height) : base(x, y, width, height)
     {
-        if (image == null)
-        {
-            return;
-        }
         this.image = image;
+        this.text = "";
+        label = new Label(0, 0, width, height)
+        {
+            text = this.text,
+            useBackground = false,
+            useForeground = false,
+            textColor = textColor,
+            horizontalTextAlignment = HorizontalAlignment.Center,
+            verticalTextAlignment = VerticalAlignment.Center,
+            Padding = new Thickness(0),
+        };
+        AddChild(label);
+    }
+
+    public Button(Image image, string text, int x, int y, int width, int height) : this(image, x, y, width, height)
+    {
+        this.text = text;
+        if (label != null) label.text = this.text;
     }
 
 
     public override void DrawLocal()
     {
+        if (label != null)
+        {
+            if (!string.IsNullOrEmpty(text))
+                label.text = text;
+            label.textColor = textColor;
+        }
 
         if (useBackground)
         {
@@ -58,50 +83,60 @@ public class Button : Component
         }
 
 
-        if (label == null && image != null)
+        Rectangle content = GetContentBounds();
+        if (image != null && label != null && !string.IsNullOrEmpty(label.text))
         {
-            int diff = Math.Min(Width, Height);
-            switch (imageDisplayMode)
-            {
-                case ImageDisplayMode.None:
-
-                    DrawImageStretch(image, new Rectangle((int)((Width / 2) - (image.Width / 2)) + 2, (int)((Height / 2) - (image.Height / 2)) + 2, diff - 4, diff - 4));
-                    break;
-
-                case ImageDisplayMode.Stretch:
-                    DrawImageStretch(image, new Rectangle(0, 0, Width, Height));
-                    break;
-
-                case ImageDisplayMode.Fill:
-                    DrawImageStretch(image, new Rectangle(0, 0, diff, diff));
-                    break;
-            }
-
-
+            DrawImageAndLabel(content);
         }
-        else
+        else if (image != null && (label == null || string.IsNullOrEmpty(label.text)))
         {
+            DrawButtonImage(content);
+        }
+        else if (label != null)
+        {
+            label.SetBounds(0, 0, Width, Height);
             DrawChild(label);
         }
+    }
 
+    private void DrawImageAndLabel(Rectangle content)
+    {
+        int size = Math.Max(1, Math.Min(iconSize, Math.Min(content.Height, content.Width)));
+        int gap = Math.Max(0, iconTextGap);
+        int textWidth = Math.Max(0, content.Width - size - gap);
+        int groupWidth = Math.Min(content.Width, size + gap + Math.Min(textWidth, MeasureStringWidth(label.text, label.fontSize)));
+        int groupX = contentAlignment switch
+        {
+            HorizontalAlignment.Left => content.X,
+            HorizontalAlignment.Right => content.Right - groupWidth,
+            _ => content.X + (content.Width - groupWidth) / 2,
+        };
+        int iconX = imageOnRight ? groupX + groupWidth - size : groupX;
+        int textX = imageOnRight ? groupX : groupX + size + gap;
+        int actualTextWidth = Math.Max(0, groupWidth - size - gap);
+        int iconY = content.Y + (content.Height - size) / 2;
 
-        /* effectiveFontSize = fontSize > 0 ? fontSize : Math.Max(1, Height - 4);
-        int textY = Math.Max(0, (Height - MeasureStringHeight(effectiveFontSize)) / 2);
-        if (MeasureStringWidth(label.text, font) > Width && ellipsize)
+        DrawImageStretch(image, new Rectangle(iconX, iconY, size, size));
+        label.SetBounds(textX, content.Y, actualTextWidth, content.Height);
+        label.horizontalTextAlignment = imageOnRight ? HorizontalAlignment.Right : HorizontalAlignment.Left;
+        label.textColor = textColor;
+        DrawChild(label);
+    }
+
+    private void DrawButtonImage(Rectangle content)
+    {
+        int size = Math.Max(1, Math.Min(content.Width, content.Height));
+        Rectangle imageBounds = imageDisplayMode switch
         {
-            int maxWidth = Width - 4; // Leave padding
-            string ellipsizedText = label.text;
-            while (MeasureStringWidth(ellipsizedText + "...", font) > maxWidth && ellipsizedText.Length > 0)
-            {
-                ellipsizedText = ellipsizedText.Substring(0, ellipsizedText.Length - 1);
-            }
-            ellipsizedText += "...";
-            DrawString(ellipsizedText, font, textColor, 2, textY);
-        }
-        else
-        {
-            DrawString(label.text, font, textColor, 2, textY);
-        }*/
+            ImageDisplayMode.Stretch => content,
+            ImageDisplayMode.Fill => new Rectangle(content.X, content.Y, size, size),
+            _ => new Rectangle(content.X + (content.Width - Math.Min(size, image.Width)) / 2,
+                                content.Y + (content.Height - Math.Min(size, image.Height)) / 2,
+                                Math.Min(size, image.Width), Math.Min(size, image.Height)),
+        };
+
+        if (imageBounds.Width > 0 && imageBounds.Height > 0)
+            DrawImageStretch(image, imageBounds);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)

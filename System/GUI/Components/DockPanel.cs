@@ -15,10 +15,22 @@ public class DockPanel : Component
 
     public Component AddDockChild(Component child, Dock dockStyle)
     {
-        child.dock = dockStyle;                    // before AddChild so the anchors skip it
-        AddChild(child);
-        ResolveDockLayout();
+        child.dock = dockStyle;
+        return AddChild(child);
+    }
+
+    public T AddDockChild<T>(T child, Dock dockStyle) where T : Component
+    {
+        child.dock = dockStyle;
+        AddChild((Component)child);
         return child;
+    }
+
+    public override Component AddChild(Component child)
+    {
+        Component added = base.AddChild(child);
+        ResolveDockLayout();
+        return added;
     }
 
     public override void Resize(int width, int height)

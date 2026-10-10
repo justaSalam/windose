@@ -55,17 +55,20 @@ public class MenuItem : Component
         bool highlighted = enabled && (IsInsideAbsolute(Cosmos.Kernel.System.Input.MouseManager.X, Cosmos.Kernel.System.Input.MouseManager.Y) || (hasSubmenu && submenu.Visible));
         int textX = isPressed ? 9 : 8;
         int textY = Math.Max(0, (Height - MeasureStringHeight(fontSize)) / 2);
+        int rightInset = hasSubmenu && drawSubmenuArrow ? 18 : 4;
+        Rectangle textBounds = new Rectangle(textX + imageOffset, 0,
+            Math.Max(0, Width - textX - imageOffset - rightInset), Height);
 
 
         if (highlighted)
         {
             DrawFilledRectangle(Palette.Highlight,2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2));
-            DrawString(text, Palette.HighlightText, textX + imageOffset, textY, fontSize);
+            DrawAlignedText(text, Palette.HighlightText, fontSize, textBounds);
         }
         else
         {
             Color color = enabled ? textColor : disabledTextColor;
-            DrawString(text, color, textX + imageOffset, textY, fontSize);
+            DrawAlignedText(text, color, fontSize, textBounds);
         }
 
         if (itemIcon != null)
