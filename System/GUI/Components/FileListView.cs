@@ -219,7 +219,7 @@ public class FileListView : Component
 
         DrawItemIcon(item, 4, y + 2, smallIconSize);
 
-        DrawString($"{TextFeatures.Fill(item.text, 20)}    {ByteFormat.FormatBytes(item.fileEntry.SizeBytes)}     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
+        DrawString($"{TextFeatures.Fill(item.text, 20)}    {ByteSize.Format(item.fileEntry.SizeBytes)}     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
 
         int currentX = 0;
         for (int i = 0; i < headerWidths.Length; i++)

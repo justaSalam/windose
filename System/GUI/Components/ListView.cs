@@ -78,11 +78,15 @@ public class ListView : Component
         DrawFilledRectangle(Palette.ControlFace, 0, 0, Width, headerHeight);
 
         int x = 0;
+        int columnIndex = 0;
         foreach (ListViewColumn c in columns)
         {
             DrawSunkenRectangle(x, 0, c.Width, headerHeight);
-            DrawString(Clip(c.Header, c.Width - 8), Palette.ControlBlack, x + 4, 2, fontSize);
+            int iconOffset = columnIndex == 0 ? IconSlot : 0;
+            int textX = x + 4 + iconOffset;
+            DrawString(Clip(c.Header, c.Width - iconOffset - 8), Palette.ControlBlack, textX, 2, fontSize);
             x += c.Width;
+            columnIndex++;
         }
     }
 

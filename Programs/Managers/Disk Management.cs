@@ -12,51 +12,99 @@ public sealed class DiskManagement : Window
     private readonly ListView partitionListView;
     private readonly PartitionBar partitionBar;
     private readonly Label statusLabel;
+    private readonly Label diskInfoLabel;
     private readonly ComboBox diskCombo;
-
-    // Action pane
-    private readonly DockPanel actionPane;
-    private readonly Label formatTitle;
-    private readonly ComboBox fsCombo;
-    private readonly TextField labelBox;
-    private readonly Button formatButton;
-    private readonly Button cancelButton;
-
-    // Toolbar buttons that need a selection
-    private readonly List<Button> needsSelection = new List<Button>();
+    private readonly ScrollView partitionDetailsScroll;
+    private readonly DockPanel partitionDetailsContent;
+    private readonly Panel partitionNameDetail;
+    private readonly Panel fileSystemDetail;
+    private readonly Panel mountPointDetail;
+    private readonly Panel volumeLabelDetail;
+    private readonly Panel sizeDetail;
+    private readonly Panel usedDetail;
+    private readonly Panel freeDetail;
+    private readonly Panel detailsHint;
 
     private readonly Png partitionIcon = new Png("/mnt/System/Icons/hard_disk_drive_pie.png");
 
     private readonly List<IBlockDevice> devices = new List<IBlockDevice>();
+    private readonly List<PartitionDetails> partitionDetails = new List<PartitionDetails>();
     private IBlockDevice? selectedDevice;
-    private Partition? selectedPartition;
+
+    private sealed class PartitionDetails
+    {
+        public Partition Partition;
+        public string FileSystem = "Unknown";
+        public string MountPoint = "Unmounted";
+        public string VolumeLabel = "Not available";
+        public string Used = "Not available";
+        public string Free = "Not available";
+        public ulong Size;
+        public bool HasSize;
+
+        public PartitionDetails(Partition partition)
+        {
+            Partition = partition;
+        }
+    }
 
     public DiskManagement(int x, int y, int width, int height)
         : base(x, y, width, height, "Disk Management", true)
     {
-        root = new DockPanel(0, TitleBar, Width, Height - TitleBar) { useBackground = true };
+        root = new DockPanel(0, TitleBar, Width, Height - TitleBar)
+        {
+            useBackground = true,
+            backgroundColor = Palette.ControlFace,
+            Margin = new Thickness(0),
+            Padding = new Thickness(4),
+        };
         AddChild(root);                                     // attach first
 
         // ---- Toolbar ----
-        var toolbar = new DockPanel(0, 0, Width, 30);
-        AddToolbarButton(toolbar, "Refresh", 80, false, RescanDisks);
-        AddToolbarButton(toolbar, "Format", 80, true, ShowFormatPane);
-        // Add New / Delete / Resize / Label here the same way once the StorageManager calls exist.
+        var toolbar = new DockPanel(0, 0, Width, 30)
+        {
+            Margin = new Thickness(0),
+            Padding = new Thickness(0),
+        };
+        AddToolbarButton(toolbar, "Refresh", 86, RescanDisks);
 
         // ---- Disk row ----
-        var diskRow = new DockPanel(0, 0, Width, 26);
-        diskRow.AddDockChild(new Label(0, 0, 40, 20) { text = "Disk:", useBackground = false }, Dock.Left);
-        diskCombo = new ComboBox(0, 0, 200);                // ASSUMPTION: (x, y, width)
+        var diskRow = new DockPanel(0, 0, Width, 26)
+        {
+            Margin = new Thickness(0),
+            Padding = new Thickness(0),
+        };
+        diskRow.AddDockChild(new Label(0, 0, 40, 20)
+        {
+            text = "Disk:",
+            useBackground = false,
+            Margin = new Thickness(0),
+        }, Dock.Left);
+        diskCombo = new ComboBox(0, 0, 200) { Margin = new Thickness(0) };
         diskRow.AddDockChild(diskCombo, Dock.Fill);
+
+        diskInfoLabel = new Label(0, 0, Width, 22)
+        {
+            text = "No disk selected",
+            useBackground = false,
+            clampSize = false,
+            Margin = new Thickness(4, 2, 4, 0),
+        };
 
         // ---- Partition bar ----
         partitionBar = new PartitionBar(0, 0, Width, 50)
         {
+            Margin = new Thickness(0),
             segmentClicked = seg => SelectPartition(seg?.Tag as Partition, fromBar: true)
         };
 
         // ---- Status ----
-        statusLabel = new Label(0, 0, Width, 20) { text = "", useBackground = false };
+        statusLabel = new Label(0, 0, Width, 20)
+        {
+            text = "",
+            useBackground = false,
+            Margin = new Thickness(0),
+        };
 
         // ---- List ----
         partitionListView = new ListView(0, 0, 300, 200)
@@ -64,46 +112,56 @@ public sealed class DiskManagement : Window
             Margin = new Thickness(0, 4, 4, 0),
             columns = new List<ListViewColumn>
             {
-                new() { Header = "Partition",   Width = 100 },
-                new() { Header = "File system", Width = 100 },
-                new() { Header = "Mount",       Width = 70 },
-                new() { Header = "Label",       Width = 100 },
-                new() { Header = "Size",        Width = 80 },
-                new() { Header = "Used",        Width = 80 },
-                new() { Header = "Unused",      Width = 80 },
+                new() { Header = "Partition",   Width = 104 },
+                new() { Header = "FS",          Width = 64 },
+                new() { Header = "Mount point", Width = 96 },
+                new() { Header = "Capacity",    Width = 84 },
             },
             selectedChanged = item => SelectPartition(item?.Tag as Partition, fromBar: false)
         };
 
-        // ---- Action pane (fixed positions inside, dock = None) ----
-        actionPane = new DockPanel(0, 0, 250, 100) { useBackground = true };
-        formatTitle = new Label(10, 10, 230, 20) { text = "Format", useBackground = false };
-        var fsLabel = new Label(10, 40, 80, 20) { text = "File system:", useBackground = false };
-        fsCombo = new ComboBox(95, 38, 140);
-        var lblLabel = new Label(10, 70, 80, 20) { text = "Label:", useBackground = false };
-        labelBox = new TextField(95, 68, 140, 22);            // ASSUMPTION: (x, y, w, h)
-        var warn1 = new Label(10, 100, 230, 20) { text = "Everything on the partition", useBackground = false };
-        var warn2 = new Label(10, 118, 230, 20) { text = "will be lost.", useBackground = false };
-        formatButton = new Button("Format", 10, 150, 100, 26);
-        cancelButton = new Button("Cancel", 120, 150, 100, 26);
-        formatButton.leftClickAction = DoFormat;            // ASSUMPTION: Button fires leftClickAction
-        cancelButton.leftClickAction = () => actionPane.Visible = false;
-
-        foreach (Component c in new Component[] { formatTitle, fsLabel, fsCombo, lblLabel, labelBox, warn1, warn2, formatButton, cancelButton })
+        partitionDetailsScroll = new ScrollView(0, 0, 210, Height)
         {
-            actionPane.AddChild(c);
-        }
-
-        fsCombo.AddItem("FAT32");
-        fsCombo.AddItem("ext2");
-        actionPane.Visible = false;
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+            showHorizontalScrollbar = false,
+            showVerticalScrollbar = true,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+        partitionDetailsContent = new DockPanel(0, 0, 190, 320)
+        {
+            useBackground = true,
+            backgroundColor = Palette.ControlWhite,
+            Padding = new Thickness(6),
+            Margin = new Thickness(0),
+        };
+        partitionDetailsContent.AddDockChild(CreateDetailRow("Partition details", Palette.ControlFace, 30), Dock.Top);
+        partitionNameDetail = CreateDetailRow("Partition: —", Palette.ControlWhite, 42);
+        fileSystemDetail = CreateDetailRow("File system: —", Palette.ControlWhite, 26);
+        mountPointDetail = CreateDetailRow("Mount point: —", Palette.ControlWhite, 42);
+        volumeLabelDetail = CreateDetailRow("Volume label: —", Palette.ControlWhite, 38);
+        sizeDetail = CreateDetailRow("Capacity: —", Palette.ControlWhite, 26);
+        usedDetail = CreateDetailRow("Used: —", Palette.ControlWhite, 26);
+        freeDetail = CreateDetailRow("Free: —", Palette.ControlWhite, 26);
+        detailsHint = CreateDetailRow("Select a partition to view its details. Disk operations are read-only.", Palette.ControlWhite, 52);
+        partitionDetailsContent.AddDockChild(partitionNameDetail, Dock.Top);
+        partitionDetailsContent.AddDockChild(fileSystemDetail, Dock.Top);
+        partitionDetailsContent.AddDockChild(mountPointDetail, Dock.Top);
+        partitionDetailsContent.AddDockChild(volumeLabelDetail, Dock.Top);
+        partitionDetailsContent.AddDockChild(sizeDetail, Dock.Top);
+        partitionDetailsContent.AddDockChild(usedDetail, Dock.Top);
+        partitionDetailsContent.AddDockChild(freeDetail, Dock.Top);
+        partitionDetailsContent.AddDockChild(detailsHint, Dock.Fill);
+        partitionDetailsScroll.SetContent(partitionDetailsContent, 190, 320);
 
 
         root.AddDockChild(toolbar, Dock.Top);
         root.AddDockChild(diskRow, Dock.Top);
+        root.AddDockChild(diskInfoLabel, Dock.Top);
         root.AddDockChild(partitionBar, Dock.Top);
         root.AddDockChild(statusLabel, Dock.Bottom);
-        root.AddDockChild(actionPane, Dock.Right);
+        root.AddDockChild(partitionDetailsScroll, Dock.Right);
         root.AddDockChild(partitionListView, Dock.Fill);
 
         diskCombo.SelectedIndexChanged += OnDiskChanged;
@@ -121,13 +179,26 @@ public sealed class DiskManagement : Window
     }
 
 
-    private void AddToolbarButton(DockPanel bar, string text, int width, bool needsPartition, Action click)
+    private static Panel CreateDetailRow(string text, System.Drawing.Color color, int height)
+    {
+        return new Panel(color, 0, 0, 100, height)
+        {
+            useBackground = color != Palette.ControlWhite,
+            text = text,
+            fontSize = 14,
+            textColor = Palette.ControlBlack,
+            textOffsetX = 4,
+            wrapText = true,
+            clampSize = false,
+            Margin = new Thickness(0),
+        };
+    }
+
+    private static void AddToolbarButton(DockPanel bar, string text, int width, Action click)
     {
         var button = new Button(text, 0, 0, width, 26) { Margin = new Thickness(0, 2, 4, 2) };
         button.leftClickAction = click;
         bar.AddDockChild(button, Dock.Left);
-
-        if (needsPartition) needsSelection.Add(button);
     }
 
     private void RescanDisks()
@@ -152,11 +223,13 @@ public sealed class DiskManagement : Window
             {
                 format = "MBR";
             }
-            diskCombo.AddItem($"{devicee.Name} ({ByteFormat.FormatBytes(devicee.BlockSize * devicee.BlockCount)}, {format})");
+            diskCombo.AddItem($"{devicee.Name} ({FormatCapacity(devicee.BlockSize, devicee.BlockCount)}, {format})");
         }
 
-        selectedDevice = devices.Count > 0 ? devices[0] : null;
-        RefreshSelectedDrive();
+        if (devices.Count > 0)
+            diskCombo.SelectedIndex = 0;
+        else
+            OnDiskChanged(-1);
     }
 
     private void OnDiskChanged(int index)
@@ -168,48 +241,57 @@ public sealed class DiskManagement : Window
     private void RefreshSelectedDrive()
     {
         partitionListView.ClearItems();
+        partitionDetails.Clear();
 
         List<PartitionBar.Segment> segs = new();
 
         if (selectedDevice == null)
         {
             partitionBar.SetSegments(segs);
+            diskInfoLabel.text = "No disk selected";
+            diskInfoLabel.MarkDirty();
             SelectPartition(null, false);
             return;
         }
 
         foreach (Partition partition in StorageManager.GetPartitions(selectedDevice))
         {
-            ulong size = partition.BlockSize * partition.BlockCount;
+            bool hasSize = TryGetByteSize(partition.BlockSize, partition.BlockCount, out ulong size);
 
             string partitionName = partition.Name ?? "";
-
-            string filesystem = "";
-            FsKind fsKind = FsKind.Unknown;
-            string mountPoint = "UNMOUNTED";
-            string label = "";
-
-            string used = "";
-            string unused = "";
+            FsKind fsKind = Probe(partition, out string labelFromProbe);
+            string mountPoint = "Unmounted";
+            string label = string.IsNullOrWhiteSpace(labelFromProbe) ? "Not available" : labelFromProbe;
+            string used = "Not available";
+            string free = "Not available";
 
             // Find the VFS mount belonging to this partition.
             VfsMount? mount = GetMount(partition);
 
             if (mount != null)
             {
-                byte[] b = ReadBytes(partition, 0, 2048)!;
-                fsKind = Probe(partition, out string labelFromProbe);
                 mountPoint = mount.MountPoint;
-                label = labelFromProbe;
 
-                if (TryGetSpace(mount.MountPoint, out ulong total, out ulong usedBytes, out ulong freeBytes))
+                if (TryGetSpace(mount.MountPoint, out _, out ulong usedBytes, out ulong freeBytes))
                 {
-                    used = ByteFormat.FormatBytes(usedBytes);
-                    unused = ByteFormat.FormatBytes(freeBytes);
+                    used = ByteSize.Format(usedBytes);
+                    free = ByteSize.Format(freeBytes);
                 }
             }
 
-            partitionListView.AddItem([partitionName, fsKind.ToString(), mountPoint, label, ByteFormat.FormatBytes(size), used, unused], partitionIcon, tag: partition);
+            PartitionDetails details = new PartitionDetails(partition)
+            {
+                FileSystem = fsKind.ToString(),
+                MountPoint = mountPoint,
+                VolumeLabel = label,
+                Used = used,
+                Free = free,
+                Size = hasSize ? size : 0,
+                HasSize = hasSize,
+            };
+            partitionDetails.Add(details);
+
+            partitionListView.AddItem([partitionName, details.FileSystem, mountPoint, hasSize ? ByteSize.Format(size) : "Unavailable"], partitionIcon, tag: partition);
 
             segs.Add(new PartitionBar.Segment
             {
@@ -220,10 +302,68 @@ public sealed class DiskManagement : Window
         }
 
         partitionBar.SetSegments(segs);
+        string format = Gpt.IsGpt(selectedDevice) ? "GPT" : Mbr.IsMbr(selectedDevice) ? "MBR" : "Unknown partition table";
+        string diskSize = FormatCapacity(selectedDevice.BlockSize, selectedDevice.BlockCount);
+        diskInfoLabel.text = $"{selectedDevice.Name} | {format} | {diskSize} | {selectedDevice.BlockSize}-byte sectors | {partitionDetails.Count} partitions";
+        diskInfoLabel.MarkDirty();
+        statusLabel.text = $"{partitionDetails.Count} partitions";
+        statusLabel.MarkDirty();
         SelectPartition(null, false);
     }
+
+    private void UpdatePartitionDetails(Partition? partition)
+    {
+        PartitionDetails? details = null;
+        if (partition != null)
+        {
+            foreach (PartitionDetails candidate in partitionDetails)
+            {
+                if (ReferenceEquals(candidate.Partition, partition))
+                {
+                    details = candidate;
+                    break;
+                }
+            }
+        }
+
+        if (details == null)
+        {
+            partitionNameDetail.text = "Partition: —";
+            fileSystemDetail.text = "File system: —";
+            mountPointDetail.text = "Mount point: —";
+            volumeLabelDetail.text = "Volume label: —";
+            sizeDetail.text = "Capacity: —";
+            usedDetail.text = "Used: —";
+            freeDetail.text = "Free: —";
+            detailsHint.text = partitionDetails.Count == 0
+                ? "No partitions are available on this disk. Disk operations are read-only."
+                : "Select a partition to view its details. Disk operations are read-only.";
+        }
+        else
+        {
+            partitionNameDetail.text = $"Partition: {(string.IsNullOrWhiteSpace(details.Partition.Name) ? "Unnamed" : details.Partition.Name)}";
+            fileSystemDetail.text = $"File system: {details.FileSystem}";
+            mountPointDetail.text = $"Mount point: {details.MountPoint}";
+            volumeLabelDetail.text = $"Volume label: {details.VolumeLabel}";
+            sizeDetail.text = details.HasSize
+                ? $"Capacity: {ByteSize.Format(details.Size)}"
+                : "Capacity: Unavailable";
+            usedDetail.text = $"Used: {details.Used}";
+            freeDetail.text = $"Free: {details.Free}";
+            detailsHint.text = "Disk operations are read-only; no partition changes will be made.";
+        }
+
+        partitionNameDetail.MarkDirty();
+        fileSystemDetail.MarkDirty();
+        mountPointDetail.MarkDirty();
+        volumeLabelDetail.MarkDirty();
+        sizeDetail.MarkDirty();
+        usedDetail.MarkDirty();
+        freeDetail.MarkDirty();
+        detailsHint.MarkDirty();
+    }
     private enum FsKind { Unknown, Fat12, Fat16, Fat32, Ext2 }
-    static FsKind Probe(Partition p, out string label)
+    private static FsKind Probe(Partition p, out string label)
     {
         label = "";
 
@@ -259,21 +399,44 @@ public sealed class DiskManagement : Window
         return FsKind.Unknown;
     }
 
-    static string Ascii(byte[] b, int off, int len)
+    private static string Ascii(byte[] b, int off, int len)
         => System.Text.Encoding.ASCII.GetString(b, off, len).TrimEnd(' ', '\0');
 
     // Handles any block size, so byte offsets stay correct
-    static byte[]? ReadBytes(Partition p, int byteOffset, int count)
+    private static byte[]? ReadBytes(Partition p, int byteOffset, int count)
     {
-        int bs = (int)p.BlockSize;
-        int firstLba = byteOffset / bs;
-        int blocks = (byteOffset % bs + count + bs - 1) / bs;
-        byte[] raw = new byte[blocks * bs];
+        if (byteOffset < 0 || count < 0 || p.BlockSize == 0 || p.BlockSize > int.MaxValue)
+            return null;
 
-        p.ReadBlock((ulong)firstLba, (ulong)blocks, raw);
+        if (count == 0)
+            return Array.Empty<byte>();
+
+        ulong blockSize = p.BlockSize;
+        ulong firstLba = (ulong)byteOffset / blockSize;
+        ulong endByte = (ulong)byteOffset + (ulong)count;
+        ulong endLba = (endByte + blockSize - 1) / blockSize;
+        if (endLba > p.BlockCount)
+            return null;
+
+        ulong blockCount = endLba - firstLba;
+        ulong rawSize = blockCount * blockSize;
+        if (rawSize > int.MaxValue)
+            return null;
+
+        byte[] raw = new byte[(int)rawSize];
+        int offset = (int)((ulong)byteOffset % blockSize);
+
+        try
+        {
+            p.ReadBlock(firstLba, blockCount, raw);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
 
         byte[] result = new byte[count];
-        Array.Copy(raw, byteOffset % bs, result, 0, count);
+        Array.Copy(raw, offset, result, 0, count);
         return result;
     }
 
@@ -287,7 +450,10 @@ public sealed class DiskManagement : Window
                 continue; 
             }
 
-            if (mount.Partition.Name == partition.Name)     
+            Partition mountedPartition = mount.Partition;
+            if (ReferenceEquals(mountedPartition.Host, partition.Host) &&
+                mountedPartition.StartSector == partition.StartSector &&
+                mountedPartition.BlockCount == partition.BlockCount)
             { 
                 return mount; 
             }
@@ -306,16 +472,36 @@ public sealed class DiskManagement : Window
             return false;
         }
 
+        if (stats.BlockSize == 0 || stats.AvailableBlocks > stats.Blocks ||
+            stats.Blocks > ulong.MaxValue / stats.BlockSize)
+            return false;
+
         total = stats.Blocks * stats.BlockSize;
         free = stats.AvailableBlocks * stats.BlockSize;
         used = total - free;
 
         return true;
     }
+
+    private static bool TryGetByteSize(ulong blockSize, ulong blockCount, out ulong size)
+    {
+        size = 0;
+        if (blockSize == 0 || blockCount > ulong.MaxValue / blockSize)
+            return false;
+
+        size = blockSize * blockCount;
+        return true;
+    }
+
+    private static string FormatCapacity(ulong blockSize, ulong blockCount)
+    {
+        return TryGetByteSize(blockSize, blockCount, out ulong size)
+            ? ByteSize.Format(size)
+            : "Unavailable";
+    }
+
     private void SelectPartition(Partition? p, bool fromBar)
     {
-        selectedPartition = p;
-
         if (fromBar)
         {
             foreach (var item in partitionListView.items)
@@ -326,35 +512,10 @@ public sealed class DiskManagement : Window
             partitionBar.SelectByTag(p);
         }
 
-        foreach (var b in needsSelection) b.Visible = p != null;
-
-        if (p == null)
-        {
-            statusLabel.text = "";
-            actionPane.Visible = false;
-        }
-        else
-        {
-            ulong size = (ulong)p.BlockSize * (ulong)p.BlockCount;
-            statusLabel.text = $"{p.Name}: {ByteFormat.FormatBytes(size)}";
-            formatTitle.text = $"Format {p.Name}";
-        }
-        statusLabel.MarkDirty();
-    }
-
-    private void ShowFormatPane()
-    {
-        if (selectedPartition == null) return;
-        actionPane.Visible = true;                           // DockPanel re-flows via OnChildVisibilityChanged
-    }
-
-    private void DoFormat()
-    {
-        if (selectedPartition == null) return;
-
-        // TODO: call your actual format routine here, with fsCombo's selection and labelBox.text.
-        // Deliberately not guessed: a wrong call here wipes a disk.
-        statusLabel.text = $"Format of {selectedPartition.Name} not implemented yet";
+        UpdatePartitionDetails(p);
+        statusLabel.text = p == null
+            ? $"{partitionDetails.Count} partitions"
+            : $"Selected: {p.Name} | {FormatCapacity(p.BlockSize, p.BlockCount)}";
         statusLabel.MarkDirty();
     }
 }

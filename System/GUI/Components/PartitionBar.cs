@@ -36,29 +36,60 @@ public class PartitionBar : Component
         MarkDirty();
     }
 
-    private int SegmentWidth(Segment s, ulong total, int inner)
-        => total == 0 ? inner : Math.Max(4, (int)((double)s.Size / total * inner));
-
-    private ulong Total()
+    private double Total()
     {
-        ulong t = 0;
+        double t = 0;
         foreach (var s in segments) t += s.Size;
         return t;
+    }
+
+    private int[] GetSegmentWidths(int inner)
+    {
+        int[] widths = new int[segments.Count];
+        if (segments.Count == 0 || inner <= 0)
+            return widths;
+
+        double total = Total();
+        int remaining = inner;
+        int lastNonEmpty = segments.Count - 1;
+        while (lastNonEmpty > 0 && segments[lastNonEmpty].Size == 0)
+            lastNonEmpty--;
+
+        for (int i = 0; i < segments.Count; i++)
+        {
+            int width;
+            if (total == 0)
+                width = i == segments.Count - 1 ? remaining : inner / segments.Count;
+            else if (segments[i].Size == 0)
+                width = 0;
+            else if (i == lastNonEmpty)
+                width = remaining;
+            else
+                width = (int)((double)segments[i].Size / total * inner);
+
+            width = Math.Clamp(width, 0, remaining);
+            widths[i] = width;
+            remaining -= width;
+        }
+
+        return widths;
     }
 
     public override void DrawLocal()
     {
         DrawFilledRectangle(Color.White, 0, 0, Width, Height);
 
-        int inner = Width - 8;
-        ulong total = Total();
+        int inner = Math.Max(0, Width - 8);
+        int[] widths = GetSegmentWidths(inner);
         int x = 4;
 
         for (int i = 0; i < segments.Count; i++)
         {
             Segment s = segments[i];
-            int w = SegmentWidth(s, total, inner);
-            if (i == segments.Count - 1) w = Math.Max(4, 4 + inner - x);   // absorb rounding
+            int w = widths[i];
+
+            if (w == 0)
+                continue;
 
             DrawFilledRectangle(Color.FromArgb(255, 200, 215, 235), x, 4, w - 2, Height - 8);
 
@@ -88,13 +119,13 @@ public class PartitionBar : Component
         if (mouse.left == MouseEvents.Release)
         {
             int lx = mouseX - AbsoluteX;
-            int inner = Width - 8;
-            ulong total = Total();
+            int inner = Math.Max(0, Width - 8);
+            int[] widths = GetSegmentWidths(inner);
             int x = 4;
 
             for (int i = 0; i < segments.Count; i++)
             {
-                int w = SegmentWidth(segments[i], total, inner);
+                int w = widths[i];
                 if (lx >= x && lx < x + w)
                 {
                     selected = segments[i];

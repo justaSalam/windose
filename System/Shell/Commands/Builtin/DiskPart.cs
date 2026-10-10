@@ -39,7 +39,7 @@ public sealed class DiskPart : InteractiveShellCommand
                 }
 
                 string marker = ReferenceEquals(device, selectedDisk) ? "*" : " ";
-                context.WriteLine($"{marker} Disk {i}    {device.Name}    {ByteFormat.FormatBytes(device.BlockSize * device.BlockCount)}");
+                context.WriteLine($"{marker} Disk {i}    {device.Name}    {ByteSize.Format(device.BlockSize * device.BlockCount)}");
             }
             return;
         }
@@ -54,7 +54,7 @@ public sealed class DiskPart : InteractiveShellCommand
             foreach (Partition partition in StorageManager.Partitions)
             {
                 string marker = ReferenceEquals(partition, selectedPartition) ? "*" : " ";
-                context.WriteLine($"{marker} Partition {index}    {partition.Name}    {ByteFormat.FormatBytes(partition.BlockSize * partition.BlockCount)}");
+                context.WriteLine($"{marker} Partition {index}    {partition.Name}    {ByteSize.Format(partition.BlockSize * partition.BlockCount)}");
                 index++;
             }
             return;
@@ -96,7 +96,7 @@ public sealed class DiskPart : InteractiveShellCommand
             return;
         }
 
-        ulong sectorCount = sizeMb * ByteFormat.mega / selectedDisk.BlockSize;
+        ulong sectorCount = sizeMb * ByteSize.Megabyte / selectedDisk.BlockSize;
 
         if (!Gpt.IsGpt(selectedDisk))
         {
@@ -155,7 +155,7 @@ public sealed class DiskPart : InteractiveShellCommand
                 return;
             }
             context.WriteLine($"Name: {selectedDisk.Name}");
-            context.WriteLine($"Total size: {ByteFormat.FormatBytes(selectedDisk.BlockSize * selectedDisk.BlockCount)}");
+            context.WriteLine($"Total size: {ByteSize.Format(selectedDisk.BlockSize * selectedDisk.BlockCount)}");
             context.WriteLine($"Block size: {selectedDisk.BlockSize}");
             context.WriteLine($"Block count: {selectedDisk.BlockCount}");
         }

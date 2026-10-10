@@ -34,7 +34,7 @@ public sealed class DirectoryCommand : IShellCommand
 
             foreach (FileInfo file in files)
             {
-                context.WriteLine($"{file.CreationTime.ToString("yyyy-MM-dd HH:mm")} {ByteFormat.FormatBytes(file.Length)} {file.Name}");
+                context.WriteLine($"{file.CreationTime.ToString("yyyy-MM-dd HH:mm")} {ByteSize.Format(file.Length)} {file.Name}");
             }
         }
     }

@@ -29,8 +29,8 @@ public class ScrollView : Component
     public void SetContent(Component child, int width, int height)
     {
         content = child;
-        contentWidth = Math.Max(width, Width);
-        contentHeight = Math.Max(height, Height);
+        contentWidth = Math.Max(width, GetViewportWidth());
+        contentHeight = Math.Max(height, GetViewportHeight());
 
         child.clampSize = false;
         child.X = 0;

@@ -38,7 +38,7 @@ public class FileListViewItem
         tag = fileEntry.AbsoluteLocation;
         isFolder = fileEntry.FileType == FileType.Directory;
 
-        size = isFolder ? "" : ByteFormat.FormatBytes(fileEntry.SizeBytes);
+        size = isFolder ? "" : ByteSize.Format(fileEntry.SizeBytes);
         type = isFolder ? "File Folder" : fileEntry.FileType.ToString();
 
         modified = fileEntry.CreatedAt;
