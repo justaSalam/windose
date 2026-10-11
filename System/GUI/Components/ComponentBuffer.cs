@@ -2,7 +2,7 @@ using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 
 
-public class DirectBitmap : Canvas
+public class ComponentBuffer : Canvas
 {
     public int Width { get; private set; }
     public int Height { get; private set; }
@@ -21,7 +21,7 @@ public class DirectBitmap : Canvas
     private Rectangle clipBounds;
 
 
-    public DirectBitmap(int width, int height) : base(Math.Max(1, width), Math.Max(1, height), ColorDepth.ColorDepth32)
+    public ComponentBuffer(int width, int height) : base(Math.Max(1, width), Math.Max(1, height), ColorDepth.ColorDepth32)
     {
         Width = Math.Max(1, width);
         Height = Math.Max(1, height);
@@ -80,23 +80,24 @@ public class DirectBitmap : Canvas
         y += originY;
         if (!ContainsClipped(x, y)) return;
         int index = x + y * Width;
+        int[] buffer = GetBuffer();
 
-        if (index >= 0 && index < Buffer.Length)
+        if (index >= 0 && index < buffer.Length)
         {
             if ((colour >> 24) == 0xFF)
             {
-                Buffer[index] = colour;
+                buffer[index] = colour;
                 return;
             }
 
-            int bgColour = Buffer[index];
+            int bgColour = buffer[index];
             int alpha = (colour >> 24) & 0xff;
             int invAlpha = 255 - alpha;
             int newRed = (((colour >> 16) & 0xff) * alpha + ((bgColour >> 16) & 0xff) * invAlpha) >> 8;
             int newGreen = (((colour >> 8) & 0xff) * alpha + ((bgColour >> 8) & 0xff) * invAlpha) >> 8;
             int newBlue = ((colour & 0xff) * alpha + (bgColour & 0xff) * invAlpha) >> 8;
 
-            Buffer[index] = unchecked((int)0xFF000000) | (newRed << 16) | (newGreen << 8) | newBlue;
+            buffer[index] = unchecked((int)0xFF000000) | (newRed << 16) | (newGreen << 8) | newBlue;
         }
     }
     public override void Clear(Color color)
@@ -230,9 +231,14 @@ public class DirectBitmap : Canvas
             return;
         }
 
-        for (int y = target.Top; y < target.Bottom; y++)
-            for (int x = target.Left; x < target.Right; x++)
-                BlendTargetPixel(x, y, argb);
+        int rowStart = target.Top * Width + target.Left;
+        for (int y = 0; y < target.Height; y++, rowStart += Width)
+        {
+            int index = rowStart;
+            int end = index + target.Width;
+            for (; index < end; index++)
+                BlendPixel(buffer, index, argb);
+        }
     }
 
     public new void DrawRectangle(Color color, int x, int y, int width, int height)
@@ -254,11 +260,9 @@ public class DirectBitmap : Canvas
         }
     }
 
-    public virtual void DrawArrayClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
+    private bool TryClipArrayRegion(int sourceWidth, int sourceHeight, ref int sourceX, ref int sourceY,
+        ref int destinationX, ref int destinationY, ref int width, ref int height)
     {
-        if (colors == null || sourceWidth <= 0) return;
-        int sourceHeight = colors.Length / sourceWidth;
-
         destinationX += originX;
         destinationY += originY;
 
@@ -333,7 +337,7 @@ public class DirectBitmap : Canvas
             height = sourceHeight - sourceY;
 
         if (destinationX < 0 || destinationY < 0 || destinationX >= Width || destinationY >= Height)
-            return;
+            return false;
 
         if (width > Width - destinationX)
             width = Width - destinationX;
@@ -341,7 +345,15 @@ public class DirectBitmap : Canvas
         if (height > Height - destinationY)
             height = Height - destinationY;
 
-        if (width <= 0 || height <= 0) return;
+        return width > 0 && height > 0;
+    }
+
+    public virtual void DrawArrayClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
+    {
+        if (colors == null || sourceWidth <= 0) return;
+        int sourceHeight = colors.Length / sourceWidth;
+        if (!TryClipArrayRegion(sourceWidth, sourceHeight, ref sourceX, ref sourceY,
+            ref destinationX, ref destinationY, ref width, ref height)) return;
 
         int[] buffer = GetBuffer();
 
@@ -366,88 +378,41 @@ public class DirectBitmap : Canvas
     {
         if (colors == null || sourceWidth <= 0) return;
         int sourceHeight = colors.Length / sourceWidth;
-
-        destinationX += originX;
-        destinationY += originY;
-
-        if (sourceX < 0)
-        {
-            int clipped = -sourceX;
-            destinationX += clipped;
-            width -= clipped;
-            sourceX = 0;
-        }
-
-        if (sourceY < 0)
-        {
-            int clipped = -sourceY;
-            destinationY += clipped;
-            height -= clipped;
-            sourceY = 0;
-        }
-
-        if (destinationX < 0)
-        {
-            int clipped = -destinationX;
-            sourceX += clipped;
-            width -= clipped;
-            destinationX = 0;
-        }
-
-        if (destinationY < 0)
-        {
-            int clipped = -destinationY;
-            sourceY += clipped;
-            height -= clipped;
-            destinationY = 0;
-        }
-
-        if (destinationX + width > Width)
-            width = Width - destinationX;
-
-        if (destinationY + height > Height)
-            height = Height - destinationY;
-
-        if (destinationX < clipBounds.Left)
-        {
-            int clipped = clipBounds.Left - destinationX;
-            sourceX += clipped;
-            width -= clipped;
-            destinationX = clipBounds.Left;
-        }
-
-        if (destinationY < clipBounds.Top)
-        {
-            int clipped = clipBounds.Top - destinationY;
-            sourceY += clipped;
-            height -= clipped;
-            destinationY = clipBounds.Top;
-        }
-
-        if (destinationX + width > clipBounds.Right)
-            width = clipBounds.Right - destinationX;
-
-        if (destinationY + height > clipBounds.Bottom)
-            height = clipBounds.Bottom - destinationY;
-
-        if (sourceX + width > sourceWidth)
-            width = sourceWidth - sourceX;
-
-        if (sourceY + height > sourceHeight)
-            height = sourceHeight - sourceY;
-
-        if (destinationX < 0 || destinationY < 0 || destinationX >= Width || destinationY >= Height)
-            return;
-
-        if (width > Width - destinationX)
-            width = Width - destinationX;
-
-        if (height > Height - destinationY)
-            height = Height - destinationY;
-
-        if (width <= 0 || height <= 0) return;
+        if (!TryClipArrayRegion(sourceWidth, sourceHeight, ref sourceX, ref sourceY,
+            ref destinationX, ref destinationY, ref width, ref height)) return;
 
         int[] buffer = GetBuffer();
+        if (globalOpacity == byte.MaxValue)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                int sourceIndex = (sourceY + y) * sourceWidth + sourceX;
+                int destinationIndex = (destinationY + y) * Width + destinationX;
+
+                for (int x = 0; x < width; x++)
+                {
+                    int color = colors[sourceIndex + x];
+                    int alpha = (color >> 24) & 0xff;
+                    if (alpha == 0) continue;
+
+                    if (alpha == 0xff)
+                    {
+                        buffer[destinationIndex + x] = color;
+                        continue;
+                    }
+
+                    int bgColor = buffer[destinationIndex + x];
+                    int invAlpha = 255 - alpha;
+                    int red = (((color >> 16) & 0xff) * alpha + ((bgColor >> 16) & 0xff) * invAlpha) >> 8;
+                    int green = (((color >> 8) & 0xff) * alpha + ((bgColor >> 8) & 0xff) * invAlpha) >> 8;
+                    int blue = ((color & 0xff) * alpha + (bgColor & 0xff) * invAlpha) >> 8;
+
+                    buffer[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+                }
+            }
+
+            return;
+        }
 
         for (int y = 0; y < height; y++)
         {
@@ -506,12 +471,13 @@ public class DirectBitmap : Canvas
 
         int[] buffer = GetBuffer();
 
-        for (int y = top; y < bottom; y++)
+        int index = top * Width + targetX;
+        for (int y = top; y < bottom; y++, index += Width)
         {
             if (color.A == byte.MaxValue)
-                buffer[y * Width + targetX] = argb;
+                buffer[index] = argb;
             else
-                BlendTargetPixel(targetX, y, argb);
+                BlendPixel(buffer, index, argb);
         }
     }
 
@@ -538,8 +504,9 @@ public class DirectBitmap : Canvas
             return;
         }
 
-        for (int target = left; target < right; target++)
-            BlendTargetPixel(target, targetY, argb);
+        int end = index + right - left;
+        for (; index < end; index++)
+            BlendPixel(buffer, index, argb);
     }
 
     internal void DrawDiagonalLine(Color color, int dx, int dy, int x1, int y1)
@@ -713,23 +680,22 @@ public class DirectBitmap : Canvas
             y >= clipBounds.Top && y < clipBounds.Bottom;
     }
 
-    private void BlendTargetPixel(int x, int y, int color)
+    private void BlendPixel(int[] buffer, int index, int color)
     {
-        int index = x + y * Width;
         int alpha = (color >> 24) & 0xff;
         if (alpha == 0) return;
         if (alpha == 0xff)
         {
-            GetBuffer()[index] = color;
+            buffer[index] = color;
             return;
         }
 
-        int background = GetBuffer()[index];
+        int background = buffer[index];
         int inverse = 255 - alpha;
         int red = (((color >> 16) & 0xff) * alpha + ((background >> 16) & 0xff) * inverse) >> 8;
         int green = (((color >> 8) & 0xff) * alpha + ((background >> 8) & 0xff) * inverse) >> 8;
         int blue = ((color & 0xff) * alpha + (background & 0xff) * inverse) >> 8;
-        GetBuffer()[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+        buffer[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
     }
 
     protected void TrimLine(ref int x1, ref int y1, ref int x2, ref int y2)

@@ -8,14 +8,10 @@ public class HotkeyManager : SingleThreadedProcess
 {
     public static List<GlobalHotkey> Hotkeys = new List<GlobalHotkey>();
 
-    public static Queue<QueueCommand> CommandQueue = new Queue<QueueCommand>();
-
-    public HotkeyManager() : base("syshtks", ProcessType.Kernel)
+    public HotkeyManager() : base("System Hotkeys", ProcessType.Kernel)
     { 
         canOverridePriority = false;
         canTerminate = false;
-        Priority = ProcessPriority.High;
-        
     }
 
     public static void RegisterHotkey(KeyEvent keyEvent, Action action)
@@ -32,26 +28,18 @@ public class HotkeyManager : SingleThreadedProcess
     
 
     public static void HandleKeyEvent()
-    {
-        SystemKeyEvent key;
-        if (!Keyboard.CurrentEvent(out key))
-            return;
-
-        if (key.consumed)
-            return;
+    {  
+        KeyEvent keyEvent = KeyboardManager.Peek();
 
         foreach (GlobalHotkey hotkey in Hotkeys)
         {
-            if (hotkey.keyEvent.Key == key.KeyEvent.Key && hotkey.keyEvent.Modifiers == key.KeyEvent.Modifiers && hotkey.keyEvent.Type == key.KeyEvent.Type)
+            if (hotkey.keyEvent.Key == keyEvent.Key && hotkey.keyEvent.Modifiers == keyEvent.Modifiers && hotkey.keyEvent.Type == keyEvent.Type)
             {
-                key.consumed = true;
                 hotkey.action?.Invoke();
                 break;
             }
         }
-
     }
-
 
 
     public override void Update()
@@ -59,8 +47,3 @@ public class HotkeyManager : SingleThreadedProcess
         HandleKeyEvent();
     }
 }
-public struct QueueCommand
-{
-    public GlobalHotkey hotkey;
-}
-

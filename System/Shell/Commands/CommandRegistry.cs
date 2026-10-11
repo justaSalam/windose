@@ -117,10 +117,12 @@ public static class CommandRegistry
         }));
 
         Register(new UacCommand());
+        Register(new ReadCommand());
         Register(new DirectoryCommand());
         Register(new ChangeDirectoryCommand());
         Register(new SchedulerInfoCommand());
         Register(new MemoryInfoCommand());
+        Register(new DrawingDebugCommand());
         Register(new DiskPart());
 
 

@@ -46,9 +46,11 @@ public class Component : IDisposable
         set
         {
             if (visible == value) return;
+            bool wasEffectivelyVisible = IsEffectivelyVisible();
             visible = value;
             dirty = true;
-            WindowManager.Invalidate(this);
+            if (wasEffectivelyVisible || IsEffectivelyVisible())
+                WindowManager.Invalidate(this);
             if (!isRoot && parent != null)
             {
                 parent.MarkChildDirty();
@@ -122,7 +124,7 @@ public class Component : IDisposable
     public string text = string.Empty;
 
 
-    protected DirectBitmap buffer;
+    protected ComponentBuffer buffer;
     private bool ownsRenderSurface;
     public Rectangle rectangle;
     public Rectangle clampedBounds = new Rectangle(0, 0, 50, 50);
@@ -202,7 +204,7 @@ public class Component : IDisposable
         {
 
             rectangle = new Rectangle(x, y, width, height);
-            buffer = new DirectBitmap(rectangle.Width, rectangle.Height);
+            buffer = new ComponentBuffer(rectangle.Width, rectangle.Height);
             ownsRenderSurface = true;
 
             children = new List<Component>();
@@ -252,23 +254,24 @@ public class Component : IDisposable
 
     public virtual void Update()
     {
-        bool isInside = IsInsideAbsolute(MouseManager.X, MouseManager.Y);
-        State prevState = state;
+        if (Visible)
+        {
+            bool isInside = IsInsideAbsolute(MouseManager.X, MouseManager.Y);
+            State prevState = state;
 
-        if (isInside && state != State.Highlighted)
-        {
-            state = State.Highlighted;
-            MarkDirty();
-        }
-        else if (!isInside && state != State.Normal)
-        {
-            state = State.Normal;
-            MarkDirty();
-        }
+            if (isInside && state != State.Highlighted)
+            {
+                state = State.Highlighted;
+                MarkDirty();
+            }
+            else if (!isInside && state != State.Normal)
+            {
+                state = State.Normal;
+                MarkDirty();
+            }
 
-        if (prevState != state)
-        {
-            UpdateFrame();
+            if (prevState != state)
+                UpdateFrame();
         }
 
         for (int i = 0; i < children.Count; i++)
@@ -527,7 +530,15 @@ public class Component : IDisposable
         Rectangle clipped = Rectangle.Intersect(AbsoluteRectangle, dirtyRect);
         if (clipped.Width <= 0 || clipped.Height <= 0) return;
 
-        DrawToScreen();
+        Kernel.mainBuffer.DrawArrayClipped(
+            buffer.GetBuffer(),
+            buffer.Width,
+            clipped.X - AbsoluteX,
+            clipped.Y - AbsoluteY,
+            clipped.X,
+            clipped.Y,
+            clipped.Width,
+            clipped.Height);
     }
     public bool IsInsideAbsolute(int x, int y) => x >= AbsoluteX && x < AbsoluteX + Width && y >= AbsoluteY && y < AbsoluteY + Height;
 
@@ -894,7 +905,7 @@ public class Component : IDisposable
 
     public virtual void MarkDirty(bool invalidate = true)
     {
-        if (invalidate) WindowManager.Invalidate(this);
+        if (invalidate && IsEffectivelyVisible()) WindowManager.Invalidate(this);
         dirty = true;
         if (!isRoot && parent != null) parent.MarkChildDirty();
     }
@@ -908,12 +919,25 @@ public class Component : IDisposable
     public virtual void ForceDirty()
     {
         forceDirty = true;
-        WindowManager.Invalidate(this);
+        if (IsEffectivelyVisible()) WindowManager.Invalidate(this);
         if (!isRoot && parent != null) parent.MarkChildDirty();
+    }
+
+    private bool IsEffectivelyVisible()
+    {
+        for (Component? component = this; component != null; component = component.parent)
+        {
+            if (!component.visible) return false;
+            if (component.isRoot) break;
+        }
+
+        return true;
     }
 
     protected void InvalidateLocalRegion(Rectangle localRegion)
     {
+        if (!IsEffectivelyVisible()) return;
+
         Rectangle bounds = new Rectangle(0, 0, Width, Height);
         Rectangle clipped = Rectangle.Intersect(bounds, localRegion);
         if (clipped.Width <= 0 || clipped.Height <= 0) return;
@@ -968,12 +992,17 @@ public class Component : IDisposable
             if (!child.Visible) continue;
             if (!child.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
 
-            if (child.HasDirtyTree())
-                child.DrawDirtyLocal(dirtyRect);
-
-            DrawChildClipped(child, dirtyRect);
-            child.MarkCleaned();
+            DrawDirtyChild(child, dirtyRect);
         }
+    }
+
+    private void DrawDirtyChild(Component child, Rectangle dirtyRect)
+    {
+        if (child.HasDirtyTree())
+            child.DrawDirtyLocal(dirtyRect);
+
+        DrawChildClipped(child, dirtyRect);
+        child.MarkCleaned();
     }
 
     protected void DrawChildClipped(Component child, Rectangle dirtyRect)
@@ -1055,7 +1084,7 @@ public class Component : IDisposable
         forceDirty = false;
     }
 
-    private void BindRenderSurface(DirectBitmap surface, bool ownsSurface)
+    private void BindRenderSurface(ComponentBuffer surface, bool ownsSurface)
     {
         if (ownsRenderSurface && !ReferenceEquals(buffer, surface))
             buffer.Dispose();
@@ -1070,8 +1099,8 @@ public class Component : IDisposable
     {
         if (!ownsRenderSurface) return;
 
-        DirectBitmap oldSurface = buffer;
-        buffer = new DirectBitmap(width, height);
+        ComponentBuffer oldSurface = buffer;
+        buffer = new ComponentBuffer(width, height);
 
         for (int i = 0; i < children.Count; i++)
             children[i].BindRenderSurface(buffer, false);

@@ -20,14 +20,12 @@ namespace Windose;
 public class Kernel : Sys.Kernel
 {
     public static Kernel Instance = null!;
-    public static DirectBitmap mainBuffer;
+    public static ComponentBuffer mainBuffer;
     public static Canvas canvas;
 
+    private WindowManager windowManager;
+    public Drivers.DisplayManager displayDriver = new Drivers.DisplayManager();
 
-
-
-    private WindowManager windowManager = null!;
-    public CosmosDisplayDriver displayDriver = null!;
     protected override void BeforeRun()
     {
         SchedulerManager.SetScheduler(new MlfqScheduler());
@@ -50,13 +48,9 @@ public class Kernel : Sys.Kernel
 
         Palette.Initialize();
 
-        SystemLogger.WriteLine("BOOT", "FileSystemManager.Setup() starting", ConsoleMessageType.Log);
+        SystemLogger.WriteLine("FSM", "Starting", ConsoleMessageType.Log);
         FileSystemManager.Setup();
 
-        SystemLogger.WriteLine("WASM", "Runtime initialized", ConsoleMessageType.Log, true);
-
-
-        SystemLogger.WriteLine("BOOT", "Canvas starting", ConsoleMessageType.Log);
 
         canvas = Canvas.GetFullScreen(new Mode(1920, 1080, ColorDepth.ColorDepth32));
 
@@ -67,11 +61,9 @@ public class Kernel : Sys.Kernel
 
         MouseManager.SetScreenSize(canvas.Width, canvas.Height);
 
-
-        displayDriver = new CosmosDisplayDriver();
-        DriverManager.Register(displayDriver);
-        DriverManager.StartAll();
         mainBuffer = displayDriver.BackBuffer;
+
+        CompositorSelfTests.Run();
 
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
@@ -133,7 +125,6 @@ public class Kernel : Sys.Kernel
             startBusy = SchedulerDiagnostics.BusyCpuTimeNs;
 
             Mouse.Update();
-            System.Drivers.Keyboard.BeginFrame();
             Tick();
 
             PerformanceMetrics.BeginFrame();

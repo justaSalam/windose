@@ -6,19 +6,14 @@ using Windose.System.Kernel;
 
 namespace Windose.Drivers;
 
-public sealed class CosmosDisplayDriver : IWindoseDriver
+public sealed class DisplayManager
 {
-    public string Name => "Cosmos GOP Display";
-    public WindoseDriverState State { get; private set; } = WindoseDriverState.Created;
-
     public Canvas canvas { get; private set; }
-    public DirectBitmap BackBuffer { get; private set; }
+    public ComponentBuffer BackBuffer { get; private set; }
     public int Width => canvas == null ? 0 : canvas.Width;
     public int Height => canvas == null ? 0 : canvas.Height;
 
-
-
-    public void Start()
+    public DisplayManager()
     {
         canvas = Kernel.canvas;
 
@@ -27,8 +22,7 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         int height = (int)Registry.GetInteger("System/Display/Height", 1080);
         int depth = (int)Registry.GetInteger("System/Display/BitsPerPixel", 32);
 
-        BackBuffer = new DirectBitmap(canvas.Width, canvas.Height);
-        State = WindoseDriverState.Started;
+        BackBuffer = new ComponentBuffer(canvas.Width, canvas.Height);
 
         TimerManager.ScheduleRecurring(() =>
         {
@@ -36,9 +30,9 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         }, TimeSpan.FromMilliseconds(83));
     }
 
+
     public void Present(int cursorX, int cursorY)
     {
-        if (State != WindoseDriverState.Started || canvas == null) return;
         long uploadStartedAt = PerformanceMetrics.Now;
         canvas.DrawCanvas(BackBuffer, 0, 0);
         canvas.DrawString($"Util.: {Kernel.utilization:F3}%", SystemFonts.msSansSerif, Color.White, 10, 10);
@@ -56,13 +50,6 @@ public sealed class CosmosDisplayDriver : IWindoseDriver
         long displayStartedAt = PerformanceMetrics.Now;
         canvas.Display();
         PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
-    }
-
-
-    //console shares the same canvas, don't disable
-    public void Stop()
-    {
-        State = WindoseDriverState.Stopped;
     }
 
     private bool isCursorVisible = true;
