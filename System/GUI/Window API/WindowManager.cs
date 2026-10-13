@@ -179,10 +179,8 @@ public partial class WindowManager : SingleThreadedProcess
                         {
                             component.DrawDirtyLocal(region);
                             renderedComponents.Add(component);
-
-                            Windose.Drivers.DisplayManager.compositor.Draw(component, componentIndex);
-                            //component.DrawToScreen(region);
                         }
+                        component.DrawToScreen(region);
                     }
                     catch (Exception exception)
                     {
@@ -267,409 +265,409 @@ public partial class WindowManager : SingleThreadedProcess
 
     public static void ShowPreviewRect(Rectangle rect)
     {
-    if (hasPreviewRect)
+        if (hasPreviewRect)
+            InvalidatePreviewRect(previewRect);
+
+        previewRect = rect;
+        hasPreviewRect = true;
         InvalidatePreviewRect(previewRect);
+    }
 
-    previewRect = rect;
-    hasPreviewRect = true;
-    InvalidatePreviewRect(previewRect);
-}
-
-public static void ClearPreviewRect()
-{
-    if (!hasPreviewRect) return;
-
-    InvalidatePreviewRect(previewRect);
-    hasPreviewRect = false;
-}
-
-private static void InvalidatePreviewRect(Rectangle rect)
-{
-    Invalidate(new Rectangle(rect.X - 1, rect.Y - 1, rect.Width + 2, rect.Height + 2));
-}
-
-private static void DrawPreviewRect()
-{
-    if (!hasPreviewRect || focusedWindow == null) return;
-
-    Kernel.mainBuffer.DrawDottedRectangle(Color.White, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
-}
-
-
-//TODO Potential self register through the constructor
-public static void Register(Window window)
-{
-    PostRegister(window);
-}
-
-private static void RegisterNow(Window window)
-{
-    lock (windows)
+    public static void ClearPreviewRect()
     {
-        if (windows.Contains(window)) return;
+        if (!hasPreviewRect) return;
 
-        window.zIndex = nextZIndex;
-        window.Start();
-        windows.Add(window);
-        nextZIndex++;
-        SetFocusedWindow(window);
+        InvalidatePreviewRect(previewRect);
+        hasPreviewRect = false;
+    }
 
-        // A newly registered window has no previous dirty rectangle to drive its
-        // first composition pass. Explicitly schedule that first paint.
-        window.ForceDirty();
-        Invalidate(window.bounds);
+    private static void InvalidatePreviewRect(Rectangle rect)
+    {
+        Invalidate(new Rectangle(rect.X - 1, rect.Y - 1, rect.Width + 2, rect.Height + 2));
+    }
 
-        if (!window.showInTaskbar || Explorer.taskbar == null) return;
+    private static void DrawPreviewRect()
+    {
+        if (!hasPreviewRect || focusedWindow == null) return;
 
-        int taskbarButtonWidth = Math.Max(84, window.text.Length * 7 + (window.Icon == null ? 18 : 38));
-        taskbarButtonWidth = Math.Min(taskbarButtonWidth, 180);
-        int taskbarButtonHeight = Math.Max(20, Explorer.taskbar.Height - 10);
+        Kernel.mainBuffer.DrawDottedRectangle(Color.White, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
+    }
 
-        Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
+
+    //TODO Potential self register through the constructor
+    public static void Register(Window window)
+    {
+        PostRegister(window);
+    }
+
+    private static void RegisterNow(Window window)
+    {
+        lock (windows)
         {
-            verticalAlignment = VerticalAlignment.Center,
-            contentAlignment = HorizontalAlignment.Left,
-            iconSize = 16,
-            iconTextGap = 4,
-            Padding = new Thickness(3),
-            Margin = new Thickness(2, 2, 0, 0),
-            useBorders = true,
-            image = window.Icon,
+            if (windows.Contains(window)) return;
 
-            leftClickAction = () =>
+            window.zIndex = nextZIndex;
+            window.Start();
+            windows.Add(window);
+            nextZIndex++;
+            SetFocusedWindow(window);
+
+            // A newly registered window has no previous dirty rectangle to drive its
+            // first composition pass. Explicitly schedule that first paint.
+            window.ForceDirty();
+            Invalidate(window.bounds);
+
+            if (!window.showInTaskbar || Explorer.taskbar == null) return;
+
+            int taskbarButtonWidth = Math.Max(84, window.text.Length * 7 + (window.Icon == null ? 18 : 38));
+            taskbarButtonWidth = Math.Min(taskbarButtonWidth, 180);
+            int taskbarButtonHeight = Math.Max(20, Explorer.taskbar.Height - 10);
+
+            Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
             {
-                if (window.isMinimized)
+                verticalAlignment = VerticalAlignment.Center,
+                contentAlignment = HorizontalAlignment.Left,
+                iconSize = 16,
+                iconTextGap = 4,
+                Padding = new Thickness(3),
+                Margin = new Thickness(2, 2, 0, 0),
+                useBorders = true,
+                image = window.Icon,
+
+                leftClickAction = () =>
                 {
-                    Restore(window);
+                    if (window.isMinimized)
+                    {
+                        Restore(window);
+                    }
+                    else if (focusedWindow == window)
+                    {
+                        Minimize(window);
+                    }
+                    else
+                    {
+                        Activate(window);
+                    }
                 }
-                else if (focusedWindow == window)
-                {
-                    Minimize(window);
-                }
-                else
-                {
-                    Activate(window);
-                }
-            }
-        };
-
-        taskbarButtons[window] = taskbarButton;
-        Explorer.taskbar.windows.Add(taskbarButton);
-        Explorer.taskbar.bar.AddStackChild(taskbarButton);
-        RefreshTaskbarButtons();
-        Explorer.taskbar.ForceDirty();
-        Invalidate(Explorer.taskbar.AbsoluteRectangle);
-    }
-
-}
-
-public static void Close(Window window)
-{
-    PostClose(window);
-    PostInvalidate(window);
-}
-
-public static void Minimize(Window window)
-{
-    MinimizeImmediate(window);
-}
-
-public static void MinimizeAllWindows()
-{
-    Window[] windowsToMinimize = windows.ToArray();
-    for (int i = 0; i < windowsToMinimize.Length; i++)
-    {
-        Window window = windowsToMinimize[i];
-        if (window.showInTaskbar && window.Visible && !window.isMinimized)
-            MinimizeImmediate(window);
-    }
-}
-
-internal static void MinimizeImmediate(Window window)
-{
-    if (window == null || !window.canMinimize || window.isMinimized) return;
-
-    Invalidate(window.bounds);
-    window.SetFocused(false);
-    window.MinimizeWindow();
-
-    if (focusedWindow == window)
-        focusedWindow = null;
-
-    FocusTopVisibleWindow(window);
-    RefreshTaskbarButtons();
-    Explorer.taskbar.MarkDirty();
-}
-
-public static void Restore(Window window)
-{
-    if (window == null) return;
-    Activate(window);
-}
-
-public static Rectangle GetTaskbarButtonBounds(Window window)
-{
-    if (window == null || !taskbarButtons.TryGetValue(window, out Button taskbarButton))
-        return Rectangle.Empty;
-
-    return taskbarButton.AbsoluteRectangle;
-}
-
-internal static void FocusTopVisibleWindowPublic(Window excludedWindow)
-{
-    FocusTopVisibleWindow(excludedWindow);
-}
-
-public static void ToggleMaximize(Window window)
-{
-    if (window == null || !window.canMaximize) return;
-
-    Rectangle oldBounds = window.bounds;
-    int workAreaHeight = Explorer.taskbar != null
-        ? Explorer.taskbar.Y
-        : Global.screenHeight;
-
-    window.ToggleMaximized(new Rectangle(0, 0, Global.screenWidth, workAreaHeight));
-    Invalidate(oldBounds);
-    Invalidate(window.bounds);
-    Activate(window);
-}
-
-public static void SetWindowTitle(Window window, string title)
-{
-    if (window == null) return;
-
-    window.SetTitle(title);
-
-    if (!taskbarButtons.TryGetValue(window, out Button taskbarButton)) return;
-
-    taskbarButton.text = window.text;
-    taskbarButton.MarkDirty();
-
-    if (Explorer.taskbar == null) return;
-
-    Explorer.taskbar.ForceDirty();
-    Invalidate(Explorer.taskbar.AbsoluteRectangle);
-}
-
-public static void Activate(Window window)
-{
-    if (window == null) return;
-
-    if (window.isMinimized)
-        window.RestoreFromTaskbar();
-
-    window.zIndex = nextZIndex++;
-    SetFocusedWindow(window);
-    Invalidate(window.bounds);
-}
-
-private static void FocusTopVisibleWindow(Window excludedWindow)
-{
-    Window nextWindow = null;
-
-    for (int i = 0; i < windows.Count; i++)
-    {
-        Window candidate = windows[i];
-        if (candidate == excludedWindow || !candidate.Visible) continue;
-        if (nextWindow == null || candidate.zIndex > nextWindow.zIndex)
-            nextWindow = candidate;
-    }
-
-    if (nextWindow != null)
-        SetFocusedWindow(nextWindow);
-}
-
-private void FailApplication(Window window, string operation, Exception exception)
-{
-    if (window != null && failedWindows.Contains(window))
-    {
-        return;
-    }
-    string applicationName = window?.text;
-    if (string.IsNullOrEmpty(applicationName))
-    {
-        applicationName = "Application";
-    }
-
-    string detail = exception?.Message;
-    if (string.IsNullOrEmpty(detail))
-    {
-        detail = "Unknown error";
-    }
-
-    SystemLogger.WriteLine(applicationName, "failed while " + operation + ": " + detail + "\n", ConsoleMessageType.Error);
-    pendingFailures.Add(new ApplicationFailure(applicationName, operation, detail));
-
-    if (window == null)
-    {
-        return;
-    }
-
-    failedWindows.Add(window);
-    if (focusedWindow == window)
-    {
-        focusedWindow = null;
-    }
-
-    if (capturedWindow == window)
-    {
-        capturedWindow = null;
-    }
-
-    if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
-    {
-        capturedComponent = null;
-    }
-
-    PostClose(window);
-}
-
-private void ShowPendingFailures()
-{
-    if (pendingFailures.Count == 0) return;
-
-    for (int i = 0; i < pendingFailures.Count; i++)
-    {
-        ApplicationFailure failure = pendingFailures[i];
-        try
-        {
-            string message = failure.application + " crashed while " + failure.operation + ": " + failure.detail;
-
-
-            Window error = new Window(140, 140, 680, 130, "Application Error", true)
-            {
-                canMaximize = false,
-                canResize = false,
             };
-            Panel text = new Panel(Palette.ControlFace, 8, 34, 664, 48)
-            {
-                text = message,
-                fontSize = 16,
-                textColor = Palette.ControlBlack,
-                useBackground = true,
-                horizontalAlignment = HorizontalAlignment.Stretch,
-                Margin = new Thickness(8, 34, 8, 8),
 
-            };
-            error.AddChild(text);
-            Register(error);
+            taskbarButtons[window] = taskbarButton;
+            Explorer.taskbar.windows.Add(taskbarButton);
+            Explorer.taskbar.bar.AddStackChild(taskbarButton);
+            RefreshTaskbarButtons();
+            Explorer.taskbar.ForceDirty();
+            Invalidate(Explorer.taskbar.AbsoluteRectangle);
         }
-        catch (Exception reportException)
+
+    }
+
+    public static void Close(Window window)
+    {
+        PostClose(window);
+        PostInvalidate(window);
+    }
+
+    public static void Minimize(Window window)
+    {
+        MinimizeImmediate(window);
+    }
+
+    public static void MinimizeAllWindows()
+    {
+        Window[] windowsToMinimize = windows.ToArray();
+        for (int i = 0; i < windowsToMinimize.Length; i++)
         {
-            SystemLogger.WriteLine("DWM", "Could not display application error: " + reportException.Message + "\n", ConsoleMessageType.Error);
+            Window window = windowsToMinimize[i];
+            if (window.showInTaskbar && window.Visible && !window.isMinimized)
+                MinimizeImmediate(window);
         }
     }
 
-    pendingFailures.Clear();
-}
-
-private void CloseNow(Window window)
-{
-    lock (windows)
+    internal static void MinimizeImmediate(Window window)
     {
-
-        if (window == null || !windows.Contains(window)) return;
-
-        BreezeRuntime.NotifyWindowClosed(window);
+        if (window == null || !window.canMinimize || window.isMinimized) return;
 
         Invalidate(window.bounds);
-        ClearPreviewRect();
+        window.SetFocused(false);
+        window.MinimizeWindow();
 
         if (focusedWindow == window)
             focusedWindow = null;
 
-        if (capturedWindow == window)
-            capturedWindow = null;
-
-        if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
-            capturedComponent = null;
-
-        if (taskbarButtons.ContainsKey(window))
-        {
-            Button taskbarButton = taskbarButtons[window];
-
-            taskbarButtons.Remove(window);
-
-            Explorer.taskbar.windows.Remove(taskbarButton);
-            Explorer.taskbar.bar.RemoveStackChild(taskbarButton);
-            Explorer.taskbar.bar.ForceDirty();
-            Explorer.taskbar.ForceDirty();
-
-            Invalidate(Explorer.taskbar.AbsoluteRectangle);
-
-        }
-
-        windows.Remove(window);
-        failedWindows.Remove(window);
-
         FocusTopVisibleWindow(window);
         RefreshTaskbarButtons();
-        window.Stop();
+        Explorer.taskbar.MarkDirty();
     }
-}
 
-public static void Invalidate(Component dirty)
-{
-    Invalidate(dirty.AbsoluteRectangle);
-
-}
-
-public static void Invalidate(Rectangle dirtyRect)
-{
-    dirtyRect = Rectangle.Intersect(
-        dirtyRect,
-        new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
-
-    if (dirtyRect.Width <= 0 || dirtyRect.Height <= 0) return;
-
-    lock (dirtyRectsLock)
+    public static void Restore(Window window)
     {
-        for (int i = 0; i < dirtyRects.Count; i++)
-        {
-            if (dirtyRects[i].Equals(dirtyRect)) return;
-            if (!dirtyRects[i].IntersectsWith(dirtyRect)) continue;
+        if (window == null) return;
+        Activate(window);
+    }
 
-            dirtyRect = Rectangle.Union(dirtyRects[i], dirtyRect);
-            dirtyRects.RemoveAt(i);
-            i--;
+    public static Rectangle GetTaskbarButtonBounds(Window window)
+    {
+        if (window == null || !taskbarButtons.TryGetValue(window, out Button taskbarButton))
+            return Rectangle.Empty;
+
+        return taskbarButton.AbsoluteRectangle;
+    }
+
+    internal static void FocusTopVisibleWindowPublic(Window excludedWindow)
+    {
+        FocusTopVisibleWindow(excludedWindow);
+    }
+
+    public static void ToggleMaximize(Window window)
+    {
+        if (window == null || !window.canMaximize) return;
+
+        Rectangle oldBounds = window.bounds;
+        int workAreaHeight = Explorer.taskbar != null
+            ? Explorer.taskbar.Y
+            : Global.screenHeight;
+
+        window.ToggleMaximized(new Rectangle(0, 0, Global.screenWidth, workAreaHeight));
+        Invalidate(oldBounds);
+        Invalidate(window.bounds);
+        Activate(window);
+    }
+
+    public static void SetWindowTitle(Window window, string title)
+    {
+        if (window == null) return;
+
+        window.SetTitle(title);
+
+        if (!taskbarButtons.TryGetValue(window, out Button taskbarButton)) return;
+
+        taskbarButton.text = window.text;
+        taskbarButton.MarkDirty();
+
+        if (Explorer.taskbar == null) return;
+
+        Explorer.taskbar.ForceDirty();
+        Invalidate(Explorer.taskbar.AbsoluteRectangle);
+    }
+
+    public static void Activate(Window window)
+    {
+        if (window == null) return;
+
+        if (window.isMinimized)
+            window.RestoreFromTaskbar();
+
+        window.zIndex = nextZIndex++;
+        SetFocusedWindow(window);
+        Invalidate(window.bounds);
+    }
+
+    private static void FocusTopVisibleWindow(Window excludedWindow)
+    {
+        Window nextWindow = null;
+
+        for (int i = 0; i < windows.Count; i++)
+        {
+            Window candidate = windows[i];
+            if (candidate == excludedWindow || !candidate.Visible) continue;
+            if (nextWindow == null || candidate.zIndex > nextWindow.zIndex)
+                nextWindow = candidate;
         }
 
-        dirtyRects.Add(dirtyRect);
+        if (nextWindow != null)
+            SetFocusedWindow(nextWindow);
     }
-}
 
-public static void InvalidateAll()
-{
-    for (int i = 0; i < Component.components.Count; i++)
+    private void FailApplication(Window window, string operation, Exception exception)
     {
-        Component component = Component.components[i];
-        if (component == null || !component.Visible) continue;
-        component.ForceDirty();
+        if (window != null && failedWindows.Contains(window))
+        {
+            return;
+        }
+        string applicationName = window?.text;
+        if (string.IsNullOrEmpty(applicationName))
+        {
+            applicationName = "Application";
+        }
+
+        string detail = exception?.Message;
+        if (string.IsNullOrEmpty(detail))
+        {
+            detail = "Unknown error";
+        }
+
+        SystemLogger.WriteLine(applicationName, "failed while " + operation + ": " + detail + "\n", ConsoleMessageType.Error);
+        pendingFailures.Add(new ApplicationFailure(applicationName, operation, detail));
+
+        if (window == null)
+        {
+            return;
+        }
+
+        failedWindows.Add(window);
+        if (focusedWindow == window)
+        {
+            focusedWindow = null;
+        }
+
+        if (capturedWindow == window)
+        {
+            capturedWindow = null;
+        }
+
+        if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
+        {
+            capturedComponent = null;
+        }
+
+        PostClose(window);
     }
 
-    Invalidate(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
-}
-
-
-public static void BringToFront(Window window)
-{
-    window.zIndex = nextZIndex++;
-    Invalidate(window);
-}
-
-
-private readonly struct ApplicationFailure
-{
-    public readonly string application;
-    public readonly string operation;
-    public readonly string detail;
-
-    public ApplicationFailure(string application, string operation, string detail)
+    private void ShowPendingFailures()
     {
-        this.application = application;
-        this.operation = operation;
-        this.detail = detail;
+        if (pendingFailures.Count == 0) return;
+
+        for (int i = 0; i < pendingFailures.Count; i++)
+        {
+            ApplicationFailure failure = pendingFailures[i];
+            try
+            {
+                string message = failure.application + " crashed while " + failure.operation + ": " + failure.detail;
+
+
+                Window error = new Window(140, 140, 680, 130, "Application Error", true)
+                {
+                    canMaximize = false,
+                    canResize = false,
+                };
+                Panel text = new Panel(Palette.ControlFace, 8, 34, 664, 48)
+                {
+                    text = message,
+                    fontSize = 16,
+                    textColor = Palette.ControlBlack,
+                    useBackground = true,
+                    horizontalAlignment = HorizontalAlignment.Stretch,
+                    Margin = new Thickness(8, 34, 8, 8),
+
+                };
+                error.AddChild(text);
+                Register(error);
+            }
+            catch (Exception reportException)
+            {
+                SystemLogger.WriteLine("DWM", "Could not display application error: " + reportException.Message + "\n", ConsoleMessageType.Error);
+            }
+        }
+
+        pendingFailures.Clear();
     }
-}
+
+    private void CloseNow(Window window)
+    {
+        lock (windows)
+        {
+
+            if (window == null || !windows.Contains(window)) return;
+
+            BreezeRuntime.NotifyWindowClosed(window);
+
+            Invalidate(window.bounds);
+            ClearPreviewRect();
+
+            if (focusedWindow == window)
+                focusedWindow = null;
+
+            if (capturedWindow == window)
+                capturedWindow = null;
+
+            if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
+                capturedComponent = null;
+
+            if (taskbarButtons.ContainsKey(window))
+            {
+                Button taskbarButton = taskbarButtons[window];
+
+                taskbarButtons.Remove(window);
+
+                Explorer.taskbar.windows.Remove(taskbarButton);
+                Explorer.taskbar.bar.RemoveStackChild(taskbarButton);
+                Explorer.taskbar.bar.ForceDirty();
+                Explorer.taskbar.ForceDirty();
+
+                Invalidate(Explorer.taskbar.AbsoluteRectangle);
+
+            }
+
+            windows.Remove(window);
+            failedWindows.Remove(window);
+
+            FocusTopVisibleWindow(window);
+            RefreshTaskbarButtons();
+            window.Stop();
+        }
+    }
+
+    public static void Invalidate(Component dirty)
+    {
+        Invalidate(dirty.AbsoluteRectangle);
+
+    }
+
+    public static void Invalidate(Rectangle dirtyRect)
+    {
+        dirtyRect = Rectangle.Intersect(
+            dirtyRect,
+            new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
+
+        if (dirtyRect.Width <= 0 || dirtyRect.Height <= 0) return;
+
+        lock (dirtyRectsLock)
+        {
+            for (int i = 0; i < dirtyRects.Count; i++)
+            {
+                if (dirtyRects[i].Equals(dirtyRect)) return;
+                if (!dirtyRects[i].IntersectsWith(dirtyRect)) continue;
+
+                dirtyRect = Rectangle.Union(dirtyRects[i], dirtyRect);
+                dirtyRects.RemoveAt(i);
+                i--;
+            }
+
+            dirtyRects.Add(dirtyRect);
+        }
+    }
+
+    public static void InvalidateAll()
+    {
+        for (int i = 0; i < Component.components.Count; i++)
+        {
+            Component component = Component.components[i];
+            if (component == null || !component.Visible) continue;
+            component.ForceDirty();
+        }
+
+        Invalidate(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
+    }
+
+
+    public static void BringToFront(Window window)
+    {
+        window.zIndex = nextZIndex++;
+        Invalidate(window);
+    }
+
+
+    private readonly struct ApplicationFailure
+    {
+        public readonly string application;
+        public readonly string operation;
+        public readonly string detail;
+
+        public ApplicationFailure(string application, string operation, string detail)
+        {
+            this.application = application;
+            this.operation = operation;
+            this.detail = detail;
+        }
+    }
 }

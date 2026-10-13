@@ -15,13 +15,10 @@ public sealed class DisplayManager
     public int Height => canvas == null ? 0 : canvas.Height;
 
 
-    public static GpuCompositor ?compositor;
 
     public DisplayManager()
     {
         canvas = Kernel.canvas;
-        compositor = GpuCompositor.TryCreate(canvas);
-
 
         int width = (int)Registry.GetInteger("System/Display/Width", 1920);
         int height = (int)Registry.GetInteger("System/Display/Height", 1080);
@@ -39,8 +36,6 @@ public sealed class DisplayManager
     public void Present(int cursorX, int cursorY)
     {
         long uploadStartedAt = PerformanceMetrics.Now;
-        compositor.BeginFrame(Color.Teal);
-        
         canvas.DrawCanvas(BackBuffer, 0, 0);
 
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
@@ -54,9 +49,7 @@ public sealed class DisplayManager
 
 
         long displayStartedAt = PerformanceMetrics.Now;
-        //canvas.Display();
-        compositor.EndFrame();
-
+        canvas.Display();
 
         PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
     }

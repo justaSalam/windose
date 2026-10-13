@@ -13,8 +13,9 @@
   <ItemGroup>
     <PackageReference Include="Cosmos.Kernel" Version="3.0.94" />
     <PackageReference Include="Cosmos.Kernel.System" Version="3.0.94" />
-	  <PackageReference Include="Cosmos.Executable.Lua" Version="4.0.0" />
-	  <PackageReference Include="Cosmos.Network.Http" Version="3.0.0" />
+	<PackageReference Include="Cosmos.Executable.Lua" Version="4.0.0" />
+	<PackageReference Include="Cosmos.Network.Http" Version="3.0.0" />
+	  
   </ItemGroup>
 
     <ItemGroup>

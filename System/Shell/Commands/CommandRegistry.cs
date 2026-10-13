@@ -118,6 +118,7 @@ public static class CommandRegistry
             context.Clear();
         }));
 
+        Register(new IpConfig());
         Register(new UacCommand());
         Register(new ReadCommand());
         Register(new DirectoryCommand());

@@ -12,6 +12,7 @@ using Cosmos.Kernel.Core.Scheduler;
 using Windose.System.Scheduling;
 using Cosmos.Kernel.System.Input;
 using Windose.Compositing;
+using Windose.System.Elf;
 namespace Windose;
 
 /// <summary>
@@ -50,7 +51,9 @@ public class Kernel : Sys.Kernel
     private void InitializeKernel()
     {
         Instance = this;
+        WindoseBridge.Install();
 
+        
         Palette.Initialize();
 
         SystemLogger.WriteLine("FSM", "Starting", ConsoleMessageType.Log);
