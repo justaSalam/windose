@@ -1,5 +1,8 @@
+using Cosmos.Kernel.HAL.Devices.Storage;
+using Cosmos.Kernel.System.FileSystem;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
+using Cosmos.Kernel.System.Storage;
 using System.Drawing;
 using Windose;
 using Windose.System.Kernel;
@@ -232,10 +235,6 @@ public class FileExplorer : Window
 
         AddChild(root);
         files.SetViewMode(ListViewMode.LargeIcon);
-
-
-
-
     }
 
     private void NewFileFromContext()
@@ -275,17 +274,41 @@ public class FileExplorer : Window
 
     }
 
+    private const string DriveImage = "/mnt/System/Icons/hard_disk_drive.png";
+
     private void BuildTree(in string path)
     {
         tree.ClearItems();
 
         PopulateFilesystemLocation(path);
 
-        TreeViewItem treeRoot = tree.AddRoot(path, path);
-        PopulateTreeItem(treeRoot);
+        for (int i = 0; i < StorageManager.DeviceCount; i++)
+        {
+            IBlockDevice? device = StorageManager.GetDevice(i);
+            if (device == null)
+            {
+                continue;
+            }
 
-        TreeViewItem bootRoot = tree.AddRoot("/boot", "/boot");
-        PopulateTreeItem(bootRoot);
+            IReadOnlyList<Partition> partitions = StorageManager.GetPartitions(device);
+
+            foreach (Partition partition in partitions)
+            {
+
+                VfsMount? mount = DiskManagement.GetMount(partition);
+                if (mount == null)
+                {
+                    continue;
+                }
+
+                string mPoint = mount.MountPoint;
+
+                TreeViewItem root = tree.AddRoot(mPoint, DriveImage, mPoint);
+                PopulateTreeItem(root);
+            }
+
+
+        }
     }
 
     private void PopulateTreeItem(TreeViewItem item)
@@ -301,12 +324,14 @@ public class FileExplorer : Window
         {
             foreach (string dir in Directory.GetDirectories(path))
             {
-                TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), dir);
+                TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), "/mnt/System/Icons/directory_closed.png", dir);
                 PopulateTreeItem(childItem);
             }
         }
-        catch
+        catch (Exception ex)
         {
+            SystemLogger.WriteLine("FileExplorer", $"Access denied reading {path}: {ex.Message}", ConsoleMessageType.Error);
+            SystemLogger.Dump();
         }
     }
 

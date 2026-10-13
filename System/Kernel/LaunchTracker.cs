@@ -21,6 +21,8 @@ namespace Windose.System.Kernel
                 catch (Exception ex)
                 {
                     SystemLogger.WriteLine("LaunchTracker", $"Error launching window: {ex.Message}", ConsoleMessageType.Error, true);
+                    SystemLogger.WriteLine("LaunchTracker", $"           Stack trace: {ex.StackTrace}", ConsoleMessageType.Error, true);
+                    SystemLogger.WriteLine("LaunchTracker", $"                  Type: {ex.GetType().FullName}", ConsoleMessageType.Error, true);
                 }
                 finally
                 {

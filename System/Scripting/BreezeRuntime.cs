@@ -496,8 +496,18 @@ public sealed class BreezeRuntime
                 }
 
             case "writeFile":
-                File.WriteAllText(ToText(args[0]), ToText(args[1]));
-                break;
+                {
+                    string path = FileSystemManager.NormalizePath(ToText(args[0]));
+                    bool overwrite = ToBool(args[2]);
+                    if (!overwrite && File.Exists(path)) return false;
+
+                    string directory = FileSystemManager.GetParent(path);
+                    if (directory != "" && !Directory.Exists(directory))
+                        Directory.CreateDirectory(directory);
+
+                    File.WriteAllText(path, ToText(args[1]));
+                    return true;
+                }
 
             case "fileInfo":
                 {

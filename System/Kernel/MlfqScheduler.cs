@@ -11,14 +11,17 @@ public sealed class MlfqScheduler : IScheduler
     private const int LevelCount = 4;
 
     /*
-     * Cosmos currently uses a 10 ms scheduler tick.
+     * Per-level queue capacity at CPU init. OnThreadCreate grows the
+     * queues so that every queue can hold every thread on the CPU, which
+     * means the tick / pick / ready paths never allocate.
+     */
+    private const int InitialQueueCapacity = 64;
+
+    /*
+     * Allotment per level. A thread that accumulates this much runtime
+     * while staying on the level is demoted.
      *
-     * These are expressed in milliseconds:
-     *
-     * L0 = 10 ms
-     * L1 = 20 ms
-     * L2 = 40 ms
-     * L3 = 80 ms
+     * L0 = 10 ms, L1 = 20 ms, L2 = 40 ms, L3 = 80 ms
      */
     private static readonly ulong[] QuantumNs =
     {
@@ -29,15 +32,121 @@ public sealed class MlfqScheduler : IScheduler
     };
 
     /*
-     * Every N ticks perform the classic MLFQ
-     * priority boost.
-     *
-     * 100 ticks × 10 ms = ~1 second.
+     * Classic MLFQ priority boost, driven by real elapsed time
+     * (not by a tick counter) so it can't drift when idle ticks occur.
      */
-    private const ulong BoostIntervalTicks = 100;
+    private const ulong BoostIntervalNs = 1_000_000_000;
 
 
-    public string Name => "Windose MLFQ";
+    public string Name => "Multilevel Feedback Queue";
+
+
+    // ------------------------------------------------------------
+    // Allocation-free ring-buffer run queue
+    // ------------------------------------------------------------
+
+    private sealed class RunQueue
+    {
+        private SchedulerThread[] _items;
+        private int _head;
+        private int _count;
+
+        public RunQueue(int capacity)
+        {
+            _items = new SchedulerThread[capacity];
+        }
+
+        public int Count => _count;
+
+        public SchedulerThread this[int index] => _items[Wrap(_head + index)];
+
+        // Valid for i in [0, 2 * length).
+        private int Wrap(int i)
+        {
+            int len = _items.Length;
+            return i >= len ? i - len : i;
+        }
+
+        public void EnqueueTail(SchedulerThread thread)
+        {
+            if (_count == _items.Length)
+                Grow(_items.Length * 2);
+
+            _items[Wrap(_head + _count)] = thread;
+            _count++;
+        }
+
+        public void EnqueueHead(SchedulerThread thread)
+        {
+            if (_count == _items.Length)
+                Grow(_items.Length * 2);
+
+            _head = _head == 0 ? _items.Length - 1 : _head - 1;
+            _items[_head] = thread;
+            _count++;
+        }
+
+        public SchedulerThread DequeueHead()
+        {
+            SchedulerThread thread = _items[_head];
+
+            _items[_head] = null!;
+            _head = Wrap(_head + 1);
+            _count--;
+
+            return thread;
+        }
+
+        public bool Remove(SchedulerThread thread)
+        {
+            /*
+             * Reference comparison on purpose. Cosmos warns against
+             * List.Remove / Contains / IndexOf on scheduler paths.
+             */
+            for (int i = 0; i < _count; i++)
+            {
+                if (!ReferenceEquals(_items[Wrap(_head + i)], thread))
+                    continue;
+
+                // Shift the tail down by one, preserving order.
+                for (int j = i; j < _count - 1; j++)
+                    _items[Wrap(_head + j)] = _items[Wrap(_head + j + 1)];
+
+                _items[Wrap(_head + _count - 1)] = null!;
+                _count--;
+
+                return true;
+            }
+
+            return false;
+        }
+
+        public void Clear()
+        {
+            for (int i = 0; i < _count; i++)
+                _items[Wrap(_head + i)] = null!;
+
+            _head = 0;
+            _count = 0;
+        }
+
+        public void EnsureCapacity(int capacity)
+        {
+            if (capacity > _items.Length)
+                Grow(capacity);
+        }
+
+        private void Grow(int newCapacity)
+        {
+            SchedulerThread[] newItems = new SchedulerThread[newCapacity];
+
+            for (int i = 0; i < _count; i++)
+                newItems[i] = _items[Wrap(_head + i)];
+
+            _items = newItems;
+            _head = 0;
+        }
+    }
 
 
     // ------------------------------------------------------------
@@ -48,26 +157,45 @@ public sealed class MlfqScheduler : IScheduler
     {
         public int Level;
 
+        /*
+         * Lowest level (numerically highest) this thread may be
+         * demoted to. Default is the bottom level. SetPriority()
+         * lowers it to pin a thread (e.g. the focused window).
+         */
+        public int Floor = LevelCount - 1;
+
+        /*
+         * Runtime accumulated on the current level. Only reset when
+         * the level changes, so yielding can't dodge demotion.
+         */
         public ulong QuantumUsed;
 
         /*
-         * Set when the thread consumed its complete quantum.
-         *
-         * The actual demotion happens when OnThreadYield()
-         * receives the thread.
+         * Set by OnTick when the allotment ran out.
+         * The demotion itself is applied in OnThreadYield/OnThreadBlocked.
          */
         public bool QuantumExpired;
 
         /*
-         * Used to detect whether the thread is currently
-         * present in one of our queues.
+         * Set by OnTick when the thread is being kicked off the CPU
+         * because a higher level has runnable threads. A preempted
+         * thread keeps its turn: it goes back to the head of its queue.
+         */
+        public bool Preempted;
+
+        /*
+         * True from PickNext until the first tick afterwards.
+         * That tick only covers part of an interval, see OnTick.
+         */
+        public bool JustPicked;
+
+        /*
+         * Present in one of our queues.
          */
         public bool Queued;
 
         /*
-         * Number of consecutive ticks spent running.
-         *
-         * Useful for diagnostics / tuning.
+         * Ticks spent running, for diagnostics / tuning.
          */
         public ulong RuntimeTicks;
     }
@@ -79,15 +207,37 @@ public sealed class MlfqScheduler : IScheduler
 
     private sealed class CpuData
     {
-        public readonly List<SchedulerThread>[] Queues =
-        {
-            new List<SchedulerThread>(16),
-            new List<SchedulerThread>(16),
-            new List<SchedulerThread>(16),
-            new List<SchedulerThread>(16)
-        };
+        public readonly RunQueue[] Queues = new RunQueue[LevelCount];
 
-        public ulong TickCount;
+        public ulong BoostTimerNs;
+
+        public int ThreadCount;
+
+        public CpuData()
+        {
+            for (int i = 0; i < LevelCount; i++)
+                Queues[i] = new RunQueue(InitialQueueCapacity);
+        }
+
+        public void EnsureCapacity(int capacity)
+        {
+            for (int i = 0; i < LevelCount; i++)
+                Queues[i].EnsureCapacity(capacity);
+        }
+    }
+
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    private static void Demote(ThreadData data)
+    {
+        if (data.Level < data.Floor)
+            data.Level++;
+
+        data.QuantumUsed = 0;
+        data.QuantumExpired = false;
     }
 
 
@@ -121,17 +271,30 @@ public sealed class MlfqScheduler : IScheduler
         thread.SchedulerData = new ThreadData
         {
             Level = 0,
+            Floor = LevelCount - 1,
             QuantumUsed = 0,
             QuantumExpired = false,
+            Preempted = false,
+            JustPicked = false,
             Queued = false,
             RuntimeTicks = 0
         };
 
         /*
-         * Important:
-         *
+         * Grow every queue now, in creation context, so it can hold
+         * every thread. This keeps allocation out of the interrupt
+         * paths (OnTick / OnThreadReady / OnThreadYield).
+         */
+        CpuData? cpu = cpuState.SchedulerData as CpuData;
+
+        if (cpu is not null)
+        {
+            cpu.ThreadCount++;
+            cpu.EnsureCapacity(cpu.ThreadCount);
+        }
+
+        /*
          * Do NOT queue it here.
-         *
          * Cosmos calls OnThreadReady() when it becomes runnable.
          */
     }
@@ -152,8 +315,7 @@ public sealed class MlfqScheduler : IScheduler
             return;
 
         /*
-         * The documentation specifically warns that this hook
-         * can be called more than once for the same thread.
+         * This hook can be called more than once for the same thread.
          */
         if (data.Queued)
             return;
@@ -164,7 +326,7 @@ public sealed class MlfqScheduler : IScheduler
         if (data.Level >= LevelCount)
             data.Level = LevelCount - 1;
 
-        cpu.Queues[data.Level].Add(thread);
+        cpu.Queues[data.Level].EnqueueTail(thread);
 
         data.Queued = true;
     }
@@ -185,34 +347,40 @@ public sealed class MlfqScheduler : IScheduler
             return;
 
         /*
-         * A running thread normally isn't in the queue.
-         *
-         * A READY thread can still be in a queue when it gets
-         * blocked, so remove it if necessary.
+         * A READY thread can still be in a queue when it gets blocked.
          */
         if (data.Queued)
         {
-            RemoveThread(cpu, thread, data.Level);
+            cpu.Queues[data.Level].Remove(thread);
             data.Queued = false;
         }
 
-        /*
-         * Blocking before consuming the complete quantum means
-         * the thread behaved interactively.
-         *
-         * Promote it.
-         */
-        if (!data.QuantumExpired)
+        if (data.QuantumExpired)
         {
-            if (data.Level > 0)
-                data.Level--;
+            /*
+             * Used its whole allotment before blocking: demote.
+             */
+            Demote(data);
+        }
+        else if (data.Level > 0 &&
+                 data.QuantumUsed < QuantumNs[data.Level] / 2)
+        {
+            /*
+             * Blocked after using less than half its allotment:
+             * clearly interactive, promote. Requiring "less than half"
+             * stops a CPU-bound thread from climbing by sleeping 1 ms
+             * every cycle.
+             */
+            data.Level--;
+            data.QuantumUsed = 0;
         }
 
         /*
-         * Start a fresh quantum after blocking.
+         * Otherwise keep the accumulated usage; the allotment is per
+         * level, not per scheduling round.
          */
-        data.QuantumUsed = 0;
-        data.QuantumExpired = false;
+        data.Preempted = false;
+        data.JustPicked = false;
     }
 
 
@@ -231,28 +399,25 @@ public sealed class MlfqScheduler : IScheduler
             return;
 
         /*
-         * If the thread used its whole quantum,
-         * demote it.
+         * Only a fully used allotment demotes. A voluntary yield or a
+         * preemption keeps QuantumUsed, so yielding at 90% of the
+         * quantum can't be used to stay on a high level forever.
          */
         if (data.QuantumExpired)
-        {
-            if (data.Level < LevelCount - 1)
-                data.Level++;
-        }
+            Demote(data);
 
-        /*
-         * Reset quantum accounting.
-         */
-        data.QuantumUsed = 0;
-        data.QuantumExpired = false;
+        bool preempted = data.Preempted;
 
-        /*
-         * The thread is runnable again, so place it at the
-         * tail of its current queue.
-         */
+        data.Preempted = false;
+        data.JustPicked = false;
+
         if (!data.Queued)
         {
-            cpu.Queues[data.Level].Add(thread);
+            if (preempted)
+                cpu.Queues[data.Level].EnqueueHead(thread);
+            else
+                cpu.Queues[data.Level].EnqueueTail(thread);
+
             data.Queued = true;
         }
     }
@@ -271,26 +436,25 @@ public sealed class MlfqScheduler : IScheduler
             return null;
 
         /*
-         * Highest priority queue first.
+         * Highest priority queue first, FIFO within a level.
          */
         for (int level = 0; level < LevelCount; level++)
         {
-            List<SchedulerThread> queue = cpu.Queues[level];
+            RunQueue queue = cpu.Queues[level];
 
             if (queue.Count == 0)
                 continue;
 
-            /*
-             * FIFO.
-             */
-            SchedulerThread thread = queue[0];
-
-            queue.RemoveAt(0);
+            SchedulerThread thread = queue.DequeueHead();
 
             ThreadData? data = thread.SchedulerData as ThreadData;
 
             if (data is not null)
+            {
                 data.Queued = false;
+                data.JustPicked = true;
+                data.Preempted = false;
+            }
 
             return thread;
         }
@@ -312,45 +476,85 @@ public sealed class MlfqScheduler : IScheduler
         ulong elapsedNs)
     {
         CpuData? cpu = cpuState.SchedulerData as CpuData;
-        ThreadData? data = current.SchedulerData as ThreadData;
 
-        if (cpu is null || data is null)
+        if (cpu is null)
             return true;
 
-        cpu.TickCount++;
+        ThreadData? data = current.SchedulerData as ThreadData;
 
         /*
-         * Account this tick.
+         * Boost timer runs on real elapsed time and ticks even while
+         * the idle thread is current (data == null).
          */
-        data.QuantumUsed += elapsedNs;
-        data.RuntimeTicks++;
+        cpu.BoostTimerNs += elapsedNs;
 
-        /*
-         * Classic MLFQ priority boost.
-         */
-        if (cpu.TickCount >= BoostIntervalTicks)
+        bool boost = false;
+
+        if (cpu.BoostTimerNs >= BoostIntervalNs)
         {
-            cpu.TickCount = 0;
+            cpu.BoostTimerNs -= BoostIntervalNs;
+
+            // Don't try to catch up on a long stall.
+            if (cpu.BoostTimerNs >= BoostIntervalNs)
+                cpu.BoostTimerNs = 0;
 
             BoostAllThreads(cpu);
-
-            /*
-             * Also boost the currently running thread.
-             */
-            data.Level = 0;
+            boost = true;
         }
 
         /*
-         * Quantum expired.
+         * Idle thread (or foreign thread): always reschedule so
+         * newly runnable threads get picked up.
+         */
+        if (data is null)
+            return true;
+
+        if (boost)
+        {
+            /*
+             * The running thread is boosted too.
+             */
+            data.Level = 0;
+            data.QuantumUsed = 0;
+            data.QuantumExpired = false;
+        }
+
+        /*
+         * Charge runtime.
+         *
+         * The first tick after a pick only covers a random part of the
+         * interval, so charging a full tick would overbill short-running
+         * threads. Charging half is unbiased on average. Later ticks are
+         * full intervals.
+         */
+        ulong charge = data.JustPicked ? elapsedNs / 2 : elapsedNs;
+
+        data.JustPicked = false;
+        data.QuantumUsed += charge;
+        data.RuntimeTicks++;
+
+        /*
+         * Allotment used up: reschedule. The demotion is applied in
+         * OnThreadYield / OnThreadBlocked.
          */
         if (data.QuantumUsed >= QuantumNs[data.Level])
         {
             data.QuantumExpired = true;
-
-            /*
-             * Tell Cosmos to schedule another thread.
-             */
             return true;
+        }
+
+        /*
+         * Preempt if any higher level has a runnable thread. Without
+         * this, a thread woken into L0 would wait behind an L3 hog for
+         * its whole quantum.
+         */
+        for (int level = 0; level < data.Level; level++)
+        {
+            if (cpu.Queues[level].Count > 0)
+            {
+                data.Preempted = true;
+                return true;
+            }
         }
 
         return false;
@@ -363,25 +567,23 @@ public sealed class MlfqScheduler : IScheduler
 
     private static void BoostAllThreads(CpuData cpu)
     {
+        RunQueue destination = cpu.Queues[0];
+
         /*
-         * Move all queued threads to level 0.
-         *
-         * We iterate backwards because we're modifying
-         * the queues while iterating.
+         * Drain front to back so relative order is preserved and
+         * boosted threads queue behind the existing L0 threads.
          */
         for (int level = 1; level < LevelCount; level++)
         {
-            List<SchedulerThread> source = cpu.Queues[level];
-            List<SchedulerThread> destination = cpu.Queues[0];
+            RunQueue source = cpu.Queues[level];
 
-            for (int i = source.Count - 1; i >= 0; i--)
+            int count = source.Count;
+
+            for (int i = 0; i < count; i++)
             {
                 SchedulerThread thread = source[i];
 
-                source.RemoveAt(i);
-
-                ThreadData? data =
-                    thread.SchedulerData as ThreadData;
+                ThreadData? data = thread.SchedulerData as ThreadData;
 
                 if (data is null)
                     continue;
@@ -390,41 +592,10 @@ public sealed class MlfqScheduler : IScheduler
                 data.QuantumUsed = 0;
                 data.QuantumExpired = false;
 
-                destination.Add(thread);
+                destination.EnqueueTail(thread);
             }
-        }
-    }
 
-
-    // ------------------------------------------------------------
-    // Remove helper
-    // ------------------------------------------------------------
-
-    private static void RemoveThread(
-        CpuData cpu,
-        SchedulerThread thread,
-        int level)
-    {
-        if (level < 0 || level >= LevelCount)
-            return;
-
-        List<SchedulerThread> queue = cpu.Queues[level];
-
-        /*
-         * Do NOT use:
-         *
-         * queue.Remove(thread)
-         *
-         * Cosmos explicitly warns against List.Remove(),
-         * Contains(), and IndexOf() on scheduler paths.
-         */
-        for (int i = 0; i < queue.Count; i++)
-        {
-            if (ReferenceEquals(queue[i], thread))
-            {
-                queue.RemoveAt(i);
-                return;
-            }
+            source.Clear();
         }
     }
 
@@ -437,7 +608,22 @@ public sealed class MlfqScheduler : IScheduler
         PerCpuState cpuState,
         SchedulerThread thread)
     {
-        OnThreadReady(cpuState, thread);
+        CpuData? cpu = cpuState.SchedulerData as CpuData;
+        ThreadData? data = thread.SchedulerData as ThreadData;
+
+        if (cpu is null || data is null)
+            return;
+
+        if (data.Queued)
+            return;
+
+        /*
+         * PickNext took it from the head, so it goes back to the head.
+         */
+        data.JustPicked = false;
+
+        cpu.Queues[data.Level].EnqueueHead(thread);
+        data.Queued = true;
     }
 
 
@@ -451,8 +637,7 @@ public sealed class MlfqScheduler : IScheduler
         uint cpuCount)
     {
         /*
-         * SMP isn't currently active in the Cosmos scheduler
-         * mechanism, so simply keep the thread on its CPU.
+         * SMP isn't active in the Cosmos scheduler mechanism.
          */
         return currentCpu;
     }
@@ -474,11 +659,14 @@ public sealed class MlfqScheduler : IScheduler
         if (from is null || to is null || data is null)
             return;
 
+        from.ThreadCount--;
+        to.ThreadCount++;
+        to.EnsureCapacity(to.ThreadCount);
+
         if (data.Queued)
         {
-            RemoveThread(from, thread, data.Level);
-
-            to.Queues[data.Level].Add(thread);
+            from.Queues[data.Level].Remove(thread);
+            to.Queues[data.Level].EnqueueTail(thread);
         }
     }
 
@@ -492,10 +680,7 @@ public sealed class MlfqScheduler : IScheduler
         PerCpuState[] allCpuStates)
     {
         /*
-         * Cosmos currently runs the scheduler on one CPU,
-         * so this is intentionally empty.
-         *
-         * This becomes important when SMP scheduling is enabled.
+         * Intentionally empty while the scheduler runs on one CPU.
          */
     }
 
@@ -510,20 +695,20 @@ public sealed class MlfqScheduler : IScheduler
         long priority)
     {
         /*
-         * Priority is policy-defined.
+         * Priority = MLFQ level, 0 = highest, 3 = lowest.
          *
-         * For MLFQ we interpret it as the starting/current
-         * MLFQ level:
-         *
-         * 0 = highest
-         * 3 = lowest
+         * This sets both the current level and the demotion floor:
+         * the thread starts at that level and is never demoted below
+         * it. Pinning to 0 means a CPU-bound thread there starves the
+         * lower levels (the boost doesn't help, it's already at 0), so
+         * pin the focused window to 1 unless you really want that.
          */
-
         using var mask = SchedulerManager.MaskInterrupts();
 
+        CpuData? cpu = cpuState.SchedulerData as CpuData;
         ThreadData? data = thread.SchedulerData as ThreadData;
 
-        if (data is null)
+        if (cpu is null || data is null)
             return;
 
         int newLevel = (int)priority;
@@ -534,26 +719,26 @@ public sealed class MlfqScheduler : IScheduler
         if (newLevel >= LevelCount)
             newLevel = LevelCount - 1;
 
+        data.Floor = newLevel;
+
         if (data.Level == newLevel)
-            return;
-
-        CpuData? cpu = cpuState.SchedulerData as CpuData;
-
-        if (cpu is null)
             return;
 
         if (data.Queued)
         {
-            RemoveThread(cpu, thread, data.Level);
+            cpu.Queues[data.Level].Remove(thread);
 
             data.Level = newLevel;
 
-            cpu.Queues[newLevel].Add(thread);
+            cpu.Queues[newLevel].EnqueueTail(thread);
         }
         else
         {
             data.Level = newLevel;
         }
+
+        data.QuantumUsed = 0;
+        data.QuantumExpired = false;
     }
 
 
@@ -607,7 +792,7 @@ public sealed class MlfqScheduler : IScheduler
 
         for (int level = 0; level < LevelCount; level++)
         {
-            List<SchedulerThread> queue = cpu.Queues[level];
+            RunQueue queue = cpu.Queues[level];
 
             if (index < current + queue.Count)
                 return queue[index - current];
@@ -618,9 +803,14 @@ public sealed class MlfqScheduler : IScheduler
         return null;
     }
 
+
+    // ------------------------------------------------------------
+    // Thread exit
+    // ------------------------------------------------------------
+
     public void OnThreadExit(
-    PerCpuState cpuState,
-    SchedulerThread thread)
+        PerCpuState cpuState,
+        SchedulerThread thread)
     {
         CpuData? cpu = cpuState.SchedulerData as CpuData;
         ThreadData? data = thread.SchedulerData as ThreadData;
@@ -628,13 +818,14 @@ public sealed class MlfqScheduler : IScheduler
         if (cpu is null || data is null)
             return;
 
-        // The thread may still be sitting in a run queue
-        // when it exits.
+        // The thread may still be sitting in a run queue when it exits.
         if (data.Queued)
         {
-            RemoveThread(cpu, thread, data.Level);
+            cpu.Queues[data.Level].Remove(thread);
             data.Queued = false;
         }
+
+        cpu.ThreadCount--;
 
         // Release scheduler-specific state.
         thread.SchedulerData = null;

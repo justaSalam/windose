@@ -199,6 +199,19 @@ public class Window : Component
         titlebar.MarkDirty();
     }
 
+    public void SetTitle(string title)
+    {
+        text = title ?? "";
+
+        if (hasTitleBar && titlebar != null)
+        {
+            titlebar.text = text;
+            titlebar.MarkDirty();
+        }
+
+        MarkDirty();
+    }
+
 
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)

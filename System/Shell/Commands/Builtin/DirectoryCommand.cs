@@ -29,12 +29,12 @@ public sealed class DirectoryCommand : IShellCommand
 
             foreach (DirectoryInfo directory in directories)
             {
-                context.WriteLine($"{directory.CreationTime.ToString("yyyy-MM-dd HH:mm")} <DIR> {directory.Name}");
+                context.WriteLine($"^cyan{directory.CreationTime.ToString("yyyy-MM-dd HH:mm")} ^yellow<DIR> ^white{directory.Name}");
             }
 
             foreach (FileInfo file in files)
             {
-                context.WriteLine($"{file.CreationTime.ToString("yyyy-MM-dd HH:mm")} {ByteSize.Format(file.Length)} {file.Name}");
+                context.WriteLine($"^cyan{file.CreationTime.ToString("yyyy-MM-dd HH:mm")} ^gray{ByteSize.Format(file.Length)} ^white{file.Name}");
             }
         }
     }

@@ -1,7 +1,9 @@
-using System.Drawing;
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
+using System.ComponentModel;
+using System.Drawing;
 using Windose;
-using Windose.System.Drivers;
+using Windose.Drivers;
 using Windose.System.System_Calls;
 
 public partial class WindowManager : SingleThreadedProcess
@@ -177,9 +179,10 @@ public partial class WindowManager : SingleThreadedProcess
                         {
                             component.DrawDirtyLocal(region);
                             renderedComponents.Add(component);
-                        }
 
-                        component.DrawToScreen(region);
+                            Windose.Drivers.DisplayManager.compositor.Draw(component, componentIndex);
+                            //component.DrawToScreen(region);
+                        }
                     }
                     catch (Exception exception)
                     {
@@ -430,6 +433,23 @@ public static void ToggleMaximize(Window window)
     Invalidate(oldBounds);
     Invalidate(window.bounds);
     Activate(window);
+}
+
+public static void SetWindowTitle(Window window, string title)
+{
+    if (window == null) return;
+
+    window.SetTitle(title);
+
+    if (!taskbarButtons.TryGetValue(window, out Button taskbarButton)) return;
+
+    taskbarButton.text = window.text;
+    taskbarButton.MarkDirty();
+
+    if (Explorer.taskbar == null) return;
+
+    Explorer.taskbar.ForceDirty();
+    Invalidate(Explorer.taskbar.AbsoluteRectangle);
 }
 
 public static void Activate(Window window)

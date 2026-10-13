@@ -7,7 +7,7 @@ using Cosmos.Kernel.System.Storage;
 public sealed class DiskManagement : Window
 {
     private const int TitleBar = 28;
- 
+
     private readonly DockPanel root;
     private readonly ListView partitionListView;
     private readonly PartitionBar partitionBar;
@@ -355,8 +355,8 @@ public sealed class DiskManagement : Window
         freeDetail.MarkDirty();
         detailsHint.MarkDirty();
     }
-    private enum FsKind { Unknown, Fat12, Fat16, Fat32, Ext2 }
-    private static FsKind Probe(Partition p, out string label)
+    public enum FsKind { Unknown, Fat12, Fat16, Fat32, Ext2 }
+    public static FsKind Probe(Partition p, out string label)
     {
         label = "";
 
@@ -433,22 +433,20 @@ public sealed class DiskManagement : Window
         return result;
     }
 
-    private VfsMount? GetMount(Partition partition)
+    public static VfsMount? GetMount(Partition partition)
     {
         foreach (VfsMount mount in VfsManager.Mounts)
         {
 
-            if (mount.Partition == null) 
-            { 
-                continue; 
+            if (mount.Partition == null)
+            {
+                continue;
             }
 
             Partition mountedPartition = mount.Partition;
-            if (ReferenceEquals(mountedPartition.Host, partition.Host) &&
-                mountedPartition.StartSector == partition.StartSector &&
-                mountedPartition.BlockCount == partition.BlockCount)
-            { 
-                return mount; 
+            if (ReferenceEquals(mountedPartition.Host, partition.Host) && mountedPartition.StartSector == partition.StartSector && mountedPartition.BlockCount == partition.BlockCount)
+            {
+                return mount;
             }
         }
 

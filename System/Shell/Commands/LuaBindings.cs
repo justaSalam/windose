@@ -1,7 +1,4 @@
 ﻿using Cosmos.Executable.Lua;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Windose.System.Shell.Commands
 {
@@ -84,6 +81,8 @@ namespace Windose.System.Shell.Commands
 
 
             state.SetGlobal("terminal");
+
+            
         }
 
     }

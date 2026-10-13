@@ -78,7 +78,7 @@ public sealed class TerminalView : Component
         }, TimeSpan.FromMilliseconds(500));
     }
 
-
+    
     // Markup: "^yellowprogram x^white failed to start". "^^" = literal '^'.
     public void WriteLine(string text = "")
     {

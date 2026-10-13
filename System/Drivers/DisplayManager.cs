@@ -2,6 +2,7 @@ using System.Drawing;
 
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Timers;
+using Windose.Compositing;
 using Windose.System.Kernel;
 
 namespace Windose.Drivers;
@@ -13,9 +14,13 @@ public sealed class DisplayManager
     public int Width => canvas == null ? 0 : canvas.Width;
     public int Height => canvas == null ? 0 : canvas.Height;
 
+
+    public static GpuCompositor ?compositor;
+
     public DisplayManager()
     {
         canvas = Kernel.canvas;
+        compositor = GpuCompositor.TryCreate(canvas);
 
 
         int width = (int)Registry.GetInteger("System/Display/Width", 1920);
@@ -34,8 +39,9 @@ public sealed class DisplayManager
     public void Present(int cursorX, int cursorY)
     {
         long uploadStartedAt = PerformanceMetrics.Now;
+        compositor.BeginFrame(Color.Teal);
+        
         canvas.DrawCanvas(BackBuffer, 0, 0);
-        canvas.DrawString($"Util.: {Kernel.utilization:F3}%", SystemFonts.msSansSerif, Color.White, 10, 10);
 
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 
@@ -48,7 +54,10 @@ public sealed class DisplayManager
 
 
         long displayStartedAt = PerformanceMetrics.Now;
-        canvas.Display();
+        //canvas.Display();
+        compositor.EndFrame();
+
+
         PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
     }
 

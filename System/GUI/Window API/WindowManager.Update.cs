@@ -1,6 +1,5 @@
 using Cosmos.Kernel.System.Input;
 using Windose;
-using Windose.System.Drivers;
 
 public partial class WindowManager
 {

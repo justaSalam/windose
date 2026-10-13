@@ -269,7 +269,7 @@ public static class FileSystemManager
     /// </summary>
     public static string GetUniquePath(string directory, string baseName, string extension = "")
     {
-        string path = Path.Combine(directory, $"{baseName}{extension}");
+        string path = Combine(directory, $"{baseName}{extension}");
 
         if (!File.Exists(path) && !Directory.Exists(path))
             return path;
@@ -277,7 +277,7 @@ public static class FileSystemManager
         int i = 2;
         while (true)
         {
-            path = Path.Combine(directory, $"{baseName} ({i}){extension}");
+            path = Combine(directory, $"{baseName} ({i}){extension}");
 
             if (!File.Exists(path) && !Directory.Exists(path))
                 return path;
@@ -360,6 +360,8 @@ public static class FileSystemManager
 
     public static string NormalizePath(string path)
     {
+        if (string.IsNullOrWhiteSpace(path)) return "";
+
         path = path.Replace('\\', '/');
 
         while (path.Contains("//"))
@@ -372,16 +374,23 @@ public static class FileSystemManager
     {
         string parent = NormalizePath(directory);
         if (string.IsNullOrEmpty(name)) return parent;
-        return NormalizePath(parent + "\\" + name.Trim('\\', '/'));
+
+        string child = name.Trim('\\', '/');
+        if (parent == "" || parent == "/") return NormalizePath("/" + child);
+
+        return NormalizePath(parent.TrimEnd('/') + "/" + child);
     }
 
     public static string GetParent(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return "";
         string value = NormalizePath(path);
-        if (value.Length <= 3) return "";
-        int separator = value.LastIndexOf('\\');
-        if (separator <= 2) return value.Substring(0, 3);
+
+        if (value == "/" || value == "/mnt") return "";
+
+        int separator = value.LastIndexOf('/');
+        if (separator <= 0) return "";
+
         return value.Substring(0, separator);
     }
 
@@ -389,8 +398,10 @@ public static class FileSystemManager
     {
         if (string.IsNullOrWhiteSpace(path)) return "";
         string value = NormalizePath(path);
-        if (value.Length <= 3) return value;
-        int separator = value.LastIndexOf('\\');
+        if (value == "/") return value;
+
+        value = value.TrimEnd('/');
+        int separator = value.LastIndexOf('/');
         return separator < 0 ? value : value.Substring(separator + 1);
     }
 

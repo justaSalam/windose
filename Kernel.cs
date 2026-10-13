@@ -1,6 +1,5 @@
 using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
-using Windose.Drivers;
 using Windose.Programs.Breeze;
 using Windose.System.Kernel.Subsystem;
 using Windose.System.System_Calls;
@@ -12,6 +11,7 @@ using Windose.System.Kernel.FileSystem;
 using Cosmos.Kernel.Core.Scheduler;
 using Windose.System.Scheduling;
 using Cosmos.Kernel.System.Input;
+using Windose.Compositing;
 namespace Windose;
 
 /// <summary>
@@ -24,11 +24,16 @@ public class Kernel : Sys.Kernel
     public static Canvas canvas;
 
     private WindowManager windowManager;
-    public Drivers.DisplayManager displayDriver = new Drivers.DisplayManager();
+    public Drivers.DisplayManager displayDriver;
+
+    protected override void OnBoot()
+    {
+        base.OnBoot();
+        SchedulerManager.SetScheduler(new MlfqScheduler());
+    }
 
     protected override void BeforeRun()
     {
-        SchedulerManager.SetScheduler(new MlfqScheduler());
         try
         {
             SystemLogger.WriteLine("BOOT", "BeforeRun starting", ConsoleMessageType.Log);
@@ -39,7 +44,7 @@ public class Kernel : Sys.Kernel
         {
             SystemLogger.WriteLine("BOOT", "Error occurred while initializing kernel, " + exception.Message, ConsoleMessageType.Error);
             Log.WriteString("KERNEL FAILED TO INIT\n");
-            
+
         }
     }
     private void InitializeKernel()
@@ -51,8 +56,9 @@ public class Kernel : Sys.Kernel
         SystemLogger.WriteLine("FSM", "Starting", ConsoleMessageType.Log);
         FileSystemManager.Setup();
 
-
         canvas = Canvas.GetFullScreen(new Mode(1920, 1080, ColorDepth.ColorDepth32));
+
+        displayDriver = new Drivers.DisplayManager();
 
         Console.WriteLine("Canvas:     " + canvas.Name);
         Console.WriteLine("Resolution: " + canvas.Width + "x" + canvas.Height);
@@ -71,7 +77,7 @@ public class Kernel : Sys.Kernel
         Registry.SetRuntimeValue("System/Display/CurrentWidth", (long)canvas.Width);
         Registry.SetRuntimeValue("System/Display/CurrentHeight", (long)canvas.Height);
 
-        
+
         Explorer explorer = new Explorer(canvas);
         windowManager = new WindowManager();
 
@@ -89,6 +95,7 @@ public class Kernel : Sys.Kernel
         Directory.CreateDirectory(SystemPaths.SystemLua);
         File.WriteAllText(SystemPaths.SystemLua + "/init.lua", "terminal.write('^blueHello From Lua!')\nterminal.write('Running From: ' .. terminal.currentDirectory())\n ");
         File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
+        File.WriteAllText("/mnt/System/Lua/demo.lua", "windose.open(\"explorer\")");
 
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze", "service.control");
 
@@ -102,30 +109,15 @@ public class Kernel : Sys.Kernel
 
     }
 
-    private long lastFrameTicks;
     public static double DeltaTimeMs;
     public static double DeltaTimeSeconds;
     public static int Fps;
 
-
-    public static ulong startWall;
-    public static ulong endWall;
-    public static ulong wallDelta;
-
-    public static ulong startBusy;
-    public static ulong endBusy;
-    public static ulong busyDelta;
-
-    public static double utilization;
     protected override void Run()
     {
         try
         {
-            startWall = Clock.Nanoseconds;
-            startBusy = SchedulerDiagnostics.BusyCpuTimeNs;
-
             Mouse.Update();
-            Tick();
 
             PerformanceMetrics.BeginFrame();
 
@@ -136,16 +128,6 @@ public class Kernel : Sys.Kernel
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
             displayDriver.Present(MouseManager.X, MouseManager.Y);
-
-
-            endWall = Clock.Nanoseconds;
-            endBusy = SchedulerDiagnostics.BusyCpuTimeNs;
-
-            wallDelta = endWall - startWall;
-            busyDelta = endBusy - startBusy;
-
-            utilization = (double)busyDelta / (wallDelta * SchedulerDiagnostics.CpuCount) * 100;
-
         }
         catch (Exception ex)
         {
@@ -154,21 +136,4 @@ public class Kernel : Sys.Kernel
 
     }
 
-    private void Tick()
-    {
-        long now = DateTime.UtcNow.Ticks;
-
-        if (lastFrameTicks != 0)
-        {
-            long deltaTicks = now - lastFrameTicks;
-
-            DeltaTimeMs = deltaTicks / 10000.0;
-            DeltaTimeSeconds = deltaTicks / 10_000_000.0;
-
-            if (DeltaTimeSeconds > 0)
-                Fps = (int)(1.0 / DeltaTimeSeconds);
-        }
-
-        lastFrameTicks = now;
-    }
 }

@@ -1,5 +1,6 @@
 using Cosmos.Executable.Lua;
 using Windose.System.Kernel.FileSystem;
+using Windose.System.Lua;
 using Windose.System.Shell.Commands;
 
 public delegate void CommandHandler(CommandContext context, string[] arguments);
@@ -7,7 +8,7 @@ public delegate void CommandHandler(CommandContext context, string[] arguments);
 
 public static class CommandRegistry
 {
-    
+
     private static readonly Dictionary<string, IShellCommand> commands =
         new Dictionary<string, IShellCommand>(StringComparer.OrdinalIgnoreCase);
     private static readonly List<IShellCommand> orderedCommands = new List<IShellCommand>();
@@ -39,26 +40,27 @@ public static class CommandRegistry
 
     public static void Execute(CommandContext context, string commandLine)
     {
-        if(context == null) throw new ArgumentNullException(nameof(context));
+        if (context == null) throw new ArgumentNullException(nameof(context));
 
         string[] parts = Parse(commandLine);
         if (parts.Length == 0) return;
 
         if (!commands.TryGetValue(parts[0], out IShellCommand command))
         {
-            string[] files = Directory.GetFiles(SystemPaths.SystemLua, "*.lua");
+            string scriptPath = ResolveLuaScript(parts[0]);
 
-            if (files.Any(f => Path.GetFileName(f).Equals(parts[0], StringComparison.OrdinalIgnoreCase)))
+            if (scriptPath != "")
             {
                 LuaInterpreter lua = new()
                 {
                     WorkingDirectory = context.CurrentDirectory, // where dofile, require and io.open start relative paths from
                 };
-                LuaBindings.RegisterBindings(lua, context);
-
+                //LuaBindings.RegisterBindings(lua, context);
                 try
                 {
-                    lua.DoFile($"{SystemPaths.SystemLua}/{parts[0]}");
+                    
+                    new LuaWindoseLib(scriptPath, ["*"]).Install(lua.State);
+                    lua.DoFile(scriptPath);
                 }
                 catch (LuaException e)
                 {
@@ -99,15 +101,15 @@ public static class CommandRegistry
 
         // File/system commands can stay as tiny inline classes or lambdas via
         // a thin adapter (see DelegateCommand below) if a full class is overkill.
-        Register(new DelegateCommand("help", "Displays help information.", "help",(context, args) =>
+        Register(new DelegateCommand("help", "Displays help information.", "help", (context, args) =>
         {
             foreach (IShellCommand command in Commands)
             {
                 context.WriteLine($"{command.Name} - {command.Description}");
             }
-            
+
         }));
-        Register(new DelegateCommand("echo", "Echoes the input arguments.", "echo <ars>",(context, args) =>
+        Register(new DelegateCommand("echo", "Echoes the input arguments.", "echo <ars>", (context, args) =>
         {
             context.WriteLine(string.Join(" ", args));
         }));
@@ -151,5 +153,24 @@ public static class CommandRegistry
         }
         if (current != "") parts.Add(current);
         return parts.ToArray();
+    }
+
+    private static string ResolveLuaScript(string commandName)
+    {
+        string requested = commandName ?? "";
+        string requestedWithExtension = requested.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)
+            ? requested
+            : requested + ".lua";
+
+        string[] files = Directory.GetFiles(SystemPaths.SystemLua, "*.lua");
+        foreach (string file in files)
+        {
+            string name = Path.GetFileName(file);
+            if (name.Equals(requested, StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(requestedWithExtension, StringComparison.OrdinalIgnoreCase))
+                return file;
+        }
+
+        return "";
     }
 }

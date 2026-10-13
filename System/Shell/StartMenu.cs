@@ -91,6 +91,12 @@ public class StartMenu : Window
             LaunchTracker.Start(() => new CommandPrompt());
         });
 
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/console_prompt.png"), "Lua", () =>
+        {
+            string script = "local w = win.createWindow(\"Lua App\", 160, 120, 360, 220)\nlocal label = win.createLabel(\"Hello from Lua ABI\", 24, 48, 220, 28)\nlocal button = win.createButton(\"Close\", 24, 90, 90, 28)\n\nwin.addChild(w, label)\nwin.addChild(w, button)\n\nwin.setOnClick(button, function()\n  win.closeWindow(w)\nend)\n\nwin.showWindow(w)";
+
+        });
+
         MenuItem systemTools = programs.AddSubmenuItem("System Tools");
         systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/scanregw.png"), "Registry Editor", () =>
         {

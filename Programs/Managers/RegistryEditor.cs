@@ -132,7 +132,7 @@ public sealed class RegistryEditor : Window
     {
         string pathToRestore = selectedPath;
         keyTree.ClearItems();
-        TreeViewItem computer = keyTree.AddRoot("Computer", "");
+        TreeViewItem computer = keyTree.AddRoot("Computer", "/mnt/System/Icons/hard_disk_drive.png", "");
         List<string> keys = Registry.GetKeys();
 
         for (int i = 0; i < keys.Count; i++)

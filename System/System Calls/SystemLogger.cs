@@ -33,7 +33,11 @@ namespace Windose.System.System_Calls
             Directory.CreateDirectory("/mnt/console");
             File.WriteAllText($"/mnt/console/{DateTime.Now.ToString("yyyyMMdd-HHmmss")}.log", logBuilder.ToString());
         }
-
+        public static void Dump(string  name)
+        {
+            Directory.CreateDirectory("/mnt/console");
+            File.WriteAllText($"/mnt/console/{name}.log", logBuilder.ToString());
+        }
     }
 
     public enum ConsoleMessageType

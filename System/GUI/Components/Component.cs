@@ -3,12 +3,13 @@ using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Input;
 using Windose;
+using Windose.Compositing;
 
 
 /// <summary>
 /// A base for every GUI object
 /// </summary>
-public class Component : IDisposable
+public class Component : IDisposable, ICompositedSurface
 {
     public virtual string GetComponentName() => "UNASSIGNED COMPONENT";
     public Canvas RenderCanvas => buffer;
@@ -156,6 +157,12 @@ public class Component : IDisposable
             MarkDirty();
         }
     }
+
+    public int[] ?Buffer => buffer.GetBuffer();
+
+    public bool IsDirty => dirty || childrenDirty || forceDirty;
+    public void ClearDirty() => MarkCleaned();
+
 
     protected Frame frame;
     protected Frame normalFrame;
@@ -816,9 +823,10 @@ public class Component : IDisposable
     }
 
     //TODO Replace with proper font measurement using TrueTypeFont
+
     public int MeasureStringWidth(string str, int fontSize)
     {
-        return MeasureTextWidth(str, fontSize);
+        return SystemFonts.msSansSerif.MeasureString(str);
     }
 
     public int MeasureStringHeight(int fontSize)

@@ -1,4 +1,4 @@
-<Project Sdk="Cosmos.Sdk/3.0.94">
+﻿<Project Sdk="Cosmos.Sdk/3.0.94">
 
   <PropertyGroup>
     <CosmosKernelClass>Windose.Kernel</CosmosKernelClass>
