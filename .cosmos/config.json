@@ -23,6 +23,9 @@
         "size": "128"
       }
     ],
-    "audio": "intel-hda"
+    "audio": "intel-hda",
+    "portForwards": [
+      "tcp::2121-:21"
+    ]
   }
 }

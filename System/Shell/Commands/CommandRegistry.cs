@@ -119,6 +119,7 @@ public static class CommandRegistry
         }));
 
         Register(new IpConfig());
+        Register(new FtpCommand());
         Register(new UacCommand());
         Register(new ReadCommand());
         Register(new DirectoryCommand());
