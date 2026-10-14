@@ -1,7 +1,8 @@
 // ElfReader.cs - ELF32/ELF64 parser for Cosmos / NativeAOT.
 // No LINQ, no lambdas, no reflection, no System.IO. Pure byte[] in, objects out.
 // Handles LE and BE, ET_EXEC/ET_DYN/ET_REL, program headers, sections, symbols.
-// Does NOT do relocations or dynamic linking; LoadImage() just lays out PT_LOAD segments.
+// Loading: GetImageExtent() + CopyImage() lay out PT_LOAD segments, ApplyRelocations() fixes up a PIE
+// (little-endian x86-64 only). No dynamic linking against shared libraries.
 
 namespace Windose.System.Elf
 {
@@ -20,6 +21,11 @@ namespace Windose.System.Elf
                           SHT_RELA = 4, SHT_NOBITS = 8, SHT_REL = 9, SHT_DYNSYM = 11;
         // sh_flags
         public const ulong SHF_WRITE = 1, SHF_ALLOC = 2, SHF_EXECINSTR = 4;
+        // dynamic tags
+        public const long DT_NULL = 0, DT_PLTRELSZ = 2, DT_STRTAB = 5, DT_SYMTAB = 6, DT_RELA = 7, DT_RELASZ = 8,
+                          DT_RELAENT = 9, DT_SYMENT = 11, DT_JMPREL = 23, DT_RELRSZ = 35;
+        // x86-64 relocation types
+        public const uint R_X86_64_NONE = 0, R_X86_64_64 = 1, R_X86_64_GLOB_DAT = 6, R_X86_64_JUMP_SLOT = 7, R_X86_64_RELATIVE = 8;
     }
 
     public sealed class ElfSegment
@@ -296,35 +302,158 @@ namespace Windose.System.Elf
 
         // ---------------------------------------------------------------- loading
 
-        /// <summary>
-        /// Lays all PT_LOAD segments into one zero-initialised flat buffer (bss included).
-        /// image[0] corresponds to 'lowAddr' (lowest PT_LOAD vaddr). Entry offset = Entry - lowAddr.
-        /// maxSize guards against hostile files exhausting the Cosmos heap.
-        /// </summary>
-        public byte[] LoadImage(ulong maxSize, out ulong lowAddr)
+        /// <summary>Address range covered by all PT_LOAD segments. size includes bss. False if none / too big / wraps.</summary>
+        public bool GetImageExtent(ulong maxSize, out ulong low, out ulong size)
         {
-            lowAddr = 0;
+            low = 0; size = 0;
             ulong lo = ulong.MaxValue, hi = 0;
             for (int i = 0; i < Segments.Length; i++)
             {
                 ElfSegment s = Segments[i];
                 if (!s.IsLoad || s.MemSize == 0) continue;
+                if (s.VAddr + s.MemSize < s.VAddr) { Error = "segment wraps address space"; return false; }
                 if (s.VAddr < lo) lo = s.VAddr;
-                if (s.VAddr + s.MemSize < s.VAddr) { Error = "segment wraps address space"; return null; }
                 if (s.VAddr + s.MemSize > hi) hi = s.VAddr + s.MemSize;
             }
-            if (lo == ulong.MaxValue) { Error = "no PT_LOAD segments"; return null; }
-            if (hi - lo > maxSize) { Error = "image exceeds maxSize"; return null; }
+            if (lo == ulong.MaxValue) { Error = "no PT_LOAD segments"; return false; }
+            if (hi - lo > maxSize) { Error = "image exceeds maxSize"; return false; }
+            low = lo; size = hi - lo;
+            return true;
+        }
 
-            byte[] image = new byte[(int)(hi - lo)];
+        /// <summary>Copies every PT_LOAD segment's file bytes to dest[destOffset + (vaddr - low)]. dest must be zeroed (bss).</summary>
+        public void CopyImage(byte[] dest, int destOffset, ulong low)
+        {
             for (int i = 0; i < Segments.Length; i++)
             {
                 ElfSegment s = Segments[i];
                 if (!s.IsLoad || s.FileSize == 0) continue;
-                global::System.Array.Copy(_d, (int)s.Offset, image, (int)(s.VAddr - lo), (int)s.FileSize);
+                global::System.Array.Copy(_d, (int)s.Offset, dest, destOffset + (int)(s.VAddr - low), (int)s.FileSize);
             }
-            lowAddr = lo;
+        }
+
+        /// <summary>Convenience: extent + copy into a fresh array (no alignment control, no relocation).</summary>
+        public byte[] LoadImage(ulong maxSize, out ulong lowAddr)
+        {
+            ulong size;
+            if (!GetImageExtent(maxSize, out lowAddr, out size)) return null;
+            byte[] image = new byte[(int)size];
+            CopyImage(image, 0, lowAddr);
             return image;
+        }
+
+        /// <summary>
+        /// Applies the dynamic relocations of a loaded image (RELA + JMPREL tables). 'mem[memOffset]' holds the byte
+        /// for vaddr 'low'; 'bias' is (runtime address of that byte) - low. Supports RELATIVE, 64, GLOB_DAT, JUMP_SLOT
+        /// against symbols defined inside the program itself. Undefined symbols, TLS and RELR are rejected.
+        /// A file without PT_DYNAMIC has nothing to relocate and succeeds.
+        /// </summary>
+        public bool ApplyRelocations(byte[] mem, int memOffset, ulong low, ulong size, ulong bias, out string error)
+        {
+            error = null;
+            ElfSegment dyn = null;
+            for (int i = 0; i < Segments.Length; i++)
+                if (Segments[i].Type == ElfConst.PT_DYNAMIC) { dyn = Segments[i]; break; }
+            if (dyn == null) return true;
+
+            ulong rela = 0, relasz = 0, relaent = 24, jmprel = 0, pltrelsz = 0, symtab = 0, strtab = 0, relrsz = 0;
+            if (dyn.VAddr < low || dyn.VAddr - low + dyn.MemSize > size) { error = "PT_DYNAMIC outside image"; return false; }
+            int dp = memOffset + (int)(dyn.VAddr - low);
+            for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
+            {
+                long tag = (long)Rd64(mem, dp + (int)o);
+                ulong val = Rd64(mem, dp + (int)o + 8);
+                if (tag == ElfConst.DT_NULL) break;
+                switch (tag)
+                {
+                    case ElfConst.DT_RELA: rela = val; break;
+                    case ElfConst.DT_RELASZ: relasz = val; break;
+                    case ElfConst.DT_RELAENT: relaent = val; break;
+                    case ElfConst.DT_JMPREL: jmprel = val; break;
+                    case ElfConst.DT_PLTRELSZ: pltrelsz = val; break;
+                    case ElfConst.DT_SYMTAB: symtab = val; break;
+                    case ElfConst.DT_STRTAB: strtab = val; break;
+                    case ElfConst.DT_RELRSZ: relrsz = val; break;
+                }
+            }
+            if (relrsz != 0) { error = "DT_RELR relocations not supported (don't link with -z pack-relative-relocs)"; return false; }
+            if (relaent != 24) { error = "bad DT_RELAENT"; return false; }
+
+            if (rela != 0 && relasz != 0 && !ApplyTable(mem, memOffset, low, size, bias, rela, relasz, symtab, strtab, out error)) return false;
+            if (jmprel != 0 && pltrelsz != 0 && !ApplyTable(mem, memOffset, low, size, bias, jmprel, pltrelsz, symtab, strtab, out error)) return false;
+            return true;
+        }
+
+        private static bool ApplyTable(byte[] mem, int memOffset, ulong low, ulong size, ulong bias,
+                                       ulong tableVaddr, ulong tableSize, ulong symtab, ulong strtab, out string error)
+        {
+            error = null;
+            if (tableVaddr < low || tableVaddr - low + tableSize > size) { error = "relocation table outside image"; return false; }
+            int tp = memOffset + (int)(tableVaddr - low);
+            ulong count = tableSize / 24;
+            for (ulong i = 0; i < count; i++)
+            {
+                int e = tp + (int)(i * 24);
+                ulong rOff = Rd64(mem, e);
+                ulong info = Rd64(mem, e + 8);
+                long addend = (long)Rd64(mem, e + 16);
+                uint type = (uint)(info & 0xFFFFFFFF);
+                uint sym = (uint)(info >> 32);
+                if (type == ElfConst.R_X86_64_NONE) continue;
+                if (rOff < low || rOff - low + 8 > size) { error = "relocation target outside image"; return false; }
+
+                ulong value;
+                if (type == ElfConst.R_X86_64_RELATIVE)
+                {
+                    value = unchecked(bias + (ulong)addend);
+                }
+                else if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
+                {
+                    ulong s = 0;
+                    if (sym != 0)
+                    {
+                        if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
+                        ulong so = symtab - low + (ulong)sym * 24;
+                        if (so + 24 > size) { error = "symbol index out of range"; return false; }
+                        int sp = memOffset + (int)so;
+                        uint nameOff = Rd32(mem, sp);
+                        byte stInfo = mem[sp + 4];
+                        ushort shndx = (ushort)(mem[sp + 6] | (mem[sp + 7] << 8));
+                        ulong stValue = Rd64(mem, sp + 8);
+                        if (shndx == 0)
+                        {
+                            if ((stInfo >> 4) == 2) s = 0;   // weak undefined resolves to 0
+                            else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
+                        }
+                        else if (shndx == 0xFFF1) s = stValue;                 // SHN_ABS
+                        else s = unchecked(bias + stValue);
+                    }
+                    value = type == ElfConst.R_X86_64_64 ? unchecked(s + (ulong)addend) : s;
+                }
+                else { error = "unsupported relocation type " + type; return false; }
+
+                Wr64(mem, memOffset + (int)(rOff - low), value);
+            }
+            return true;
+        }
+
+        private static string CStrAt(byte[] mem, int memOffset, ulong low, ulong size, ulong strtab, uint nameOff)
+        {
+            if (strtab < low) return "?";
+            ulong o = strtab - low + nameOff;
+            if (o >= size) return "?";
+            int s = memOffset + (int)o, e = s, lim = memOffset + (int)size;
+            while (e < lim && mem[e] != 0 && e - s < 64) e++;
+            char[] c = new char[e - s];
+            for (int i = 0; i < c.Length; i++) c[i] = (char)mem[s + i];
+            return new string(c);
+        }
+
+        private static uint Rd32(byte[] m, int o) { return (uint)(m[o] | (m[o + 1] << 8) | (m[o + 2] << 16) | (m[o + 3] << 24)); }
+        private static ulong Rd64(byte[] m, int o) { return Rd32(m, o) | ((ulong)Rd32(m, o + 4) << 32); }
+        private static void Wr64(byte[] m, int o, ulong v)
+        {
+            for (int i = 0; i < 8; i++) m[o + i] = (byte)(v >> (8 * i));
         }
 
         // ---------------------------------------------------------------- helpers

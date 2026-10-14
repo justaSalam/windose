@@ -1,17 +1,26 @@
 #!/bin/sh
-# Usage: sh build.sh hello        (builds hello.c -> hello.elf)
-#        sh build.sh              (builds every .c in this folder)
+# Builds libc.a and the programs in src/ into bin/ (position-independent ELF, ET_DYN).
+#   sh build.sh            build everything
+#   sh build.sh hello      build only src/hello.c
 # Needs gcc + binutils on x86-64 Linux (WSL / Docker / VM is fine).
 set -e
 cd "$(dirname "$0")"
+mkdir -p bin obj
+
+GCCINC=$(gcc -print-file-name=include)
+CFLAGS="-c -O2 -Wall -Wno-unused-function -Wno-infinite-recursion -ffreestanding -fno-builtin -fno-tree-loop-distribute-patterns \
+ -fPIE -fvisibility=hidden -fno-stack-protector -fcf-protection=none -ffunction-sections -fdata-sections \
+ -mno-red-zone -fno-asynchronous-unwind-tables -nostdinc -isystem include -isystem $GCCINC"
+LDFLAGS="-pie --no-dynamic-linker -e _start -z norelro -z noseparate-code -z max-page-size=0x1000 \
+ -z common-page-size=0x1000 --build-id=none --gc-sections"
+
+rm -f obj/*.o libc.a
+for f in libc/*.c; do gcc $CFLAGS "$f" -o "obj/$(basename "${f%.c}").o"; done
+ar rcs libc.a $(ls obj/*.o | grep -v crt0.o)
+
 build() {
-    gcc -c "$1.c" -o "$1.o" \
-        -ffreestanding -fno-builtin -fno-tree-loop-distribute-patterns \
-        -fPIE -fvisibility=hidden -fno-stack-protector -ffunction-sections \
-        -mno-red-zone -fno-asynchronous-unwind-tables -O2 -Wall
-    ld -T link.ld -static -nostdlib -z norelro -z noseparate-code --build-id=none \
-        -o "$1.elf" "$1.o" 2>&1 | grep -v "RWX permissions" || true
-    rm -f "$1.o"
-    echo "built $1.elf"
+    gcc $CFLAGS "src/$1.c" -o "obj/prog_$1.o"
+    ld $LDFLAGS -o "bin/$1.elf" obj/crt0.o "obj/prog_$1.o" libc.a
+    echo "built bin/$1.elf"
 }
-if [ -n "$1" ]; then build "$1"; else for f in *.c; do build "${f%.c}"; done; fi
+if [ -n "$1" ]; then build "$1"; else for f in src/*.c; do build "$(basename "${f%.c}")"; done; fi

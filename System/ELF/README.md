@@ -1,69 +1,67 @@
-# Windose ELF loader
+# Windose ELF loader (v2)
 
-Run static x86-64 ELF programs (written in C) inside your Cosmos kernel, with windows,
-buttons, labels, events and files exposed through a function table.
+Runs x86-64 ELF programs written in C inside your Cosmos kernel: several at once, each with its own
+handles, events, memory quota and process-list entry, with a small libc and normal `main(argc, argv)`.
 
 ```
-kernel/    -> add all of these to your kernel project
-programs/  -> C programs + build scripts (hello.elf and window.elf are prebuilt)
+kernel/            add all of these to your kernel project (AllowUnsafeBlocks on)
+programs/          C library, headers, example programs, build scripts; prebuilt ELFs in bin/
+tests/             desktop test suite (Linux/WSL + dotnet 8): format_test.c and ElfTests/
 ```
 
-## Setup (do in order, test after each step)
+```csharp
+byte[] data = File.ReadAllBytes(path);
+string err; ElfProgram p = ElfRunner.Spawn(data, "hello", new string[] { "one" }, out err);
+if (p == null) Terminal.WriteLine("exec failed: " + err);
+```
 
-1. Copy everything in `kernel/` into your kernel project. Turn on `AllowUnsafeBlocks` in the .csproj.
-2. In `WindoseBridge.Install()` replace the `Output` TODO with your terminal write, and call
-   `WindoseBridge.Install();` once at boot.
-3. Add a terminal command `run <path>` (on its own Thread, like your other shell commands):
-   ```csharp
-   byte[] data = /* read the file from your VFS */;
-   string err;
-   if (!ElfRunner.Run(data, out err)) Terminal.WriteLine("exec failed: " + err);
-   ```
-4. Put `programs/hello.elf` on your disk and run it.
-   Expected output:  `Hello from an ELF program!`  then  `c=8`
-5. Fill in the TODOs in `WindoseBridge.cs` (CreateWindow, CreateButton, CreateLabel, Bind, SetText,
-   FillRect, Close, ReadFile, WriteFile). Then run `programs/window.elf`:
-   a window with a button; each click updates the label; closing the window ends the program.
+## What it does now
+
+* **PIE + relocations**: normal compiler output works, including tables of pointers (R_X86_64_RELATIVE/64/GLOB_DAT/JUMP_SLOT
+  against symbols in the program itself). Images are page-aligned. Unresolved symbols, TLS and RELR are rejected with a message.
+* **libc** (`programs/libc`, headers in `programs/include`): string.h, stdlib.h (malloc/free/calloc/realloc, strtol, qsort,
+  bsearch, rand), stdio.h (printf family without floats, puts, `file_read`), ctype.h, `exit()` from any depth, `abort()`.
+  `crt0` builds argc/argv and turns the return value / `exit()` into the program's exit code.
+* **Processes**: `ElfRunner.Spawn` gives every program its own thread, pid, handle table, event queue and memory quota
+  (`ElfRunner.MemoryQuota`, default 64 MB). Windows and memory are released when it exits. `ElfRunner.Kill(pid)` closes its windows
+  at once and the program stops at its next kernel call (sleep/poll are checked every 10 ms). `ElfRunner.List()` for `ps`.
+* **API** (`kernel.h` -> `k_*`): write, create_window, close, sleep, create_button, create_label, set_text, fill_rect,
+  poll_event, read_file, write_file, ticks, pid. Memory comes from malloc (kernel `alloc` underneath).
 
 ## Writing programs
 
-Edit/copy `programs/hello.c` or `window.c`, then build:
+`programs/src/*.c`: write a normal `int main(int argc, char **argv)`; `#include <stdio.h>` etc. and `"kernel.h"` for k_* calls.
+Build: Linux/WSL `sh build.sh [name]` (gcc + binutils), Windows `build.bat [name]` (LLVM, untested). Output: `bin/<name>.elf`.
 
-* Windows native: `winget install LLVM.LLVM`, then `build.bat hello` (untested; prefer WSL).
-  Do NOT use MinGW/MSVC - they produce .exe, not ELF.
-
-Rules for programs: freestanding C, no libc (no printf/malloc/memcpy), entry point is
-`KABI void _start(KernelApi *k)`. Avoid static tables of pointers (they need relocations,
-which the loader doesn't apply). If linking complains about `memcpy`/`memset`, you used
-a big struct copy or array init - write the loop by hand.
+Limits: no floating point in printf, no global constructors (`.init_array`), no TLS, no `fopen` (use `file_read` / `k_write_file`),
+no threads inside a program. Kill cannot stop a program stuck in a pure compute loop that never calls the kernel.
 
 ## Adding a kernel function
 
-Three places, same order every time:
-1. `programs/kapi.h`      - add a field at the END of `KernelApi`
-2. `kernel/ElfRunner.cs`  - add the matching field at the END of `KernelApi`
-3. `kernel/ElfRunner.cs`  - write an `[UnmanagedCallersOnly]` handler (try/catch, validate everything)
-   and assign it in `Run()`: `api.MyThing = &ApiMyThing;`
-
-If it needs OS access, add a method to `IElfHost` and implement it in `WindoseBridge.cs`.
+1. `programs/include/kernel.h`: new field at the END of `KernelApi` (first parameter is always `int pid`) + a `k_*` wrapper.
+2. `kernel/ElfRunner.cs`: same field at the END of `KernelApi`, an `[UnmanagedCallersOnly]` handler (start with
+   `Live(pid)`, try/catch, validate everything), and assign it in `FillApi`. Bump `KAPI_VERSION`/`ApiVersion` if you change existing ones.
+3. Need OS access? Add a method to `IElfHost`, implement it in `WindoseBridge.cs`.
 
 ## If it breaks
 
 | Symptom | Fix |
 |---|---|
-| Page fault on the first instruction | Heap isn't executable. Set `ElfRunner.MakeExecutable` to mark those pages executable. |
-| Crash on the first kernel call from the program | ABI mismatch. In `kapi.h` change `sysv_abi` to `ms_abi`, rebuild the programs. |
-| `exec failed: need ET_EXEC` | Built as PIE/shared. Use the provided build scripts. |
-| `exec failed: not an ELF file` | Built with MinGW/MSVC, or the VFS read returned wrong bytes. |
-| Window functions return 0 | `WindoseBridge` TODOs not filled in yet. |
+| Page fault on the first instruction | Heap isn't executable: set `ElfRunner.MakeExecutable` to mark the pages. |
+| Crash on the first kernel call | ABI mismatch: in `kernel.h` change `sysv_abi` to `ms_abi`, rebuild libc + programs. |
+| `kernel API version mismatch` | Program built against an older `kernel.h`: rebuild. |
+| `exec failed: ... unresolved symbol 'x'` | The program calls a function that isn't in libc: add it to `programs/libc`. |
+| `exec failed: ET_EXEC linked at a fixed address` | Use the provided build scripts (they link PIE). |
 
-## Limits
+## Testing on a desktop first
 
-Ring 0, no isolation: a buggy program can crash or corrupt the kernel. One program at a time
-(static state). No relocations, no dynamic linking, no TLS.
+```
+cd tests && gcc -O1 -o /tmp/format_test format_test.c ../programs/libc/format.c && /tmp/format_test    # printf engine vs glibc
+cd ElfTests && dotnet run ../../programs/bin                                                           # loader, processes, kill, quota
+```
 
-## Handles
+## Isolation
 
-Programs only see `int` handles (`handle_t`). The kernel keeps the real objects in `HandleTable`.
-`0` always means failure/none. Don't do arithmetic on handles. A handle becomes invalid when its
-object is closed (stale handles return an error, they never hit a reused slot).
+Programs run in ring 0 on kernel threads: a buggy program can still crash or corrupt the kernel, and `Kill` is cooperative.
+Programs only use the `k_*` wrappers, so a future ring-3 transport (syscall instruction, per-process page tables) only
+changes `kernel.h` and the kernel entry path, not program sources.

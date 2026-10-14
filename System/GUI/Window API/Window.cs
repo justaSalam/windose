@@ -44,6 +44,9 @@ public class Window : Component
 
     protected SingleThreadedProcess process;
 
+    public Action? onClosed;                 // fired after the window's process is disposed
+    public bool closeRequested;
+
     //TODO Process manager should be responsible for every update instead of window manager being a separate subsystem
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png? icon = null) : base(x, y, width, height)
     {
@@ -56,7 +59,11 @@ public class Window : Component
         process = new SingleThreadedProcess(title, ProcessType.Program);
 
         //process.onStart += () => WindowManager.PostRegister(this);
-        process.onDispose += () => WindowManager.PostClose(this);
+        process.onDispose += () => 
+        {
+            WindowManager.PostClose(this); 
+            onClosed?.Invoke(); 
+        };
         process.onUpdate += Update;
 
         TitlebarSetup(useTitleBar, title);
@@ -157,7 +164,7 @@ public class Window : Component
             textColor = Palette.ControlWhite,
             leftClickAction = () =>
             {
-                ProcessManger.QueueStop(process);
+                RequestClose();
             }
         });
 
@@ -469,6 +476,7 @@ public class Window : Component
 
 
     bool disposed = false;
+
     public override void Dispose()
     {
         if (disposed)
@@ -489,4 +497,10 @@ public class Window : Component
 
     public override string GetComponentName() => "Window";
 
+    public void RequestClose()
+    {
+        if (closeRequested) return;
+        closeRequested = true;
+        ProcessManger.QueueStop(process);
+    }
 }

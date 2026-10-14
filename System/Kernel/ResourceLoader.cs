@@ -51,7 +51,7 @@ namespace Windose.System.Kernel
             }
         }
 
-        public static bool WriteStorage(string path, string resource)
+        public static bool WriteStorage(string path, string resource, bool overwrite = false)
         {
             try
             {
@@ -60,7 +60,8 @@ namespace Windose.System.Kernel
                 {
                     return false;
                 }
-                if (File.Exists(path))
+
+                if (File.Exists(path) && !overwrite)
                 {
                     return false;
                 }

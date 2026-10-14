@@ -1,98 +1,161 @@
-// WindoseBridge.cs - FILL THIS IN. Every TODO is one call into your own Window/Panel/Button/VFS code.
-// Until you do, window functions just fail (return 0 / -1) and hello.elf still runs.
+// WindoseBridge.cs - connects the ELF loader to Windose's Window / Component / Button / Label / Panel,
+// the WindowManager, the process list and System.IO.
+// Written against the signatures you pasted; NOT compiled against your project (I can't see Label, Palette,
+// ProcessManger, SingleThreadedProcess). Expect to fix a name or two. Needs the two edits in README_WINDOW_PATCH.txt.
 using System;
-using Windose.System.Kernel;
+using System.Drawing;
+using Windose.System.System_Calls;
 
 namespace Windose.System.Elf
 {
-    /// <summary>
-    /// C# Side of the ELF host bridge
-    /// Implement this interface to connect ElfRunner to your Kernel
-    /// </summary>
     public sealed class WindoseBridge : IElfHost
     {
+        private static int _windowCount;
+
         /// <summary>Call once at boot.</summary>
         public static void Install()
         {
             ElfRunner.Host = new WindoseBridge();
-            ElfRunner.Output = delegate (string s) { /* TODO: Terminal.Write(s); */ };
-        
-            // Only needed if your heap is non-executable and you get a page fault on the first instruction:
-            // ElfRunner.MakeExecutable = delegate (ulong address, ulong length) { /* TODO: mark pages executable */ };
+
+            // TODO: where program output goes (your terminal's write method).
+            ElfRunner.Output = delegate (ElfProgram p, string s) { /* Terminal.Write(s); */ };
+
+            // Shell command, e.g. "run <path> [args]":
+            //   byte[] data = File.ReadAllBytes(path);
+            //   string err; ElfProgram p = ElfRunner.Spawn(data, name, args, out err);
+            //   if (p == null) Terminal.WriteLine("exec failed: " + err); else Terminal.WriteLine("pid " + p.Pid);
+            // "ps":   foreach (ElfProgram p in ElfRunner.List()) ... p.Pid, p.Name, p.State, p.MemoryBytes
+            // "kill": ElfRunner.Kill(pid);
+            // Exit notice: ElfRunner.Exited = delegate (ElfProgram p) { Terminal.WriteLine("pid " + p.Pid + " exited: " + p.ExitCode); };
+
+            // Only if you get a page fault on the first instruction (non-executable heap):
+            // ElfRunner.MakeExecutable = delegate (ulong address, ulong length) { /* mark pages executable */ };
         }
 
+        // ---------------------------------------------------------------- process list
+
+        // The ELF itself runs on its own thread (it blocks in its main loop). This entry only makes the program
+        // visible in the process list and lets "kill" from there work.
+        public void ProgramStarted(ElfProgram p)
+        {
+            SingleThreadedProcess proc = new SingleThreadedProcess("elf: " + p.Name, ProcessType.Program);
+            proc.onUpdate += delegate () { };
+            proc.onDispose += delegate () { ElfRunner.Kill(p.Pid); };
+            p.HostData = proc;
+            ProcessManger.QueueStart(proc);
+        }
+
+        public void ProgramExited(ElfProgram p)
+        {
+            SingleThreadedProcess proc = p.HostData as SingleThreadedProcess;
+            if (proc != null) ProcessManger.QueueStop(proc);
+        }
+
+        // ---------------------------------------------------------------- UI
+
+        // Programs see a client area of w x h; we add the frame and title bar around it.
         public object CreateWindow(int w, int h, string title)
         {
-            Window win = new Window(100, 100, w, h, title);
-            LaunchTracker.Start(() => win);
+            int n = _windowCount++ % 10;
+            int border = Palette.BorderSize;
+            int titleH = Palette.TitleBarHeight;
+
+            Window win = new Window(80 + n * 30, 80 + n * 30,
+                                    w + border * 2, h + titleH + border,
+                                    title, true);
+            WindowManager.Register(win);   // posts to the DWM: starts the process, z-order, focus, taskbar button
             return win;
         }
 
         public object CreateButton(object parent, int x, int y, int w, int h, string text)
         {
-            Button button = new Button(text, x, y, w, h);
-
-            using Component component = (Component)parent;
-
-            component.AddChild(button);
-
-            return button;
+            Component p = parent as Component;
+            if (p == null) return null;
+            Button b = new Button(text, ClientX(p, x), ClientY(p, y), w, h);
+            lock (Component.components) { p.AddChild(b); }   // the DWM composes under this same lock
+            return b;
         }
 
         public object CreateLabel(object parent, int x, int y, string text)
         {
-            Label label = new Label(x, y, text.Length * 8, 20)
+            Component p = parent as Component;
+            if (p == null) return null;
+            int lx = ClientX(p, x);
+            int width = Math.Max(32, p.Width - lx - Palette.BorderSize);
+            Label l = new Label(lx, ClientY(p, y), width, 20)
             {
                 text = text,
+                useBackground = false,
+                useForeground = false,
             };
-
-            using Component component = (Component)parent;
-
-            component.AddChild(label);
-
-            return label;
+            lock (Component.components) { p.AddChild(l); }
+            return l;
         }
 
-        public void Bind(object obj, int handle)
+        public void Bind(object obj, int handle, ElfProgram owner)
         {
-            using Window winHandle = (Window)obj;
-          
-            // TODO: window -> win.OnClose = () => ElfEvents.Push(ElfEvent.Close, handle, 0, 0);
-            //       button -> btn.OnClick = () => ElfEvents.Push(ElfEvent.Click, handle, 0, 0);
-            //       (capture 'handle' in a local, one lambda per object is fine here)
+            int h = handle;
+            Window win = obj as Window;
+            if (win != null)
+            {
+                win.onClosed = delegate () { owner.PostEvent(ElfEvent.Close, h, 0, 0); };
+                return;
+            }
+            Button b = obj as Button;
+            if (b != null)
+                b.leftClickAction = delegate () { owner.PostEvent(ElfEvent.Click, h, 0, 0); };
         }
 
         public bool SetText(object obj, string text)
         {
-            using Component component = (Component)obj;
-            component.text = text;
-            component.MarkDirty();
-            // TODO: ((Component)obj).Text = text; mark dirty; return true;
+            Button b = obj as Button;
+            if (b != null) { b.text = text; b.MarkDirty(); return true; }
+            Label l = obj as Label;
+            if (l != null) { l.text = text; l.MarkDirty(); return true; }
+            Window w = obj as Window;
+            if (w != null) { w.SetTitle(text); return true; }
             return false;
         }
 
+        // Windose redraws windows every frame (DrawLocal), so pixels drawn "from outside" would be wiped.
+        // A filled rect is therefore a solid Panel child. NOTE: every call adds one Panel - fine for a few
+        // static rects, not for per-frame animation. (A proper canvas component is the next step.)
         public bool FillRect(object window, int x, int y, int w, int h, uint argb)
         {
-            // TODO: draw into the window's buffer, mark dirty; return true;
-            return false;
+            Component p = window as Component;
+            if (p == null || w <= 0 || h <= 0) return false;
+            Panel rect = new Panel(Color.FromArgb(unchecked((int)argb)), ClientX(p, x), ClientY(p, y), w, h);
+            rect.useBackground = true;
+            lock (Component.components) { p.AddChild(rect); }
+            return true;
         }
 
         public void Close(object obj)
         {
-            WindowManager.Close(obj as Window);
-            // TODO: if already closed return; otherwise close/remove from DWM
+            Window win = obj as Window;
+            if (win != null) { WindowManager.Close(win); return; }   // async; safe to call twice (CloseNow checks windows.Contains)
+
+            Component c = obj as Component;
+            if (c != null && c.Parent != null)
+                lock (Component.components) { c.Parent.RemoveChild(c); }
         }
+
+        // ---------------------------------------------------------------- files
 
         public byte[] ReadFile(string path)
         {
-            // TODO: return your VFS read (null if it doesn't exist)
-            return null;
+            try { return global::System.IO.File.Exists(path) ? global::System.IO.File.ReadAllBytes(path) : null; }
+            catch { return null; }
         }
 
         public bool WriteFile(string path, byte[] data)
         {
-            // TODO: your VFS write
-            return false;
+            try { global::System.IO.File.WriteAllBytes(path, data); return true; }
+            catch { return false; }
         }
+
+        // Program coordinates are relative to the window's client area (inside frame + title bar).
+        private static int ClientX(Component parent, int x) { return parent is Window ? x + Palette.BorderSize : x; }
+        private static int ClientY(Component parent, int y) { return parent is Window ? y + Palette.TitleBarHeight : y; }
     }
 }

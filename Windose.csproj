@@ -9,6 +9,32 @@
 	  <NoWarn>$(NoWarn);COSMOS0001</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="System\ELF\programs\bin\hello.elf" />
+    <None Remove="System\ELF\programs\bin\libctest.elf" />
+    <None Remove="System\ELF\programs\bin\memhog.elf" />
+    <None Remove="System\ELF\programs\bin\spin.elf" />
+    <None Remove="System\ELF\programs\bin\window.elf" />
+    <None Remove="System\ELF\programs\hello.elf" />
+    <None Remove="System\ELF\programs\include\ctype.h" />
+    <None Remove="System\ELF\programs\include\kernel.h" />
+    <None Remove="System\ELF\programs\include\stdio.h" />
+    <None Remove="System\ELF\programs\include\stdlib.h" />
+    <None Remove="System\ELF\programs\include\string.h" />
+    <None Remove="System\ELF\programs\libc\crt0.c" />
+    <None Remove="System\ELF\programs\libc\format.c" />
+    <None Remove="System\ELF\programs\libc\malloc.c" />
+    <None Remove="System\ELF\programs\libc\stdio.c" />
+    <None Remove="System\ELF\programs\libc\stdlib.c" />
+    <None Remove="System\ELF\programs\libc\string.c" />
+    <None Remove="System\ELF\programs\src\hello.c" />
+    <None Remove="System\ELF\programs\src\libctest.c" />
+    <None Remove="System\ELF\programs\src\memhog.c" />
+    <None Remove="System\ELF\programs\src\spin.c" />
+    <None Remove="System\ELF\programs\src\window.c" />
+    <None Remove="System\ELF\programs\window.elf" />
+  </ItemGroup>
+
   <!-- Core kernel packages -->
   <ItemGroup>
     <PackageReference Include="Cosmos.Kernel" Version="3.0.94" />
@@ -230,6 +256,29 @@
     <EmbeddedResource Include=".\Resources\Icons\xml_gear.png" />
     <EmbeddedResource Include=".\Resources\Fonts\lucida-10x16.psf" />
     <EmbeddedResource Include=".\Resources\Wallpapers\WRAMW.png" />
+    <EmbeddedResource Include=".\System\ELF\programs\hello.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\window.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\hello.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\libctest.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\memhog.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\spin.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\window.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\ctype.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\kernel.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\stdio.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\stdlib.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\string.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\crt0.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\format.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\malloc.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\stdio.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\stdlib.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\string.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\src\hello.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\src\libctest.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\src\memhog.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\src\spin.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\src\window.c" />
   </ItemGroup>
 
     <ItemGroup>

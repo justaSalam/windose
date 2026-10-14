@@ -13,6 +13,7 @@ using Windose.System.Scheduling;
 using Cosmos.Kernel.System.Input;
 using Windose.Compositing;
 using Windose.System.Elf;
+using Windose.System.Kernel;
 namespace Windose;
 
 /// <summary>
@@ -109,6 +110,26 @@ public class Kernel : Sys.Kernel
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
         FileAssociations.DiscoverPrograms(typeof(Kernel).Assembly);
+
+        ResourceLoader.WriteStorage("/mnt/Programs/window.elf", "Windose.System.ELF.programs.bin.window.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/hello.elf", "Windose.System.ELF.programs.bin.hello.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/libctest.elf", "Windose.System.ELF.programs.bin.libctest.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/memhog.elf", "Windose.System.ELF.programs.bin.memhog.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/spin.elf", "Windose.System.ELF.programs.bin.spin.elf", true);
+
+        ResourceLoader.WriteStorage("/mnt/Programs/ctype.h", "Windose.System.ELF.programs.include.ctype.h", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/kernel.h", "Windose.System.ELF.programs.include.kernel.h", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/stdio.h", "Windose.System.ELF.programs.include.stdio.h", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/stdlib.h", "Windose.System.ELF.programs.include.stdlib.h", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/string.h", "Windose.System.ELF.programs.include.string.h", true);
+
+        ResourceLoader.WriteStorage("/mnt/Programs/crt0.c", "Windose.System.ELF.programs.libc.crt0.c", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/format.c", "Windose.System.ELF.programs.libc.format.c", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/malloc.c", "Windose.System.ELF.programs.libc.malloc.c", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/stdio.c", "Windose.System.ELF.programs.libc.stdio.c", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/stdlib.c", "Windose.System.ELF.programs.libc.stdlib.c", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/string.c", "Windose.System.ELF.programs.libc.string.c", true);
+
 
     }
 

@@ -118,6 +118,7 @@ public static class CommandRegistry
             context.Clear();
         }));
 
+        Register(new ElfCommand());
         Register(new IpConfig());
         Register(new FtpCommand());
         Register(new UacCommand());
