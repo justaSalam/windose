@@ -7,3 +7,13 @@
 bin/
 obj/
 output-x64/
+BREEZE.md
+BREEZE_API.html
+COMMANDS.md
+win.wasm
+asm.wat
+.appdata/Nuget
+.dotnet-home/.dotnet/
+.github/
+.idea/.idea.windose.dir/.idea/
+.vscode/
