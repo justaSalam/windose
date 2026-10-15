@@ -104,7 +104,7 @@ public class Kernel : Sys.Kernel
 
 
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.Tab, Modifiers = ConsoleModifiers.Alt }, WindowManager.SwapFocusedWindow);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.E & Key.LWin }, () => WindowManager.PostRegister(new FileExplorer(100, 100, 800, 500, "File Explorer")));
+        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.E, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.PostRegister(new FileExplorer(100, 100, 800, 500, "File Explorer")));
         HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
@@ -112,6 +112,9 @@ public class Kernel : Sys.Kernel
 
         ResourceLoader.WriteStorage("/mnt/Programs/window.elf", "Windose.System.ELF.programs.bin.window.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/hello.elf", "Windose.System.ELF.programs.bin.hello.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/canvas.elf", "Windose.System.ELF.programs.bin.canvas.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/explorer.elf", "Windose.System.ELF.programs.bin.explorer.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/widgets.elf", "Windose.System.ELF.programs.bin.widgets.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/libctest.elf", "Windose.System.ELF.programs.bin.libctest.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/memhog.elf", "Windose.System.ELF.programs.bin.memhog.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/spin.elf", "Windose.System.ELF.programs.bin.spin.elf", true);

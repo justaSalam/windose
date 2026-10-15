@@ -18,6 +18,8 @@ namespace Windose.System.Elf
         public volatile bool KillRequested;
         /// <summary>Free slot for the host (WindoseBridge keeps its process-list entry here).</summary>
         public object HostData;
+        /// <summary>Text payload of the last drag-and-drop onto this program's windows.</summary>
+        public string LastDropText;
 
         internal readonly HandleTable Objs = new HandleTable();
         internal readonly ElfEventQueue Events = new ElfEventQueue();

@@ -42,6 +42,23 @@ public class StatusBar : Component
         return panel;
     }
 
+    public int PanelCount => panels.children.Count;
+
+    public Panel GetPanel(int index)
+    {
+        if (index < 0 || index >= panels.children.Count) return null;
+        return panels.children[index] as Panel;
+    }
+
+    public void SetPanelText(int index, string text)
+    {
+        Panel panel = GetPanel(index);
+        if (panel == null) return;
+        panel.text = text ?? "";
+        panel.MarkDirty();
+        MarkDirty();
+    }
+
     public override void Resize(int width, int height)
     {
         panels.Resize(Math.Max(1, width - 4), Math.Max(1, height - 4));

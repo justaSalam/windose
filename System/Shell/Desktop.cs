@@ -39,6 +39,10 @@ public class Desktop : Component
     public int contextY { get; private set; }
     public bool ConsumeKeyboardInput => selectedIcons.Count == 1 || FindRenamingIcon() != null;
 
+    /// <summary>True while an icon label is being edited. Rename input must keep the keyboard
+    /// even if a window is focused (clicking elsewhere commits the rename first).</summary>
+    public bool IsRenaming => FindRenamingIcon() != null;
+
 
     //Mark as hidden
     public const string layoutFilePath = "/mnt/user/desktop/.desktop.layout";

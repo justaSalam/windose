@@ -46,4 +46,26 @@ public class TreeViewItem
     {
         return children.Count > 0;
     }
+
+    public void Expand() => expanded = true;
+    public void Collapse() => expanded = false;
+    public void Toggle() => expanded = !expanded;
+
+    public int Level
+    {
+        get
+        {
+            int depth = 0;
+            for (TreeViewItem c = parent; c != null; c = c.parent) depth++;
+            return depth;
+        }
+    }
+
+    public string FullPath(string separator = "/")
+    {
+        string path = text ?? "";
+        for (TreeViewItem c = parent; c != null; c = c.parent)
+            path = (c.text ?? "") + separator + path;
+        return path;
+    }
 }

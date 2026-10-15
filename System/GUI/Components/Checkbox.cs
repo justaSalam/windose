@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Cosmos.Kernel.Core.IO;
 using Windose;
@@ -30,6 +31,7 @@ public class Checkbox : Component
     public Checkbox(int x, int y) : base(x, y, 15, 15)
     {
         clampSize = false;
+        TabStop = true;
     }
 
     public override void Update()
@@ -62,11 +64,12 @@ public class Checkbox : Component
         Rectangle content = GetContentBounds();
         Rectangle textBounds = new Rectangle(content.X + BoxSize + TextGap, content.Y,
             Math.Max(0, content.Width - BoxSize - TextGap), content.Height);
-        DrawAlignedText(text, textColor, effectiveFontSize, textBounds);
+        DrawAlignedText(text, IsInputEnabled() ? textColor : Color.Gray, effectiveFontSize, textBounds);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (mouse.left == MouseEvents.Release)
         {
             Checked = !Checked;
@@ -76,6 +79,16 @@ public class Checkbox : Component
 
 
         return true;
+    }
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled()) return;
+        if (GetPrintableCharacter(keyEvent) == ' ')
+        {
+            Checked = !Checked;
+            Click?.Invoke();
+        }
     }
 
     private void EnsureTextFits()

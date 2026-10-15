@@ -107,6 +107,8 @@ public class MenuPopup : Component
         openMenus.Clear();
     }
 
+    public static bool HasOpenMenus => openMenus.Count > 0;
+
     public static bool HandleOpenMenuInput(int mouseX, int mouseY, MouseState mouse)
     {
         for (int i = openMenus.Count - 1; i >= 0; i--)

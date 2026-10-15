@@ -88,4 +88,6 @@ public class Label : Component
             }
         }
     }
+
+    public override string GetComponentName() => "Label";
 }

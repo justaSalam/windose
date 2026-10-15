@@ -1,5 +1,6 @@
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Input;
 using Windose.System.Features;
 
 public class ListView : Component
@@ -33,6 +34,7 @@ public class ListView : Component
     public ListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        TabStop = true;
     }
 
     public ListViewItem AddItem(string[] text, Image? icon = null, object? tag = null)
@@ -54,6 +56,24 @@ public class ListView : Component
         items.Clear();
         selectedItem = null;
         MarkDirty();
+    }
+
+    public void RemoveItemAt(int index)
+    {
+        if (index < 0 || index >= items.Count) return;
+        if (selectedItem == items[index]) selectedItem = null;
+        items.RemoveAt(index);
+        MarkDirty();
+    }
+
+    public int SelectedIndex
+    {
+        get => selectedItem == null ? -1 : items.IndexOf(selectedItem);
+        set
+        {
+            if (value < -1 || value >= items.Count) return;
+            SelectItem(value < 0 ? null : items[value]);
+        }
     }
 
     public override void DrawLocal()
@@ -130,6 +150,7 @@ public class ListView : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (!IsInsideAbsolute(mouseX, mouseY))
             return false;
 
@@ -191,6 +212,39 @@ public class ListView : Component
 
         selectedChanged?.Invoke(selectedItem);
         MarkDirty();
+    }
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled() || items.Count == 0) return;
+        int index = selectedItem == null ? -1 : items.IndexOf(selectedItem);
+        int page = Math.Max(1, (Height - headerHeight) / Math.Max(1, detailsRowHeight));
+
+        switch (keyEvent.Key)
+        {
+            case Key.UpArrow:
+                SelectItem(items[Math.Max(0, index <= 0 ? 0 : index - 1)]);
+                break;
+            case Key.DownArrow:
+                SelectItem(items[Math.Min(items.Count - 1, index + 1)]);
+                break;
+            case Key.Home:
+                SelectItem(items[0]);
+                break;
+            case Key.End:
+                SelectItem(items[items.Count - 1]);
+                break;
+            case Key.PageUp:
+                SelectItem(items[Math.Max(0, (index < 0 ? items.Count : index) - page)]);
+                break;
+            case Key.PageDown:
+                SelectItem(items[Math.Min(items.Count - 1, index + page)]);
+                break;
+            case Key.Enter:
+                if (selectedItem != null)
+                    itemDoubleClick?.Invoke(selectedItem);
+                break;
+        }
     }
 
     public int GetItemIndexAt(int localX, int localY)

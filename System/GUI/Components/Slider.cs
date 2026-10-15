@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Windose;
 
@@ -72,11 +73,13 @@ public class Slider : Component
     public Slider(int x, int y, int width) : base(x, y, width, 25)
     {
         clampSize = false;
+        TabStop = true;
     }
 
     public Slider(int x, int y, int width, int height, Orientation orientation) : base(x, y, width, height)
     {
         clampSize = false;
+        TabStop = true;
         Orientation = orientation;
     }
 
@@ -184,8 +187,26 @@ public class Slider : Component
         }
     }
 
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled()) return;
+        bool horizontal = Orientation == Orientation.Horizontal;
+        switch (keyEvent.Key)
+        {
+            case Key.LeftArrow: Value -= horizontal ? SmallChange : 0; break;
+            case Key.RightArrow: Value += horizontal ? SmallChange : 0; break;
+            case Key.UpArrow: Value += horizontal ? 0 : SmallChange; break;
+            case Key.DownArrow: Value -= horizontal ? 0 : SmallChange; break;
+            case Key.PageUp: Value += LargeChange; break;
+            case Key.PageDown: Value -= LargeChange; break;
+            case Key.Home: Value = Minimum; break;
+            case Key.End: Value = Maximum; break;
+        }
+    }
+
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (mouse.left == MouseEvents.Release || mouse.left == MouseEvents.None)
         {
             if (isDragging)

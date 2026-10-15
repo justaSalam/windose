@@ -87,6 +87,7 @@ public class MenuItem : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (submenu != null && submenu.Visible && submenu.IsInsideAbsolute(mouseX, mouseY))
             return submenu.HandleInput(mouseX, mouseY, mouse);
 

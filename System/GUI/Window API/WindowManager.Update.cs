@@ -16,7 +16,14 @@ public partial class WindowManager
         ComponentZSort();
         UpdateComponents();
 
-        if (capturedWindow != null || capturedComponent != null)
+        if (DragDropManager.IsDragging)
+        {
+            capturedWindow = null;
+            capturedComponent = null;
+            HandleKeyboardInput();
+            HandleWindowCapture();
+        }
+        else if (capturedWindow != null || capturedComponent != null)
         {
             HandleCapturedInput();
         }
@@ -86,6 +93,11 @@ public partial class WindowManager
 
     private void HandleWindowCapture()
     {
+        if (DragDropManager.IsDragging)
+        {
+            HandleDragUpdate();
+            return;
+        }
         lock (windows)
         {
             bool hitWindow = false;
@@ -123,6 +135,65 @@ public partial class WindowManager
             if (!hitWindow && !hitComponent && mouseState.left == MouseEvents.Press)
                 ClearFocusedWindow();
         }
+    }
+
+    private void HandleDragUpdate()
+    {
+        if (mouseState.left == MouseEvents.Release)
+        {
+            try { DragDropManager.FinishDrop(mx, my); }
+            catch (Exception exception)
+            {
+                FailApplication(focusedWindow, "finishing drag and drop", exception);
+                DragDropManager.Cancel();
+            }
+            return;
+        }
+
+        if (mouseState.left == MouseEvents.None)
+        {
+            DragDropManager.Cancel();
+            return;
+        }
+
+        try { DragDropManager.UpdateTarget(FindDropTarget(mx, my), mx, my); }
+        catch (Exception exception)
+        {
+            FailApplication(focusedWindow, "routing drag and drop", exception);
+            DragDropManager.Cancel();
+        }
+    }
+
+    private Component FindDropTarget(int x, int y)
+    {
+        lock (windows)
+        {
+            for (int i = windows.Count - 1; i >= 0; i--)
+            {
+                Window win = windows[i];
+                if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
+                if (!win.HitTest(x, y)) continue;
+                Component deepest = win.GetChildAt(x, y) ?? (Component)win;
+                for (Component c = deepest; c != null; c = c.Parent)
+                {
+                    if (c.AllowDrop && c.Visible && c.IsInsideAbsolute(x, y)) return c;
+                }
+            }
+        }
+
+        for (int i = components.Count - 1; i >= 0; i--)
+        {
+            Component root = components[i];
+            if (root == null || !root.Visible || !root.isRoot || root is Window) continue;
+            if (!root.IsInsideAbsolute(x, y)) continue;
+            Component deepest = root.GetChildAt(x, y) ?? root;
+            for (Component c = deepest; c != null; c = c.Parent)
+            {
+                if (c.AllowDrop && c.Visible && c.IsInsideAbsolute(x, y)) return c;
+            }
+        }
+
+        return null;
     }
 
     private void ComponentZSort()
@@ -173,9 +244,16 @@ public partial class WindowManager
                 return;
             }
 
+            if (key.Key == Key.Escape && MenuPopup.HasOpenMenus)
+            {
+                MenuPopup.HideAll();
+                return;
+            }
+
             HotkeyManager.HandleKeyEvent();
 
-            if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput)
+            if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput &&
+                (focusedWindow == null || Explorer.desktop.IsRenaming))
             {
                 Explorer.desktop.HandleKeyboard(key);
                 return;

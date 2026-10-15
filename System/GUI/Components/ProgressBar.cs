@@ -25,22 +25,41 @@ public class ProgressBar : Component
         set
         {
             _targetValue = Math.Clamp(value, _min, _max);
-            if (Math.Abs(_animSpeed) < 0.001f)
+            if (Math.Abs(AnimationSpeed) < 0.001f)
                 _value = _targetValue;
             MarkDirty();
         }
     }
 
+    /// <summary>Units per second the bar eases toward Value. 0 snaps instantly.</summary>
+    public float AnimationSpeed
+    {
+        get => _animSpeed;
+        set { _animSpeed = Math.Max(0, value); MarkDirty(); }
+    }
+
     public float Minimum
     {
         get => _min;
-        set { _min = value; MarkDirty(); }
+        set
+        {
+            _min = Math.Min(value, _max);
+            _value = Math.Clamp(_value, _min, _max);
+            _targetValue = Math.Clamp(_targetValue, _min, _max);
+            MarkDirty();
+        }
     }
 
     public float Maximum
     {
         get => _max;
-        set { _max = value; MarkDirty(); }
+        set
+        {
+            _max = Math.Max(value, _min);
+            _value = Math.Clamp(_value, _min, _max);
+            _targetValue = Math.Clamp(_targetValue, _min, _max);
+            MarkDirty();
+        }
     }
 
     public bool Indeterminate
@@ -71,9 +90,12 @@ public class ProgressBar : Component
             return;
         }
 
-        float step = (float)(Kernel.DeltaTimeMs / 50.0);
-        _value += _targetValue > _value ? step : -step;
-        _value = Math.Clamp(_value, _min, _max);
+        float step = _animSpeed > 0 ? _animSpeed * (float)Kernel.DeltaTimeSeconds
+                                    : (float)(Kernel.DeltaTimeMs / 50.0);
+        float next = _value + (_targetValue > _value ? step : -step);
+        if ((_targetValue - _value) * (_targetValue - next) <= 0)
+            next = _targetValue;   // reached or overshot
+        _value = Math.Clamp(next, _min, _max);
         MarkDirty();
     }
 

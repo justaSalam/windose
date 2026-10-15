@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Windose;
 
@@ -52,9 +53,10 @@ public class ComboBox : Component
     public event Action<int> SelectedIndexChanged;
     public event Action<int> ItemClicked;
 
-    public ComboBox(int x, int y, int width) : base(x, y, width, 25)
+    public ComboBox(int x, int y, int width) : base(x, y, width, 20)
     {
         clampSize = false;
+        TabStop = true;
     }
 
     public override void Resize(int width, int height)
@@ -67,11 +69,12 @@ public class ComboBox : Component
         RebuildDropDown();
     }
 
-    public void AddItem(object item)
+    public int AddItem(object item)
     {
         items.Add(item);
-        RebuildDropDown();
+        if (dropDown != null) AppendDropDownItem(items.Count - 1);
         MarkDirty();
+        return items.Count - 1;
     }
 
     public void AddRange(IEnumerable<object> newItems)
@@ -87,6 +90,15 @@ public class ComboBox : Component
         items.Clear();
         selectedIndex = -1;
         SetDroppedDown(false);
+        RebuildDropDown();
+        MarkDirty();
+    }
+
+    public void RemoveItemAt(int index)
+    {
+        if (index < 0 || index >= items.Count) return;
+        items.RemoveAt(index);
+        if (selectedIndex >= items.Count) selectedIndex = items.Count - 1;
         RebuildDropDown();
         MarkDirty();
     }
@@ -152,6 +164,7 @@ public class ComboBox : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (mouse.left == MouseEvents.Press)
         {
             isPressed = true;
@@ -177,6 +190,32 @@ public class ComboBox : Component
         }
 
         return true;
+    }
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled()) return;
+        switch (keyEvent.Key)
+        {
+            case Key.Enter:
+                SetDroppedDown(!isDroppedDown && items.Count > 0);
+                break;
+            case Key.Escape:
+                SetDroppedDown(false);
+                break;
+            case Key.UpArrow:
+                if (selectedIndex > 0) SelectedIndex = selectedIndex - 1;
+                break;
+            case Key.DownArrow:
+                if (selectedIndex + 1 < items.Count) SelectedIndex = selectedIndex + 1;
+                break;
+            case Key.Home:
+                if (items.Count > 0) SelectedIndex = 0;
+                break;
+            case Key.End:
+                if (items.Count > 0) SelectedIndex = items.Count - 1;
+                break;
+        }
     }
 
     private void SetDroppedDown(bool droppedDown)
@@ -225,20 +264,23 @@ public class ComboBox : Component
         dropDown.Resize(Width, DropDownHeight);
 
         for (int i = 0; i < items.Count; i++)
-        {
-            int index = i;
-            MenuItem item = dropDown.AddItem(items[i]?.ToString() ?? "", () =>
-            {
-                SelectedIndex = index;
-                ItemClicked?.Invoke(index);
-                isDroppedDown = false;
-                MarkDirty();
-            });
-            item.fontSize = fontSize > 0 ? fontSize : 14;
-        }
+            AppendDropDownItem(i);
 
         if (wasVisible && items.Count > 0)
             dropDown.ShowAt(AbsoluteX, AbsoluteY + collapsedHeight - 1);
+    }
+
+    private void AppendDropDownItem(int index)
+    {
+        MenuItem item = dropDown.AddItem(items[index]?.ToString() ?? "", () =>
+        {
+            SelectedIndex = index;
+            ItemClicked?.Invoke(index);
+            SetDroppedDown(false);
+            MarkDirty();
+        });
+        item.fontSize = fontSize > 0 ? fontSize : 14;
+        dropDown.Resize(Width, DropDownHeight);
     }
 
     private void DrawFilledTriangle(Color color, int centerX, int centerY, int size)

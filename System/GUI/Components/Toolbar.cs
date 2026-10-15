@@ -25,6 +25,11 @@ public class Toolbar : Component
 
     public Button AddButton(string text, Action click = null)
     {
+        return AddButton(text, click, "");
+    }
+
+    public Button AddButton(string text, Action click, string tooltip)
+    {
         int width = text.Length * 10;
         Button button = new Button(text, 0, 0, width, Height - 6)
         {
@@ -36,11 +41,17 @@ public class Toolbar : Component
         };
 
         items.AddStackChild(button);
+        TooltipService.Attach(button, tooltip);
         MarkDirty();
         return button;
     }
 
     public Button AddButton(Image image, Action ?click = null, int width = 28)
+    {
+        return AddButton(image, click, width, "");
+    }
+
+    public Button AddButton(Image image, Action ?click, int width, string tooltip)
     {
         Button button = new Button(image, 0, 0, width, Height - 6)
         {
@@ -52,6 +63,7 @@ public class Toolbar : Component
         };
 
         items.AddStackChild(button);
+        TooltipService.Attach(button, tooltip);
         MarkDirty();
         return button;
     }

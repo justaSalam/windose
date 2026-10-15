@@ -14,7 +14,13 @@ namespace Windose.System.Elf
         public const int None = 0;
         public const int Click = 1;   // Handle = button
         public const int Close = 2;   // Handle = window (user pressed X)
-        public const int Key = 3;     // A = key code
+        public const int Key = 3;     // A = key code, B = (modifiers << 16) | char
+        public const int MouseMove = 4;   // Handle = innermost component, A = x, B = y (component-local)
+        public const int MouseDown = 5;   // A = x | (button << 28), B = y (button: 1 left, 2 right, 3 middle)
+        public const int MouseUp = 6;     // same packing as MouseDown
+        public const int Focus = 7;       // A = 1 gained, 0 lost
+        public const int Drop = 8;        // A = x, B = y (window-local); text via dnd_get_text
+        public const int DoubleClick = 9; // like Click (selection already reported), for open-on-double-click
     }
 
     public sealed class ElfEventQueue

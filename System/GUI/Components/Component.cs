@@ -141,6 +141,78 @@ public class Component : IDisposable
     protected bool visible;
     public string designType = "";
 
+    private bool enabled = true;
+
+    /// <summary>Disabled components (and their children) ignore all input.</summary>
+    public bool Enabled
+    {
+        get => enabled;
+        set
+        {
+            if (enabled == value) return;
+            enabled = value;
+            MarkDirty();
+        }
+    }
+
+    /// <summary>False when this component or any ancestor is disabled.</summary>
+    public bool IsInputEnabled()
+    {
+        for (Component? c = this; c != null; c = c.parent)
+        {
+            if (!c.enabled) return false;
+            if (c.isRoot) break;
+        }
+        return true;
+    }
+
+    // ---- keyboard focus ----
+
+    /// <summary>Whether Tab can move focus here. Clicking a TabStop focuses it.</summary>
+    public bool TabStop;
+    /// <summary>Focus order for Tab navigation. Equal values keep tree order.</summary>
+    public int TabIndex;
+
+    public static Component? FocusedComponent { get; private set; }
+    public bool Focused => FocusedComponent == this;
+    public event Action<bool> FocusChanged;
+
+    public virtual void RequestFocus()
+    {
+        if (!IsInputEnabled() || !Visible) return;
+        if (FocusedComponent == this) return;
+        Component? old = FocusedComponent;
+        FocusedComponent = null;
+        if (old != null)
+        {
+            old.MarkDirty();
+            try { old.FocusChanged?.Invoke(false); } catch { }
+        }
+        FocusedComponent = this;
+        MarkDirty();
+        try { FocusChanged?.Invoke(true); } catch { }
+    }
+
+    public static void ClearFocus()
+    {
+        Component? old = FocusedComponent;
+        if (old == null) return;
+        FocusedComponent = null;
+        old.MarkDirty();
+        try { old.FocusChanged?.Invoke(false); } catch { }
+    }
+
+    /// <summary>True when this component is inside root's subtree.</summary>
+    public bool IsDescendantOf(Component root)
+    {
+        for (Component? c = this; c != null; c = c.parent)
+        {
+            if (c == root) return true;
+            if (c.isRoot) break;
+        }
+        return false;
+    }
+
     //Should not render until added as a child or is a parent
     protected bool canRender = false;
     public bool isRoot;
@@ -165,6 +237,13 @@ public class Component : IDisposable
     public Action leftClickAction;
     public Action rightClickAction;
     public Action middleClickAction;
+
+    /// <summary>Accept dropped data. When true the window manager routes drags here.</summary>
+    public bool AllowDrop;
+    public Action<DragData> DragEntered;
+    public Action<DragData> DragOver;
+    public Action<DragData> DragLeft;
+    public Action<DragData> DragDropped;
 
 
     public MenuPopup popup;
@@ -303,6 +382,7 @@ public class Component : IDisposable
     }
     public virtual bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (MouseCapture != null && MouseCapture.parent == this) return MouseCapture.HandleInput(mouseX, mouseY, mouse);
         if (IsInsideAbsolute(mouseX, mouseY))
         {
@@ -989,6 +1069,9 @@ public class Component : IDisposable
             return;
 
         disposed = true;
+
+        if (FocusedComponent == this)
+            ClearFocus();
 
         for (int i = children.Count - 1; i >= 0; i--)
             children[i].Dispose();

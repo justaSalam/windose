@@ -293,6 +293,18 @@ public class ScrollView : Component
                 ApplyContentOffset();
             }
         }
+        else if (content is ListView plainList)
+        {
+            int newHeight = Math.Max(GetViewportHeight(), plainList.GetContentHeight());
+
+            if (newHeight != contentHeight)
+            {
+                contentHeight = newHeight;
+                content.Resize(contentWidth, contentHeight);
+                ClampScroll();
+                ApplyContentOffset();
+            }
+        }
     }
 
     private int GetViewportWidth()

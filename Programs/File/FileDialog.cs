@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Input;
 
 public enum FileDialogMode
 {
@@ -20,6 +21,9 @@ public sealed class FileDialogOptions
 
 public sealed class FileDialog : Window
 {
+    /// <summary>Chosen path after Accept. Null if cancelled or not yet chosen.</summary>
+    public string SelectedPath { get; private set; }
+
     private readonly FileDialogOptions options;
     private readonly Action<string> accepted;
     private readonly AddressBar addressBar;
@@ -232,8 +236,16 @@ public sealed class FileDialog : Window
             return;
         }
 
+        SelectedPath = path;
         accepted?.Invoke(path);
         WindowManager.PostClose(this);
+    }
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (keyEvent.Key == Key.Enter) { Accept(); return; }
+        if (keyEvent.Key == Key.Escape) { WindowManager.PostClose(this); return; }
+        base.HandleKeyboard(keyEvent);
     }
 
     private void SetStatus(string value)

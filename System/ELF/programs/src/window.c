@@ -27,5 +27,7 @@ int main(int argc, char **argv)
             }
         }
         k_sleep(10);     // don't spin at 100% CPU
+        
+        
     }
 }

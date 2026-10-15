@@ -2,7 +2,7 @@
 // No LINQ, no lambdas, no reflection, no System.IO. Pure byte[] in, objects out.
 // Handles LE and BE, ET_EXEC/ET_DYN/ET_REL, program headers, sections, symbols.
 // Loading: GetImageExtent() + CopyImage() lay out PT_LOAD segments, ApplyRelocations() fixes up a PIE
-// (little-endian x86-64 only). No dynamic linking against shared libraries.
+// (little-endian x86-64 only) via RELA/JMPREL and RELR. No dynamic linking against shared libraries.
 
 namespace Windose.System.Elf
 {
@@ -23,7 +23,7 @@ namespace Windose.System.Elf
         public const ulong SHF_WRITE = 1, SHF_ALLOC = 2, SHF_EXECINSTR = 4;
         // dynamic tags
         public const long DT_NULL = 0, DT_PLTRELSZ = 2, DT_STRTAB = 5, DT_SYMTAB = 6, DT_RELA = 7, DT_RELASZ = 8,
-                          DT_RELAENT = 9, DT_SYMENT = 11, DT_JMPREL = 23, DT_RELRSZ = 35;
+                          DT_RELAENT = 9, DT_SYMENT = 11, DT_JMPREL = 23, DT_RELRSZ = 35, DT_RELR = 36, DT_RELRENT = 37;
         // x86-64 relocation types
         public const uint R_X86_64_NONE = 0, R_X86_64_64 = 1, R_X86_64_GLOB_DAT = 6, R_X86_64_JUMP_SLOT = 7, R_X86_64_RELATIVE = 8;
     }
@@ -192,7 +192,23 @@ namespace Windose.System.Elf
                 return true;
             }
 
-            // Extended numbering: shnum==0 means real count lives in sh_size of section 0. Not handled (rare).
+            // Extended numbering: PN_XNUM / section 0 holds the real counts (large objects from real toolchains).
+            const ushort PN_XNUM = 0xFFFF;
+            if ((phnum == PN_XNUM || shnum == 0) && shoff != 0)
+            {
+                int need = Is64 ? 64 : 40;
+                if (!Fits(shoff, (ulong)need)) return Fail("section 0 out of range");
+                int p0 = (int)shoff;
+                uint extInfo, extSize, extLink;
+                if (Is64) { extSize = (uint)U64(p0 + 32); extLink = U32(p0 + 40); extInfo = U32(p0 + 44); }
+                else { extSize = U32(p0 + 20); extLink = U32(p0 + 24); extInfo = U32(p0 + 28); }
+                if (phnum == PN_XNUM) phnum = (int)extInfo;
+                if (shnum == 0) shnum = (int)extSize;
+                if (shstrndx == 0xFFFF) shstrndx = (int)extLink;   // SHN_XINDEX
+                if (phnum < 0 || shnum < 0 || shstrndx < 0) return Fail("bad extended numbering");
+            }
+            if (phnum > 64) return Fail("too many program headers");
+            if (shnum > 4096) return Fail("too many section headers");
             Sections = new ElfSection[shnum];
             for (int i = 0; i < shnum; i++)
             {
@@ -343,10 +359,10 @@ namespace Windose.System.Elf
         }
 
         /// <summary>
-        /// Applies the dynamic relocations of a loaded image (RELA + JMPREL tables). 'mem[memOffset]' holds the byte
-        /// for vaddr 'low'; 'bias' is (runtime address of that byte) - low. Supports RELATIVE, 64, GLOB_DAT, JUMP_SLOT
-        /// against symbols defined inside the program itself. Undefined symbols, TLS and RELR are rejected.
-        /// A file without PT_DYNAMIC has nothing to relocate and succeeds.
+        /// Applies the dynamic relocations of a loaded image (RELA + JMPREL tables, plus RELR when present).
+        /// 'mem[memOffset]' holds the byte for vaddr 'low'; 'bias' is (runtime address of that byte) - low.
+        /// Supports RELATIVE, 64, GLOB_DAT, JUMP_SLOT against symbols defined inside the program itself.
+        /// Undefined symbols and TLS are rejected. A file without PT_DYNAMIC has nothing to relocate and succeeds.
         /// </summary>
         public bool ApplyRelocations(byte[] mem, int memOffset, ulong low, ulong size, ulong bias, out string error)
         {
@@ -356,7 +372,8 @@ namespace Windose.System.Elf
                 if (Segments[i].Type == ElfConst.PT_DYNAMIC) { dyn = Segments[i]; break; }
             if (dyn == null) return true;
 
-            ulong rela = 0, relasz = 0, relaent = 24, jmprel = 0, pltrelsz = 0, symtab = 0, strtab = 0, relrsz = 0;
+            ulong rela = 0, relasz = 0, relaent = 24, jmprel = 0, pltrelsz = 0, symtab = 0, strtab = 0;
+            ulong syment = 24, relr = 0, relrsz = 0, relent = 8;
             if (dyn.VAddr < low || dyn.VAddr - low + dyn.MemSize > size) { error = "PT_DYNAMIC outside image"; return false; }
             int dp = memOffset + (int)(dyn.VAddr - low);
             for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
@@ -373,14 +390,19 @@ namespace Windose.System.Elf
                     case ElfConst.DT_PLTRELSZ: pltrelsz = val; break;
                     case ElfConst.DT_SYMTAB: symtab = val; break;
                     case ElfConst.DT_STRTAB: strtab = val; break;
+                    case ElfConst.DT_SYMENT: syment = val; break;
+                    case ElfConst.DT_RELR: relr = val; break;
                     case ElfConst.DT_RELRSZ: relrsz = val; break;
+                    case ElfConst.DT_RELRENT: relent = val; break;
                 }
             }
-            if (relrsz != 0) { error = "DT_RELR relocations not supported (don't link with -z pack-relative-relocs)"; return false; }
             if (relaent != 24) { error = "bad DT_RELAENT"; return false; }
+            if (syment != 24) { error = "bad DT_SYMENT"; return false; }
+            if (relent != 8) { error = "bad DT_RELRENT"; return false; }
 
             if (rela != 0 && relasz != 0 && !ApplyTable(mem, memOffset, low, size, bias, rela, relasz, symtab, strtab, out error)) return false;
             if (jmprel != 0 && pltrelsz != 0 && !ApplyTable(mem, memOffset, low, size, bias, jmprel, pltrelsz, symtab, strtab, out error)) return false;
+            if (relr != 0 && relrsz != 0 && !ApplyRelr(mem, memOffset, low, size, bias, relr, relrsz, out error)) return false;
             return true;
         }
 
@@ -434,6 +456,48 @@ namespace Windose.System.Elf
 
                 Wr64(mem, memOffset + (int)(rOff - low), value);
             }
+            return true;
+        }
+
+        private static bool ApplyRelr(byte[] mem, int memOffset, ulong low, ulong size, ulong bias,
+                                       ulong tableVaddr, ulong tableSize, out string error)
+        {
+            error = null;
+            if (tableVaddr < low || tableVaddr - low + tableSize > size) { error = "DT_RELR table outside image"; return false; }
+            if (tableSize % 8 != 0) { error = "bad DT_RELRSZ"; return false; }
+            int tp = memOffset + (int)(tableVaddr - low);
+            ulong where = 0;
+            for (ulong o = 0; o < tableSize; o += 8)
+            {
+                ulong e = Rd64(mem, tp + (int)o);
+                if ((e & 1) == 0)
+                {
+                    where = e;
+                    if (!RelrApplyOne(mem, memOffset, low, size, bias, where, out error)) return false;
+                }
+                else
+                {
+                    for (int bit = 1; bit < 64; bit++)
+                    {
+                        if (((e >> bit) & 1) == 0) continue;
+                        ulong addr = where + (ulong)bit * 8;
+                        if (addr < where) { error = "DT_RELR address wraps"; return false; }
+                        if (!RelrApplyOne(mem, memOffset, low, size, bias, addr, out error)) return false;
+                    }
+                    if (where + 63UL * 8 < where) { error = "DT_RELR address wraps"; return false; }
+                    where += 63UL * 8;
+                }
+            }
+            return true;
+        }
+
+        private static bool RelrApplyOne(byte[] mem, int memOffset, ulong low, ulong size, ulong bias,
+                                         ulong addr, out string error)
+        {
+            error = null;
+            if (addr < low || addr - low + 8 > size) { error = "DT_RELR target outside image"; return false; }
+            int p = memOffset + (int)(addr - low);
+            Wr64(mem, p, unchecked(Rd64(mem, p) + bias));
             return true;
         }
 

@@ -26,7 +26,7 @@ public class Separator : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
-        return IsInsideAbsolute(mouseX, mouseY);
+        return false;   // separators are hit-test invisible; clicks pass through
     }
 
     public override string GetComponentName() => "Separator";

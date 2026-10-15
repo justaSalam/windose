@@ -17,7 +17,8 @@ public sealed class ElfCommand : IShellCommand
     {
         dispatcher = new SubcommandDispatcher(Usage)
             .Add("list", "", 0, ListElfProcess)
-            .Add("run", "run <file.elf>", 1, RunElf);
+            .Add("run", "run <file.elf>", 1, RunElf)
+            .Add("kill", "kill <pid>", 1, KillElf);
 
     }
 
@@ -44,7 +45,7 @@ public sealed class ElfCommand : IShellCommand
         context.WriteLine();
         foreach (ElfProgram program in ElfRunner.List())
         {
-            context.WriteLine($"Name: {program.Args[1]}");
+            context.WriteLine($"Name: {program.Args[0]}");
             context.WriteLine($"State: {program.State}");
             context.WriteLine($"Pid: {program.Pid}");
             context.WriteLine($"Image Size: {ByteSize.Format(program.ImageSize)}");
@@ -57,6 +58,17 @@ public sealed class ElfCommand : IShellCommand
     public void Execute(CommandContext context, string[] args)
     {
         dispatcher.Dispatch(context, args);
+    }
+
+    private void KillElf(CommandContext context, string[] args)
+    {
+        if (!int.TryParse(args[0], out int pid))
+        {
+            context.WriteLine($"Invalid pid: {args[0]}");
+            return;
+        }
+
+        context.WriteLine(ElfRunner.Kill(pid) ? $"Sent kill to pid {pid}." : $"No such program: {pid}.");
     }
 
 }

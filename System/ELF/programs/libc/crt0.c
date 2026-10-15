@@ -16,8 +16,8 @@ void abort(void) { static const char m[] = "abort()\n"; k_write(m, (int)sizeof m
 KABI int _start(KernelApi *k)
 {
     __k = k;
-    if (k->version != KAPI_VERSION || (size_t)k->size < sizeof(KernelApi)) {
-        static const char m[] = "ELF: kernel API version mismatch - rebuild the program\n";
+    if ((int)k->version < KAPI_VERSION || (size_t)k->size < sizeof(KernelApi)) {
+        static const char m[] = "ELF: kernel API too old - rebuild the program\n";
         k->write(k->pid, m, (int)sizeof m - 1);
         return 127;
     }

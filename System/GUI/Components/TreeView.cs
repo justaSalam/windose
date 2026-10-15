@@ -1,4 +1,5 @@
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 
 public class TreeView : Component
@@ -30,6 +31,7 @@ public class TreeView : Component
     public TreeView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        TabStop = true;
     }
 
     public TreeViewItem AddRoot(string text, object tag = null)
@@ -56,6 +58,38 @@ public class TreeView : Component
         roots.Clear();
         selectedItem = null;
         MarkDirty();
+    }
+
+    public void RemoveNode(TreeViewItem item)
+    {
+        if (item == null) return;
+        if (item.parent != null)
+            item.parent.children.Remove(item);
+        else
+            roots.Remove(item);
+        if (selectedItem == item) selectedItem = null;
+        MarkDirty();
+    }
+
+    public void ExpandAll()
+    {
+        for (int i = 0; i < roots.Count; i++)
+            SetExpanded(roots[i], true);
+        MarkDirty();
+    }
+
+    public void CollapseAll()
+    {
+        for (int i = 0; i < roots.Count; i++)
+            SetExpanded(roots[i], false);
+        MarkDirty();
+    }
+
+    private static void SetExpanded(TreeViewItem item, bool expanded)
+    {
+        item.expanded = expanded;
+        for (int i = 0; i < item.children.Count; i++)
+            SetExpanded(item.children[i], expanded);
     }
 
 
@@ -122,6 +156,7 @@ public class TreeView : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (!IsInsideAbsolute(mouseX, mouseY))
             return false;
 
@@ -203,6 +238,86 @@ public class TreeView : Component
 
         selectedChanged?.Invoke(selectedItem);
         MarkDirty();
+    }
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled()) return;
+        int count = GetVisibleItemCount();
+        if (count == 0) return;
+        int row = GetRowOf(selectedItem);
+        if (row < 0) row = 0;
+
+        switch (keyEvent.Key)
+        {
+            case Key.UpArrow:
+                SelectItem(GetVisibleItem(Math.Max(0, row - 1)));
+                break;
+            case Key.DownArrow:
+                SelectItem(GetVisibleItem(Math.Min(count - 1, row + 1)));
+                break;
+            case Key.Home:
+                SelectItem(GetVisibleItem(0));
+                break;
+            case Key.End:
+                SelectItem(GetVisibleItem(count - 1));
+                break;
+            case Key.LeftArrow:
+                if (selectedItem != null)
+                {
+                    if (selectedItem.HasChildren() && selectedItem.expanded)
+                    {
+                        selectedItem.expanded = false;
+                        MarkDirty();
+                    }
+                    else if (selectedItem.parent != null)
+                        SelectItem(selectedItem.parent);
+                }
+                break;
+            case Key.RightArrow:
+                if (selectedItem != null && selectedItem.HasChildren() && !selectedItem.expanded)
+                {
+                    selectedItem.expanded = true;
+                    MarkDirty();
+                }
+                break;
+            case Key.Enter:
+                if (selectedItem != null)
+                {
+                    if (selectedItem.HasChildren())
+                    {
+                        selectedItem.expanded = !selectedItem.expanded;
+                        MarkDirty();
+                    }
+                    itemDoubleClick?.Invoke(selectedItem);
+                }
+                break;
+        }
+    }
+
+    private int GetRowOf(TreeViewItem target)
+    {
+        if (target == null) return -1;
+        int row = 0;
+        for (int i = 0; i < roots.Count; i++)
+        {
+            int found = FindRow(roots[i], target, ref row);
+            if (found >= 0) return found;
+        }
+        return -1;
+    }
+
+    private static int FindRow(TreeViewItem item, TreeViewItem target, ref int row)
+    {
+        if (item == target) return row;
+        row++;
+        if (!item.expanded) return -1;
+        for (int i = 0; i < item.children.Count; i++)
+        {
+            int found = FindRow(item.children[i], target, ref row);
+            if (found >= 0) return found;
+        }
+        return -1;
     }
 
     public TreeViewItem GetVisibleItem(int targetRow)

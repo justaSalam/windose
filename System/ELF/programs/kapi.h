@@ -1,5 +1,5 @@
-// kapi.h - what the kernel hands to every program. MUST match KernelApi in kernel/ElfRunner.cs
-// (same fields, same order). Add new functions at the END of both.
+// kapi.h - DEPRECATED v1 header, kept only because the retired top-level hello.c/window.c include it.
+// New programs use include/kernel.h (v5). Do not extend this file.
 #pragma once
 
 // If the program crashes on its first kernel call, switch to ms_abi

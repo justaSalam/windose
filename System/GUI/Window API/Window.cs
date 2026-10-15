@@ -33,6 +33,7 @@ public class Window : Component
     private Point resizeStart;
     private Rectangle original;
     private Rectangle previewBounds;
+    private int lastTitlePress;
 
     private Component? focusedComponent;
 
@@ -219,6 +220,7 @@ public class Window : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
     {
+        if (!IsInputEnabled()) return false;
         if (Mouse.scroll != 0)
         {
 
@@ -240,7 +242,10 @@ public class Window : Component
 
             focusedComponent = (hit != this && hit != titlebar) ? hit : null;
 
-
+            if (focusedComponent != null && focusedComponent.TabStop)
+                focusedComponent.RequestFocus();
+            else if (focusedComponent == null)
+                Component.ClearFocus();
         }
 
 
@@ -271,8 +276,55 @@ public class Window : Component
 
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
-        if (focusedComponent != null) focusedComponent.HandleKeyboard(keyEvent);
+        if (keyEvent.Key == Key.Tab)
+        {
+            FocusNextTabStop(IsShiftPressed(keyEvent));
+            return;
+        }
+
+        Component target = focusedComponent;
+        if (target == null && Component.FocusedComponent != null && Component.FocusedComponent.IsDescendantOf(this))
+            target = Component.FocusedComponent;
+        if (target != null) target.HandleKeyboard(keyEvent);
         else base.HandleKeyboard(keyEvent);
+    }
+
+    private void FocusNextTabStop(bool reverse)
+    {
+        List<Component> stops = new List<Component>();
+        CollectTabStops(this, stops);
+        if (stops.Count == 0) return;
+        stops.Sort((a, b) =>
+        {
+            int t = a.TabIndex.CompareTo(b.TabIndex);
+            return t != 0 ? t : a.zIndex.CompareTo(b.zIndex);
+        });
+
+        int current = -1;
+        for (int i = 0; i < stops.Count; i++)
+        {
+            if (stops[i] == focusedComponent || stops[i] == Component.FocusedComponent)
+            {
+                current = i;
+                break;
+            }
+        }
+
+        int next = current < 0 ? (reverse ? stops.Count - 1 : 0)
+                               : (current + (reverse ? stops.Count - 1 : 1)) % stops.Count;
+        focusedComponent = stops[next];
+        stops[next].RequestFocus();
+    }
+
+    private static void CollectTabStops(Component parent, List<Component> stops)
+    {
+        for (int i = 0; i < parent.children.Count; i++)
+        {
+            Component child = parent.children[i];
+            if (child == null || !child.Visible || !child.IsInputEnabled()) continue;
+            if (child.TabStop) stops.Add(child);
+            CollectTabStops(child, stops);
+        }
     }
 
     public bool FocusCheck(int mouseX, int mouseY, MouseState mouseState)
@@ -282,6 +334,20 @@ public class Window : Component
 
     private void DragWindow(MouseState mouse, int mouseX, int mouseY)
     {
+        if (mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY) && canMaximize)
+        {
+            int tick = Environment.TickCount;
+            if (unchecked(tick - lastTitlePress) >= 0 && unchecked(tick - lastTitlePress) <= 500)
+            {
+                lastTitlePress = 0;
+                dragging = false;
+                WindowManager.ClearPreviewRect();
+                WindowManager.ToggleMaximize(this);
+                return;
+            }
+            lastTitlePress = tick;
+        }
+
         if (resizing || !canMove || isMaximized) return;
 
         if (mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY))
@@ -401,6 +467,15 @@ public class Window : Component
         WindowManager.Invalidate(bounds);
 
         MarkDirty();
+    }
+
+    /// <summary>Resize the window so its client area becomes w x h (frame and title bar added around it).</summary>
+    public void SetClientSize(int width, int height)
+    {
+        if (width <= 0 || height <= 0) return;
+        Resize(bounds.X, bounds.Y,
+               width + Palette.BorderSize * 2,
+               height + Palette.TitleBarHeight + Palette.BorderSize);
     }
 
     internal void ApplyBounds(Rectangle rect)

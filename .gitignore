@@ -6,7 +6,6 @@
 *.vs/
 bin/
 obj/
-output-x64/
 BREEZE.md
 BREEZE_API.html
 COMMANDS.md

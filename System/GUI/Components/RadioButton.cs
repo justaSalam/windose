@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Windose;
 
@@ -36,6 +37,7 @@ public class RadioButton : Component
 
     public RadioButton(int x, int y) : base(x, y, 25, 25)
     {
+        TabStop = true;
     }
 
     public override void Update()
@@ -78,12 +80,13 @@ public class RadioButton : Component
             Rectangle content = GetContentBounds();
             Rectangle textBounds = new Rectangle(Math.Max(content.X, Width + 2), content.Y,
                 Math.Max(0, content.Right - Math.Max(content.X, Width + 2)), content.Height);
-            DrawAlignedText(text, textColor, effectiveFontSize, textBounds);
+            DrawAlignedText(text, IsInputEnabled() ? textColor : Color.Gray, effectiveFontSize, textBounds);
         }
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
         if (mouse.left == MouseEvents.Press)
         {
             isPressed = true;
@@ -105,6 +108,17 @@ public class RadioButton : Component
         }
 
         return true;
+    }
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled()) return;
+        if (GetPrintableCharacter(keyEvent) == ' ' && !_checked)
+        {
+            UncheckSiblingsInGroup();
+            Checked = true;
+            Click?.Invoke();
+        }
     }
 
     private void UncheckSiblingsInGroup()

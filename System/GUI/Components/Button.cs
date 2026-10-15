@@ -1,3 +1,4 @@
+using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Windose.System.GUI.Layout;
@@ -28,6 +29,7 @@ public class Button : Component
     public Button(string text, int x, int y, int width, int height) : base(x, y, width, height)
     {
         this.text = text;
+        TabStop = true;
         label = new Label(0, 0, width, height)
         {
             text = this.text,
@@ -47,6 +49,7 @@ public class Button : Component
     {
         this.image = image;
         this.text = "";
+        TabStop = true;
         label = new Label(0, 0, width, height)
         {
             text = this.text,
@@ -73,7 +76,7 @@ public class Button : Component
         {
             if (!string.IsNullOrEmpty(text))
                 label.text = text;
-            label.textColor = textColor;
+            label.textColor = IsInputEnabled() ? textColor : Color.Gray;
         }
 
         if (useBackground)
@@ -82,6 +85,9 @@ public class Button : Component
             else DrawRaisedRectangle(0, 0, Width, Height);
 
         }
+
+        if (Focused)
+            buffer.DrawDottedRectangle(Color.Black, 2, 2, Math.Max(1, Width - 4), Math.Max(1, Height - 4));
 
         Rectangle content = GetContentBounds();
         if (image != null && label != null && !string.IsNullOrEmpty(label.text))
@@ -149,6 +155,7 @@ public class Button : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
+        if (!IsInputEnabled()) return false;
 
         isPressed = mouse.left == MouseEvents.Press || mouse.left == MouseEvents.Hold;
 
@@ -175,4 +182,11 @@ public class Button : Component
     }
 
     public override string GetComponentName() => "Button";
+
+    public override void HandleKeyboard(KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled()) return;
+        if (keyEvent.Key == Key.Enter || GetPrintableCharacter(keyEvent) == ' ')
+            leftClickAction?.Invoke();
+    }
 }

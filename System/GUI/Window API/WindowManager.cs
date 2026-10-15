@@ -41,6 +41,7 @@ public partial class WindowManager : SingleThreadedProcess
     private static int nextZIndex = 1;
     private static bool zOrderDirty = true;
     private static bool frameComposed;
+    private static Rectangle lastOpenBounds = new Rectangle(-1, -1, 0, 0);
 
     internal static void MarkZOrderDirty() => zOrderDirty = true;
 
@@ -290,6 +291,17 @@ public partial class WindowManager : SingleThreadedProcess
         lock (windows)
         {
             if (windows.Contains(window)) return;
+
+            // Cascade windows opened at the exact same spot so they don't stack invisibly.
+            if (window.bounds.X == lastOpenBounds.X && window.bounds.Y == lastOpenBounds.Y)
+            {
+                int nx = window.bounds.X + 28;
+                int ny = window.bounds.Y + 28;
+                if (nx + window.bounds.Width > Global.screenWidth) nx = 40;
+                if (ny + window.bounds.Height > Global.screenHeight) ny = 40;
+                window.ApplyBounds(new Rectangle(nx, ny, window.bounds.Width, window.bounds.Height));
+            }
+            lastOpenBounds = window.bounds;
 
             window.zIndex = nextZIndex;
             window.Start();
