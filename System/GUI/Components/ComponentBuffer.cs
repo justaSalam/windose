@@ -8,9 +8,6 @@ public class ComponentBuffer : Canvas
     public int Height { get; private set; }
     public int[] Buffer => GetBuffer();
 
-    internal int Stride;
-    internal int Pitch;
-
     private const int MaxClipDepth = 32;
     private readonly int[] originXStack = new int[MaxClipDepth];
     private readonly int[] originYStack = new int[MaxClipDepth];
@@ -25,8 +22,6 @@ public class ComponentBuffer : Canvas
     {
         Width = Math.Max(1, width);
         Height = Math.Max(1, height);
-        Stride = 32 / 8;
-        Pitch = Width * Stride;
         clipBounds = new Rectangle(0, 0, Width, Height);
     }
     public bool HasVisibleClip => clipBounds.Width > 0 && clipBounds.Height > 0;
@@ -79,26 +74,7 @@ public class ComponentBuffer : Canvas
         x += originX;
         y += originY;
         if (!ContainsClipped(x, y)) return;
-        int index = x + y * Width;
-        int[] buffer = GetBuffer();
-
-        if (index >= 0 && index < buffer.Length)
-        {
-            if ((colour >> 24) == 0xFF)
-            {
-                buffer[index] = colour;
-                return;
-            }
-
-            int bgColour = buffer[index];
-            int alpha = (colour >> 24) & 0xff;
-            int invAlpha = 255 - alpha;
-            int newRed = (((colour >> 16) & 0xff) * alpha + ((bgColour >> 16) & 0xff) * invAlpha) >> 8;
-            int newGreen = (((colour >> 8) & 0xff) * alpha + ((bgColour >> 8) & 0xff) * invAlpha) >> 8;
-            int newBlue = ((colour & 0xff) * alpha + (bgColour & 0xff) * invAlpha) >> 8;
-
-            buffer[index] = unchecked((int)0xFF000000) | (newRed << 16) | (newGreen << 8) | newBlue;
-        }
+        BlendPixel(GetBuffer(), x + y * Width, colour);
     }
     public override void Clear(Color color)
     {
@@ -114,43 +90,8 @@ public class ComponentBuffer : Canvas
             return;
         }
 
-        if (color.A < byte.MaxValue)
-        {
-            if (color.A == 0)
-            {
-                return;
-            }
-
-            color = AlphaBlend(color, Color.FromArgb(buffer[y * Width + x]), color.A);
-        }
-
-        buffer[y * Width + x] = color.ToArgb();
+        BlendPixel(buffer, y * Width + x, color.ToArgb());
     }
-
-    public override Bitmap GetImage(int x, int y, int width, int height)
-    {
-        Bitmap bitmap = new Bitmap(width, height, ColorDepth.ColorDepth32);
-        for (int i = 0; i < height; i++)
-        {
-            for (int j = 0; j < width; j++)
-            {
-                bitmap.RawData[i * width + j] = GetRawPointColor(x + j, y + i);
-            }
-        }
-
-        return bitmap;
-    }
-
-
-    public void CroppedDrawImage(Image image, int x, int y, int maxWidth, int maxHeight, bool preventOffBoundPixels = true)
-    {
-        int croppedWidth = Math.Min(image.Width, maxWidth);
-        int croppedHeigth = Math.Min(image.Height, maxHeight);
-
-        DrawArrayAlphaClipped(image.RawData, image.Width, 0, 0, x, y, croppedWidth, croppedHeigth);
-    }
-
-
 
     public new void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
@@ -169,6 +110,13 @@ public class ComponentBuffer : Canvas
     {
         if (sourceRect.Width <= 0 || sourceRect.Height <= 0 || destRect.Width <= 0 || destRect.Height <= 0)
             return;
+
+        if (sourceRect.Width == destRect.Width && sourceRect.Height == destRect.Height)
+        {
+            DrawArrayAlphaClipped(image.RawData, image.Width, sourceRect.Left, sourceRect.Top,
+                destRect.Left, destRect.Top, destRect.Width, destRect.Height);
+            return;
+        }
 
         float scaleX = (float)sourceRect.Width / destRect.Width;
         float scaleY = (float)sourceRect.Height / destRect.Height;
@@ -371,79 +319,19 @@ public class ComponentBuffer : Canvas
     }
     public virtual void DrawArrayAlphaClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
     {
-        DrawArrayAlphaClipped(colors, sourceWidth, sourceX, sourceY, destinationX, destinationY, width, height, 255);
-    }
-
-    public virtual void DrawArrayAlphaClipped(int[] colors, int sourceWidth, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height, byte globalOpacity)
-    {
         if (colors == null || sourceWidth <= 0) return;
         int sourceHeight = colors.Length / sourceWidth;
         if (!TryClipArrayRegion(sourceWidth, sourceHeight, ref sourceX, ref sourceY,
             ref destinationX, ref destinationY, ref width, ref height)) return;
 
         int[] buffer = GetBuffer();
-        if (globalOpacity == byte.MaxValue)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                int sourceIndex = (sourceY + y) * sourceWidth + sourceX;
-                int destinationIndex = (destinationY + y) * Width + destinationX;
-
-                for (int x = 0; x < width; x++)
-                {
-                    int color = colors[sourceIndex + x];
-                    int alpha = (color >> 24) & 0xff;
-                    if (alpha == 0) continue;
-
-                    if (alpha == 0xff)
-                    {
-                        buffer[destinationIndex + x] = color;
-                        continue;
-                    }
-
-                    int bgColor = buffer[destinationIndex + x];
-                    int invAlpha = 255 - alpha;
-                    int red = (((color >> 16) & 0xff) * alpha + ((bgColor >> 16) & 0xff) * invAlpha) >> 8;
-                    int green = (((color >> 8) & 0xff) * alpha + ((bgColor >> 8) & 0xff) * invAlpha) >> 8;
-                    int blue = ((color & 0xff) * alpha + (bgColor & 0xff) * invAlpha) >> 8;
-
-                    buffer[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
-                }
-            }
-
-            return;
-        }
-
         for (int y = 0; y < height; y++)
         {
             int sourceIndex = (sourceY + y) * sourceWidth + sourceX;
             int destinationIndex = (destinationY + y) * Width + destinationX;
 
             for (int x = 0; x < width; x++)
-            {
-                int color = colors[sourceIndex + x];
-                int alpha = (color >> 24) & 0xff;
-
-                if (globalOpacity < 255)
-                    alpha = (alpha * globalOpacity) >> 8;
-
-                if (alpha == 0)
-                    continue;
-
-                if (alpha == 0xff)
-                {
-                    buffer[destinationIndex + x] = color;
-                    continue;
-                }
-
-                int bgColor = buffer[destinationIndex + x];
-                int invAlpha = 255 - alpha;
-                int red = (((color >> 16) & 0xff) * alpha + ((bgColor >> 16) & 0xff) * invAlpha) >> 8;
-                int green = (((color >> 8) & 0xff) * alpha + ((bgColor >> 8) & 0xff) * invAlpha) >> 8;
-                int blue = ((color & 0xff) * alpha + (bgColor & 0xff) * invAlpha) >> 8;
-
-                buffer[destinationIndex + x] = (0xff << 24) | (red << 16) | (green << 8) | blue;
-            }
+                BlendPixel(buffer, destinationIndex + x, colors[sourceIndex + x]);
         }
     }
     internal void DrawHorizontalLine(Color color, int dx, int x1, int y1)
@@ -682,6 +570,7 @@ public class ComponentBuffer : Canvas
 
     private void BlendPixel(int[] buffer, int index, int color)
     {
+        if ((uint)index >= (uint)buffer.Length) return;
         int alpha = (color >> 24) & 0xff;
         if (alpha == 0) return;
         if (alpha == 0xff)
@@ -696,97 +585,6 @@ public class ComponentBuffer : Canvas
         int green = (((color >> 8) & 0xff) * alpha + ((background >> 8) & 0xff) * inverse) >> 8;
         int blue = ((color & 0xff) * alpha + (background & 0xff) * inverse) >> 8;
         buffer[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
-    }
-
-    protected void TrimLine(ref int x1, ref int y1, ref int x2, ref int y2)
-    {
-        if (x1 == x2)
-        {
-            x1 = Math.Min(Width - 1, Math.Max(0, x1));
-            x2 = x1;
-            y1 = Math.Min(Height - 1, Math.Max(0, y1));
-            y2 = Math.Min(Height - 1, Math.Max(0, y2));
-            return;
-        }
-
-        float num = x1;
-        float num2 = y1;
-        float num3 = x2;
-        float num4 = y2;
-        float num5 = (num4 - num2) / (num3 - num);
-        float num6 = num2 - num5 * num;
-        if (num < 0f)
-        {
-            num = 0f;
-            num2 = num6;
-        }
-        else if (num >= Width)
-        {
-            num = Width - 1;
-            num2 = (Width - 1) * num5 + num6;
-        }
-
-        if (num3 < 0f)
-        {
-            num3 = 0f;
-            num4 = num6;
-        }
-        else if (num3 >= Width)
-        {
-            num3 = Width - 1;
-            num4 = (Width - 1) * num5 + num6;
-        }
-
-        if (num2 < 0f)
-        {
-            num = (0f - num6) / num5;
-            num2 = 0f;
-        }
-        else if (num2 >= Height)
-        {
-            num = (Height - 1 - num6) / num5;
-            num2 = Height - 1;
-        }
-
-        if (num4 < 0f)
-        {
-            num3 = (0f - num6) / num5;
-            num4 = 0f;
-        }
-        else if (num4 >= Height)
-        {
-            num3 = (Height - 1 - num6) / num5;
-            num4 = Height - 1;
-        }
-
-        if (num < 0f || num >= Width || num2 < 0f || num2 >= Height)
-        {
-            num = 0f;
-            num3 = 0f;
-            num2 = 0f;
-            num4 = 0f;
-        }
-
-        if (num3 < 0f || num3 >= Width || num4 < 0f || num4 >= Height)
-        {
-            num = 0f;
-            num3 = 0f;
-            num2 = 0f;
-            num4 = 0f;
-        }
-
-        x1 = (int)num;
-        y1 = (int)num2;
-        x2 = (int)num3;
-        y2 = (int)num4;
-    }
-
-    public new Color AlphaBlend(Color to, Color from, byte alpha)
-    {
-        byte red = (byte)(to.R * alpha + from.R * (255 - alpha) >> 8);
-        byte green = (byte)(to.G * alpha + from.G * (255 - alpha) >> 8);
-        byte blue = (byte)(to.B * alpha + from.B * (255 - alpha) >> 8);
-        return Color.FromArgb(red, green, blue);
     }
 
     private bool disposed;

@@ -171,7 +171,7 @@ public class PerformanceMonitor : Window
             return;
         }
 
-        summary.text = $"FPS {Kernel.Fps}    Frame {Kernel.DeltaTimeMs:0.0} ms";
+        summary.text = $"FPS {Kernel.Fps}    Frame {Kernel.DeltaTimeMs:0.0} ms    Frames {Kernel.FrameCount}";
         summary.MarkDirty();
         frameGraph.AddSample((float)Kernel.DeltaTimeMs, 16.7f);
 

@@ -11,7 +11,6 @@ using Windose.System.Kernel.FileSystem;
 using Cosmos.Kernel.Core.Scheduler;
 using Windose.System.Scheduling;
 using Cosmos.Kernel.System.Input;
-using Windose.Compositing;
 using Windose.System.Elf;
 using Windose.System.Kernel;
 namespace Windose;
@@ -136,11 +135,32 @@ public class Kernel : Sys.Kernel
     public static double DeltaTimeMs;
     public static double DeltaTimeSeconds;
     public static int Fps;
+    public static long FrameCount;
+    private int lastFrameTick;
+    private int fpsWindowTick;
+    private int fpsWindowFrames;
 
     protected override void Run()
     {
         try
         {
+            int nowTick = Environment.TickCount;
+            if (FrameCount > 0)
+            {
+                DeltaTimeMs = Math.Max(0, unchecked(nowTick - lastFrameTick));
+                DeltaTimeSeconds = DeltaTimeMs / 1000.0;
+            }
+            lastFrameTick = nowTick;
+            FrameCount++;
+
+            fpsWindowFrames++;
+            if (unchecked(nowTick - fpsWindowTick) >= 1000)
+            {
+                Fps = fpsWindowFrames;
+                fpsWindowFrames = 0;
+                fpsWindowTick = nowTick;
+            }
+
             Mouse.Update();
 
             PerformanceMetrics.BeginFrame();
@@ -151,7 +171,7 @@ public class Kernel : Sys.Kernel
 
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 
-            displayDriver.Present(MouseManager.X, MouseManager.Y);
+            displayDriver.Present(MouseManager.X, MouseManager.Y, WindowManager.TakeFrameComposed());
         }
         catch (Exception ex)
         {

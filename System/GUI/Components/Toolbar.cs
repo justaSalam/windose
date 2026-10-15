@@ -77,10 +77,6 @@ public class Toolbar : Component
         items.ResolveStackLayout();
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {

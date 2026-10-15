@@ -22,10 +22,6 @@ public class Label : Component
         verticalAlignment = VerticalAlignment.Center;
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {
@@ -92,5 +88,4 @@ public class Label : Component
             }
         }
     }
-    public override bool IsOpaqueForCopy() => useBackground;
 }

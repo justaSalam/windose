@@ -49,10 +49,6 @@ public class GroupBox : Component
         ResolveGroupLayout();
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {

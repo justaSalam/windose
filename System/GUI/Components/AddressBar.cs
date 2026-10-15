@@ -63,11 +63,6 @@ public class AddressBar : Component
         ResolveChildren();
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-
-    }
 
     public override void DrawLocal()
     {

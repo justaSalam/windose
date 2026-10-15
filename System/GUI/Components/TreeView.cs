@@ -58,10 +58,6 @@ public class TreeView : Component
         MarkDirty();
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {
@@ -282,8 +278,6 @@ public class TreeView : Component
 
         return depth;
     }
-
-    public override bool IsOpaqueForCopy() => useBackground;
 
     public override string GetComponentName() => "TreeView";
 }

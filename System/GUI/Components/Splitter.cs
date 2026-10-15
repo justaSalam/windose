@@ -12,10 +12,6 @@ public class Splitter : Component
         clampSize = false;
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {

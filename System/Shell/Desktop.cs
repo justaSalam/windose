@@ -79,6 +79,11 @@ public class Desktop : Component
     //TODO Load last wallpaper from a config file
     public static Image wallpaper = new Png("/mnt/System/Wallpapers/Lithium.png");
 
+    private ComponentBuffer scaledWallpaper;
+    private Image scaledWallpaperSource;
+    private int scaledWallpaperWidth;
+    private int scaledWallpaperHeight;
+
 
     public static void SetWallpaper(string path)
     {
@@ -86,7 +91,7 @@ public class Desktop : Component
     }
     public override void DrawLocal()
     {
-        DrawImageStretch(wallpaper, new Rectangle(0, 0, Width, Height));
+        DrawWallpaper();
 
         if (ShowIconGrid)
             DrawIconGrid();
@@ -97,6 +102,26 @@ public class Desktop : Component
             DrawChild(icon);
         }
 
+    }
+
+    private void DrawWallpaper()
+    {
+        if (scaledWallpaper == null || !ReferenceEquals(scaledWallpaperSource, wallpaper)
+            || scaledWallpaperWidth != Width || scaledWallpaperHeight != Height)
+        {
+            if (scaledWallpaper == null || scaledWallpaper.Width != Width || scaledWallpaper.Height != Height)
+            {
+                scaledWallpaper?.Dispose();
+                scaledWallpaper = new ComponentBuffer(Width, Height);
+            }
+            scaledWallpaper.ResetContext();
+            scaledWallpaper.DrawImageStretch(wallpaper, new Rectangle(0, 0, Width, Height));
+            scaledWallpaperSource = wallpaper;
+            scaledWallpaperWidth = Width;
+            scaledWallpaperHeight = Height;
+        }
+
+        buffer.DrawArrayClipped(scaledWallpaper.GetBuffer(), scaledWallpaper.Width, 0, 0, 0, 0, Width, Height);
     }
 
     private void CreateDesktopContextMenu()

@@ -12,40 +12,32 @@ public partial class WindowManager
 
         DispatchMessages();
         ShowPendingFailures();
-        DispatchMessages();
 
         ComponentZSort();
         UpdateComponents();
 
-        bool flowControl = HandleCapturedWindow(updateStartedAt);
-        if (!flowControl)
+        if (capturedWindow != null || capturedComponent != null)
         {
-            return;
+            HandleCapturedInput();
         }
-
-        HandleKeyboardInput();
-
-        bool menuHandled = false;
-
-        try
+        else
         {
-            menuHandled = MenuPopup.HandleOpenMenuInput(mx, my, mouseState);
-        }
-        catch (Exception exception)
-        {
-            FailApplication(focusedWindow, "handling menu input", exception);
-        }
+            HandleKeyboardInput();
 
-        if (menuHandled)
-        {
-            DispatchMessages();
-            ComposeDirtyRegions();
-            DrawPreviewRect();
-            PerformanceMetrics.AddWindowManager(updateStartedAt);
-            return;
-        }
+            bool menuHandled = false;
 
-        HandleWindowCapture();
+            try
+            {
+                menuHandled = MenuPopup.HandleOpenMenuInput(mx, my, mouseState);
+            }
+            catch (Exception exception)
+            {
+                FailApplication(focusedWindow, "handling menu input", exception);
+            }
+
+            if (!menuHandled)
+                HandleWindowCapture();
+        }
 
         DispatchMessages();
         ComposeDirtyRegions();
@@ -53,7 +45,7 @@ public partial class WindowManager
         PerformanceMetrics.AddWindowManager(updateStartedAt);
     }
 
-    private bool HandleCapturedWindow(long updateStartedAt)
+    private void HandleCapturedInput()
     {
         if (capturedWindow != null)
         {
@@ -71,13 +63,8 @@ public partial class WindowManager
 
             if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
                 capturedWindow = null;
-
-            HandleKeyboardInput();
-            FinishCapturedUpdate(updateStartedAt);
-            return false;
         }
-
-        if (capturedComponent != null)
+        else if (capturedComponent != null)
         {
             try
             {
@@ -92,21 +79,9 @@ public partial class WindowManager
             {
                 capturedComponent = null;
             }
-
-            HandleKeyboardInput();
-            FinishCapturedUpdate(updateStartedAt);
-            return false;
         }
 
-        return true;
-    }
-
-    private void FinishCapturedUpdate(long updateStartedAt)
-    {
-        DispatchMessages();
-        ComposeDirtyRegions();
-        DrawPreviewRect();
-        PerformanceMetrics.AddWindowManager(updateStartedAt);
+        HandleKeyboardInput();
     }
 
     private void HandleWindowCapture()
@@ -152,6 +127,8 @@ public partial class WindowManager
 
     private void ComponentZSort()
     {
+        if (!zOrderDirty) return;
+        zOrderDirty = false;
         lock (Component.components)
         {
             components.Sort((component1, component2) =>

@@ -49,10 +49,6 @@ public class StatusBar : Component
         base.Resize(width, height);
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {

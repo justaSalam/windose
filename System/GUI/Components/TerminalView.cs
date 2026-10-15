@@ -339,8 +339,6 @@ public sealed class TerminalView : Component
     private int VisibleLineCount() => Math.Max(1, (Height - 6) / LineHeight());
     private int MaxScrollLine() => Math.Max(0, lines.Count - Math.Max(0, VisibleLineCount() - 1));
     private void ScrollToBottom() => scrollLine = MaxScrollLine();
-
-    public override bool IsOpaqueForCopy() => true;
     public override string GetComponentName() => "TerminalConsole";
 
     public override void Dispose()

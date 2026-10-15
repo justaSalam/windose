@@ -19,8 +19,6 @@ public partial class WindowManager : SingleThreadedProcess
     private static readonly object messageQueueLock = new object();
 
     private readonly HashSet<Window> failedWindows = new HashSet<Window>();
-    private readonly HashSet<Component> renderedComponents = new HashSet<Component>();
-    private readonly List<Rectangle> composeRegions = new List<Rectangle>();
     private bool fullComposePending = true;
 
     private readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
@@ -41,6 +39,18 @@ public partial class WindowManager : SingleThreadedProcess
     private MouseState mouseState;
 
     private static int nextZIndex = 1;
+    private static bool zOrderDirty = true;
+    private static bool frameComposed;
+
+    internal static void MarkZOrderDirty() => zOrderDirty = true;
+
+    /// <summary>True if the last compose pass drew anything. Resets on read.</summary>
+    internal static bool TakeFrameComposed()
+    {
+        bool composed = frameComposed;
+        frameComposed = false;
+        return composed;
+    }
 
     private static readonly Comparison<Window> zIndexCompare = (a, b) =>
     {
@@ -130,77 +140,65 @@ public partial class WindowManager : SingleThreadedProcess
         lock (Component.components)
         {
             long startedAt = PerformanceMetrics.Now;
-            renderedComponents.Clear();
+            Rectangle region;
             lock (dirtyRectsLock)
             {
-                composeRegions.Clear();
                 if (fullComposePending)
                 {
-                    composeRegions.Add(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
+                    region = new Rectangle(0, 0, Global.screenWidth, Global.screenHeight);
                     fullComposePending = false;
+                }
+                else if (dirtyRects.Count == 0)
+                {
+                    PerformanceMetrics.AddCompose(startedAt);
+                    return;
                 }
                 else
                 {
-                    composeRegions.AddRange(dirtyRects);
+                    region = dirtyRects[0];
+                    for (int i = 1; i < dirtyRects.Count; i++)
+                        region = Rectangle.Union(region, dirtyRects[i]);
                 }
                 dirtyRects.Clear();
             }
 
-            if (composeRegions.Count == 0)
-            {
-                PerformanceMetrics.AddCompose(startedAt);
-                return;
-            }
+            ExpandRegionForDirtyRoots(ref region);
+            if (drawingDebugEnabled)
+                TrackDrawingDebugRegion(region);
+            Kernel.mainBuffer.DrawFilledRectangle(Color.Black, region.X, region.Y, region.Width, region.Height);
+            frameComposed = true;
 
-            for (int regionIndex = 0; regionIndex < composeRegions.Count; regionIndex++)
+            for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
             {
-                Rectangle region = composeRegions[regionIndex];
-                ExpandRegionForDirtyRoots(ref region);
-                composeRegions[regionIndex] = region;
-                if (drawingDebugEnabled)
-                    TrackDrawingDebugRegion(region);
-                Kernel.mainBuffer.DrawFilledRectangle(Color.Black, region.X, region.Y, region.Width, region.Height);
+                Component component = components[componentIndex];
+                if (component == null || !component.Visible || !component.isRoot) continue;
 
-                for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
+                Rectangle componentBounds = component.AbsoluteRectangle;
+                Rectangle clipped = Rectangle.Intersect(componentBounds, region);
+                if (clipped.Width <= 0 || clipped.Height <= 0) continue;
+
+                Window owner = component.GetOwningWindow();
+                if (owner != null && failedWindows.Contains(owner)) continue;
+
+                try
                 {
-                    Component component = components[componentIndex];
-                    if (component == null || !component.Visible || !component.isRoot) continue;
-
-                    Rectangle componentBounds = component.AbsoluteRectangle;
-                    Rectangle clipped = Rectangle.Intersect(componentBounds, region);
-                    if (clipped.Width <= 0 || clipped.Height <= 0) continue;
-
-                    Window owner = component.GetOwningWindow();
-                    if (owner != null && failedWindows.Contains(owner)) continue;
-
-                    try
+                    if (component.HasDirtyTree())
                     {
-                        if (component.HasDirtyTree())
-                        {
-                            component.DrawDirtyLocal(region);
-                            renderedComponents.Add(component);
-                        }
-                        component.DrawToScreen(region);
+                        component.DrawDirtyLocal(region);
+                        component.MarkCleaned();
                     }
-                    catch (Exception exception)
-                    {
-                        lock (dirtyRectsLock)
-                            fullComposePending = true;
-                        FailApplication(owner, "Drawing", exception);
-                    }
+                    component.DrawToScreen(region);
+                }
+                catch (Exception exception)
+                {
+                    lock (dirtyRectsLock)
+                        fullComposePending = true;
+                    FailApplication(owner, "Drawing", exception);
                 }
             }
-            foreach (Component component in renderedComponents)
-                component.MarkCleaned();
 
             if (drawingDebugEnabled)
-            {
-                for (int i = 0; i < composeRegions.Count; i++)
-                {
-                    Rectangle region = composeRegions[i];
-                    Kernel.mainBuffer.DrawRectangle(Color.Magenta, region.X, region.Y, region.Width, region.Height);
-                }
-            }
+                Kernel.mainBuffer.DrawRectangle(Color.Magenta, region.X, region.Y, region.Width, region.Height);
 
             PerformanceMetrics.AddCompose(startedAt);
         }
@@ -238,29 +236,16 @@ public partial class WindowManager : SingleThreadedProcess
     private void ExpandRegionForDirtyRoots(ref Rectangle region)
     {
         Rectangle screenBounds = new Rectangle(0, 0, Global.screenWidth, Global.screenHeight);
-        bool expanded;
-        do
+        for (int i = 0; i < components.Count; i++)
         {
-            expanded = false;
-            for (int i = 0; i < components.Count; i++)
-            {
-                Component component = components[i];
-                if (component == null || !component.Visible || !component.isRoot || !component.HasDirtyTree()) continue;
+            Component component = components[i];
+            if (component == null || !component.Visible || !component.isRoot || !component.HasDirtyTree()) continue;
 
-                Rectangle bounds = Rectangle.Intersect(component.AbsoluteRectangle, screenBounds);
-                if (bounds.Width <= 0 || bounds.Height <= 0 || !bounds.IntersectsWith(region) || Contains(region, bounds)) continue;
+            Rectangle bounds = Rectangle.Intersect(component.AbsoluteRectangle, screenBounds);
+            if (bounds.Width <= 0 || bounds.Height <= 0 || !bounds.IntersectsWith(region)) continue;
 
-                region = Rectangle.Union(region, bounds);
-                expanded = true;
-            }
+            region = Rectangle.Union(region, bounds);
         }
-        while (expanded);
-    }
-
-    private static bool Contains(Rectangle outer, Rectangle inner)
-    {
-        return inner.Left >= outer.Left && inner.Top >= outer.Top &&
-            inner.Right <= outer.Right && inner.Bottom <= outer.Bottom;
     }
 
     public static void ShowPreviewRect(Rectangle rect)
@@ -310,6 +295,7 @@ public partial class WindowManager : SingleThreadedProcess
             window.Start();
             windows.Add(window);
             nextZIndex++;
+            MarkZOrderDirty();
             SetFocusedWindow(window);
 
             // A newly registered window has no previous dirty rectangle to drive its
@@ -363,8 +349,9 @@ public partial class WindowManager : SingleThreadedProcess
 
     public static void Close(Window window)
     {
+        if (window == null) return;
         PostClose(window);
-        PostInvalidate(window);
+        Invalidate(window.bounds);
     }
 
     public static void Minimize(Window window)
@@ -403,19 +390,6 @@ public partial class WindowManager : SingleThreadedProcess
     {
         if (window == null) return;
         Activate(window);
-    }
-
-    public static Rectangle GetTaskbarButtonBounds(Window window)
-    {
-        if (window == null || !taskbarButtons.TryGetValue(window, out Button taskbarButton))
-            return Rectangle.Empty;
-
-        return taskbarButton.AbsoluteRectangle;
-    }
-
-    internal static void FocusTopVisibleWindowPublic(Window excludedWindow)
-    {
-        FocusTopVisibleWindow(excludedWindow);
     }
 
     public static void ToggleMaximize(Window window)
@@ -458,6 +432,7 @@ public partial class WindowManager : SingleThreadedProcess
             window.RestoreFromTaskbar();
 
         window.zIndex = nextZIndex++;
+        MarkZOrderDirty();
         SetFocusedWindow(window);
         Invalidate(window.bounds);
     }
@@ -551,7 +526,7 @@ public partial class WindowManager : SingleThreadedProcess
 
                 };
                 error.AddChild(text);
-                Register(error);
+                RegisterNow(error);
             }
             catch (Exception reportException)
             {
@@ -653,6 +628,7 @@ public partial class WindowManager : SingleThreadedProcess
     public static void BringToFront(Window window)
     {
         window.zIndex = nextZIndex++;
+        MarkZOrderDirty();
         Invalidate(window);
     }
 

@@ -74,10 +74,6 @@ public class GridPanel : Component
         MarkDirty();
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {
@@ -93,6 +89,4 @@ public class GridPanel : Component
     }
 
     public override string GetComponentName() => "GridPanel";
-
-    public override bool IsOpaqueForCopy() => useBackground;
 }

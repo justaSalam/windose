@@ -342,6 +342,4 @@ public class ProcessPerformanceList : Component
         if (value == null || value.Length <= maximumLength) return value ?? "";
         return value.Substring(0, maximumLength - 3) + "...";
     }
-
-    public override bool IsOpaqueForCopy() => true;
 }

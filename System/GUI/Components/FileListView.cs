@@ -86,10 +86,6 @@ public class FileListView : Component
         MarkDirty();
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {
@@ -447,8 +443,6 @@ public class FileListView : Component
 
         return Height;
     }
-
-    public override bool IsOpaqueForCopy() => useBackground;
 
     public override string GetComponentName() => "ListView";
 }

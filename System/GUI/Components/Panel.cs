@@ -29,10 +29,6 @@ public class Panel : Component
         useGradient = false;
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {
@@ -137,6 +133,4 @@ public class Panel : Component
 
         return remaining;
     }
-
-    public override bool IsOpaqueForCopy() => useBackground;
 }

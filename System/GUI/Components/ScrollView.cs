@@ -81,11 +81,6 @@ public class ScrollView : Component
         DrawScrollbars();
     }
 
-    public override void DrawDirtyLocal(Rectangle dirtyRect)
-    {
-        DrawLocal();
-    }
-
     protected override void MarkChildDirty()
     {
         base.MarkChildDirty();
@@ -385,8 +380,6 @@ public class ScrollView : Component
         DrawLine(Palette.ControlBlack, cx, cy, cx - 4, cy - 4);
         DrawLine(Palette.ControlBlack, cx, cy, cx - 4, cy + 4);
     }
-
-    public override bool IsOpaqueForCopy() => useBackground;
 
     public override string GetComponentName() => "ScrollView";
 }

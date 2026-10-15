@@ -32,10 +32,6 @@ public class MenuItem : Component
         imageOffset = (int)icon.Width + 4;
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {

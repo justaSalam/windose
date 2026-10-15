@@ -122,7 +122,5 @@ public class PerformanceGraph : Component
         int plotHeight = plotBottom - plotTop;
         return plotBottom - (int)(value * plotHeight / Math.Max(1, maximum));
     }
-
-    public override bool IsOpaqueForCopy() => true;
     public override string GetComponentName() => "PerformanceGraph";
 }

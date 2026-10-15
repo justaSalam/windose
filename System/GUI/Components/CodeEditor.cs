@@ -1492,8 +1492,6 @@ public class CodeEditor : Component
         while (count < line.Length && (line[count] == ' ' || line[count] == '\t')) count++;
         return line.Substring(0, count);
     }
-
-    public override bool IsOpaqueForCopy() => true;
     public override string GetComponentName() => "CodeEditor";
 
     private readonly struct SyntaxSpan

@@ -2,7 +2,6 @@ using System.Drawing;
 
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Timers;
-using Windose.Compositing;
 using Windose.System.Kernel;
 
 namespace Windose.Drivers;
@@ -33,8 +32,20 @@ public sealed class DisplayManager
     }
 
 
-    public void Present(int cursorX, int cursorY)
+    public void Present(int cursorX, int cursorY, bool contentChanged)
     {
+        // Skip the fullscreen upload when neither the backbuffer nor the cursor changed.
+        bool cursorChanged = cursorX != lastCursorX || cursorY != lastCursorY
+            || isCursorVisible != lastCursorVisible || LaunchTracker.isStarting != lastStarting;
+        if (!firstPresent && !contentChanged && !cursorChanged)
+            return;
+
+        firstPresent = false;
+        lastCursorX = cursorX;
+        lastCursorY = cursorY;
+        lastCursorVisible = isCursorVisible;
+        lastStarting = LaunchTracker.isStarting;
+
         long uploadStartedAt = PerformanceMetrics.Now;
         canvas.DrawCanvas(BackBuffer, 0, 0);
 
@@ -42,8 +53,6 @@ public sealed class DisplayManager
 
         long overlayStartedAt = PerformanceMetrics.Now;
         DrawCursor(cursorX, cursorY);
-        canvas.DrawString($"Starting Count: {LaunchTracker.startingCount}", SystemFonts.msSansSerif, Color.White, 10, 30);
-        canvas.DrawString($"Is starting: {LaunchTracker.isStarting}", SystemFonts.msSansSerif, Color.White, 10, 50);
         PerformanceMetrics.OverlayTicks = PerformanceMetrics.Now - overlayStartedAt;
 
 
@@ -55,6 +64,11 @@ public sealed class DisplayManager
     }
 
     private bool isCursorVisible = true;
+    private bool firstPresent = true;
+    private int lastCursorX = int.MinValue;
+    private int lastCursorY = int.MinValue;
+    private bool lastCursorVisible;
+    private bool lastStarting;
 
     private void DrawCursor(int x, int y)
     {

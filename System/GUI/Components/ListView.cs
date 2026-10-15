@@ -207,8 +207,6 @@ public class ListView : Component
         return Math.Max(headerHeight + detailsRowHeight, headerHeight + items.Count * detailsRowHeight);
     }
 
-    public override bool IsOpaqueForCopy() => useBackground;
-
     public override string GetComponentName() => "ListView";
 }
 public class ListViewColumn

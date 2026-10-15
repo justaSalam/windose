@@ -90,10 +90,6 @@ public class Window : Component
     /// <summary>
     /// Coordinates relative to the screen
     /// </summary>
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     /// <summary>
     /// Component rendering, coordinates relative to the window
@@ -382,8 +378,6 @@ public class Window : Component
         bounds.Width = Width;
         bounds.Height = Height;
 
-        ComputeAbsoluteCoordinates();
-
 
         WindowManager.Invalidate(oldBounds);
         WindowManager.Invalidate(bounds);
@@ -422,8 +416,6 @@ public class Window : Component
         bounds.Y = Y;
         bounds.Width = Width;
         bounds.Height = Height;
-
-        ComputeAbsoluteCoordinates();
 
         WindowManager.Invalidate(oldBounds);
         WindowManager.Invalidate(bounds);

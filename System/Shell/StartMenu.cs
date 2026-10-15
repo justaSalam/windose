@@ -177,11 +177,6 @@ public class StartMenu : Window
     }
 
 
-    public override void Draw()
-    {
-        DrawLocal();
-        DrawToScreen();
-    }
 
     public override void DrawLocal()
     {

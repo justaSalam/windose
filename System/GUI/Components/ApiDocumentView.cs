@@ -194,7 +194,5 @@ public class ApiDocumentView : Component
 
         displayLines.Add(new DisplayLine { text = remaining, style = first ? style : 0, height = height });
     }
-
-    public override bool IsOpaqueForCopy() => true;
     public override string GetComponentName() => "ApiDocumentView";
 }

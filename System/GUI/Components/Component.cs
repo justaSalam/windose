@@ -3,13 +3,12 @@ using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Input;
 using Windose;
-using Windose.Compositing;
 
 
 /// <summary>
 /// A base for every GUI object
 /// </summary>
-public class Component : IDisposable, ICompositedSurface
+public class Component : IDisposable
 {
     public virtual string GetComponentName() => "UNASSIGNED COMPONENT";
     public Canvas RenderCanvas => buffer;
@@ -64,11 +63,11 @@ public class Component : IDisposable, ICompositedSurface
 
     public int AbsoluteX
     {
-        get { int a = 0; for (Component? c = this; c != null; c = c.parent) { a += c.X; if (c.isRoot) break; } return a; }
+        get { if (!_absoluteValid) RecalcAbsolute(); return _absoluteX; }
     }
     public int AbsoluteY
     {
-        get { int a = 0; for (Component? c = this; c != null; c = c.parent) { a += c.Y; if (c.isRoot) break; } return a; }
+        get { if (!_absoluteValid) RecalcAbsolute(); return _absoluteY; }
     }
     public Rectangle AbsoluteRectangle
     {
@@ -86,8 +85,9 @@ public class Component : IDisposable, ICompositedSurface
         }
         set
         {
+            if (rectangle.X == value) return;
             rectangle.X = value;
-            ComputeAbsoluteX();
+            InvalidateAbsolute();
         }
     }
     public int Y
@@ -98,8 +98,9 @@ public class Component : IDisposable, ICompositedSurface
         }
         set
         {
+            if (rectangle.Y == value) return;
             rectangle.Y = value;
-            ComputeAbsoluteY();
+            InvalidateAbsolute();
         }
     }
 
@@ -137,40 +138,18 @@ public class Component : IDisposable, ICompositedSurface
     protected bool childrenDirty;
     private bool disposed;
     public bool clampSize = true;
-    public bool forceDirty { get; private set; }
     protected bool visible;
     public string designType = "";
 
     //Should not render until added as a child or is a parent
     protected bool canRender = false;
-    private byte opacity = 255;
     public bool isRoot;
-
-    public byte Opacity
-    {
-        get => opacity;
-        set
-        {
-            byte clamped = value;
-            if (opacity == clamped) return;
-            opacity = clamped;
-            MarkDirty();
-        }
-    }
-
-    public int[] ?Buffer => buffer.GetBuffer();
-
-    public bool IsDirty => dirty || childrenDirty || forceDirty;
-    public void ClearDirty() => MarkCleaned();
 
 
     protected Frame frame;
     protected Frame normalFrame;
     protected Frame highlightedFrame;
     protected Frame pressedFrame;
-
-    protected int _absoluteX;
-    protected int _absoluteY;
 
     public static int currentZIndex = 0;
     public int zIndex;
@@ -239,9 +218,8 @@ public class Component : IDisposable, ICompositedSurface
 
             state = State.Normal;
 
-            ComputeAbsoluteCoordinates();
-
             components.Add(this);
+            WindowManager.MarkZOrderDirty();
             MarkDirty();
             currentZIndex++;
         }
@@ -635,63 +613,38 @@ public class Component : IDisposable, ICompositedSurface
 
 
 
-    private static int RoundUpToChunk(int value, int chunkSize)
+    // AbsoluteX/Y are cached; moves are rare, reads are per-frame hot.
+    private int _absoluteX;
+    private int _absoluteY;
+    private bool _absoluteValid;
+
+    private void RecalcAbsolute()
     {
-        return (value + chunkSize - 1) / chunkSize * chunkSize;
-    }
-
-
-    public void ComputeAbsoluteCoordinates()
-    {
-        ComputeAbsoluteX();
-        ComputeAbsoluteY();
-    }
-
-    public void ComputeAbsoluteX()
-    {
-        int absoluteX = 0;
-        Component currentComponent = this;
-
-        while (currentComponent != null)
+        int x = 0;
+        int y = 0;
+        for (Component? c = this; c != null; c = c.parent)
         {
-            absoluteX += currentComponent.X;
-
-            if (currentComponent.isRoot) break;
-
-            currentComponent = currentComponent.parent;
+            x += c.X;
+            y += c.Y;
+            if (c.isRoot) break;
         }
+        _absoluteX = x;
+        _absoluteY = y;
+        _absoluteValid = true;
+    }
 
-        _absoluteX = absoluteX;
-
+    private void InvalidateAbsolute()
+    {
+        _absoluteValid = false;
         for (int i = 0; i < children.Count; i++)
-        {
-            Component child = children[i];
-            child.ComputeAbsoluteX();
-        }
+            children[i].InvalidateAbsolute();
     }
 
-    public void ComputeAbsoluteY()
-    {
-        int absoluteY = 0;
-        Component currentComponent = this;
+    public void ComputeAbsoluteCoordinates() { }
 
-        while (currentComponent != null)
-        {
-            absoluteY += currentComponent.Y;
+    public void ComputeAbsoluteX() { }
 
-            if (currentComponent.isRoot) break;
-
-            currentComponent = currentComponent.parent;
-        }
-
-        _absoluteY = absoluteY;
-
-        for (int i = 0; i < children.Count; i++)
-        {
-            Component child = children[i];
-            child.ComputeAbsoluteY();
-        }
-    }
+    public void ComputeAbsoluteY() { }
 
     // ---- replace AddChild / RemoveChild ----
     public virtual Component AddChild(Component child)
@@ -701,8 +654,9 @@ public class Component : IDisposable, ICompositedSurface
         child.canRender = true;
         child.isRoot = false;
         child.parent = this;
-        child.ComputeAbsoluteCoordinates();
+        child.InvalidateAbsolute();
         zIndex++;
+        WindowManager.MarkZOrderDirty();
 
         child.BindRenderSurface(buffer, false);
         child.ResolveHorizontalAnchor();
@@ -729,7 +683,7 @@ public class Component : IDisposable, ICompositedSurface
         WindowManager.Invalidate(child.AbsoluteRectangle);
         child.parent = null;
         child.isRoot = true;
-        child.ComputeAbsoluteCoordinates();
+        child.InvalidateAbsolute();
         lock (components) { components.Remove(child); }
         MarkDirty();
     }
@@ -899,17 +853,11 @@ public class Component : IDisposable, ICompositedSurface
             byte g = (byte)((color2.G - color1.G) * ratio + color1.G);
             byte b = (byte)((color2.B - color1.B) * ratio + color1.B);
 
-            int interpolatedColor = Color.FromArgb(0xff, r, g, b).ToArgb();
-
-            for (int j = 0; j < height; j++)
-            {
-                buffer.SetPixelAlpha(x + i, y + j, interpolatedColor);
-            }
+            DrawFilledRectangle(Color.FromArgb(0xff, r, g, b), x + i, y, 1, height);
         }
     }
 
-    public virtual bool HasDirtyTree() => dirty || childrenDirty || forceDirty;
-    public virtual bool IsOpaqueForCopy() => opacity >= 255;
+    public virtual bool HasDirtyTree() => dirty || childrenDirty;
 
     public virtual void MarkDirty(bool invalidate = true)
     {
@@ -926,9 +874,7 @@ public class Component : IDisposable, ICompositedSurface
 
     public virtual void ForceDirty()
     {
-        forceDirty = true;
-        if (IsEffectivelyVisible()) WindowManager.Invalidate(this);
-        if (!isRoot && parent != null) parent.MarkChildDirty();
+        MarkDirty();
     }
 
     private bool IsEffectivelyVisible()
@@ -961,70 +907,25 @@ public class Component : IDisposable, ICompositedSurface
     }
 
 
-    public virtual void DrawDirtyLocal(Rectangle dirtyRect)
+    public void DrawDirtyLocal(Rectangle dirtyRect)
     {
-        if (isRoot)
-        {
-            Rectangle localClip = new Rectangle(
-                dirtyRect.X - AbsoluteX,
-                dirtyRect.Y - AbsoluteY,
-                dirtyRect.Width,
-                dirtyRect.Height);
-            localClip = Rectangle.Intersect(new Rectangle(0, 0, Width, Height), localClip);
-            if (localClip.Width <= 0 || localClip.Height <= 0) return;
+        Rectangle localClip = new Rectangle(
+            dirtyRect.X - AbsoluteX,
+            dirtyRect.Y - AbsoluteY,
+            dirtyRect.Width,
+            dirtyRect.Height);
+        localClip = Rectangle.Intersect(new Rectangle(0, 0, Width, Height), localClip);
+        if (localClip.Width <= 0 || localClip.Height <= 0) return;
 
-            buffer.ResetContext(localClip);
-            try
-            {
-                DrawLocal();
-            }
-            finally
-            {
-                buffer.ResetContext();
-            }
-            return;
-        }
-
-        if (dirty || forceDirty)
+        buffer.ResetContext(localClip);
+        try
         {
             DrawLocal();
-            return;
         }
-
-        if (!childrenDirty)
-            return;
-
-        for (int i = 0; i < children.Count; i++)
+        finally
         {
-            Component child = children[i];
-            if (!child.Visible) continue;
-            if (!child.AbsoluteRectangle.IntersectsWith(dirtyRect)) continue;
-
-            DrawDirtyChild(child, dirtyRect);
+            buffer.ResetContext();
         }
-    }
-
-    private void DrawDirtyChild(Component child, Rectangle dirtyRect)
-    {
-        if (child.HasDirtyTree())
-            child.DrawDirtyLocal(dirtyRect);
-
-        DrawChildClipped(child, dirtyRect);
-        child.MarkCleaned();
-    }
-
-    protected void DrawChildClipped(Component child, Rectangle dirtyRect)
-    {
-        if (ReferenceEquals(buffer, child.buffer))
-        {
-            DrawChild(child);
-            return;
-        }
-
-        Rectangle clipped = Rectangle.Intersect(child.AbsoluteRectangle, dirtyRect);
-        if (clipped.Width <= 0 || clipped.Height <= 0) return;
-
-        DrawChildArea(child, clipped.X - child.AbsoluteX, clipped.Y - child.AbsoluteY, clipped.X - AbsoluteX, clipped.Y - AbsoluteY, clipped.Width, clipped.Height);
     }
 
     protected void DrawChild(Component child)
@@ -1036,52 +937,19 @@ public class Component : IDisposable, ICompositedSurface
     {
         if (child == null || !child.Visible) return;
 
-        if (ReferenceEquals(buffer, child.buffer))
+        bool pushed = buffer.PushContext(child.X, child.Y, child.Width, child.Height, parentLocalClip);
+        try
         {
-            bool pushed = buffer.PushContext(child.X, child.Y, child.Width, child.Height, parentLocalClip);
-            try
+            if (pushed && buffer.HasVisibleClip)
             {
-                if (pushed && buffer.HasVisibleClip)
-                {
-                    child.DrawLocal();
-                    child.MarkCleaned();
-                }
+                child.DrawLocal();
+                child.MarkCleaned();
             }
-            finally
-            {
-                if (pushed) buffer.PopContext();
-            }
-            return;
         }
-
-        DrawChildArea(child, 0, 0, child.X, child.Y, child.Width, child.Height);
-    }
-
-    protected void DrawChildArea(Component child, int sourceX, int sourceY, int destinationX, int destinationY, int width, int height)
-    {
-        if (child.IsOpaqueForCopy())
+        finally
         {
-            buffer.DrawArrayClipped(
-                child.buffer.GetBuffer(),
-                child.buffer.Width,
-                sourceX,
-                sourceY,
-                destinationX,
-                destinationY,
-                width,
-                height);
-            return;
+            if (pushed) buffer.PopContext();
         }
-
-        buffer.DrawArrayAlphaClipped(
-            child.buffer.GetBuffer(),
-            child.buffer.Width,
-            sourceX,
-            sourceY,
-            destinationX,
-            destinationY,
-            width,
-            height);
     }
 
 
@@ -1089,7 +957,6 @@ public class Component : IDisposable, ICompositedSurface
     {
         dirty = false;
         childrenDirty = false;
-        forceDirty = false;
     }
 
     private void BindRenderSurface(ComponentBuffer surface, bool ownsSurface)

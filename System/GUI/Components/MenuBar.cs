@@ -60,10 +60,6 @@ public class MenuBar : Component
         items.ResolveStackLayout();
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {

@@ -131,11 +131,6 @@ public class MenuPopup : Component
         items.ResolveStackLayout();
     }
 
-    public override void Draw()
-    {
-        DrawLocal();
-        DrawToScreen();
-    }
 
     public override void DrawLocal()
     {

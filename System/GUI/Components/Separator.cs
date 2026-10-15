@@ -7,10 +7,6 @@ public class Separator : Component
         clampSize = false;
     }
 
-    public override void Draw()
-    {
-        base.Draw();
-    }
 
     public override void DrawLocal()
     {
