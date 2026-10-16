@@ -40,7 +40,6 @@ static char listbuf[LISTBUF];
 static char clipPath[MAXPATH];
 static int clipCut;
 static handle_t focusedH;
-static char addrbuf[MAXPATH];
 static char searchbuf[128];
 
 static TNode tnodes[MAXTNODES];
@@ -345,8 +344,6 @@ static void navigate(const char *path)
 {
     strncpy(cwd, path, sizeof cwd - 1);
     cwd[sizeof cwd - 1] = 0;
-    strncpy(addrbuf, cwd, sizeof addrbuf - 1);
-    addrbuf[sizeof addrbuf - 1] = 0;
     k_set_text(addrField, cwd);
     inputMode = 0;
     refresh();
@@ -597,23 +594,6 @@ static void popup_at(handle_t widget, int lx, int ly, handle_t popup)
     k_popup_show_at(popup, sx, sy);
 }
 
-// edit a line buffer, echo to a widget; returns 1 on commit, -1 on cancel, 0 waiting
-static int edit_line(char *buf, int cap, handle_t widget, char ch)
-{
-    int n;
-    if (ch == 27) return -1;
-    if (ch == '\r') return 1;
-    if (ch == '\b') {
-        n = (int)strlen(buf);
-        if (n > 0) buf[n - 1] = 0;
-    } else if (ch >= 32 && ch < 127) {
-        n = (int)strlen(buf);
-        if (n < cap - 1) { buf[n] = ch; buf[n + 1] = 0; }
-    } else return 0;
-    k_set_text(widget, buf);
-    return 0;
-}
-
 static void on_key(char ch)
 {
     char s[320];
@@ -659,7 +639,6 @@ int main(int argc, char **argv)
     handle_t vp, it;
     strncpy(cwd, start, sizeof cwd - 1);
     cwd[sizeof cwd - 1] = 0;
-    strncpy(addrbuf, cwd, sizeof addrbuf - 1);
 
     win = k_create_window(880, 452, "Explorer");
     if (!win) { puts("window creation failed"); return 1; }
@@ -756,21 +735,33 @@ int main(int argc, char **argv)
                 char ch = (char)(e.b & 0xFFFF);
                 if (inputMode != 0) { on_key(ch); continue; }
                 if (focusedH == addrField) {
-                    int r = edit_line(addrbuf, (int)sizeof addrbuf, addrField, ch);
-                    if (r == 1) {
-                        FileStat st;
-                        if (k_stat_file(addrbuf, &st) == 0 && st.is_dir) navigate_push(addrbuf);
-                        else set_sel("not a folder");
-                    } else if (r == -1) {
-                        strncpy(addrbuf, cwd, sizeof addrbuf - 1);
+                    // typing is native; Enter navigates, Esc resyncs
+                    if (ch == '\r') {
+                        char p[300];
+                        if (k_get_text(addrField, p, (int)sizeof p) >= 0) {
+                            FileStat st;
+                            if (k_stat_file(p, &st) == 0 && st.is_dir) navigate_push(p);
+                            else set_sel("not a folder");
+                        }
+                    } else if (ch == 27) {
                         k_set_text(addrField, cwd);
                     }
                     continue;
                 }
                 if (focusedH == searchField) {
-                    int r = edit_line(searchbuf, (int)sizeof searchbuf, searchField, ch);
-                    if (r == 1 || r == 0) refilter();
-                    if (r == -1) { searchbuf[0] = 0; k_set_text(searchField, ""); refilter(); }
+                    if (ch == 27) {
+                        k_set_text(searchField, "");
+                        searchbuf[0] = 0;
+                        refilter();
+                    } else {
+                        char cur[128];
+                        if (k_get_text(searchField, cur, (int)sizeof cur) >= 0 &&
+                            strcmp(cur, searchbuf)) {
+                            strncpy(searchbuf, cur, sizeof searchbuf - 1);
+                            searchbuf[sizeof searchbuf - 1] = 0;
+                            refilter();
+                        }
+                    }
                     continue;
                 }
                 on_key(ch);

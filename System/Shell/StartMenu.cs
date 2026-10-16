@@ -8,6 +8,8 @@ public class StartMenu : Window
 {
 
     private StackPanel panel;
+    private MenuItem programsMenu;
+    private TextField searchField;
     public StartMenu(int x, int y, int width, int height, string title, bool useTitleBar) : base(x, y, width, height, title, useTitleBar)
     {
         process.processType = ProcessType.System;
@@ -42,6 +44,21 @@ public class StartMenu : Window
 
         });
 
+        searchField = new TextField(0, 0, width, 24)
+        {
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            verticalAlignment = VerticalAlignment.Top,
+            clampSize = false,
+            Margin = new Thickness(0, 0, 0, 4),
+            PlaceholderText = "Search programs",
+        };
+        searchField.TextChanged += delegate (string text)
+        {
+            if (programsMenu != null && programsMenu.submenu != null)
+                programsMenu.submenu.FilterItems(text);
+        };
+        panel.AddStackChild(searchField);
+
         MenuItem programs = new MenuItem(0, 0, width + 30, 24)
         {
             text = "Programs",
@@ -50,6 +67,7 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
+        programsMenu = programs;
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/directx.png"), "VMWare SVGA Test", () => LaunchTracker.Start(() => new GraphicsEngine()));
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () => LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
 
@@ -145,6 +163,7 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
+        powerOptions.AddSubmenuItem("Lock", () => LockManager.Lock());
         powerOptions.AddSubmenuItem("Log Off");
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {

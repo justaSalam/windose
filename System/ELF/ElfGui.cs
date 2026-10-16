@@ -43,7 +43,15 @@ namespace Windose.System.Elf
                 owner.PostEvent(ElfEvent.Key, ProgramHandle, (int)keyEvent.Key,
                     ((int)keyEvent.Modifiers << 16) | (ch & 0xFFFF));
             }
-            // Swallowed: ELF children (button/label/canvas) take no keyboard input.
+            // Native typing for the focused text field (if any); the program still
+            // sees every key as EV_KEY and can read the result with get_text.
+            try
+            {
+                if (focusedComponent is TextField field && field.Visible && field.IsInputEnabled())
+                    field.HandleKeyboard(keyEvent);
+            }
+            catch { }
+            // Swallowed otherwise: ELF children (button/label/canvas) take no keyboard input.
         }
 
         public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)

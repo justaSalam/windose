@@ -119,7 +119,7 @@ namespace Windose.System.Kernel.Subsystem
                     return false;
                 }
 
-                CurrentUser = new UserAccount(username, password, privilegeLevel);
+                CurrentUser = new UserAccount(username, argPassword, privilegeLevel);
                 return true;
             }
             return false;

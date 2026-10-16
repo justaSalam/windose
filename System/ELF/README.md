@@ -1,4 +1,4 @@
-# Windose ELF loader (v8)
+# Windose ELF loader (v9)
 
 Runs x86-64 ELF programs written in C inside your Cosmos kernel: several at once, each with its own
 handles, events, memory quota and process-list entry, with a small libc and normal `main(argc, argv)`.
@@ -32,7 +32,10 @@ if (p == null) Terminal.WriteLine("exec failed: " + err);
   create_checkbox, set/get_checked, create_radio, create_slider, slider_set/get, create_progress, progress_setup/set,
   create_textfield, textfield_setup, create_combo (+ add/remove/clear/get/set), create_listbox (+ add/remove/clear/get/select),
   create_tabs (+ add_page/select/get), menubar_create, menu_add_item, msgbox, statusbar_create (+ add_panel/set_text),
-  spawn, kill, yield, poll_event, read_file, write_file, ticks, pid.
+  tree (+ add_root/add_child/clear/selected/expanded), toolbar, popup, list columns (+ add_row/hit_test/screen_pos),
+  grid (+ columns/rows/cells/sort), drop_accept, dnd_get_text, widget_set/get_enabled, widget_focus,
+  spawn, kill, yield, poll_event, read_file, write_file, ticks, pid,
+  launch_app, open_file, notify_send, desktop_count, desktop_current, desktop_switch, window_set_desktop.
   Memory comes from malloc (kernel `alloc` underneath). Program output goes to the system log (`elf:<name>`).
 * **Events**: click, close, key (code + cooked char), mouse move/down/up, focus in/out, drop with text payload.
   Widget changes (checkbox, combo, list, tabs, menus, dialogs, color, numeric, calendar, grid) arrive as
@@ -49,7 +52,7 @@ Build: Linux/WSL `sh build.sh [name]` (gcc + binutils), Windows `build.bat [name
 
 Limits: no floating point in printf, no global constructors (`.init_array`), no TLS, no `fopen` (use `file_read` / `k_write_file`),
 no threads inside a program. Kill cannot stop a program stuck in a pure compute loop that never calls the kernel.
-API v8 needs rebuilt programs AND a rebuilt libc (older `bin/*.elf` exit 127 until rebuilt).
+API v9 needs rebuilt programs AND a rebuilt libc (older `bin/*.elf` exit 127 until rebuilt).
 
 ## Ideas worth adding next
 
@@ -59,13 +62,13 @@ Ordered roughly by value over effort. Anything marked ABI needs the append-at-en
 * **Crash isolation** — native faults in a program thread kill ring 0. Short of page tables: validate jump/call targets stay inside the image at load (reject wild relocations already helps), zero freed host memory, and catch/report managed exceptions at every host boundary (done). Real fix is ring 3 + per-process paging.
 * **Preemptive kill** — today a compute loop that never calls the kernel can't be stopped. Needs thread abort/suspend support from the scheduler; until then document `k_yield()` in hot loops.
 * **Stdin / console read** — programs can print but not read. Add a `read_console` call fed by focused-terminal input, or a `read_line` on the owning terminal.
-* **File metadata** — `stat`/`readdir`/`mkdir`/`delete` so programs can browse the FS (host already has the paths; just expose them).
+* **File metadata** — ~~`stat`/`readdir`/`mkdir`/`delete` so programs can browse the FS~~ done (v4: list_dir, stat_file, make_dir, delete_path, rename_path; v8: list_drives, drive_stat).
 * **`waitpid`** — `spawn` exists but the parent can't wait; add a blocking wait on child exit code.
-* **Clipboard + Env vars** — `getenv`/`setenv` (tiny) and clipboard get/set (needs a WM-side clipboard first).
+* **Clipboard + Env vars** — `getenv`/`setenv` (tiny) and clipboard get/set (WM clipboard exists; just expose it).
 * **VSync / wait-vblank** — throttle animation loops to the display instead of `k_sleep` guessing.
 * **Sockets** — Cosmos has a network stack; a `tcp_connect`/`send`/`recv` trio would make networked ELF programs possible.
-* **Message boxes + file dialogs** — `msgbox(text)` and `open_file()` on the host side; five-line wrappers, big usability win for C programs.
-* **Drag & drop / taskbar progress / notifications** — host-side features programs could drive with 2-3 more calls.
+* **Message boxes + file dialogs** — ~~`msgbox(text)` and `open_file()`~~ done (v5/v6: msgbox, filedialog_open, open_file, launch_app).
+* **Drag & drop / taskbar progress / notifications** — ~~host-side features programs could drive~~ done (v6/v9: drop_accept, dnd_get_text, notify_send; taskbar progress still open).
 * **`.init_array` constructors + TLS** — parse and run init arrays at load (easy); TLS needs a thread-pointer the kernel can't provide yet (hard).
 * **mmap/sbrk + `free` to kernel** — libc sub-allocates from kernel chunks and never returns them; add a `release` call so long-lived programs can give whole chunks back.
 * **Fuzz the loader** — feed mutated ELFs to `ElfFile.Parse` + `ApplyRelocations` on desktop; every error path returns a string instead of throwing, so this is cheap and high-value.

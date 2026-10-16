@@ -107,6 +107,41 @@ public class MenuPopup : Component
         openMenus.Clear();
     }
 
+    /// <summary>Shows only items matching the query (parents stay if any child matches).</summary>
+    public void FilterItems(string query)
+    {
+        bool active = !string.IsNullOrEmpty(query);
+        for (int i = 0; i < items.children.Count; i++)
+        {
+            MenuItem mi = items.children[i] as MenuItem;
+            if (mi == null) continue;
+            if (mi.submenu != null)
+            {
+                mi.submenu.FilterItems(query);
+                mi.Visible = !active || mi.submenu.HasVisibleItems();
+            }
+            else if (mi.drawSeparator)
+            {
+                mi.Visible = !active;
+            }
+            else
+            {
+                mi.Visible = !active || mi.text.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+        }
+        MarkDirty();
+    }
+
+    public bool HasVisibleItems()
+    {
+        for (int i = 0; i < items.children.Count; i++)
+        {
+            MenuItem mi = items.children[i] as MenuItem;
+            if (mi != null && mi.Visible) return true;
+        }
+        return false;
+    }
+
     public static bool HasOpenMenus => openMenus.Count > 0;
 
     public static bool HandleOpenMenuInput(int mouseX, int mouseY, MouseState mouse)

@@ -5,6 +5,7 @@
 using System;
 using System.Drawing;
 using Cosmos.Kernel.System.FileSystem;
+using Windose.System.Kernel;
 using Windose.System.System_Calls;
 
 namespace Windose.System.Elf
@@ -926,6 +927,84 @@ namespace Windose.System.Elf
             ElfWindow win = obj as ElfWindow;
             if (win == null) return false;
             win.AllowDrop = accept;
+            return true;
+        }
+        /// <summary>
+        /// TODO Implement a better way of launching, this is some seriously ill shit way of doing it
+        /// </summary>
+        /// <param name="name"></param>
+        /// <param name="arg"></param>
+        /// <returns></returns>
+        public bool LaunchApp(string name, string arg)
+        {
+            try
+            {
+                string app = (name ?? "").Trim().ToLowerInvariant();
+                if (app == "explorer") LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
+                else if (app == "terminal") LaunchTracker.Start(() => new CommandPrompt());
+                else if (app == "editor")
+                {
+                    if (string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new BreezeEditor());
+                    else LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, arg));
+                }
+                else if (app == "taskmgr") LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+                else if (app == "registry") LaunchTracker.Start(() => new RegistryEditor());
+                else if (app == "settings") LaunchTracker.Start(() => new DisplaySettings());
+                else if (app == "imageviewer" && !string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new ImageViewer(arg, 120, 120, 640, 480));
+                else return false;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public bool OpenFile(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path)) return false;
+                if (path.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+                {
+                    byte[] data = ReadFile(path);
+                    if (data == null) return false;
+                    string error;
+                    return ElfRunner.Spawn(data, path, new string[] { path }, out error) != null;
+                }
+                FileExplorer.OpenFilePath(path);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public void NotifySend(string title, string text)
+        {
+            try { NotificationManager.Notify(title ?? "", text ?? ""); } catch { }
+        }
+
+        public int DesktopCount()
+        {
+            return WindowManager.DesktopCount;
+        }
+
+        public int DesktopCurrent()
+        {
+            return WindowManager.CurrentDesktop;
+        }
+
+        public bool DesktopSwitch(int index)
+        {
+            if (index < 0 || index >= WindowManager.DesktopCount) return false;
+            WindowManager.SwitchDesktop(index);
+            return true;
+        }
+
+        public bool WindowSetDesktop(object obj, int index)
+        {
+            Window win = obj as Window;
+            if (win == null || !win.showInTaskbar) return false;
+            if (index < 0 || index >= WindowManager.DesktopCount) return false;
+            win.desktop = index;
+            WindowManager.Invalidate(win.bounds);
+            win.MarkDirty();
             return true;
         }
 

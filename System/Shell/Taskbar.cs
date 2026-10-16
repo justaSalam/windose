@@ -112,6 +112,27 @@ public class Taskbar : Component
 
         trayPanel.AddStackChild(trayButton);
 
+        Button notifyButton = new Button(new Png("/mnt/System/Icons/message_envelope_open.png"), 0, 0, 24, Height - 8)
+        {
+            horizontalAlignment = HorizontalAlignment.Right,
+            verticalAlignment = VerticalAlignment.Center,
+            useBorders = true,
+            iconSize = 18,
+            leftClickAction = () => LaunchTracker.Start(() => new NotificationCenter())
+        };
+        trayPanel.AddStackChild(notifyButton);
+        TooltipService.Attach(notifyButton, "Notifications");
+
+        Button showDesktopButton = new Button("", 0, 0, 10, Height - 8)
+        {
+            horizontalAlignment = HorizontalAlignment.Right,
+            verticalAlignment = VerticalAlignment.Center,
+            useBorders = true,
+            leftClickAction = WindowManager.ToggleShowDesktop
+        };
+        trayPanel.AddStackChild(showDesktopButton);
+        TooltipService.Attach(showDesktopButton, "Show desktop");
+
 
         int trayX = Math.Max(0, Global.screenWidth - 160);
         int trayY = Math.Max(0, Global.screenHeight - 160 - Height);

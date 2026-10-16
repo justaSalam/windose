@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Windose ELF Developer Docs</title>
+<style>
+:root{
+  --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#30363d;
+  --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --accent2:#3fb950;
+  --warn:#d29922; --code:#0a0d12; --th:#21262d;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.layout{display:flex;max-width:1280px;margin:0 auto}
+nav.sidebar{width:250px;flex:0 0 250px;position:sticky;top:0;height:100vh;overflow:auto;
+  border-right:1px solid var(--border);padding:22px 16px;background:var(--panel)}
+nav.sidebar h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 6px}
+nav.sidebar .ver{display:inline-block;font-size:12px;background:var(--panel2);border:1px solid var(--border);
+  border-radius:12px;padding:1px 10px;margin:6px 0 14px;color:var(--accent2)}
+nav.sidebar a{display:block;color:var(--text);text-decoration:none;padding:4px 8px;border-radius:6px;font-size:14px}
+nav.sidebar a:hover{background:var(--panel2);color:var(--accent)}
+nav.sidebar a.sub{padding-left:22px;color:var(--muted);font-size:13px}
+main{flex:1;min-width:0;padding:32px 40px 120px}
+h1{font-size:34px;margin:0 0 4px}
+h2{font-size:24px;margin:44px 0 10px;padding-top:18px;border-top:1px solid var(--border)}
+h3{font-size:18px;margin:28px 0 8px;color:var(--accent)}
+p.sub{color:var(--muted);font-size:17px;margin-top:0}
+code,tt{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13.5px}
+p code,li code,td code{background:var(--panel2);padding:1px 6px;border-radius:5px;color:#ffa657}
+pre{background:var(--code);border:1px solid var(--border);border-radius:8px;padding:14px 16px;overflow:auto}
+pre code{background:none;padding:0;color:var(--text)}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px}
+th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top}
+th{background:var(--th);white-space:nowrap}
+td.sig{white-space:nowrap}
+td.sig code{color:var(--accent);background:none;padding:0}
+td.ret{white-space:nowrap;color:var(--accent2)}
+.note{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--accent);
+  border-radius:6px;padding:10px 14px;margin:14px 0}
+.note.warn{border-left-color:var(--warn)}
+#apiSearch{width:100%;padding:10px 14px;font-size:15px;color:var(--text);background:var(--code);
+  border:1px solid var(--border);border-radius:8px;margin:8px 0 4px}
+.count{color:var(--muted);font-size:13px}
+footer{color:var(--muted);font-size:13px;margin-top:60px}
+@media(max-width:900px){nav.sidebar{display:none}main{padding:20px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="sidebar">
+<h2>ELF Developer Docs</h2>
+<span class="ver">KAPI v9</span>
+<a href="#overview">Overview</a>
+<a href="#quickstart">Quickstart</a>
+<a href="#anatomy">Program anatomy</a>
+<a href="#building">Building</a>
+<a href="#libc">Bundled libc</a>
+<a href="#api">API reference</a>
+<a class="sub" href="#api-core">Core · time · memory</a>
+<a class="sub" href="#api-proc">Processes</a>
+<a class="sub" href="#api-window">Windows &amp; text</a>
+<a class="sub" href="#api-input">Inputs &amp; pickers</a>
+<a class="sub" href="#api-lists">Lists · tabs · grid</a>
+<a class="sub" href="#api-menus">Menus · dialogs · bars</a>
+<a class="sub" href="#api-canvas">Canvas</a>
+<a class="sub" href="#api-tree">Tree</a>
+<a class="sub" href="#api-files">Filesystem</a>
+<a class="sub" href="#api-system">System &amp; desktop</a>
+<a href="#events">Events</a>
+<a href="#widgets">Widget guide</a>
+<a href="#files">Filesystem notes</a>
+<a href="#processes">Processes &amp; limits</a>
+<a href="#desktop">Desktops &amp; notifications</a>
+<a href="#abi">ABI &amp; versioning</a>
+<a href="#troubleshooting">Troubleshooting</a>
+<a href="#examples">Shipped examples</a>
+</nav>
+<main>
+
+<h1>Windose ELF Developer Docs</h1>
+<p class="sub">Write native x86-64 programs in C that run as first-class Windose apps — windows, widgets, files, processes.</p>
+
+<h2 id="overview">Overview</h2>
+<p>Windose runs position-independent ELF64 binaries (<code>ET_DYN</code>) compiled with an ordinary
+C toolchain. Each program gets its own thread, pid, handle table, event queue and memory quota,
+plus a function table (<code>KernelApi</code>) with ~112 syscalls. Programs never touch the kernel
+directly — they call <code>k_*</code> wrappers from <code>programs/include/kernel.h</code>.</p>
+<ul>
+<li><strong>Ring 0, no isolation.</strong> A wild pointer can take down the kernel. Validate everything; the C side can't save you.</li>
+<li><strong>Handles, not pointers.</strong> UI objects come back as small ints (<code>0</code> = failed). Never do arithmetic on them.</li>
+<li><strong>Event-driven UI.</strong> Clicks, keys, mouse and dialogs arrive as <code>Event</code> structs you poll.</li>
+<li><strong>Cooperative kill.</strong> <code>kill</code> closes a program's windows at once; its thread stops at its next kernel call. A pure compute loop that never calls in cannot be stopped — call <code>k_yield()</code> in hot loops.</li>
+</ul>
+
+<h2 id="quickstart">Quickstart</h2>
+<pre><code># Linux / WSL
+cd System/ELF/programs
+sh build.sh hello          # -&gt; bin/hello.elf
+# Windows (clang)
+build.bat hello            # -&gt; bin\hello.elf</code></pre>
+<p>Deploy and run it inside Windose:</p>
+<pre><code>elf run /mnt/Programs/hello.elf   # runs to completion, prints exit code
+elf list                            # running programs: pid, state, memory
+elf kill 3                          # cooperative kill by pid</code></pre>
+<div class="note">New binaries are staged at boot from embedded resources (<code>Windose.csproj</code> +
+<code>Kernel.cs</code> <code>WriteStorage</code>). If you add a program, add both lines or it won't ship.</div>
+
+<h2 id="anatomy">Program anatomy</h2>
+<p>Normal <code>main(argc, argv)</code>. <code>crt0</code> checks the API version, builds argv via
+<code>get_args</code>, and turns your return value — or <code>exit(code)</code> from any depth
+(longjmp) — into the exit code.</p>
+<pre><code>#include &lt;stdio.h&gt;
+#include "kernel.h"
+
+int main(int argc, char **argv)
+{
+    handle_t win = k_create_window(320, 200, "Demo");
+    if (!win) { puts("no window"); return 1; }
+    handle_t btn = k_create_button(win, 20, 60, 140, 32, "Click me");
+    handle_t lab = k_create_label(win, 20, 20, "Press the button");
+    int clicks = 0;
+    char text[32];
+    for (;;) {
+        Event e;
+        while (k_poll_event(&amp;e)) {
+            if (e.type == EV_CLOSE &amp;&amp; e.handle == win) { k_close(win); return 0; }
+            if (e.type == EV_CLICK &amp;&amp; e.handle == btn) {
+                snprintf(text, sizeof text, "Clicks: %d", ++clicks);
+                k_set_text(lab, text);
+            }
+        }
+        k_sleep(10);   // never spin at 100% CPU
+    }
+}</code></pre>
+<div class="note warn"><strong>Return codes:</strong> <code>0</code> = ok. Negative = error.
+<code>K_KILLED (-100)</code> means your program was killed — every wrapper calls
+<code>exit(137)</code> for you via <code>__kchk</code>. Handles: <code>0</code> = failed.</div>
+
+<h2 id="building">Building</h2>
+<ul>
+<li><code>build.sh [name]</code> — gcc + binutils on x86-64 Linux. Needs <code>gcc</code>, <code>ld</code>, <code>ar</code>.</li>
+<li><code>build.bat [name]</code> — clang + <code>ld.lld</code> on Windows (<code>winget install LLVM.LLVM</code>; the Cosmos <code>llvm-tools</code> folder also works, no archiver needed). <code>build.bat clean</code> wipes <code>obj/</code> + <code>bin/</code>.</li>
+<li>Flags that matter: <code>-fPIE</code> + <code>-pie --no-dynamic-linker -e _start</code> (static PIE, <code>ET_DYN</code>), <code>-mno-red-zone</code>, <code>-fno-stack-protector</code>, <code>-z norelro -z noseparate-code</code>, <code>--gc-sections</code>. RELR relocations are supported, so modern linkers work unmodified.</li>
+<li>Drop a new <code>src/foo.c</code> in and rebuild — it is picked up automatically. <code>libc.a</code> rebuilds from <code>libc/*.c</code> every time.</li>
+</ul>
+
+<h2 id="libc">Bundled libc</h2>
+<ul>
+<li><code>string.h</code> <code>stdlib.h</code> (malloc/free/calloc/realloc, strtol, qsort, bsearch, rand) <code>stdio.h</code> (printf family, puts, <code>file_read</code>) <code>ctype.h</code>, <code>exit()</code>/<code>abort()</code> from anywhere.</li>
+<li><strong>printf has no floats</strong> — <code>%f/%e/%g</code> print the literal text <code>&lt;float&gt;</code>. Format integers and strings; scale fixed-point yourself.</li>
+<li><code>malloc</code> sub-allocates from kernel chunks (pinned, zeroed, auto-freed at exit). <code>free</code> works; memory is never returned to the kernel mid-run.</li>
+<li>Limits: no <code>fopen</code> (use <code>file_read</code> / <code>k_write_file</code>), no global constructors (<code>.init_array</code>), no TLS, no threads inside a program.</li>
+</ul>
+
+<h2 id="api">API reference</h2>
+<p>Every call below is the <code>k_*</code> wrapper (first <code>pid</code> arg filled in for you).
+Unless noted, <code>0</code> = ok, negative = error, <code>0</code> handle = failed.</p>
+<input id="apiSearch" type="text" placeholder="Filter 112 calls… e.g. canvas, combo, dir">
+<div class="count" id="apiCount"></div>
+<div id="apiTables"></div>
+
+<h2 id="events">Events</h2>
+<p><code>k_poll_event(&amp;e)</code> returns <code>1</code> with an event, <code>0</code> when the queue is empty.
+The queue holds 64 events and <strong>drops the newest when full</strong> — drain it every frame and <code>k_sleep</code> instead of spinning.</p>
+<table>
+<tr><th>Event</th><th>handle</th><th>a</th><th>b</th></tr>
+<tr><td><code>EV_CLICK (1)</code></td><td>button / checkbox / combo / list / tab / menu item / dialog</td><td>payload: checked 0/1 · combo/list/tab index · msgbox button · dialog 1/0 · color ARGB · numeric value · date yyyymmdd · grid row</td><td>grid column (else 0)</td></tr>
+<tr><td><code>EV_CLOSE (2)</code></td><td>window</td><td>—</td><td>—</td></tr>
+<tr><td><code>EV_KEY (3)</code></td><td>window</td><td>key code</td><td><code>(modifiers &lt;&lt; 16) | char</code>. Control keys are cooked: <code>\b \r \t</code> Esc=27 Del=127</td></tr>
+<tr><td><code>EV_MOUSEMOVE (4)</code></td><td>innermost owned component</td><td>x (component-local)</td><td>y</td></tr>
+<tr><td><code>EV_MOUSEDOWN (5)</code> / <code>EV_MOUSEUP (6)</code></td><td>same</td><td><code>x | (button &lt;&lt; 28)</code>, 1 left 2 right 3 middle</td><td>y</td></tr>
+<tr><td><code>EV_FOCUS (7)</code></td><td>component</td><td>1 gained, 0 lost</td><td>—</td></tr>
+<tr><td><code>EV_DROP (8)</code></td><td>window</td><td>x</td><td>y — payload via <code>k_dnd_get_text</code></td></tr>
+<tr><td><code>EV_DBLCLICK (9)</code></td><td>list / tree</td><td>index / item handle (selection already reported via click)</td><td>—</td></tr>
+</table>
+
+<h2 id="widgets">Widget guide</h2>
+<ul>
+<li><strong>Coordinates are client-relative.</strong> <code>(0,0)</code> is the client's top-left; the frame and title bar are added for you. No manual offset math.</li>
+<li><strong>Creation binds automatically.</strong> Every created object is tracked and wired (clicks, selects, close) — you just handle the events.</li>
+<li><strong>Text round-trips</strong> with <code>k_set_text</code> / <code>k_get_text</code> (buttons, labels, fields, combo selection, tab titles, dialog results).</li>
+<li><strong>Text fields type natively</strong> (caret, selection, clipboard, focus). Your program still sees every key as <code>EV_KEY</code>; poll with <code>k_get_text</code> when you need the value.</li>
+<li><strong>Poll, don't push, for continuous values</strong> — sliders and progress bars have no change events; read them with <code>k_slider_get</code> in your loop.</li>
+<li><strong>Tab pages are parents</strong> — <code>k_tab_add_page</code> returns a handle you pass as <code>parent</code> to populate the page.</li>
+<li><strong>Popups take screen coordinates</strong> — convert with <code>k_widget_screen_pos</code> (returns <code>(y &lt;&lt; 16) | x</code>). The bridge clamps to the screen.</li>
+<li><strong>Row identity is by index</strong> for lists/grids (re-query after add/remove); by <strong>handle</strong> for tree nodes, menu items and tabs.</li>
+</ul>
+
+<h2 id="files">Filesystem notes</h2>
+<ul>
+<li>Paths are absolute (<code>/mnt/…</code>). <code>k_list_dir</code> fills NUL-separated names, returns the count (<code>-1</code> = missing/not-a-dir or buffer too small).</li>
+<li><code>k_stat_file</code> fills <code>FileStat{is_dir, size_lo, size_hi}</code>. <code>k_read_file</code>/<code>k_write_file</code> cap at 1 MiB per call — chunk big files.</li>
+<li><code>k_delete_path</code> is <strong>recursive</strong> and there is no recycle bin. Confirm destructive actions in your UI.</li>
+<li><code>k_make_dir</code> creates parents. <code>k_rename_path</code> fails if the destination exists.</li>
+<li><code>k_list_drives</code> gives mount points; <code>k_drive_stat</code> gives total/free bytes.</li>
+<li><code>k_filedialog_open(title, initial, filter, save)</code> is non-blocking: result arrives as <code>EV_CLICK</code> (<code>a</code>=1 chosen, 0 cancelled) and the path reads back with <code>k_get_text</code> on the dialog handle.</li>
+<li><code>k_open_file(path)</code> spawns <code>.elf</code>, else opens with the registered C# app.</li>
+</ul>
+
+<h2 id="processes">Processes &amp; limits</h2>
+<ul>
+<li>One thread per program, 512 KiB stack. Default quota 64 MiB per program (image + malloc), 16 MiB single alloc, 32 programs max, 256 objects per program — all tunable on <code>ElfRunner</code>.</li>
+<li><code>k_spawn(path, argbuf, arglen)</code> takes NUL-separated args, returns the child pid. <code>k_kill</code> is cooperative (windows close at once; the thread stops at its next kernel call — sleeps and polls check every ~10 ms). Killing yourself returns <code>K_KILLED</code>.</li>
+<li><code>k_launch_app("explorer" | "terminal" | "editor" | "taskmgr" | "registry" | "settings" | "imageviewer", arg)</code> opens built-in C# apps.</li>
+<li>Program output (<code>printf</code>/<code>k_write</code>) goes to the system log as <code>elf:&lt;name&gt;</code>.</li>
+</ul>
+
+<h2 id="desktop">Desktops &amp; notifications</h2>
+<ul>
+<li>4 virtual desktops. <code>k_desktop_count/current/switch</code>; new windows open on the current one; <code>k_window_set_desktop</code> moves normal windows (pinned system windows refuse). Snap-on-drag and Alt+arrows are handled by the window manager.</li>
+<li><code>k_notify_send(title, text)</code> posts a toast + history entry (see it in the tray bell → notification center).</li>
+<li>Drag onto your window with <code>k_drop_accept(win, 1)</code>: you'll get <code>EV_DROP</code> + <code>k_dnd_get_text</code>.</li>
+</ul>
+
+<h2 id="abi">ABI &amp; versioning</h2>
+<ul>
+<li><code>KAPI_VERSION</code> is currently <strong>9</strong>. <code>crt0</code> rejects older kernels (<code>k-&gt;version &lt; KAPI_VERSION</code> → exit 127) and requires <code>k-&gt;size</code> to cover the struct.</li>
+<li><strong>Append-only.</strong> New syscalls go at the END of <code>KernelApi</code> in both <code>kernel.h</code> and <code>ElfRunner.cs</code>, pid first. Old binaries keep working on new kernels.</li>
+<li>Adding a syscall: ① field + <code>k_*</code> wrapper in <code>kernel.h</code> ② same field + <code>[UnmanagedCallersOnly]</code> handler (<code>Live(pid)</code>, try/catch, validate everything) + <code>FillApi</code> assignment ③ new OS access goes on <code>IElfHost</code>, implemented in <code>WindoseBridge.cs</code>. Then rebuild <code>libc.a</code> + all programs.</li>
+</ul>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<tr><th>Symptom</th><th>Fix</th></tr>
+<tr><td>Page fault on the first instruction</td><td>Heap isn't executable: set <code>ElfRunner.MakeExecutable</code> to mark the pages.</td></tr>
+<tr><td>Crash on the first kernel call</td><td>ABI mismatch: <code>sysv_abi</code> vs <code>ms_abi</code> must match the C# side. Rebuild libc + programs.</td></tr>
+<tr><td><code>kernel API too old</code> / exit 127</td><td>Program built against an older <code>kernel.h</code>: rebuild.</td></tr>
+<tr><td><code>unresolved symbol 'x'</code></td><td>The program calls something not in libc: add it to <code>programs/libc</code>.</td></tr>
+<tr><td><code>ET_EXEC linked at a fixed address</code></td><td>Use the provided build scripts (they link PIE).</td></tr>
+<tr><td>Hotkey freezes the desktop</td><td>Hotkey actions run on the input thread and must return immediately — use <code>k_spawn</code>, never wait/block there.</td></tr>
+<tr><td>System freezes on launch</td><td>Same cause one level down: don't call blocking APIs from inside a hotkey or paint path.</td></tr>
+</table>
+
+<h2 id="examples">Shipped examples</h2>
+<table>
+<tr><th>Program</th><th>Shows</th></tr>
+<tr><td><code>hello</code></td><td>printf, pid, argv</td></tr>
+<tr><td><code>window</code></td><td>window + button + label + event loop (the canonical skeleton)</td></tr>
+<tr><td><code>widgets</code></td><td>Every widget: tabs, checkbox, radio, slider, progress, textfield, combo, listbox, menus, statusbar, color, numeric, calendar, filedialog, drops</td></tr>
+<tr><td><code>canvas</code></td><td>Pixel canvas animation + mouse + Esc-to-quit</td></tr>
+<tr><td><code>explorer</code></td><td>Full file browser: tree, details, search, viewer, copy/cut/paste, spawn</td></tr>
+<tr><td><code>search</code></td><td>Recursive file search + open</td></tr>
+<tr><td><code>run</code></td><td>Run dialog: app names, paths, <code>/mnt/Programs</code> fallback</td></tr>
+<tr><td><code>pager</code></td><td>Virtual-desktop pager</td></tr>
+<tr><td><code>spin</code> / <code>memhog</code></td><td>Kill and quota behavior (deliberately hostile test programs)</td></tr>
+<tr><td><code>libctest</code></td><td>libc correctness suite</td></tr>
+</table>
+
+<footer>Windose ELF docs · KAPI v9 · generated from <code>programs/include/kernel.h</code> — if this page disagrees with that header, the header wins.</footer>
+</main>
+</div>
+<script>
+const API = [
+{g:"Core output, time & memory", id:"api-core", calls:[
+["k_write(const char *text, int len)","void","Program output (goes to the log as elf:&lt;name&gt;). Prefer printf."],
+["k_sleep(int ms)","int","Sleep 0–60000 ms, sliced so kill lands within ~10 ms. 0 or KKilled."],
+["k_yield(void)","int","Yield the timeslice. Call it in hot loops so kill stays responsive."],
+["k_ticks(void)","int","Millisecond tick count (wraps). For animation deltas and timeouts."],
+["k_get_args(char *buf, int max)","int","argv as NUL-separated bytes. Returns argc, -1 if it doesn't fit."],
+["k_poll_event(Event *out)","int","1 with an event, 0 when empty. Drain every frame; the 64-deep queue drops newest when full."],
+["k_alloc — internal","void*","Raw kernel alloc backing libc malloc. Use malloc/free instead."]]},
+{g:"Processes", id:"api-proc", calls:[
+["k_spawn(const char *path, const char *argbuf, int arglen)","int pid","Start a program file. Args are NUL-separated (like get_args format). Negative on failure."],
+["k_kill(int target)","int","Cooperative kill: windows close at once, thread stops at next kernel call. 0 ok."]]},
+{g:"Windows & text", id:"api-window", calls:[
+["k_create_window(int w, int h, const char *title)","handle","Client area w×h (32–4096); frame + title added. 0 = failed."],
+["k_close(handle_t h)","int","Close window/object. Safe to call twice."],
+["k_resize_window(handle_t win, int w, int h)","int","Resize client area."],
+["k_set_text(handle_t obj, const char *text)","int","Buttons, labels, fields, combo selection, tab titles, window titles."],
+["k_get_text(handle_t obj, char *buf, int max)","int","Length, or -1 (missing/too small). Also reads dialog results and tab titles."],
+["k_widget_set_enabled(handle_t o, int v)","int","Grey out + ignore input (applies down the subtree)."],
+["k_widget_get_enabled(handle_t o)","int","1/0, -1 if not a component."],
+["k_widget_focus(handle_t o)","int","Request keyboard focus (fires EV_FOCUS)."],
+["k_widget_screen_pos(handle_t o)","int","Screen coords packed as (y&lt;&lt;16)|x — for placing popups from component-local mouse coords."]]},
+{g:"Buttons & labels", id:"api-buttons", calls:[
+["k_create_button(handle_t parent, int x, int y, int w, int h, const char *text)","handle","Click → EV_CLICK. Enter/Space also click it when focused."],
+["k_create_label(handle_t parent, int x, int y, const char *text)","handle","Display-only, auto-width. Update with k_set_text."]]},
+{g:"Inputs & pickers", id:"api-input", calls:[
+["k_create_checkbox(handle_t p, int x, int y, const char *text)","handle","Toggle → EV_CLICK, a = 0/1."],
+["k_set_checked(handle_t o, int v) / k_get_checked(handle_t o)","int","Works for checkboxes and radios."],
+["k_create_radio(handle_t p, int x, int y, const char *text, const char *group)","handle","Same-group radios uncheck each other. Select → EV_CLICK, a = 0/1."],
+["k_create_slider(handle_t p, int x, int y, int w, int horiz, int min, int max, int value)","handle","Integer range. Drag it; poll with slider_get (no change events). Arrows/Home/End work when focused."],
+["k_slider_set(handle_t o, int v) / k_slider_get(handle_t o)","int","Clamped set; rounded get."],
+["k_create_progress(handle_t p, int x, int y, int w, int h)","handle","Bar meter."],
+["k_progress_setup(handle_t o, int min, int max) / k_progress_set(handle_t o, int v)","int","Range then value. Smooth-animates toward the value."],
+["k_create_textfield(handle_t p, int x, int y, int w)","handle","Native typing: caret, selection, clipboard, focus. Your program still sees every key as EV_KEY."],
+["k_textfield_setup(handle_t o, int maxlen, int password, int readonly)","int","password is a mask char (0 = off)."],
+["k_textfield_select(handle_t o, int start, int len)","int","Programmatic selection."],
+["k_textfield_get_caret(handle_t o)","int","Caret offset."],
+["k_textfield_set_multiline(handle_t o, int v)","int","Enter inserts newlines when on."],
+["k_create_combo(handle_t p, int x, int y, int w)","handle","Dropdown. Select → EV_CLICK, a = index. Enter opens, Esc closes, arrows move."],
+["k_combo_add_item(handle_t o, const char *text)","int","Returns the new index."],
+["k_combo_remove_item(handle_t o, int i) / k_combo_clear(handle_t o)","int","Remove one / all."],
+["k_combo_get_selected(handle_t o)","int","Index, -1 = none."],
+["k_combo_set_selected(handle_t o, int i)","int","-1 clears."],
+["k_create_colorpicker(handle_t p, int x, int y)","handle","Swatch grid popup. Change → EV_CLICK, a = ARGB."],
+["k_colorpicker_get(handle_t o)","int","ARGB. Never 0 for a real picker (opaque black is 0xFF000000)."],
+["k_colorpicker_set(handle_t o, int argb)","int",""],
+["k_numeric_create(handle_t p, int x, int y, int w, int min, int max, int inc, int value)","handle","Spinner with editable field. Change → EV_CLICK, a = value."],
+["k_numeric_set(handle_t o, int v) / k_numeric_get(handle_t o)","int","Clamped set; get."],
+["k_calendar_create(handle_t parent, int x, int y)","handle","Month grid. Click/arrows/PgUp/PgDn. Change → EV_CLICK, a = yyyymmdd."],
+["k_calendar_get(handle_t o)","int","Date as yyyymmdd, 0 if not a calendar."],
+["k_calendar_set(handle_t o, int y, int m, int d)","int","0 ok, -3 bad date."]]},
+{g:"Lists, tabs, grid", id:"api-lists", calls:[
+["k_create_listbox(handle_t p, int x, int y, int w, int h)","handle","Scrollable single column by default; add columns for details view. Select → EV_CLICK a=index; double-click → EV_DBLCLICK."],
+["k_list_add_item(handle_t o, const char *text)","int","Single-cell row. Returns index."],
+["k_list_add_row(handle_t o, const char *buf, int len)","int","Multi-cell row: NUL-separated cells, one per column."],
+["k_list_add_column(handle_t o, const char *title, int w)","int","Add a details column. Returns index."],
+["k_list_remove_item(handle_t o, int i) / k_list_clear(handle_t o)","int",""],
+["k_list_get_selected(handle_t o)","int","Row, -1 = none."],
+["k_list_select(handle_t o, int i)","int","Select programmatically."],
+["k_list_hit_test(handle_t o, int x, int y)","int","Row at listbox-local coords (for right-click menus). -1 = none."],
+["k_create_tabs(handle_t p, int x, int y, int w, int h)","handle","Select → EV_CLICK, a = index."],
+["k_tab_add_page(handle_t o, const char *title)","handle","Returns the page handle — pass it as parent to fill the page."],
+["k_tab_select(handle_t o, int i) / k_tab_get_selected(handle_t o)","int",""],
+["k_grid_create(handle_t p, int x, int y, int w, int h)","handle","Editable grid. Select → EV_CLICK (a=row, b=col); header click sorts; double-click edits."],
+["k_grid_add_column(handle_t o, const char *title, int w)","int","Returns index."],
+["k_grid_add_row(handle_t o, const char *buf, int len)","int","NUL-separated cells. Returns row."],
+["k_grid_clear(handle_t o)","int",""],
+["k_grid_get_selected(handle_t o)","int","Row, -1 = none."],
+["k_grid_select(handle_t o, int r)","int",""],
+["k_grid_set_cell(handle_t o, int r, int c, const char *t)","int",""],
+["k_grid_get_cell(handle_t o, int r, int c, char *buf, int max)","int","Length, -1 if out of range/too small."],
+["k_grid_sort(handle_t o, int c, int desc)","int","Numeric-aware sort."]]},
+{g:"Menus, dialogs, bars", id:"api-menus", calls:[
+["k_menubar_create(handle_t win)","handle","Top menu strip."],
+["k_menu_add_item(handle_t bar, const char *page, const char *text)","handle","Creates the page if missing. \"-\" adds a separator. Click → EV_CLICK."],
+["k_popup_create(void)","handle","Standalone context popup (no parent)."],
+["k_popup_add_item(handle_t o, const char *text)","handle","\"-\" adds a separator. Click → EV_CLICK."],
+["k_popup_show_at(handle_t o, int x, int y)","int","Screen coords (bridge clamps to screen). Combine with k_widget_screen_pos + right-button mouse events."],
+["k_msgbox(const char *title, const char *text, const char *buttons, int len)","handle","Non-blocking. Buttons are NUL-separated. Result: EV_CLICK on the dialog, a = button index."],
+["k_statusbar_create(handle_t p, int x, int y, int w)","handle","Bottom bar."],
+["k_status_add_panel(handle_t o, const char *text, int w)","int","Returns panel index."],
+["k_status_set_text(handle_t o, int i, const char *text)","int",""],
+["k_toolbar_create(handle_t p, int x, int y, int w)","handle","Button strip."],
+["k_toolbar_add_button(handle_t o, const char *text)","handle","Click → EV_CLICK."],
+["k_toolbar_add_separator(handle_t o)","int",""]]},
+{g:"Canvas", id:"api-canvas", calls:[
+["k_create_canvas(handle_t p, int x, int y, int w, int h)","handle","Raw pixel surface (≤2048 each side)."],
+["k_draw_pixels(handle_t cv, int x, int y, int w, int h, const void *buf, int len)","int","Blit w*h ARGB pixels; len must equal w*h*4. Redraws are cheap — animate per frame."],
+["k_fill_rect(handle_t win, int x, int y, int w, int h, unsigned argb)","int","Legacy: adds one Panel per call. Fine for static rects, not animation — use a canvas instead."]]},
+{g:"Tree", id:"api-tree", calls:[
+["k_tree_create(handle_t p, int x, int y, int w, int h)","handle","Select → EV_CLICK (a = item handle); activate → EV_DBLCLICK."],
+["k_tree_add_root(handle_t o, const char *text, const char *icon)","handle","icon is a .png path or \"\". Returns the node handle."],
+["k_tree_add_child(handle_t o, handle_t item, const char *text, const char *icon)","handle","Same for children."],
+["k_tree_clear(handle_t o)","int",""],
+["k_tree_selected_item(handle_t o)","handle","Selected node handle, 0 = none."],
+["k_tree_set_expanded(handle_t o, handle_t item, int v)","int","Programmatic expand/collapse."]]},
+{g:"Filesystem", id:"api-files", calls:[
+["k_read_file(const char *path, char *buf, int max)","int","Bytes read (≤1 MiB/call), negative on failure. Chunk big files."],
+["k_write_file(const char *path, const char *buf, int len)","int","0 ok. Overwrites."],
+["k_list_dir(const char *path, char *buf, int max)","int","Entry count; buf holds NUL-separated names. -1 = missing/not-a-dir/too small."],
+["k_stat_file(const char *path, FileStat *out)","int","Fills {is_dir, size_lo, size_hi}. 0 ok."],
+["k_make_dir(const char *path)","int","Creates parents too. Idempotent."],
+["k_delete_path(const char *path)","int","File or directory, recursive. No recycle bin — confirm first."],
+["k_rename_path(const char *oldp, const char *newp)","int","Fails if the destination exists."],
+["k_list_drives(char *buf, int max)","int","Mount points, NUL-separated."],
+["k_drive_stat(const char *mount, DriveStat *out)","int","Fills {total_lo, total_hi, free_lo, free_hi}. 0 ok."],
+["k_filedialog_open(const char *title, const char *initial, const char *filter, int save)","int","Non-blocking open/save dialog. Result: EV_CLICK (a=1 chosen, 0 cancelled); path via k_get_text on the dialog."],
+["k_open_file(const char *path)","int","Spawns .elf, else opens with the registered C# app."]]},
+{g:"System & desktop", id:"api-system", calls:[
+["k_launch_app(const char *name, const char *arg)","int","explorer · terminal · editor · taskmgr · registry · settings · imageviewer (+path)."],
+["k_notify_send(const char *title, const char *text)","int","Toast + history (tray bell → center)."],
+["k_desktop_count(void)","int","Virtual desktops (4)."],
+["k_desktop_current(void)","int","Current index."],
+["k_desktop_switch(int i)","int","Switch (new windows open here)."],
+["k_window_set_desktop(handle_t win, int i)","int","Move a normal window; pinned/system windows refuse."]]}
+];
+(function(){
+  const host = document.getElementById('apiTables');
+  let total = 0;
+  API.forEach(function(sec){
+    total += sec.calls.length;
+    const h = document.createElement('h3');
+    h.id = sec.id; h.textContent = sec.g;
+    host.appendChild(h);
+    const t = document.createElement('table');
+    const tb = document.createElement('tbody');
+    sec.calls.forEach(function(c){
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-sig', (c[0]+' '+c[2]).toLowerCase());
+      const a = document.createElement('td'); a.className='sig';
+      const code = document.createElement('code'); code.textContent = c[0]; a.appendChild(code);
+      const b = document.createElement('td'); b.className='ret'; b.textContent = c[1];
+      const d = document.createElement('td'); d.innerHTML = c[2];
+      tr.appendChild(a); tr.appendChild(b); tr.appendChild(d);
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); host.appendChild(t);
+  });
+  document.getElementById('apiCount').textContent = total + ' calls · KAPI v9';
+  const box = document.getElementById('apiSearch');
+  box.addEventListener('input', function(){
+    const q = box.value.toLowerCase().trim();
+    let shown = 0;
+    host.querySelectorAll('tr[data-sig]').forEach(function(tr){
+      const hit = !q || tr.getAttribute('data-sig').indexOf(q) >= 0;
+      tr.style.display = hit ? '' : 'none';
+      if (hit) shown++;
+    });
+    document.getElementById('apiCount').textContent = shown + ' / ' + total + ' calls';
+    host.querySelectorAll('h3').forEach(function(h){
+      let el = h.nextElementSibling, any = false;
+      if (el && el.tagName === 'TABLE') {
+        el.querySelectorAll('tr[data-sig]').forEach(function(tr){ if (tr.style.display !== 'none') any = true; });
+        h.style.display = any ? '' : 'none';
+        el.style.display = any ? '' : 'none';
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

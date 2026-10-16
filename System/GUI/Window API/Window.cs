@@ -23,6 +23,9 @@ public class Window : Component
     public bool canMove = true;
     public bool showInTaskbar = true;
 
+    /// <summary>Virtual desktop index. -1 pins the window to all desktops (taskbar, menus).</summary>
+    public int desktop;
+
 
 
 
@@ -35,7 +38,7 @@ public class Window : Component
     private Rectangle previewBounds;
     private int lastTitlePress;
 
-    private Component? focusedComponent;
+    protected Component? focusedComponent;
 
     public Png? Icon;
     private StackPanel titlebar;
@@ -362,7 +365,8 @@ public class Window : Component
         {
             dragging = false;
             WindowManager.ClearPreviewRect();
-            Move(previewBounds.X, previewBounds.Y);
+            if (!TrySnapToEdge(previewBounds))
+                Move(previewBounds.X, previewBounds.Y);
         }
         else if (mouse.left == MouseEvents.None && dragging)
         {
@@ -375,6 +379,54 @@ public class Window : Component
             previewBounds = new Rectangle(mouseX - offset.X, mouseY - offset.Y, Width, Height);
             WindowManager.ShowPreviewRect(previewBounds);
         }
+    }
+
+    private static Rectangle WorkArea()
+    {
+        int h = Explorer.taskbar != null ? Explorer.taskbar.Y : Global.screenHeight;
+        return new Rectangle(0, 0, Global.screenWidth, h);
+    }
+
+    /// <summary>Snap a dropped window to a screen edge. True when snapped.</summary>
+    private bool TrySnapToEdge(Rectangle dropped)
+    {
+        if (!canResize && !canMaximize) return false;
+        const int zone = 8;
+        Rectangle work = WorkArea();
+        if (dropped.Y <= work.Y + zone && canMaximize)
+        {
+            WindowManager.ToggleMaximize(this);
+            return true;
+        }
+        if (dropped.X <= work.X + zone && canResize)
+        {
+            ApplyBounds(new Rectangle(work.X, work.Y, work.Width / 2, work.Height));
+            return true;
+        }
+        if (dropped.X + dropped.Width >= work.Right - zone && canResize)
+        {
+            ApplyBounds(new Rectangle(work.X + work.Width / 2, work.Y, work.Width - work.Width / 2, work.Height));
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Snap left half (0), right half (1), or maximize (2).</summary>
+    public void SnapTo(int mode)
+    {
+        if (isMinimized) return;
+        if (mode == 2)
+        {
+            if (!isMaximized && canMaximize) WindowManager.ToggleMaximize(this);
+            return;
+        }
+        if (!canResize) return;
+        if (isMaximized) ToggleMaximized(restoreBounds);
+        Rectangle work = WorkArea();
+        if (mode == 0)
+            ApplyBounds(new Rectangle(work.X, work.Y, work.Width / 2, work.Height));
+        else
+            ApplyBounds(new Rectangle(work.X + work.Width / 2, work.Y, work.Width - work.Width / 2, work.Height));
     }
 
     private void ResizeWindow(MouseState mouseState, int mouseX, int mouseY)

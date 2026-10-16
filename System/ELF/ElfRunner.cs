@@ -122,6 +122,13 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, int, int, int, int> ListHitTest;                      // (pid, handle, x, y) -> index
         public delegate* unmanaged<int, byte*, int, int> ListDrives;                          // (pid, buf, max) -> count
         public delegate* unmanaged<int, byte*, DriveStat*, int> DriveStat;                    // (pid, mount, out) -> 0
+        public delegate* unmanaged<int, byte*, byte*, int> LaunchApp;                         // (pid, name, arg) -> 0
+        public delegate* unmanaged<int, byte*, int> OpenFile;                                 // (pid, path) -> 0
+        public delegate* unmanaged<int, byte*, byte*, int> NotifySend;                        // (pid, title, text) -> 0
+        public delegate* unmanaged<int, int> DesktopCount;                                    // (pid) -> count
+        public delegate* unmanaged<int, int> DesktopCurrent;                                  // (pid) -> index
+        public delegate* unmanaged<int, int, int> DesktopSwitch;                              // (pid, index) -> 0
+        public delegate* unmanaged<int, int, int, int> WindowSetDesktop;                      // (pid, win, index) -> 0
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -143,7 +150,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 8;
+        public const int ApiVersion = 9;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -400,6 +407,13 @@ namespace Windose.System.Elf
             api.ListHitTest = &ApiListHitTest;
             api.ListDrives = &ApiListDrives;
             api.DriveStat = &ApiDriveStat;
+            api.LaunchApp = &ApiLaunchApp;
+            api.OpenFile = &ApiOpenFile;
+            api.NotifySend = &ApiNotifySend;
+            api.DesktopCount = &ApiDesktopCount;
+            api.DesktopCurrent = &ApiDesktopCurrent;
+            api.DesktopSwitch = &ApiDesktopSwitch;
+            api.WindowSetDesktop = &ApiWindowSetDesktop;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -2049,6 +2063,91 @@ namespace Windose.System.Elf
                 outStat->FreeLo = (int)(uint)free;
                 outStat->FreeHi = (int)(uint)(free >> 32);
                 return 0;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiLaunchApp(int pid, byte* name, byte* arg)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                return Host.LaunchApp(CStr(name), CStr(arg)) ? 0 : -3;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiOpenFile(int pid, byte* path)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                return Host.OpenFile(CStr(path)) ? 0 : -3;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiNotifySend(int pid, byte* title, byte* text)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                Host.NotifySend(CStr(title), CStr(text));
+                return 0;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiDesktopCount(int pid)
+        {
+            try
+            {
+                if (Live(pid) == null) return KKilled;
+                return Host != null ? Host.DesktopCount() : -1;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiDesktopCurrent(int pid)
+        {
+            try
+            {
+                if (Live(pid) == null) return KKilled;
+                return Host != null ? Host.DesktopCurrent() : -1;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiDesktopSwitch(int pid, int index)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                return Host.DesktopSwitch(index) ? 0 : -3;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWindowSetDesktop(int pid, int handle, int index)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                object o = p.Objs.Get(handle);
+                if (o == null) return -1;
+                return Host.WindowSetDesktop(o, index) ? 0 : -3;
             }
             catch { return -2; }
         }

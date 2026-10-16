@@ -34,9 +34,13 @@ public sealed class UacCommand : InteractiveShellCommand
     private void Create(CommandContext context, string[] args)
     {
         UserAccount ?user = UserAccount.CreateAccount(args[0], args[1], Session.ParsePrivilege(args[2]));
+        if (user == null)
+        {
+            context.WriteLine("Could not create user (profile already exists).");
+            return;
+        }
 
         context.WriteLine($"Created user: {user.username} with privilege level: {user.privilege}");
-        context.WriteLine($"Password: {user.password}");
     }
 
     private void Login(CommandContext context, string[] args)

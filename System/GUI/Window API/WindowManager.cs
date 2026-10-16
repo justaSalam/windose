@@ -18,8 +18,8 @@ public partial class WindowManager : SingleThreadedProcess
 
     private static readonly object messageQueueLock = new object();
 
-    private readonly HashSet<Window> failedWindows = new HashSet<Window>();
-    private bool fullComposePending = true;
+    private static readonly HashSet<Window> failedWindows = new HashSet<Window>();
+    private static bool fullComposePending = true;
 
     private readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
 
@@ -31,8 +31,8 @@ public partial class WindowManager : SingleThreadedProcess
 
     public static bool DrawingDebugEnabled => drawingDebugEnabled;
 
-    private Window? capturedWindow;
-    private Component? capturedComponent;
+    private static Window? capturedWindow;
+    private static Component? capturedComponent;
     public static Window? focusedWindow;
     public static Window? lastFocusedWindow;
 
@@ -106,8 +106,49 @@ public partial class WindowManager : SingleThreadedProcess
     private static void RefreshTaskbarButtons()
     {
         foreach (KeyValuePair<Window, Button> entry in taskbarButtons)
-            entry.Value.SetSelected(entry.Key == focusedWindow && entry.Key.Visible && !entry.Key.isMinimized);
+        {
+            bool onDesktop = entry.Key.desktop < 0 || entry.Key.desktop == CurrentDesktop;
+            entry.Value.Visible = onDesktop;
+            entry.Value.SetSelected(onDesktop && entry.Key == focusedWindow && entry.Key.Visible && !entry.Key.isMinimized);
+        }
     }
+
+    internal static void FocusWindowImmediate(Window window)
+    {
+        if (window == null) return;
+        SetFocusedWindow(window);
+    }
+
+    internal static Window[] WindowsSnapshot()
+    {
+        lock (windows) return windows.ToArray();
+    }
+
+    public const int DesktopCount = 4;
+    public static int CurrentDesktop { get; private set; }
+
+    public static bool IsOnCurrentDesktop(Window window)
+    {
+        return window == null || window.desktop < 0 || window.desktop == CurrentDesktop;
+    }
+
+    public static void SwitchDesktop(int index)
+    {
+        if (index < 0 || index >= DesktopCount || index == CurrentDesktop) return;
+        lock (Component.components)
+        {
+            CurrentDesktop = index;
+            capturedWindow = null;
+            capturedComponent = null;
+            fullComposePending = true;
+            Invalidate(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
+            FocusTopVisibleWindow(null);
+            RefreshTaskbarButtons();
+        }
+    }
+
+    public static void NextDesktop() => SwitchDesktop((CurrentDesktop + 1) % DesktopCount);
+    public static void PrevDesktop() => SwitchDesktop((CurrentDesktop + DesktopCount - 1) % DesktopCount);
 
     public static void ClearFocusedWindow()
     {
@@ -120,6 +161,10 @@ public partial class WindowManager : SingleThreadedProcess
 
     public static void SwapFocusedWindow()
     {
+        if (lastFocusedWindow != null && !IsOnCurrentDesktop(lastFocusedWindow))
+        {
+            lastFocusedWindow = null;
+        }
         if (focusedWindow == lastFocusedWindow || lastFocusedWindow == null)
         {
             return;
@@ -173,6 +218,8 @@ public partial class WindowManager : SingleThreadedProcess
             {
                 Component component = components[componentIndex];
                 if (component == null || !component.Visible || !component.isRoot) continue;
+
+                if (component is Window rooto && !IsOnCurrentDesktop(rooto)) continue;
 
                 Rectangle componentBounds = component.AbsoluteRectangle;
                 Rectangle clipped = Rectangle.Intersect(componentBounds, region);
@@ -241,6 +288,7 @@ public partial class WindowManager : SingleThreadedProcess
         {
             Component component = components[i];
             if (component == null || !component.Visible || !component.isRoot || !component.HasDirtyTree()) continue;
+            if (component is Window hidden && !IsOnCurrentDesktop(hidden)) continue;
 
             Rectangle bounds = Rectangle.Intersect(component.AbsoluteRectangle, screenBounds);
             if (bounds.Width <= 0 || bounds.Height <= 0 || !bounds.IntersectsWith(region)) continue;
@@ -303,6 +351,7 @@ public partial class WindowManager : SingleThreadedProcess
             }
             lastOpenBounds = window.bounds;
 
+            window.desktop = window.showInTaskbar ? CurrentDesktop : -1;
             window.zIndex = nextZIndex;
             window.Start();
             windows.Add(window);
@@ -382,6 +431,58 @@ public partial class WindowManager : SingleThreadedProcess
         }
     }
 
+    public static void SnapFocused(int mode)
+    {
+        if (focusedWindow != null && !failedWindows.Contains(focusedWindow))
+            focusedWindow.SnapTo(mode);
+    }
+
+    private static readonly HashSet<Window> showDesktopHidden = new HashSet<Window>();
+
+    /// <summary>Show-desktop toggle: minimizes everything, pressing again restores.</summary>
+    public static void ToggleShowDesktop()
+    {
+        lock (windows)
+        {
+            bool anyVisible = false;
+            for (int i = 0; i < windows.Count; i++)
+            {
+                Window window = windows[i];
+                if (window.showInTaskbar && window.Visible && !window.isMinimized && IsOnCurrentDesktop(window))
+                {
+                    anyVisible = true;
+                    break;
+                }
+            }
+
+            if (anyVisible)
+            {
+                showDesktopHidden.Clear();
+                Window[] snapshot = windows.ToArray();
+                for (int i = 0; i < snapshot.Length; i++)
+                {
+                    Window window = snapshot[i];
+                    if (window.showInTaskbar && window.Visible && !window.isMinimized && IsOnCurrentDesktop(window))
+                    {
+                        showDesktopHidden.Add(window);
+                        MinimizeImmediate(window);
+                    }
+                }
+            }
+            else
+            {
+                Window[] snapshot = new Window[showDesktopHidden.Count];
+                showDesktopHidden.CopyTo(snapshot);
+                showDesktopHidden.Clear();
+                for (int i = 0; i < snapshot.Length; i++)
+                {
+                    if (windows.Contains(snapshot[i]))
+                        Activate(snapshot[i]);
+                }
+            }
+        }
+    }
+
     internal static void MinimizeImmediate(Window window)
     {
         if (window == null || !window.canMinimize || window.isMinimized) return;
@@ -457,6 +558,7 @@ public partial class WindowManager : SingleThreadedProcess
         {
             Window candidate = windows[i];
             if (candidate == excludedWindow || !candidate.Visible) continue;
+            if (!IsOnCurrentDesktop(candidate)) continue;
             if (nextWindow == null || candidate.zIndex > nextWindow.zIndex)
                 nextWindow = candidate;
         }
@@ -587,6 +689,7 @@ public partial class WindowManager : SingleThreadedProcess
 
             windows.Remove(window);
             failedWindows.Remove(window);
+            showDesktopHidden.Remove(window);
 
             FocusTopVisibleWindow(window);
             RefreshTaskbarButtons();

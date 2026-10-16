@@ -9,7 +9,7 @@
 // If a program crashes on its first kernel call, switch to ms_abi (must match the C# side's calling
 // convention) and rebuild libc + programs.
 #define KABI __attribute__((sysv_abi))
-#define KAPI_VERSION 8
+#define KAPI_VERSION 9
 #define K_KILLED (-100)          // returned by every call after the program was killed; the wrappers exit(137)
 
 typedef int handle_t;            // opaque; 0 = none/failed; never do arithmetic on it
@@ -137,6 +137,13 @@ typedef struct KernelApi {
     int      (KABI *list_hit_test)(int pid, handle_t obj, int x, int y);
     int      (KABI *list_drives)(int pid, char *buf, int max);
     int      (KABI *drive_stat)(int pid, const char *mount, DriveStat *out);
+    int      (KABI *launch_app)(int pid, const char *name, const char *arg);
+    int      (KABI *open_file)(int pid, const char *path);
+    int      (KABI *notify_send)(int pid, const char *title, const char *text);
+    int      (KABI *desktop_count)(int pid);
+    int      (KABI *desktop_current)(int pid);
+    int      (KABI *desktop_switch)(int pid, int index);
+    int      (KABI *window_set_desktop)(int pid, handle_t win, int index);
 } KernelApi;
 
 extern KernelApi *__k;
@@ -247,6 +254,13 @@ static inline int      k_widget_screen_pos(handle_t obj) { return __kchk(__k->wi
 static inline int      k_list_hit_test(handle_t obj, int x, int y) { return __kchk(__k->list_hit_test(__k->pid, obj, x, y)); }
 static inline int      k_list_drives(char *buf, int max) { return __kchk(__k->list_drives(__k->pid, buf, max)); }
 static inline int      k_drive_stat(const char *mount, DriveStat *out) { return __kchk(__k->drive_stat(__k->pid, mount, out)); }
+static inline int      k_launch_app(const char *name, const char *arg) { return __kchk(__k->launch_app(__k->pid, name, arg)); }
+static inline int      k_open_file(const char *path) { return __kchk(__k->open_file(__k->pid, path)); }
+static inline int      k_notify_send(const char *title, const char *text) { return __kchk(__k->notify_send(__k->pid, title, text)); }
+static inline int      k_desktop_count(void) { return __kchk(__k->desktop_count(__k->pid)); }
+static inline int      k_desktop_current(void) { return __kchk(__k->desktop_current(__k->pid)); }
+static inline int      k_desktop_switch(int i) { return __kchk(__k->desktop_switch(__k->pid, i)); }
+static inline int      k_window_set_desktop(handle_t win, int i) { return __kchk(__k->window_set_desktop(__k->pid, win, i)); }
 static inline int      k_pid(void)                                  { return __k->pid; }
 
 #endif

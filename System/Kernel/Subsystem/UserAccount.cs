@@ -33,12 +33,7 @@ namespace Windose.System.Kernel.Subsystem
 
         public bool VerifyPassword(string password)
         {
-            if(SHA256.ComputeString(password) != password)
-            {
-                //Display message
-                return false;
-            }
-            return true;
+            return SHA256.ComputeString(password) == this.password;
         }
 
         public void ChangePassword(string newPassword)
@@ -46,7 +41,8 @@ namespace Windose.System.Kernel.Subsystem
 
             string[] lines = File.ReadAllLines(Session.accountsFilePath);
 
-            
+            string hash = SHA256.ComputeString(newPassword);
+            password = hash;
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -58,7 +54,7 @@ namespace Windose.System.Kernel.Subsystem
                 if (args[0] != username)
                     continue;
 
-                lines[i] = $"{username}:{SHA256.ComputeString(newPassword)}:{privilege}";
+                lines[i] = $"{username}:{hash}:{privilege}";
                 break;
             }
 

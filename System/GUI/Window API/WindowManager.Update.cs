@@ -16,6 +16,16 @@ public partial class WindowManager
         ComponentZSort();
         UpdateComponents();
 
+        if (LockManager.IsLocked)
+        {
+            LockManager.RouteLockedInput(mx, my, mouseState);
+            DispatchMessages();
+            ComposeDirtyRegions();
+            DrawPreviewRect();
+            PerformanceMetrics.AddWindowManager(updateStartedAt);
+            return;
+        }
+
         if (DragDropManager.IsDragging)
         {
             capturedWindow = null;
@@ -108,6 +118,7 @@ public partial class WindowManager
                 Window win = windows[i];
 
                 if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
+                if (win.desktop >= 0 && win.desktop != CurrentDesktop) continue;
                 if (!win.HitTest(mx, my)) continue;
 
                 hitWindow = true;
@@ -172,6 +183,7 @@ public partial class WindowManager
             {
                 Window win = windows[i];
                 if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
+                if (win.desktop >= 0 && win.desktop != CurrentDesktop) continue;
                 if (!win.HitTest(x, y)) continue;
                 Component deepest = win.GetChildAt(x, y) ?? (Component)win;
                 for (Component c = deepest; c != null; c = c.Parent)
@@ -244,13 +256,17 @@ public partial class WindowManager
                 return;
             }
 
-            if (key.Key == Key.Escape && MenuPopup.HasOpenMenus)
+            if (key.Key == Key.Escape)
             {
-                MenuPopup.HideAll();
-                return;
+                if (TaskSwitcher.Cancel()) return;
+                if (MenuPopup.HasOpenMenus)
+                {
+                    MenuPopup.HideAll();
+                    return;
+                }
             }
 
-            HotkeyManager.HandleKeyEvent();
+            if (HotkeyManager.HandleKeyEvent(key)) return;
 
             if (Explorer.desktop != null && Explorer.desktop.ConsumeKeyboardInput &&
                 (focusedWindow == null || Explorer.desktop.IsRenaming))

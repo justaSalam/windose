@@ -46,6 +46,21 @@ namespace Windose.System.Elf
         /// <summary>Move/rename a file or directory. False on failure (e.g. destination exists).</summary>
         bool RenamePath(string oldPath, string newPath);
 
+        /// <summary>Launches a built-in app by name. False for unknown names.</summary>
+        bool LaunchApp(string name, string arg);
+
+        /// <summary>Opens a file with its default app (.elf programs are spawned). False on failure.</summary>
+        bool OpenFile(string path);
+
+        /// <summary>Posts a system notification (toast + history).</summary>
+        void NotifySend(string title, string text);
+
+        int DesktopCount();
+        int DesktopCurrent();
+        bool DesktopSwitch(int index);
+        /// <summary>Moves a normal window to a desktop. False for pinned/system windows.</summary>
+        bool WindowSetDesktop(object obj, int index);
+
         object CreateCheckbox(object parent, int x, int y, string text);
         bool SetChecked(object obj, bool value);
         /// <summary>1 checked, 0 unchecked, -1 if not a checkbox/radio.</summary>
