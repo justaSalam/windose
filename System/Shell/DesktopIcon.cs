@@ -19,6 +19,9 @@ namespace Windose.System.Shell
         public FileEntry fileEntry;
         public Image icon;
 
+        /// <summary>System icons (Recycle Bin) can't be renamed, deleted or saved to layout.</summary>
+        public bool isSystemIcon;
+
         public Action leftMousePress;
         public Action leftMouseHold;
         public Action leftMouseRelease;

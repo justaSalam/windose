@@ -25,7 +25,7 @@ static int sbObjs, sbSel;
 static handle_t tBack, tForward, tUp, tCut, tCopy, tPaste, tDelete, tRefresh;
 static handle_t mClose, mCut, mCopy, mPaste, mDelete, mRename;
 static handle_t mRefresh, mSortName, mSortSize, mUp, mRoot, mAbout;
-static handle_t vpPopup, vpRefresh, vpNewFile, vpNewFolder;
+static handle_t vpPopup, vpRefresh, vpNewFile, vpNewFolder, vpEmpty;
 static handle_t itPopup, itOpen, itRename, itDelete;
 
 static char cwd[MAXPATH];
@@ -277,6 +277,14 @@ static void rebuild_tree(void)
     }
 }
 
+static int is_trash_junk(const char *dir, const char *name)
+{
+    int n = (int)strlen(name);
+    if (n > 9 && !strcmp(name + n - 9, ".origpath")) return 1;
+    if (!strcmp(name, ".trash") && !strcmp(dir, "/mnt")) return 1;
+    return 0;
+}
+
 // ---------------- listing ----------------
 
 static void refresh(void)
@@ -299,18 +307,26 @@ static void refresh(void)
         entries = malloc((size_t)n * sizeof(Entry));
         if (!entries) { set_objs("out of memory"); return; }
         off = 0;
-        for (i = 0; i < n; i++) {
-            strncpy(entries[i].name, listbuf + off, sizeof entries[i].name - 1);
-            entries[i].name[sizeof entries[i].name - 1] = 0;
-            off += (int)strlen(listbuf + off) + 1;
-            join_path(cwd, entries[i].name, path);
-            if (k_stat_file(path, &st) == 0) {
-                entries[i].is_dir = st.is_dir;
-                entries[i].size = ((long)(unsigned)st.size_hi << 32) | (unsigned)st.size_lo;
-            } else {
-                entries[i].is_dir = 0;
-                entries[i].size = 0;
+        {
+            int k = 0;
+            for (i = 0; i < n; i++) {
+                char *nm = listbuf + off;
+                int nl = (int)strlen(nm);
+                off += nl + 1;
+                if (is_trash_junk(cwd, nm)) continue;
+                strncpy(entries[k].name, nm, sizeof entries[k].name - 1);
+                entries[k].name[sizeof entries[k].name - 1] = 0;
+                join_path(cwd, entries[k].name, path);
+                if (k_stat_file(path, &st) == 0) {
+                    entries[k].is_dir = st.is_dir;
+                    entries[k].size = ((long)(unsigned)st.size_hi << 32) | (unsigned)st.size_lo;
+                } else {
+                    entries[k].is_dir = 0;
+                    entries[k].size = 0;
+                }
+                k++;
             }
+            n = k;
         }
         nentries = n;
         qsort(entries, (size_t)n, sizeof(Entry), cmp_entry);
@@ -377,6 +393,11 @@ static void open_selected(void)
     char path[MAXPATH], s[320];
     static const char noargs = 0;
     if (selected < 0 || selected >= nentries) return;
+    if (!strcmp(cwd, "/mnt/.trash")) {
+        if (k_trash_restore(entries[selected].name) != 0) set_sel("restore failed");
+        else refresh();
+        return;
+    }
     join_path(cwd, entries[selected].name, path);
     if (entries[selected].is_dir) { navigate_push(path); return; }
     if (ends_elf(entries[selected].name)) {
@@ -604,7 +625,7 @@ static void on_key(char ch)
             inputMode = 0;
             if (selected < 0 || selected >= nentries) { refresh(); return; }
             join_path(cwd, entries[selected].name, path);
-            if (k_delete_path(path) != 0) set_sel("delete failed");
+            if (k_trash_delete(path) != 0) set_sel("delete failed");
             refresh();
         } else if (ch == 'n' || ch == 'N' || ch == 27) {
             inputMode = 0;
@@ -694,6 +715,8 @@ int main(int argc, char **argv)
     k_popup_add_item(vp, "-");
     vpNewFile = k_popup_add_item(vp, "New File");
     vpNewFolder = k_popup_add_item(vp, "New Folder");
+    k_popup_add_item(vp, "-");
+    vpEmpty = k_popup_add_item(vp, "Empty Recycle Bin");
     vpPopup = vp;
 
     it = k_popup_create();
@@ -842,6 +865,10 @@ int main(int argc, char **argv)
             }
             else if (e.handle == vpNewFolder) start_input(2, NULL, "New folder: ");
             else if (e.handle == vpNewFile) start_input(5, NULL, "New file: ");
+            else if (e.handle == vpEmpty) {
+                k_trash_empty();
+                refresh();
+            }
             else if (e.handle == itOpen) open_selected();
             else if (e.handle == tree) {
                 TNode *tn = tnode_find(e.a);

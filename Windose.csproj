@@ -261,6 +261,7 @@
     <EmbeddedResource Include=".\System\ELF\programs\bin\hello.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\canvas.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\explorer.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\calc.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\search.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\run.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\pager.elf" />

@@ -19,6 +19,10 @@ public class Desktop : Component
 
     private MenuPopup contextMenu;
     private MenuPopup iconContextMenu;
+    private MenuItem iconEmptyItem;
+    private MenuItem iconRenameItem;
+    private MenuItem iconDeleteItem;
+    private static bool trashSubscribed;
     private DesktopIcon? contextIcon;
     private DesktopIcon? activeDraggedIcon;
     private DesktopIcon? lastClickedIcon;
@@ -79,6 +83,12 @@ public class Desktop : Component
 
         CreateDesktopContextMenu();
         LoadLayout();
+        EnsureTrashIcon();
+        if (!trashSubscribed)
+        {
+            trashSubscribed = true;
+            TrashManager.Changed += RefreshTrashIcon;
+        }
     }
     //TODO Load last wallpaper from a config file
     public static Image wallpaper = new Png("/mnt/System/Wallpapers/Lithium.png");
@@ -128,6 +138,48 @@ public class Desktop : Component
         buffer.DrawArrayClipped(scaledWallpaper.GetBuffer(), scaledWallpaper.Width, 0, 0, 0, 0, Width, Height);
     }
 
+    private DesktopIcon trashIcon;
+
+    private void EnsureTrashIcon()
+    {
+        trashIcon = FindIconByPath(TrashManager.TrashDir);
+        if (trashIcon == null)
+        {
+            trashIcon = new DesktopIcon(IconGridOffsetX, IconGridOffsetY,
+                new FileEntry("Recycle Bin", FileType.Directory, TrashManager.TrashDir, 0))
+            {
+                isSystemIcon = true,
+            };
+            AddIcon(trashIcon);
+        }
+        else
+        {
+            trashIcon.isSystemIcon = true;
+        }
+        RefreshTrashIcon();
+    }
+
+    private void RefreshTrashIcon()
+    {
+        if (trashIcon == null) return;
+        try
+        {
+            trashIcon.icon = new Png(TrashManager.IsEmpty()
+                ? "/mnt/System/Icons/recycle_bin_empty.png"
+                : "/mnt/System/Icons/recycle_bin_full.png");
+        }
+        catch { }
+        trashIcon.MarkDirty();
+    }
+
+    private void ConfirmEmptyTrash()
+    {
+        MessageBox.Show("Empty the Recycle Bin?", "Recycle Bin", delegate (int index)
+        {
+            if (index == 0) TrashManager.Empty();
+        }, "Empty", "Cancel");
+    }
+
     private void CreateDesktopContextMenu()
     {
         contextMenu.AddItem("Refresh", RefreshDesktopIcons);
@@ -164,10 +216,12 @@ public class Desktop : Component
 
         iconContextMenu.AddItem("Open", OpenContextIcon);
         iconContextMenu.AddSeparator();
-        iconContextMenu.AddItem("Rename", BeginContextRename);
-        iconContextMenu.AddItem("Delete", DeleteContextIcon);
+        iconRenameItem = iconContextMenu.AddItem("Rename", BeginContextRename);
+        iconDeleteItem = iconContextMenu.AddItem("Delete", DeleteContextIcon);
         iconContextMenu.AddSeparator();
         iconContextMenu.AddItem("Properties", ShowContextProperties);
+        iconContextMenu.AddSeparator();
+        iconEmptyItem = iconContextMenu.AddItem("Empty Recycle Bin", ConfirmEmptyTrash);
     }
 
     private void DesktopNewDirectory()
@@ -197,6 +251,7 @@ public class Desktop : Component
 
         foreach (DesktopIcon icon in Icons)
         {
+            if (icon.isSystemIcon) continue;
             string path = icon.fileEntry.AbsoluteLocation;
             lines.Add($"{path}|{icon.X}|{icon.Y}");
         }
@@ -555,18 +610,16 @@ public class Desktop : Component
     private void DeleteIcon(DesktopIcon icon)
     {
         if (icon == null) return;
+        if (icon.isSystemIcon)
+        {
+            ConfirmEmptyTrash();
+            return;
+        }
 
         string path = icon.fileEntry.AbsoluteLocation;
-        try
+        if (!TrashManager.MoveToTrash(path))
         {
-            if (Directory.Exists(path))
-                Directory.Delete(path, true);
-            else if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch (Exception ex)
-        {
-            SystemLogger.WriteLine("Desktop", $"Failed to delete {path}: {ex.Message}", ConsoleMessageType.Error);
+            SystemLogger.WriteLine("Desktop", $"Failed to delete {path}", ConsoleMessageType.Error);
             return;
         }
 
@@ -594,6 +647,10 @@ public class Desktop : Component
     private void ShowIconContextMenu(int mouseX, int mouseY, DesktopIcon icon)
     {
         contextIcon = icon;
+        bool system = icon != null && icon.isSystemIcon;
+        if (iconRenameItem != null) iconRenameItem.Visible = !system;
+        if (iconDeleteItem != null) iconDeleteItem.Visible = !system;
+        if (iconEmptyItem != null) iconEmptyItem.Visible = system;
         contextX = Math.Min(mouseX, Math.Max(0, Global.screenWidth - iconContextMenu.Width));
         contextY = Math.Min(mouseY, Math.Max(0, Global.screenHeight - iconContextMenu.Height));
         iconContextMenu.ShowAt(contextX, contextY);
@@ -663,7 +720,7 @@ public class Desktop : Component
     private void BeginContextRename()
     {
         DesktopIcon icon = contextIcon ?? (selectedIcons.Count == 1 ? selectedIcons[0] : null);
-        if (icon == null) return;
+        if (icon == null || icon.isSystemIcon) return;
 
         SelectOnlyIcon(icon);
         icon.BeginRename();

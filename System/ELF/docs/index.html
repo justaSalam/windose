@@ -52,7 +52,7 @@ footer{color:var(--muted);font-size:13px;margin-top:60px}
 <div class="layout">
 <nav class="sidebar">
 <h2>ELF Developer Docs</h2>
-<span class="ver">KAPI v9</span>
+<span class="ver">KAPI v10</span>
 <a href="#overview">Overview</a>
 <a href="#quickstart">Quickstart</a>
 <a href="#anatomy">Program anatomy</a>
@@ -86,7 +86,7 @@ footer{color:var(--muted);font-size:13px;margin-top:60px}
 <h2 id="overview">Overview</h2>
 <p>Windose runs position-independent ELF64 binaries (<code>ET_DYN</code>) compiled with an ordinary
 C toolchain. Each program gets its own thread, pid, handle table, event queue and memory quota,
-plus a function table (<code>KernelApi</code>) with ~112 syscalls. Programs never touch the kernel
+plus a function table (<code>KernelApi</code>) with ~116 syscalls. Programs never touch the kernel
 directly — they call <code>k_*</code> wrappers from <code>programs/include/kernel.h</code>.</p>
 <ul>
 <li><strong>Ring 0, no isolation.</strong> A wild pointer can take down the kernel. Validate everything; the C side can't save you.</li>
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
 <h2 id="api">API reference</h2>
 <p>Every call below is the <code>k_*</code> wrapper (first <code>pid</code> arg filled in for you).
 Unless noted, <code>0</code> = ok, negative = error, <code>0</code> handle = failed.</p>
-<input id="apiSearch" type="text" placeholder="Filter 112 calls… e.g. canvas, combo, dir">
+<input id="apiSearch" type="text" placeholder="Filter 116 calls… e.g. canvas, combo, dir">
 <div class="count" id="apiCount"></div>
 <div id="apiTables"></div>
 
@@ -241,6 +241,7 @@ The queue holds 64 events and <strong>drops the newest when full</strong> — dr
 <tr><td><code>window</code></td><td>window + button + label + event loop (the canonical skeleton)</td></tr>
 <tr><td><code>widgets</code></td><td>Every widget: tabs, checkbox, radio, slider, progress, textfield, combo, listbox, menus, statusbar, color, numeric, calendar, filedialog, drops</td></tr>
 <tr><td><code>canvas</code></td><td>Pixel canvas animation + mouse + Esc-to-quit</td></tr>
+<tr><td><code>calc</code></td><td>Calculator: precedence parser, doubles, buttons + keyboard</td></tr>
 <tr><td><code>explorer</code></td><td>Full file browser: tree, details, search, viewer, copy/cut/paste, spawn</td></tr>
 <tr><td><code>search</code></td><td>Recursive file search + open</td></tr>
 <tr><td><code>run</code></td><td>Run dialog: app names, paths, <code>/mnt/Programs</code> fallback</td></tr>
@@ -249,7 +250,7 @@ The queue holds 64 events and <strong>drops the newest when full</strong> — dr
 <tr><td><code>libctest</code></td><td>libc correctness suite</td></tr>
 </table>
 
-<footer>Windose ELF docs · KAPI v9 · generated from <code>programs/include/kernel.h</code> — if this page disagrees with that header, the header wins.</footer>
+<footer>Windose ELF docs · KAPI v10 · generated from <code>programs/include/kernel.h</code> — if this page disagrees with that header, the header wins.</footer>
 </main>
 </div>
 <script>
@@ -355,7 +356,11 @@ const API = [
 ["k_list_dir(const char *path, char *buf, int max)","int","Entry count; buf holds NUL-separated names. -1 = missing/not-a-dir/too small."],
 ["k_stat_file(const char *path, FileStat *out)","int","Fills {is_dir, size_lo, size_hi}. 0 ok."],
 ["k_make_dir(const char *path)","int","Creates parents too. Idempotent."],
-["k_delete_path(const char *path)","int","File or directory, recursive. No recycle bin — confirm first."],
+["k_delete_path(const char *path)","int","File or directory, recursive and permanent. Prefer k_trash_delete."],
+["k_trash_delete(const char *path)","int","Move to the recycle bin (restorable). Prefer over delete."],
+["k_trash_list(char *buf, int max)","int","Stored names, NUL-separated."],
+["k_trash_restore(const char *name)","int","Restore by stored name (uniquifies on clash)."],
+["k_trash_empty(void)","int","Empty the recycle bin permanently."],
 ["k_rename_path(const char *oldp, const char *newp)","int","Fails if the destination exists."],
 ["k_list_drives(char *buf, int max)","int","Mount points, NUL-separated."],
 ["k_drive_stat(const char *mount, DriveStat *out)","int","Fills {total_lo, total_hi, free_lo, free_hi}. 0 ok."],
@@ -391,7 +396,7 @@ const API = [
     });
     t.appendChild(tb); host.appendChild(t);
   });
-  document.getElementById('apiCount').textContent = total + ' calls · KAPI v9';
+  document.getElementById('apiCount').textContent = total + ' calls · KAPI v10';
   const box = document.getElementById('apiSearch');
   box.addEventListener('input', function(){
     const q = box.value.toLowerCase().trim();

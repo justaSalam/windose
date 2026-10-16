@@ -2,6 +2,7 @@ using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Graphics;
 using Windose.Programs;
 using Windose.System.Kernel;
+using Windose.System.Kernel.Subsystem;
 using Windose.System.System_Calls;
 
 public class StartMenu : Window
@@ -10,6 +11,7 @@ public class StartMenu : Window
     private StackPanel panel;
     private MenuItem programsMenu;
     private TextField searchField;
+    private Label userTile;
     public StartMenu(int x, int y, int width, int height, string title, bool useTitleBar) : base(x, y, width, height, title, useTitleBar)
     {
         process.processType = ProcessType.System;
@@ -58,6 +60,20 @@ public class StartMenu : Window
                 programsMenu.submenu.FilterItems(text);
         };
         panel.AddStackChild(searchField);
+
+        userTile = new Label(0, 0, width, 22)
+        {
+            verticalAlignment = VerticalAlignment.Top,
+            horizontalAlignment = HorizontalAlignment.Stretch,
+            horizontalTextAlignment = HorizontalAlignment.Left,
+            text = "Guest",
+            fontSize = 14,
+            textColor = Palette.TitleText,
+            useBackground = false,
+            clampSize = false,
+            Margin = new Thickness(0, 0, 0, 2),
+        };
+        panel.AddStackChild(userTile);
 
         MenuItem programs = new MenuItem(0, 0, width + 30, 24)
         {
@@ -164,7 +180,11 @@ public class StartMenu : Window
             Margin = new Thickness(0)
         };
         powerOptions.AddSubmenuItem("Lock", () => LockManager.Lock());
-        powerOptions.AddSubmenuItem("Log Off");
+        powerOptions.AddSubmenuItem("Log Off", () =>
+        {
+            Session.Logout();
+            LockManager.Lock();
+        });
         powerOptions.AddSubmenuItem("Shutdown", () =>
         {
             Desktop.SaveLayout();
@@ -193,6 +213,15 @@ public class StartMenu : Window
     public override void Update()
     {
         base.Update();
+        if (userTile != null)
+        {
+            string name = Session.CurrentUser != null ? Session.CurrentUser.username : "Guest";
+            if (userTile.text != name)
+            {
+                userTile.text = name;
+                userTile.MarkDirty();
+            }
+        }
     }
 
 

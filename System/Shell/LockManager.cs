@@ -24,6 +24,7 @@ public static class LockManager
     {
         if (!IsLocked) return;
         IsLocked = false;
+        WindowManager.NoteInput();
         if (overlay != null) overlay.HideOverlay();
     }
 

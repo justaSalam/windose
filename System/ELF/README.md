@@ -1,4 +1,4 @@
-# Windose ELF loader (v9)
+# Windose ELF loader (v10)
 
 Runs x86-64 ELF programs written in C inside your Cosmos kernel: several at once, each with its own
 handles, events, memory quota and process-list entry, with a small libc and normal `main(argc, argv)`.
@@ -35,7 +35,8 @@ if (p == null) Terminal.WriteLine("exec failed: " + err);
   tree (+ add_root/add_child/clear/selected/expanded), toolbar, popup, list columns (+ add_row/hit_test/screen_pos),
   grid (+ columns/rows/cells/sort), drop_accept, dnd_get_text, widget_set/get_enabled, widget_focus,
   spawn, kill, yield, poll_event, read_file, write_file, ticks, pid,
-  launch_app, open_file, notify_send, desktop_count, desktop_current, desktop_switch, window_set_desktop.
+  launch_app, open_file, notify_send, desktop_count, desktop_current, desktop_switch, window_set_desktop,
+  trash_delete, trash_list, trash_restore, trash_empty.
   Memory comes from malloc (kernel `alloc` underneath). Program output goes to the system log (`elf:<name>`).
 * **Events**: click, close, key (code + cooked char), mouse move/down/up, focus in/out, drop with text payload.
   Widget changes (checkbox, combo, list, tabs, menus, dialogs, color, numeric, calendar, grid) arrive as
@@ -52,7 +53,7 @@ Build: Linux/WSL `sh build.sh [name]` (gcc + binutils), Windows `build.bat [name
 
 Limits: no floating point in printf, no global constructors (`.init_array`), no TLS, no `fopen` (use `file_read` / `k_write_file`),
 no threads inside a program. Kill cannot stop a program stuck in a pure compute loop that never calls the kernel.
-API v9 needs rebuilt programs AND a rebuilt libc (older `bin/*.elf` exit 127 until rebuilt).
+API v10 needs rebuilt programs AND a rebuilt libc (older `bin/*.elf` exit 127 until rebuilt).
 
 ## Ideas worth adding next
 

@@ -1008,6 +1008,37 @@ namespace Windose.System.Elf
             return true;
         }
 
+        public bool TrashDelete(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            return TrashManager.MoveToTrash(path);
+        }
+
+        public string[] TrashList()
+        {
+            try
+            {
+                TrashManager.TrashItem[] items = TrashManager.List();
+                string[] names = new string[items.Length];
+                for (int i = 0; i < items.Length; i++) names[i] = items[i].StoredName;
+                global::System.Array.Sort(names, global::System.StringComparer.Ordinal);
+                return names;
+            }
+            catch { return null; }
+        }
+
+        public bool TrashRestore(string storedName)
+        {
+            if (string.IsNullOrEmpty(storedName)) return false;
+            if (storedName.IndexOfAny(new char[] { '/', '\\' }) >= 0) return false;
+            return TrashManager.Restore(storedName);
+        }
+
+        public void TrashEmpty()
+        {
+            TrashManager.Empty();
+        }
+
         public object TreeCreate(object parent, int x, int y, int w, int h)
         {
             Component p = AsChildParent(parent);

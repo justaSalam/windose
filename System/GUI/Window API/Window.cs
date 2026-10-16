@@ -224,6 +224,11 @@ public class Window : Component
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
     {
         if (!IsInputEnabled()) return false;
+        if (mouseState.right == MouseEvents.Press && TitleHitTest(mouseX, mouseY) && !(GetChildAt(mouseX, mouseY) is Button))
+        {
+            ShowSystemMenu(mouseX, mouseY);
+            return true;
+        }
         if (Mouse.scroll != 0)
         {
 
@@ -465,6 +470,24 @@ public class Window : Component
                 WindowManager.ShowPreviewRect(previewBounds);
             }
         }
+    }
+
+    private void ShowSystemMenu(int mouseX, int mouseY)
+    {
+        MenuPopup menu = new MenuPopup(180, 24);
+        if (canMinimize)
+        {
+            MenuItem min = menu.AddItem("Minimize");
+            min.click = () => WindowManager.Minimize(this);
+        }
+        if (canMaximize)
+        {
+            MenuItem max = menu.AddItem(isMaximized ? "Restore" : "Maximize");
+            max.click = () => WindowManager.ToggleMaximize(this);
+        }
+        MenuItem close = menu.AddItem("Close");
+        close.click = () => RequestClose();
+        menu.ShowAt(mouseX, Math.Min(mouseY, Global.screenHeight - 120));
     }
 
     public virtual bool HitTest(int mouseX, int mouseY)

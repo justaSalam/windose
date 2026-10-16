@@ -97,7 +97,9 @@ public class Taskbar : Component
             Margin = new Thickness(2, 2, 2, 2),
             Padding = new Thickness(2),
             useBackground = true,
-            useForeground = false
+            useForeground = false,
+            capturesInput = true,
+            leftClickAction = CalendarFlyout.Toggle
         };
         trayPanel.AddStackChild(timeLabel);
 

@@ -129,6 +129,10 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, int> DesktopCurrent;                                  // (pid) -> index
         public delegate* unmanaged<int, int, int> DesktopSwitch;                              // (pid, index) -> 0
         public delegate* unmanaged<int, int, int, int> WindowSetDesktop;                      // (pid, win, index) -> 0
+        public delegate* unmanaged<int, byte*, int> TrashDelete;                              // (pid, path) -> 0
+        public delegate* unmanaged<int, byte*, int, int> TrashList;                           // (pid, buf, max) -> count
+        public delegate* unmanaged<int, byte*, int> TrashRestore;                             // (pid, name) -> 0
+        public delegate* unmanaged<int, int> TrashEmpty;                                      // (pid)
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -150,7 +154,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 9;
+        public const int ApiVersion = 10;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -414,6 +418,10 @@ namespace Windose.System.Elf
             api.DesktopCurrent = &ApiDesktopCurrent;
             api.DesktopSwitch = &ApiDesktopSwitch;
             api.WindowSetDesktop = &ApiWindowSetDesktop;
+            api.TrashDelete = &ApiTrashDelete;
+            api.TrashList = &ApiTrashList;
+            api.TrashRestore = &ApiTrashRestore;
+            api.TrashEmpty = &ApiTrashEmpty;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -2148,6 +2156,67 @@ namespace Windose.System.Elf
                 object o = p.Objs.Get(handle);
                 if (o == null) return -1;
                 return Host.WindowSetDesktop(o, index) ? 0 : -3;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiTrashDelete(int pid, byte* path)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                return Host.TrashDelete(CStr(path)) ? 0 : -3;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiTrashList(int pid, byte* buf, int max)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null || buf == null || max <= 0 || max > MaxIo) return -1;
+                string[] names = Host.TrashList();
+                if (names == null) return -1;
+                long total = 0;
+                for (int i = 0; i < names.Length; i++) total += names[i].Length + 1;
+                if (total > max) return -1;
+                int o = 0;
+                for (int i = 0; i < names.Length; i++)
+                {
+                    string n = names[i];
+                    for (int j = 0; j < n.Length; j++) buf[o++] = (byte)n[j];
+                    buf[o++] = 0;
+                }
+                return names.Length;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiTrashRestore(int pid, byte* name)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                return Host.TrashRestore(CStr(name)) ? 0 : -3;
+            }
+            catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiTrashEmpty(int pid)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (Host == null) return -1;
+                Host.TrashEmpty();
+                return 0;
             }
             catch { return -2; }
         }

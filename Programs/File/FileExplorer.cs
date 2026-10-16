@@ -30,6 +30,8 @@ public class FileExplorer : Window
     private readonly MenuItem editContextItem;
     private FileListViewItem? contextItem;
     private string currentLocation = "/mnt";
+    private readonly List<string> backStack = new List<string>();
+    private readonly List<string> forwardStack = new List<string>();
 
     public FileExplorer(int x, int y, int width, int height, string title, string rootPath = "/mnt") : base(x, y, width, height, title, true)
     {
@@ -44,6 +46,7 @@ public class FileExplorer : Window
         menuBar = new MenuBar(0, 0, Width);
         toolbar = new Toolbar(0, 0, Width);
         addressBar = new AddressBar(0, 0, Width);
+        addressBar.dropDownButton.leftClickAction = ShowHistoryPopup;
         statusBar = new StatusBar(0, 0, Width);
         explorerBody = new DockPanel(0, 0, Width, Height)
         {
@@ -183,21 +186,21 @@ public class FileExplorer : Window
         MenuPage helpMenu = menuBar.AddMenuPage("Help");
         helpMenu.AddItem("Windose File Explorer").enabled = false;
 
-        toolbar.AddButton("Back");
-        toolbar.AddButton("Forward");
-        toolbar.AddButton("Up");
+        toolbar.AddButton("Back", GoBack, "Back");
+        toolbar.AddButton("Forward", GoForward, "Forward");
+        toolbar.AddButton("Up", GoUp, "Up one level");
 
         toolbar.AddSeparator();
-        toolbar.AddButton("Cut");
-        toolbar.AddButton("Copy");
-        toolbar.AddButton("Paste");
+        toolbar.AddButton("Cut", null, "Cut");
+        toolbar.AddButton("Copy", null, "Copy");
+        toolbar.AddButton("Paste", null, "Paste");
 
         toolbar.AddSeparator();
-        toolbar.AddButton("Undo");
+        toolbar.AddButton("Undo", null, "Undo");
 
         toolbar.AddSeparator();
-        toolbar.AddButton("Delete");
-        toolbar.AddButton("Properties", ShowSelectedProperties);
+        toolbar.AddButton("Delete", () => DeleteFileForSelected(), "Delete");
+        toolbar.AddButton("Properties", ShowSelectedProperties, "Properties");
 
         toolbar.AddSeparator();
         toolbar.AddButton("Icons", () => files.SetViewMode(ListViewMode.LargeIcon));
@@ -249,6 +252,15 @@ public class FileExplorer : Window
         Refresh();
     }
 
+    private void DeleteFileForSelected()
+    {
+        if (files.selectedItem != null && files.selectedItem.hasFileEntry)
+        {
+            TrashManager.MoveToTrash(files.selectedItem.fileEntry.AbsoluteLocation);
+            Refresh();
+        }
+    }
+
     private void DeleteFile()
     {
         if (!IsItemValid(out FileListViewItem item))
@@ -257,18 +269,7 @@ public class FileExplorer : Window
         }
 
         FileEntry fileEntry = item.fileEntry;
-
-        switch (fileEntry.FileType)
-        {
-            case FileType.Directory:
-                Directory.Delete(fileEntry.AbsoluteLocation, true);
-                break;
-
-            default:
-                File.Delete(fileEntry.AbsoluteLocation);
-                break;
-        }
-
+        TrashManager.MoveToTrash(fileEntry.AbsoluteLocation);
 
         Refresh();
 
@@ -324,6 +325,7 @@ public class FileExplorer : Window
         {
             foreach (string dir in Directory.GetDirectories(path))
             {
+                if (Path.GetFileName(dir) == ".trash") continue;
                 TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), "/mnt/System/Icons/directory_closed.png", dir);
                 PopulateTreeItem(childItem);
             }
@@ -341,6 +343,7 @@ public class FileExplorer : Window
 
         string path = (string)item.tag;
 
+        PushHistory(path);
         addressBar.Address = path;
         PopulateFiles(path);
         Refresh();
@@ -351,6 +354,7 @@ public class FileExplorer : Window
         string path = item.hasFileEntry ? item.fileEntry.AbsoluteLocation : (string)item.tag;
         if (path == null) return;
 
+        PushHistory(path);
         addressBar.Address = item.text;
         PopulateFiles(path);
         Refresh();
@@ -432,8 +436,62 @@ public class FileExplorer : Window
     }
     private void NavigateTo(string location, string displayName)
     {
+        PushHistory(location);
         addressBar.Address = displayName;
         PopulateFiles(location);
+    }
+
+    private void PushHistory(string location)
+    {
+        if (location == currentLocation) return;
+        backStack.Add(currentLocation);
+        if (backStack.Count > 50) backStack.RemoveAt(0);
+        forwardStack.Clear();
+    }
+
+    private void GoBack()
+    {
+        if (backStack.Count == 0) return;
+        forwardStack.Add(currentLocation);
+        string location = backStack[backStack.Count - 1];
+        backStack.RemoveAt(backStack.Count - 1);
+        addressBar.Address = location;
+        PopulateFiles(location);
+    }
+
+    private void GoForward()
+    {
+        if (forwardStack.Count == 0) return;
+        backStack.Add(currentLocation);
+        string location = forwardStack[forwardStack.Count - 1];
+        forwardStack.RemoveAt(forwardStack.Count - 1);
+        addressBar.Address = location;
+        PopulateFiles(location);
+    }
+
+    private void GoUp()
+    {
+        string parent = FileSystemManager.GetParent(currentLocation);
+        if (string.IsNullOrEmpty(parent)) return;
+        PushHistory(parent);
+        addressBar.Address = parent;
+        PopulateFiles(parent);
+    }
+
+    private void ShowHistoryPopup()
+    {
+        MenuPopup history = new MenuPopup(280, 24);
+        for (int i = backStack.Count - 1; i >= 0; i--)
+        {
+            string location = backStack[i];
+            history.AddItem(location, () =>
+            {
+                forwardStack.Add(currentLocation);
+                addressBar.Address = location;
+                PopulateFiles(location);
+            });
+        }
+        history.ShowAt(MouseManager.X, MouseManager.Y);
     }
 
     public void NavigateToPath(string path)
@@ -496,6 +554,7 @@ public class FileExplorer : Window
 
             foreach (DirectoryInfo dir in directoryInfo.GetDirectories())
             {
+                if (dir.Name == ".trash") continue;
                 AddFolder(dir.Name, dir.FullName);
             }
 
@@ -507,7 +566,11 @@ public class FileExplorer : Window
 
                 if (!entry.displayInExplorer)
                 {
-                    return;
+                    continue;
+                }
+                if (file.Name.EndsWith(".origpath", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
                 }
                 FileListViewItem item = files.AddItem(entry);
 

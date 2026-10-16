@@ -9,7 +9,7 @@
 // If a program crashes on its first kernel call, switch to ms_abi (must match the C# side's calling
 // convention) and rebuild libc + programs.
 #define KABI __attribute__((sysv_abi))
-#define KAPI_VERSION 9
+#define KAPI_VERSION 10
 #define K_KILLED (-100)          // returned by every call after the program was killed; the wrappers exit(137)
 
 typedef int handle_t;            // opaque; 0 = none/failed; never do arithmetic on it
@@ -144,6 +144,10 @@ typedef struct KernelApi {
     int      (KABI *desktop_current)(int pid);
     int      (KABI *desktop_switch)(int pid, int index);
     int      (KABI *window_set_desktop)(int pid, handle_t win, int index);
+    int      (KABI *trash_delete)(int pid, const char *path);
+    int      (KABI *trash_list)(int pid, char *buf, int max);
+    int      (KABI *trash_restore)(int pid, const char *name);
+    int      (KABI *trash_empty)(int pid);
 } KernelApi;
 
 extern KernelApi *__k;
@@ -261,6 +265,10 @@ static inline int      k_desktop_count(void) { return __kchk(__k->desktop_count(
 static inline int      k_desktop_current(void) { return __kchk(__k->desktop_current(__k->pid)); }
 static inline int      k_desktop_switch(int i) { return __kchk(__k->desktop_switch(__k->pid, i)); }
 static inline int      k_window_set_desktop(handle_t win, int i) { return __kchk(__k->window_set_desktop(__k->pid, win, i)); }
+static inline int      k_trash_delete(const char *path) { return __kchk(__k->trash_delete(__k->pid, path)); }
+static inline int      k_trash_list(char *buf, int max) { return __kchk(__k->trash_list(__k->pid, buf, max)); }
+static inline int      k_trash_restore(const char *name) { return __kchk(__k->trash_restore(__k->pid, name)); }
+static inline int      k_trash_empty(void) { return __kchk(__k->trash_empty(__k->pid)); }
 static inline int      k_pid(void)                                  { return __k->pid; }
 
 #endif

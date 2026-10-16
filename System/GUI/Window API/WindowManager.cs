@@ -42,6 +42,9 @@ public partial class WindowManager : SingleThreadedProcess
     private static bool zOrderDirty = true;
     private static bool frameComposed;
     private static Rectangle lastOpenBounds = new Rectangle(-1, -1, 0, 0);
+    private static int lastInputTick = Environment.TickCount;
+    private static int lastIdleSettingTick;
+    private static int idleLockMinutes;
 
     internal static void MarkZOrderDirty() => zOrderDirty = true;
 
@@ -122,6 +125,21 @@ public partial class WindowManager : SingleThreadedProcess
     internal static Window[] WindowsSnapshot()
     {
         lock (windows) return windows.ToArray();
+    }
+
+    /// <summary>Minutes of no input before auto-lock. 0 disables. From System/Security/IdleLockMinutes.</summary>
+    private static void RefreshIdleSetting()
+    {
+        int now = Environment.TickCount;
+        if (unchecked(now - lastIdleSettingTick) < 5000 && lastIdleSettingTick != 0) return;
+        lastIdleSettingTick = now;
+        try { idleLockMinutes = Math.Max(0, (int)Registry.GetInteger("System/Security/IdleLockMinutes", 15)); }
+        catch { idleLockMinutes = 0; }
+    }
+
+    internal static void NoteInput()
+    {
+        lastInputTick = Environment.TickCount;
     }
 
     public const int DesktopCount = 4;

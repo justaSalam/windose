@@ -133,6 +133,7 @@ public class Kernel : Sys.Kernel
         ResourceLoader.WriteStorage("/mnt/Programs/hello.elf", "Windose.System.ELF.programs.bin.hello.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/canvas.elf", "Windose.System.ELF.programs.bin.canvas.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/explorer.elf", "Windose.System.ELF.programs.bin.explorer.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/calc.elf", "Windose.System.ELF.programs.bin.calc.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/search.elf", "Windose.System.ELF.programs.bin.search.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/run.elf", "Windose.System.ELF.programs.bin.run.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/pager.elf", "Windose.System.ELF.programs.bin.pager.elf", true);

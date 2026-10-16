@@ -61,6 +61,18 @@ namespace Windose.System.Elf
         /// <summary>Moves a normal window to a desktop. False for pinned/system windows.</summary>
         bool WindowSetDesktop(object obj, int index);
 
+        /// <summary>Moves a file or directory to the recycle bin. False on failure.</summary>
+        bool TrashDelete(string path);
+
+        /// <summary>Stored names in the recycle bin, sorted. Null on failure.</summary>
+        string[] TrashList();
+
+        /// <summary>Restores a trashed item by stored name. False on failure.</summary>
+        bool TrashRestore(string storedName);
+
+        /// <summary>Empties the recycle bin.</summary>
+        void TrashEmpty();
+
         object CreateCheckbox(object parent, int x, int y, string text);
         bool SetChecked(object obj, bool value);
         /// <summary>1 checked, 0 unchecked, -1 if not a checkbox/radio.</summary>

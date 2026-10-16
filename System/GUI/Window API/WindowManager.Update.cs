@@ -3,12 +3,31 @@ using Windose;
 
 public partial class WindowManager
 {
+    private int lastMx = int.MinValue;
+    private int lastMy = int.MinValue;
+    private MouseState lastMouseButtons;
+
     private void UpdateDesktop()
     {
         long updateStartedAt = PerformanceMetrics.Now;
         mx = MouseManager.X;
         my = MouseManager.Y;
         mouseState = Mouse.state;
+
+        if (mx != lastMx || my != lastMy || mouseState.left != lastMouseButtons.left ||
+            mouseState.right != lastMouseButtons.right || mouseState.middle != lastMouseButtons.middle)
+            NoteInput();
+        lastMx = mx;
+        lastMy = my;
+        lastMouseButtons = mouseState;
+
+        RefreshIdleSetting();
+        if (!LockManager.IsLocked && idleLockMinutes > 0 &&
+            unchecked(Environment.TickCount - lastInputTick) >= 0 &&
+            unchecked(Environment.TickCount - lastInputTick) > idleLockMinutes * 60000)
+        {
+            LockManager.Lock();
+        }
 
         DispatchMessages();
         ShowPendingFailures();
@@ -255,6 +274,8 @@ public partial class WindowManager
             {
                 return;
             }
+
+            NoteInput();
 
             if (key.Key == Key.Escape)
             {
