@@ -129,7 +129,6 @@ public class Component : IDisposable
     protected ComponentBuffer buffer;
     private bool ownsRenderSurface;
     public Rectangle rectangle;
-    public Rectangle clampedBounds = new Rectangle(0, 0, 50, 50);
     public State state;
     public Dock dock;
     public static Component? MouseCapture;
@@ -137,7 +136,9 @@ public class Component : IDisposable
     protected bool dirty;
     protected bool childrenDirty;
     private bool disposed;
-    public bool clampSize = true;
+    /// <summary>When true, Resize() ignores requests that fall outside clampedBounds. Default false so controls are not silently prevented from resizing to small (or large) sizes.</summary>
+    public bool clampSize = false;
+    public Rectangle clampedBounds = new Rectangle(0, 0, 0, 0);
     protected bool visible;
     public string designType = "";
 
@@ -305,6 +306,9 @@ public class Component : IDisposable
     }
 
     public string name = "";
+
+    /// <summary>User-defined data associated with this component. Useful for storing model objects, ids, or any program state alongside a control.</summary>
+    public object Tag;
 
     public Component? Find(string n)
     {

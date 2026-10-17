@@ -292,4 +292,8 @@
       <None Include=".github\copilot-instructions.md" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="System\Drivers\Network\" />
+    </ItemGroup>
+
 </Project>
