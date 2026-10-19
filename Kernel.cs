@@ -1,18 +1,18 @@
-using Cosmos.Kernel.System.Diagnostics;
-using Cosmos.Kernel.System.Graphics;
-using Windose.Programs.Breeze;
-using Windose.System.Kernel.Subsystem;
-using Windose.System.System_Calls;
-using Sys = Cosmos.Kernel.System;
-
 ///TODO Implement lua scripts instead of hardcoded programs for terminal;
 using Cosmos.Executable.Lua;
-using Windose.System.Kernel.FileSystem;
 using Cosmos.Kernel.Core.Scheduler;
-using Windose.System.Scheduling;
+using Cosmos.Kernel.System.Diagnostics;
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
+using Cosmos.Kernel.System.Network;
+using Windose.Programs.Breeze;
 using Windose.System.Elf;
 using Windose.System.Kernel;
+using Windose.System.Kernel.FileSystem;
+using Windose.System.Kernel.Subsystem;
+using Windose.System.Scheduling;
+using Windose.System.System_Calls;
+using Sys = Cosmos.Kernel.System;
 namespace Windose;
 
 /// <summary>
@@ -53,15 +53,35 @@ public class Kernel : Sys.Kernel
         Instance = this;
         WindoseBridge.Install();
 
-        
+        new Thread(() =>
+        {
+            DhcpClient dhcpClient = new();
+
+            if (dhcpClient.SendDiscoverPacket() != -1)
+            {
+                IPConfig? config = NetworkManager.Primary.IPConfig;
+            }
+
+        }).Start();
+
         Palette.Initialize();
 
         SystemLogger.WriteLine("FSM", "Starting", ConsoleMessageType.Log);
         FileSystemManager.Setup();
 
-        canvas = Canvas.GetFullScreen(new Mode(1920, 1080, ColorDepth.ColorDepth32));
+        bool safeMode = Environment.GetCommandLineArgs().Contains("safemode");
+        if (safeMode)
+        {
+            SystemLogger.WriteLine("BOOT", "Safe mode enabled, using 800x600 resolution", ConsoleMessageType.Log);
+            canvas = Canvas.GetFullScreen(new Mode(800, 600, ColorDepth.ColorDepth32));
+        }
+        else
+        {
+            canvas = Canvas.GetFullScreen(new Mode(1920, 1080, ColorDepth.ColorDepth32));
+        }
 
         displayDriver = new Drivers.DisplayManager();
+
 
         Console.WriteLine("Canvas:     " + canvas.Name);
         Console.WriteLine("Resolution: " + canvas.Width + "x" + canvas.Height);

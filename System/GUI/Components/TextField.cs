@@ -24,6 +24,9 @@ public class TextField : Component
     /// <summary>Fired whenever the text changes (typing, paste, cut, programmatic set).</summary>
     public event Action<string> TextChanged;
 
+    /// <summary>Raised when Enter is pressed in a single-line field (e.g. address bar).</summary>
+    public event Action EnterPressed;
+
     /// <summary>Maximum text length. 0 means unlimited.</summary>
     public int MaxLength { get; set; }
 
@@ -388,6 +391,8 @@ public class TextField : Component
             case Key.Enter:
                 if (Multiline)
                     InsertAtCaret("\n");
+                else
+                    EnterPressed?.Invoke();
                 break;
 
             default:

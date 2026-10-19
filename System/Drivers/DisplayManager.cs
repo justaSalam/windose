@@ -13,7 +13,7 @@ public sealed class DisplayManager
     public int Width => canvas == null ? 0 : canvas.Width;
     public int Height => canvas == null ? 0 : canvas.Height;
 
-
+    private Component test;
 
     public DisplayManager()
     {
@@ -29,6 +29,9 @@ public sealed class DisplayManager
         {
             isCursorVisible = !isCursorVisible;
         }, TimeSpan.FromMilliseconds(83));
+       
+        test = new Component(200, 200, 100, 100);
+       
     }
 
 
@@ -55,6 +58,8 @@ public sealed class DisplayManager
         DrawCursor(cursorX, cursorY);
         PerformanceMetrics.OverlayTicks = PerformanceMetrics.Now - overlayStartedAt;
 
+        test.Test_DrawFilledRectangle(Color.LightSkyBlue,0, 0, 200, 200, 128);
+        test.MarkDirty(true);
 
 
         long displayStartedAt = PerformanceMetrics.Now;

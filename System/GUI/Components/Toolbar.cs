@@ -67,6 +67,21 @@ public class Toolbar : Component
         MarkDirty();
         return button;
     }
+    public Button AddButton(Image image, string text,Action ?click, int width)
+    {
+        Button button = new Button(image, text, 0, 0, width, Height - 6)
+        {
+            image = image,
+            useBorders = true,
+            clampSize = false,
+            Margin = new Thickness(0),
+            leftClickAction = click,
+        };
+
+        items.AddStackChild(button);
+        MarkDirty();
+        return button;
+    }
 
     public Separator AddSeparator(int width = 8)
     {

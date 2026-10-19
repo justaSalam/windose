@@ -189,6 +189,39 @@ public class ComponentBuffer : Canvas
         }
     }
 
+    public void Test_DrawFilledAlphaRectangle(Color color, int xStart, int yStart, int width, int height, int alpha)
+    {
+        if (height == -1)
+        {
+            height = width;
+        }
+
+        Rectangle target = new Rectangle(originX + xStart, originY + yStart, width, height);
+        target = Rectangle.Intersect(target, clipBounds);
+        target = Rectangle.Intersect(target, new Rectangle(0, 0, Width, Height));
+        if (target.Width <= 0 || target.Height <= 0) return;
+
+        int argb = color.ToArgb();
+        int[] buffer = GetBuffer();
+        if (color.A == byte.MaxValue)
+        {
+            for (int y = target.Top; y < target.Bottom; y++)
+                Array.Fill(buffer, argb, y * Width + target.Left, target.Width);
+            return;
+        }
+
+        int rowStart = target.Top * Width + target.Left;
+        for (int y = 0; y < target.Height; y++, rowStart += Width)
+        {
+            int index = rowStart;
+            int end = index + target.Width;
+            for (; index < end; index++)
+            {
+                BlendPixel(buffer, index, argb, alpha);
+            }
+        }
+    }
+
     public new void DrawRectangle(Color color, int x, int y, int width, int height)
     {
         if (width <= 0 || height <= 0)
@@ -572,6 +605,36 @@ public class ComponentBuffer : Canvas
     {
         if ((uint)index >= (uint)buffer.Length) return;
         int alpha = (color >> 24) & 0xff;
+        if (alpha == 0) return;
+        if (alpha == 0xff)
+        {
+            buffer[index] = color;
+            return;
+        }
+
+        int background = buffer[index];
+        int inverse = 255 - alpha;
+        int red = (((color >> 16) & 0xff) * alpha + ((background >> 16) & 0xff) * inverse) >> 8;
+        int green = (((color >> 8) & 0xff) * alpha + ((background >> 8) & 0xff) * inverse) >> 8;
+        int blue = ((color & 0xff) * alpha + (background & 0xff) * inverse) >> 8;
+        buffer[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
+    }
+
+    /// <summary>
+    /// TEST Alpha blending
+    /// </summary>
+    /// <param name="buffer"></param>
+    /// <param name="index"></param>
+    /// <param name="color"></param>
+    /// <param name="alpha"></param>
+    private void BlendPixel(int[] buffer, int index, int color, int alpha)
+    {
+        if ((uint)index >= (uint)buffer.Length)
+        {
+            return;
+        }
+        alpha = Math.Clamp(alpha, 0, 255);
+
         if (alpha == 0) return;
         if (alpha == 0xff)
         {

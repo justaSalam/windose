@@ -794,7 +794,6 @@ public class Component : IDisposable
     public void DrawString(string str, TrueTypeFont font, int sizePx, Color color, int x, int y)
     {
         buffer.DrawString(str, font, sizePx, color, x, y);
-
     }
 
     protected Rectangle GetContentBounds(Thickness? padding = null)
@@ -876,6 +875,12 @@ public class Component : IDisposable
     {
         buffer.DrawFilledRectangle(color, xStart, yStart, width, height);
     }
+
+    public void Test_DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, int alpha)
+    {
+        buffer.Test_DrawFilledAlphaRectangle(color, xStart, yStart, width, height, alpha);
+    }
+
     public void DrawRectangle(Color color, int x, int y, int width, int height)
     {
         buffer.DrawRectangle(color, x, y, width, height);
