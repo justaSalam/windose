@@ -37,6 +37,12 @@ public enum CssListStyle : byte
     LowerRoman, UpperRoman, None
 }
 
+// flexbox
+public enum CssFlexDir : byte { Row, RowReverse, Column, ColumnReverse }
+public enum CssFlexWrap : byte { NoWrap, Wrap, WrapReverse }
+public enum CssJustify : byte { FlexStart, FlexEnd, Center, SpaceBetween, SpaceAround, SpaceEvenly }
+public enum CssAlignItems : byte { Auto, Stretch, FlexStart, FlexEnd, Center, Baseline }
+
 public sealed class CssComputed
 {
     // box model / flow
@@ -78,6 +84,21 @@ public sealed class CssComputed
     public bool HasW, HasH; public int W, H;
     public int MinW, MaxW, MinH, MaxH;
 
+    // flexbox
+    public CssFlexDir FlexDirection;
+    public CssFlexWrap FlexWrap;
+    public CssJustify JustifyContent;
+    public CssAlignItems AlignItems;      // Auto = initial (stretch)
+    public CssAlignItems AlignSelf;       // Auto = inherit AlignItems
+    public float FlexGrow, FlexShrink;
+    public bool HasFlexBasis; public int FlexBasis;   // px; else auto
+    public int GapRow, GapCol;
+    public int Order;
+
+    // CSS custom properties (--*) and their resolution state
+    public Dictionary<string, string> CustomProps;   // element's own --vars (may be null)
+    public Dictionary<string, string> ResolvedVars;  // cascade result used for var() lookup
+
     // paint
     public CssVis Visibility;
     public float Opacity;                // 0..1
@@ -113,6 +134,15 @@ public sealed class CssComputed
         c.Opacity = 1.0f;
         c.OverflowX = c.OverflowY = CssOverflow.Visible;
         c.ListStyleType = CssListStyle.Disc;
+        c.FlexDirection = CssFlexDir.Row;
+        c.FlexWrap = CssFlexWrap.NoWrap;
+        c.JustifyContent = CssJustify.FlexStart;
+        c.AlignItems = CssAlignItems.Auto;   // resolves to Stretch
+        c.AlignSelf = CssAlignItems.Auto;    // resolves to AlignItems
+        c.FlexGrow = 0; c.FlexShrink = 1;
+        c.HasFlexBasis = false;
+        c.GapRow = 0; c.GapCol = 0;
+        c.Order = 0;
         return c;
     }
 
@@ -894,7 +924,64 @@ public sealed class CssSheet
         }
 
         SortDecls(decls, specs);
-        for (int i = 0; i < decls.Count; i++) ApplyDecl(c, decls[i], viewportW);
+
+        // ---- custom properties (--*) + var() substitution ----
+        // Custom props cascade like normal props (specificity then order). We build
+        // a per-element var map: inherited from parent, then overridden by this
+        // element's own --props in cascade order. Inline --props win last.
+        Dictionary<string, string> vars = null;
+        if (parent != null && parent.ResolvedVars != null)
+        {
+            vars = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, string> kv in parent.ResolvedVars) vars[kv.Key] = kv.Value;
+        }
+        for (int i = 0; i < decls.Count; i++)
+        {
+            string p = decls[i].Prop;
+            if (p.Length > 1 && p[0] == '-' && p[1] == '-')
+            {
+                if (vars == null) vars = new Dictionary<string, string>();
+                vars[p] = decls[i].Value;
+            }
+        }
+        if (el != null && el.StyleAttr != null && el.StyleAttr.Length > 0)
+        {
+            int tmp0 = 0;
+            List<CssDecl> ivars = ParseDecls(el.StyleAttr, ref tmp0);
+            for (int i = 0; i < ivars.Count; i++)
+            {
+                string p = ivars[i].Prop;
+                if (p.Length > 1 && p[0] == '-' && p[1] == '-')
+                {
+                    if (vars == null) vars = new Dictionary<string, string>();
+                    vars[p] = ivars[i].Value;
+                }
+            }
+        }
+        // resolve var() references that point at other custom props (self/nested)
+        if (vars != null)
+        {
+            List<string> keys = new List<string>();
+            foreach (KeyValuePair<string, string> kv in vars) keys.Add(kv.Key);
+            for (int i = 0; i < keys.Count; i++)
+            {
+                string resolved;
+                vars.TryGetValue(keys[i], out resolved);
+                string sub = SubstituteVars(resolved, vars, 0);
+                if (sub != null) vars[keys[i]] = sub;
+            }
+        }
+        c.ResolvedVars = vars;
+
+        // apply non-custom declarations with var() substituted into each value
+        for (int i = 0; i < decls.Count; i++)
+        {
+            string p = decls[i].Prop;
+            if (p.Length > 1 && p[0] == '-' && p[1] == '-') continue;   // already collected
+            string val = SubstituteVars(decls[i].Value, vars, 0);
+            if (val == null) continue;   // invalid var() -> declaration becomes unset
+            ApplyDecl(c, p, val, viewportW);
+        }
 
         // inline style="" (highest author priority, still below !important)
         if (el != null && el.StyleAttr != null && el.StyleAttr.Length > 0)
@@ -906,13 +993,110 @@ public sealed class CssSheet
             for (int i = 0; i < inline.Count; i++) isp.Add(top);
             // keep inline !important above normal inline
             SortDecls(inline, isp);
-            for (int i = 0; i < inline.Count; i++) ApplyDecl(c, inline[i], viewportW);
+            for (int i = 0; i < inline.Count; i++)
+            {
+                string p = inline[i].Prop;
+                if (p.Length > 1 && p[0] == '-' && p[1] == '-') continue;   // already collected
+                string val = SubstituteVars(inline[i].Value, vars, 0);
+                if (val == null) continue;
+                ApplyDecl(c, p, val, viewportW);
+            }
         }
 
         c.FontSize = Math.Max(6, c.FontSize);
         if (!c.HasColor) { c.Color = 0xFF000000; c.HasColor = true; } // default black
         if (c.Opacity < 0) c.Opacity = 0; else if (c.Opacity > 1) c.Opacity = 1;
         return c;
+    }
+
+    // Replace var(--name, fallback) references in a value using the custom-property
+    // map. Returns the substituted string, or null if the value is invalid (a var()
+    // with no fallback that resolves to nothing). Cosmos-safe: manual scanning.
+    private static string SubstituteVars(string value, Dictionary<string, string> vars, int depth)
+    {
+        if (value == null || depth > 8) return value;
+        int vi = IndexOfVar(value, 0);
+        if (vi < 0) return value;
+
+        System.Text.StringBuilder sb = new System.Text.StringBuilder(value.Length);
+        int pos = 0;
+        while (vi >= 0)
+        {
+            sb.Append(value, pos, vi - pos);
+            // find the matching close paren for the '(' right after "var"
+            int open = vi + 3;                 // index of '('
+            int close = MatchParen(value, open);
+            string inner = close > open ? value.Substring(open + 1, close - open - 1) : "";
+            // split name and fallback at the first top-level comma
+            string name, fallback;
+            int comma = TopLevelComma(inner);
+            if (comma >= 0) { name = inner.Substring(0, comma); fallback = inner.Substring(comma + 1); }
+            else { name = inner; fallback = null; }
+
+            string repl = null;
+            if (vars != null)
+            {
+                string key = name.Trim();
+                vars.TryGetValue(key, out repl);
+            }
+            if (repl != null && repl.Length > 0)
+            {
+                repl = SubstituteVars(repl, vars, depth + 1);
+            }
+            else if (fallback != null)
+            {
+                repl = SubstituteVars(fallback.Trim(), vars, depth + 1);
+            }
+            else
+            {
+                return null;   // missing custom property, no fallback -> invalid
+            }
+            if (repl == null) return null;
+            sb.Append(repl);
+
+            pos = close + 1;
+            if (pos >= value.Length) { vi = -1; break; }
+            vi = IndexOfVar(value, pos);
+        }
+        sb.Append(value, pos, value.Length - pos);
+        return sb.ToString();
+    }
+
+    private static int IndexOfVar(string s, int start)
+    {
+        if (s == null) return -1;
+        for (int i = start; i + 3 < s.Length; i++)
+            if (s[i] == 'v' && s[i + 1] == 'a' && s[i + 2] == 'r' && s[i + 3] == '(') return i;
+        return -1;
+    }
+
+    // index of the ')' matching the '(' at open (paren-depth aware, skips quotes)
+    private static int MatchParen(string s, int open)
+    {
+        int depth = 0;
+        for (int i = open; i < s.Length; i++)
+        {
+            char ch = s[i];
+            if (ch == '"') { i = SkipString(s, i, s.Length); continue; }
+            if (ch == '(') depth++;
+            else if (ch == ')') { depth--; if (depth == 0) return i; }
+        }
+        return s.Length - 1;
+    }
+
+    // index of the first ',' at paren depth 0, or -1
+    private static int TopLevelComma(string s)
+    {
+        int depth = 0;
+        for (int i = 0; i < s.Length; i++)
+        {
+            char ch = s[i];
+            if (ch == '"') { i = SkipString(s, i, s.Length); continue; }
+            if (ch == '(') depth++;
+            else if (ch == ')') depth--;
+            else if (ch == ',' && depth == 0) return i;
+        }
+        return -1;
     }
 
     private static void SortDecls(List<CssDecl> decls, List<CssSpecificity> specs)
@@ -1267,8 +1451,12 @@ public sealed class CssSheet
         SortDecls(decls, specs);
         for (int i = 0; i < decls.Count; i++)
         {
-            if (decls[i].Prop == "content") content = Unquote(decls[i].Value);
-            else ApplyDecl(c, decls[i], vw);
+            string p = decls[i].Prop;
+            if (p.Length > 1 && p[0] == '-' && p[1] == '-') continue;
+            string val = SubstituteVars(decls[i].Value, c.ResolvedVars, 0);
+            if (val == null) continue;
+            if (p == "content") content = Unquote(val);
+            else ApplyDecl(c, p, val, vw);
         }
         if (content == null) return null; // ::before/::after require content
         if (content == "none" || content == "normal") return null;
@@ -1277,10 +1465,11 @@ public sealed class CssSheet
 
     // ---- property application --------------------------------------------
 
-    private static void ApplyDecl(CssComputed c, CssDecl d, int vw)
+    private static void ApplyDecl(CssComputed c, string prop, string value, int vw)
     {
-        string v = d.Value;
-        switch (d.Prop)
+        string v = value;
+        if (prop.Length > 1 && prop[0] == '-' && prop[1] == '-') return;   // custom props handled in Compute
+        switch (prop)
         {
             case "display":
                 {
@@ -1346,7 +1535,7 @@ public sealed class CssSheet
             case "background": case "background-color":
                 {
                     // "background" shorthand may carry image/position/repeat/color
-                    if (d.Prop == "background-color")
+                    if (prop == "background-color")
                     {
                         if (CssValue.TryColor(v, vw, 0, out uint bg)) { c.HasBg = true; c.BgColor = bg; }
                         break;
@@ -1498,6 +1687,71 @@ public sealed class CssSheet
             case "min-height": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MinH = px; break; }
             case "max-height": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MaxH = px; break; }
 
+            // ---- flexbox ----
+            case "flex-direction":
+                {
+                    string w = FirstWord(v);
+                    if (w == "row-reverse") c.FlexDirection = CssFlexDir.RowReverse;
+                    else if (w == "column") c.FlexDirection = CssFlexDir.Column;
+                    else if (w == "column-reverse") c.FlexDirection = CssFlexDir.ColumnReverse;
+                    else c.FlexDirection = CssFlexDir.Row;
+                    break;
+                }
+            case "flex-wrap":
+                {
+                    string w = FirstWord(v);
+                    if (w == "wrap") c.FlexWrap = CssFlexWrap.Wrap;
+                    else if (w == "wrap-reverse") c.FlexWrap = CssFlexWrap.WrapReverse;
+                    else c.FlexWrap = CssFlexWrap.NoWrap;
+                    break;
+                }
+            case "justify-content": case "justify-items": case "justify-self":
+                {
+                    string w = FirstWord(v);
+                    if (w == "flex-end" || w == "end") c.JustifyContent = CssJustify.FlexEnd;
+                    else if (w == "center") c.JustifyContent = CssJustify.Center;
+                    else if (w == "space-between") c.JustifyContent = CssJustify.SpaceBetween;
+                    else if (w == "space-around") c.JustifyContent = CssJustify.SpaceAround;
+                    else if (w == "space-evenly") c.JustifyContent = CssJustify.SpaceEvenly;
+                    else c.JustifyContent = CssJustify.FlexStart;
+                    break;
+                }
+            case "align-items":
+                {
+                    string w = FirstWord(v);
+                    if (w == "stretch") c.AlignItems = CssAlignItems.Stretch;
+                    else if (w == "flex-start" || w == "start") c.AlignItems = CssAlignItems.FlexStart;
+                    else if (w == "flex-end" || w == "end") c.AlignItems = CssAlignItems.FlexEnd;
+                    else if (w == "center") c.AlignItems = CssAlignItems.Center;
+                    else if (w == "baseline") c.AlignItems = CssAlignItems.Baseline;
+                    else c.AlignItems = CssAlignItems.Auto;
+                    break;
+                }
+            case "align-self":
+                {
+                    string w = FirstWord(v);
+                    if (w == "auto") c.AlignSelf = CssAlignItems.Auto;
+                    else if (w == "stretch") c.AlignSelf = CssAlignItems.Stretch;
+                    else if (w == "flex-start" || w == "start") c.AlignSelf = CssAlignItems.FlexStart;
+                    else if (w == "flex-end" || w == "end") c.AlignSelf = CssAlignItems.FlexEnd;
+                    else if (w == "center") c.AlignSelf = CssAlignItems.Center;
+                    else if (w == "baseline") c.AlignSelf = CssAlignItems.Baseline;
+                    break;
+                }
+            case "flex-grow": { if (CssValue.TryFloat(v, out float fg) && fg >= 0) c.FlexGrow = fg; break; }
+            case "flex-shrink": { if (CssValue.TryFloat(v, out float fs) && fs >= 0) c.FlexShrink = fs; break; }
+            case "flex-basis":
+                {
+                    if (FirstWord(v) == "auto") { c.HasFlexBasis = false; c.FlexBasis = 0; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int fb)) { c.HasFlexBasis = true; c.FlexBasis = fb; }
+                    break;
+                }
+            case "flex": ApplyFlexShorthand(c, v, c.FontSize, vw); break;
+            case "gap": ApplyGapShorthand(c, v, c.FontSize, vw); break;
+            case "row-gap": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int rg)) c.GapRow = Math.Max(0, rg); break; }
+            case "column-gap": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int cg)) c.GapCol = Math.Max(0, cg); break; }
+            case "order": { if (CssValue.TryFloat(v, out float ord)) c.Order = (int)ord; break; }
+
             case "list-style": ApplyListShorthand(c, v); break;
             case "list-style-type":
                 {
@@ -1599,6 +1853,49 @@ public sealed class CssSheet
         c.PadT = t; c.PadR = r; c.PadB = b; c.PadL = l;
     }
 
+    // flex: none | <grow> <shrink>? <basis>?  (basis "auto" or a length, grow/shrink unitless)
+    private static void ApplyFlexShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        string first = parts[0];
+        if (first == "none") { c.FlexGrow = 0; c.FlexShrink = 0; c.HasFlexBasis = true; c.FlexBasis = 0; return; }
+        if (first == "auto") { c.FlexGrow = 1; c.FlexShrink = 1; c.HasFlexBasis = false; c.FlexBasis = 0; return; }
+        if (first == "initial") { c.FlexGrow = 0; c.FlexShrink = 1; c.HasFlexBasis = true; c.FlexBasis = 0; return; }
+
+        // numeric-first form: "1", "1 2", "1 2 30px", "1 1 auto"
+        int idx = 0;
+        if (CssValue.TryFloat(parts[0], out float g)) { c.FlexGrow = g; idx = 1; }
+        else { c.FlexGrow = 0; c.FlexShrink = 1; c.HasFlexBasis = true; c.FlexBasis = 0; return; }
+
+        if (idx < parts.Count && CssValue.TryFloat(parts[idx], out float s)) { c.FlexShrink = s; idx++; }
+        else c.FlexShrink = 1;
+
+        if (idx < parts.Count)
+        {
+            if (parts[idx] == "auto") { c.HasFlexBasis = false; c.FlexBasis = 0; }
+            else if (CssValue.TryLengthPx(parts[idx], fs, vw, out int fb)) { c.HasFlexBasis = true; c.FlexBasis = fb; }
+        }
+        else
+        {
+            // "flex: <grow>" defaults basis to 0%
+            c.HasFlexBasis = true; c.FlexBasis = 0;
+        }
+    }
+
+    // gap: <row-gap> <column-gap>?  (a lone value sets both)
+    private static void ApplyGapShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        if (CssValue.TryLengthPx(parts[0], fs, vw, out int a))
+        {
+            c.GapRow = Math.Max(0, a);
+            if (parts.Count >= 2 && CssValue.TryLengthPx(parts[1], fs, vw, out int b2)) c.GapCol = Math.Max(0, b2);
+            else c.GapCol = c.GapRow;
+        }
+    }
+
     // side: 0=all,1=top,2=bottom,3=left,4=right
     private static void ApplyBorderShorthand(CssComputed c, string v, int fs, int vw, int side)
     {
@@ -1685,7 +1982,7 @@ public sealed class CssSheet
             string p = parts[i];
             if (p == "none") { c.ListStyleType = CssListStyle.None; continue; }
             // reuse the list-style-type handler
-            ApplyDecl(c, new CssDecl { Prop = "list-style-type", Value = p }, 0);
+            ApplyDecl(c, "list-style-type", p, 0);
         }
     }
 
@@ -1820,6 +2117,10 @@ public static class CssValue
         s = s.Trim();
         if (s == "auto" || s == "normal" || s == "none") return false;
 
+        // math functions: calc() / min() / max() / clamp()
+        if (s.Length > 5 && IsMathStart(s))
+            return TryMathPx(s, fontSize, viewportW, out px);
+
         int i = 0;
         bool neg = false;
         if (s[0] == '-') { neg = true; i = 1; }
@@ -1853,6 +2154,218 @@ public static class CssValue
             case "vh": px = (int)Math.Round(val * viewportW * 0.75 / 100.0); return true;
             default: px = (int)Math.Round(val); return true;
         }
+    }
+
+    // ---- math functions: calc() / min() / max() / clamp() ------------------
+
+    private static bool IsMathStart(string s)
+    {
+        return StartsWithFunc(s, "calc(") || StartsWithFunc(s, "min(") ||
+               StartsWithFunc(s, "max(") || StartsWithFunc(s, "clamp(");
+    }
+
+    private static bool StartsWithFunc(string s, string func)
+    {
+        if (s.Length < func.Length) return false;
+        for (int i = 0; i < func.Length; i++)
+        {
+            char a = s[i], b = func[i];
+            if (a >= 'A' && a <= 'Z') a = (char)(a + 32);
+            if (a != b) return false;
+        }
+        return true;
+    }
+
+    private struct MathScan { public string S; public int I; public int Fs; public int Vw; }
+
+    private static void MathSkipWs(ref MathScan p)
+    {
+        while (p.I < p.S.Length && (p.S[p.I] == ' ' || p.S[p.I] == '\t' || p.S[p.I] == '\n' || p.S[p.I] == '\r')) p.I++;
+    }
+
+    private static bool TryMathPx(string s, int fontSize, int viewportW, out int px)
+    {
+        px = 0;
+        MathScan p = new MathScan { S = s, I = 0, Fs = fontSize, Vw = viewportW };
+        double v;
+        if (!ParseMathExpr(ref p, out v)) return false;
+        MathSkipWs(ref p);
+        if (p.I != p.S.Length) return false;   // trailing junk
+        px = (int)Math.Round(v);
+        return true;
+    }
+
+    // expr := term (('+' | '-') term)*
+    private static bool ParseMathExpr(ref MathScan p, out double result)
+    {
+        result = 0;
+        double term;
+        if (!ParseMathTerm(ref p, out term)) return false;
+        result = term;
+        MathSkipWs(ref p);
+        while (p.I < p.S.Length && (p.S[p.I] == '+' || p.S[p.I] == '-'))
+        {
+            bool add = p.S[p.I] == '+';
+            p.I++;
+            double rhs;
+            if (!ParseMathTerm(ref p, out rhs)) return false;
+            result = add ? result + rhs : result - rhs;
+            MathSkipWs(ref p);
+        }
+        return true;
+    }
+
+    // term := factor (('*' | '/') factor)*
+    private static bool ParseMathTerm(ref MathScan p, out double result)
+    {
+        result = 0;
+        double factor;
+        if (!ParseMathFactor(ref p, out factor)) return false;
+        result = factor;
+        MathSkipWs(ref p);
+        while (p.I < p.S.Length && (p.S[p.I] == '*' || p.S[p.I] == '/'))
+        {
+            char op = p.S[p.I];
+            p.I++;
+            double rhs;
+            if (!ParseMathFactor(ref p, out rhs)) return false;
+            if (op == '*') result = result * rhs;
+            else result = rhs != 0 ? result / rhs : 0;
+            MathSkipWs(ref p);
+        }
+        return true;
+    }
+
+    // factor := '(' expr ')' | '-' factor | number[unit] | func '(' args ')'
+    private static bool ParseMathFactor(ref MathScan p, out double result)
+    {
+        result = 0;
+        MathSkipWs(ref p);
+        if (p.I >= p.S.Length) return false;
+        char c = p.S[p.I];
+
+        if (c == '(')
+        {
+            p.I++;
+            if (!ParseMathExpr(ref p, out result)) return false;
+            MathSkipWs(ref p);
+            if (p.I < p.S.Length && p.S[p.I] == ')') { p.I++; return true; }
+            return false;
+        }
+        if (c == '-')
+        {
+            p.I++;
+            if (!ParseMathFactor(ref p, out result)) return false;
+            result = -result;
+            return true;
+        }
+        if (c == '+') { p.I++; return ParseMathFactor(ref p, out result); }
+
+        // function or number
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+        {
+            int start = p.I;
+            while (p.I < p.S.Length && ((p.S[p.I] >= 'a' && p.S[p.I] <= 'z') || (p.S[p.I] >= 'A' && p.S[p.I] <= 'Z'))) p.I++;
+            string fn = p.S.Substring(start, p.I - start).ToLowerInvariant();
+            MathSkipWs(ref p);
+            if (p.I >= p.S.Length || p.S[p.I] != '(') return false;
+            p.I++;
+            return ParseMathFunc(ref p, fn, out result);
+        }
+
+        return ParseMathNumber(ref p, out result);
+    }
+
+    private static bool ParseMathFunc(ref MathScan p, string fn, out double result)
+    {
+        result = 0;
+        double a0, a1, a2;
+        // first arg
+        if (!ParseMathExpr(ref p, out a0)) return false;
+        MathSkipWs(ref p);
+        bool hasComma = p.I < p.S.Length && p.S[p.I] == ',';
+        if (hasComma) p.I++;
+
+        if (fn == "calc")
+        {
+            // calc takes a single expression
+            MathSkipWs(ref p);
+            if (p.I < p.S.Length && p.S[p.I] == ')') { p.I++; result = a0; return true; }
+            return false;
+        }
+
+        if (fn == "clamp")
+        {
+            if (!ParseMathExpr(ref p, out a1)) return false;
+            MathSkipWs(ref p);
+            if (p.I < p.S.Length && p.S[p.I] == ',') p.I++;
+            if (!ParseMathExpr(ref p, out a2)) return false;
+            MathSkipWs(ref p);
+            if (p.I < p.S.Length && p.S[p.I] == ')') p.I++;
+            // clamp(min, val, max)
+            double mn = a0, val = a1, mx = a2;
+            result = val < mn ? mn : (val > mx ? mx : val);
+            return true;
+        }
+
+        // min / max over one or more comma-separated args
+        double best = a0;
+        while (hasComma)
+        {
+            double arg;
+            if (!ParseMathExpr(ref p, out arg)) return false;
+            if (fn == "min") { if (arg < best) best = arg; }
+            else { if (arg > best) best = arg; }
+            MathSkipWs(ref p);
+            hasComma = p.I < p.S.Length && p.S[p.I] == ',';
+            if (hasComma) p.I++;
+        }
+        MathSkipWs(ref p);
+        if (p.I < p.S.Length && p.S[p.I] == ')') p.I++;
+        result = best;
+        return true;
+    }
+
+    private static bool ParseMathNumber(ref MathScan p, out double result)
+    {
+        result = 0;
+        int i = p.I;
+        bool neg = false;
+        if (i < p.S.Length && p.S[i] == '-') { neg = true; i++; }
+        else if (i < p.S.Length && p.S[i] == '+') i++;
+
+        double val = 0; bool hasDigits = false;
+        while (i < p.S.Length && p.S[i] >= '0' && p.S[i] <= '9') { val = val * 10 + (p.S[i] - '0'); i++; hasDigits = true; }
+        if (i < p.S.Length && p.S[i] == '.')
+        {
+            i++; double frac = 0.1;
+            while (i < p.S.Length && p.S[i] >= '0' && p.S[i] <= '9') { val += (p.S[i] - '0') * frac; frac *= 0.1; i++; hasDigits = true; }
+        }
+        if (!hasDigits) return false;
+        if (neg) val = -val;
+
+        int us = i;
+        while (i < p.S.Length && ((p.S[i] >= 'a' && p.S[i] <= 'z') || (p.S[i] >= 'A' && p.S[i] <= 'Z') || p.S[i] == '%')) i++;
+        string unit = p.S.Substring(us, i - us).ToLowerInvariant();
+        p.I = i;
+
+        switch (unit)
+        {
+            case "": case "px": result = val; break;
+            case "em": result = val * p.Fs; break;
+            case "rem": result = val * 13; break;
+            case "pt": result = val * 96.0 / 72.0; break;
+            case "pc": result = val * 16.0; break;
+            case "in": result = val * 96.0; break;
+            case "cm": result = val * 96.0 / 2.54; break;
+            case "mm": result = val * 96.0 / 25.4; break;
+            case "ex": case "ch": result = val * p.Fs * 0.5; break;
+            case "%": result = val * p.Vw / 100.0; break;
+            case "vw": result = val * p.Vw / 100.0; break;
+            case "vh": result = val * p.Vw * 0.75 / 100.0; break;
+            default: result = val; break;
+        }
+        return true;
     }
 
     /// <summary>Parse a font-size (absolute keywords + lengths). % is relative to the parent size.</summary>

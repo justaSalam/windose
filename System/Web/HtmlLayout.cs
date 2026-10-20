@@ -163,6 +163,31 @@ public static class HtmlLayout
         public DomNode Node;    // owning element for click targeting
     }
 
+    // A single flex item: either an element node or an anonymous run of inline content.
+    private sealed class FlexItem
+    {
+        public DomNode Node;             // element item (null for anonymous inline)
+        public CssComputed Style;        // item computed style
+        public List<Run> Runs;           // anonymous inline items only
+        public bool IsAnonymous;
+
+        // box-model parts (main = horizontal for row, vertical for column)
+        public int MarginMain0, MarginMain1;   // start/end margins along main axis
+        public int MarginCross0, MarginCross1;
+        public int PadMain, PadCross;          // padding start+end combined
+        public int BorderMain, BorderCross;    // border start+end combined
+
+        public int BaseSize;      // flex base size (content-box, main axis)
+        public int MainSize;      // resolved main size (content-box)
+        public int CrossSize;     // resolved cross size (content-box); 0 = auto/stretch
+        public int MinMain, MaxMain;
+        public float Grow, Shrink;
+        public int Order;
+        public CssAlignItems AlignSelf;
+
+        public int MainPos, CrossPos;   // resolved border-box origin in container content coords
+    }
+
     // ---- entry point -----------------------------------------------------
 
     public static RenderPlan Build(DomNode root, string cssText, int viewWidth, int viewHeight,
@@ -335,7 +360,10 @@ public static class HtmlLayout
         CssComputed containerStyle = style;
 
         // Table rows/cells and captions are handled as containers; lists/tables recursed above.
-        LayoutContainer(node, style, containerStyle, contentX, contentRight, ref cy, ctx);
+        if (style.Display == CssDisplay.Flex)
+            LayoutFlex(node, style, containerStyle, contentX, contentRight, ref cy, ctx);
+        else
+            LayoutContainer(node, style, containerStyle, contentX, contentRight, ref cy, ctx);
 
         int contentBottom = cy;
         if (style.HasH && style.H > (contentBottom - contentTop)) contentBottom = contentTop + style.H;
@@ -369,6 +397,471 @@ public static class HtmlLayout
         }
 
         y = boxBottom + marginBottom;
+    }
+
+    // ---- flexbox ---------------------------------------------------------
+
+    private static CssAlignItems ResolveAlign(CssAlignItems self, CssAlignItems container)
+    {
+        if (self != CssAlignItems.Auto) return self;
+        return container == CssAlignItems.Auto ? CssAlignItems.Stretch : container;
+    }
+
+    // Measure a flex item's natural content-box width (no wrap).
+    private static int MeasureNaturalWidth(FlexItem it, Ctx ctx)
+    {
+        int w;
+        if (it.IsAnonymous)
+        {
+            w = 0;
+            for (int i = 0; i < it.Runs.Count; i++)
+            {
+                Run r = it.Runs[i];
+                if (r.Break) continue;
+                int sz = r.Style != null ? r.Style.FontSize : 13;
+                w += ctx.Measure(r.Text, sz) + 6;   // + inter-token breathing room
+            }
+        }
+        else
+        {
+            RenderPlan saved = ctx.Plan;
+            RenderPlan scratch = new RenderPlan();
+            ctx.Plan = scratch;
+            CssComputed m = it.Style.Clone();
+            m.MarginL = m.MarginR = m.MarginT = m.MarginB = 0;
+            m.HasW = false; m.HasH = false;
+            int y = 0;
+            LayoutBlockNode(it.Node, m, 0, 10000, ref y, ctx, 0);
+            ctx.Plan = saved;
+            int contentX = m.BorderLW + m.PadL;
+            int maxR = contentX;
+            for (int li = 0; li < scratch.Lines.Count; li++)
+            {
+                RenderLine line = scratch.Lines[li];
+                if (line.IsImage) { if (line.TextX + line.ImageW > maxR) maxR = line.TextX + line.ImageW; continue; }
+                for (int si = 0; si < line.Spans.Count; si++)
+                {
+                    RenderSpan s = line.Spans[si];
+                    if (s.X + s.Width > maxR) maxR = s.X + s.Width;
+                }
+            }
+            w = maxR - contentX;
+        }
+        if (w < 1) w = 1;
+        CssComputed st = it.Style;
+        if (st.MaxW < int.MaxValue && w > st.MaxW) w = st.MaxW;
+        if (st.MinW > 0 && w < st.MinW) w = st.MinW;
+        return w;
+    }
+
+    // Measure a flex item's border-box height when its content-box width is contentW.
+    private static int MeasureBorderHeightAt(FlexItem it, int contentW, Ctx ctx)
+    {
+        CssComputed st = it.Style;
+        if (it.IsAnonymous)
+        {
+            RenderPlan saved = ctx.Plan;
+            RenderPlan sc = new RenderPlan();
+            ctx.Plan = sc;
+            int y = 0;
+            FlushRuns(new List<Run>(it.Runs), st, 0, contentW + st.PadL + st.PadR, ref y, ctx, null, 0);
+            ctx.Plan = saved;
+            return y < 1 ? 1 : y;
+        }
+        RenderPlan saved2 = ctx.Plan;
+        RenderPlan s2 = new RenderPlan();
+        ctx.Plan = s2;
+        CssComputed m = st.Clone();
+        m.MarginL = m.MarginR = m.MarginT = m.MarginB = 0;
+        m.HasW = true; m.HasH = false;
+        int bw = contentW + m.PadL + m.PadR + m.BorderLW + m.BorderRW;
+        m.W = m.BoxSizing == CssBox.Border ? bw : contentW;
+        int y2 = 0;
+        LayoutBlockNode(it.Node, m, 0, 10000, ref y2, ctx, 0);
+        ctx.Plan = saved2;
+        return y2 < 1 ? 1 : y2;
+    }
+
+    // Lay one item out for real at a border-box top-left, with a fixed border-box size.
+    private static void LayFlexItem(FlexItem it, int boxLeft, int boxTop, int boxW, int boxH, Ctx ctx)
+    {
+        CssComputed st = it.Style;
+        if (it.IsAnonymous)
+        {
+            RenderPlan saved = ctx.Plan;
+            // anonymous items lay out inline runs; keep them on the real plan
+            int fy = boxTop;
+            FlushRuns(new List<Run>(it.Runs), st, boxLeft, boxLeft + boxW, ref fy, ctx, null, 0);
+            return;
+        }
+        CssComputed f = st.Clone();
+        f.MarginL = f.MarginR = f.MarginT = f.MarginB = 0;
+        f.HasW = true; f.HasH = true;
+        if (f.BoxSizing == CssBox.Border) { f.W = boxW; f.H = boxH; }
+        else
+        {
+            f.W = boxW - (f.PadL + f.PadR + f.BorderLW + f.BorderRW);
+            f.H = boxH - (f.PadT + f.PadB + f.BorderTW + f.BorderBW);
+        }
+        if (f.W < 1) f.W = 1;
+        if (f.H < 1) f.H = 1;
+        int fy2 = boxTop;
+        LayoutBlockNode(it.Node, f, boxLeft, boxLeft + boxW, ref fy2, ctx, 0);
+    }
+
+    private static void CollectFlexItems(DomNode container, CssComputed baseStyle, bool row,
+        List<FlexItem> items, Ctx ctx)
+    {
+        List<Run> pending = null;
+        DomNode child = container.FirstChild;
+        while (child != null)
+        {
+            if (child.NodeType == DomNode.TextNode)
+            {
+                string collapsed = CollapseWs(child.Text);
+                bool hasInk = false;
+                for (int i = 0; i < collapsed.Length; i++) if (collapsed[i] != ' ') { hasInk = true; break; }
+                if (hasInk)
+                {
+                    if (pending == null) pending = new List<Run>();
+                    AddTextRuns(pending, collapsed, baseStyle, null, container);
+                }
+            }
+            else if (child.IsElement)
+            {
+                CssComputed cs = ctx.Sheet.Compute(child, baseStyle, ctx.Vw, ctx.Vh);
+                if (cs.Display != CssDisplay.None)
+                {
+                    if (pending != null) { items.Add(new FlexItem { IsAnonymous = true, Runs = pending, Style = baseStyle.Clone() }); pending = null; }
+                    items.Add(new FlexItem { Node = child, Style = cs });
+                }
+            }
+            child = child.Next;
+        }
+        if (pending != null) items.Add(new FlexItem { IsAnonymous = true, Runs = pending, Style = baseStyle.Clone() });
+
+        // sort by 'order' (stable)
+        for (int i = 1; i < items.Count; i++)
+        {
+            FlexItem di = items[i]; int dj = i - 1;
+            while (dj >= 0 && items[dj].Style.Order > di.Style.Order) { items[dj + 1] = items[dj]; dj--; }
+            items[dj + 1] = di;
+        }
+
+        // pull per-item box-model parts
+        for (int i = 0; i < items.Count; i++)
+        {
+            FlexItem it = items[i]; CssComputed s = it.Style;
+            if (row)
+            {
+                it.MarginMain0 = s.MarginL; it.MarginMain1 = s.MarginR;
+                it.MarginCross0 = s.MarginT; it.MarginCross1 = s.MarginB;
+                it.PadMain = s.PadL + s.PadR; it.BorderMain = s.BorderLW + s.BorderRW;
+                it.PadCross = s.PadT + s.PadB; it.BorderCross = s.BorderTW + s.BorderBW;
+            }
+            else
+            {
+                it.MarginMain0 = s.MarginT; it.MarginMain1 = s.MarginB;
+                it.MarginCross0 = s.MarginL; it.MarginCross1 = s.MarginR;
+                it.PadMain = s.PadT + s.PadB; it.BorderMain = s.BorderTW + s.BorderBW;
+                it.PadCross = s.PadL + s.PadR; it.BorderCross = s.BorderLW + s.BorderRW;
+            }
+            it.Grow = s.FlexGrow; it.Shrink = s.FlexShrink; it.Order = s.Order;
+            it.AlignSelf = s.AlignSelf;
+            it.MinMain = row ? s.MinW : s.MinH;
+            it.MaxMain = row ? s.MaxW : s.MaxH;
+        }
+    }
+
+    // Distribute free/overflow along the main axis for one line of items [lo,hi).
+    private static void ResolveFlexLine(List<FlexItem> items, int lo, int hi, int containerMain, int gap)
+    {
+        // hypothetical outer main sizes
+        long usedOuter = 0; float totalGrow = 0, weightedShrink = 0;
+        for (int i = lo; i < hi; i++)
+        {
+            FlexItem it = items[i];
+            int outer = it.BaseSize + it.PadMain + it.BorderMain + it.MarginMain0 + it.MarginMain1;
+            usedOuter += outer;
+            totalGrow += it.Grow;
+            weightedShrink += it.Shrink * it.BaseSize;
+        }
+        long gaps = (long)gap * (hi - lo - 1);
+        int free = (int)(containerMain - usedOuter - gaps);
+
+        if (free > 0 && totalGrow > 0.001f)
+        {
+            for (int i = lo; i < hi; i++)
+            {
+                FlexItem it = items[i];
+                if (it.Grow <= 0) continue;
+                int add = (int)(free * (it.Grow / totalGrow));
+                it.BaseSize += add;
+            }
+        }
+        else if (free < 0 && weightedShrink > 0.001f)
+        {
+            int toRemove = -free;
+            for (int i = lo; i < hi; i++)
+            {
+                FlexItem it = items[i];
+                if (it.Shrink <= 0 || it.BaseSize <= 0) continue;
+                int sub = (int)(toRemove * (it.Shrink * it.BaseSize / weightedShrink));
+                it.BaseSize -= sub;
+            }
+        }
+
+        // clamp to min/max and recompute leftover
+        for (int i = lo; i < hi; i++)
+        {
+            FlexItem it = items[i];
+            if (it.MaxMain < int.MaxValue && it.BaseSize > it.MaxMain) it.BaseSize = it.MaxMain;
+            if (it.MinMain > 0 && it.BaseSize < it.MinMain) it.BaseSize = it.MinMain;
+            if (it.BaseSize < 0) it.BaseSize = 0;
+        }
+    }
+
+    private static void LayoutFlex(DomNode container, CssComputed cstyle, CssComputed baseStyle,
+        int contentX, int contentRight, ref int y, Ctx ctx)
+    {
+        bool row = cstyle.FlexDirection == CssFlexDir.Row || cstyle.FlexDirection == CssFlexDir.RowReverse;
+        bool reverseMain = cstyle.FlexDirection == CssFlexDir.RowReverse || cstyle.FlexDirection == CssFlexDir.ColumnReverse;
+        bool wrap = cstyle.FlexWrap == CssFlexWrap.Wrap || cstyle.FlexWrap == CssFlexWrap.WrapReverse;
+        bool reverseCross = cstyle.FlexWrap == CssFlexWrap.WrapReverse;
+
+        List<FlexItem> items = new List<FlexItem>();
+        CollectFlexItems(container, baseStyle, row, items, ctx);
+        if (items.Count == 0) return;
+
+        CssAlignItems contAlign = cstyle.AlignItems == CssAlignItems.Auto ? CssAlignItems.Stretch : cstyle.AlignItems;
+        int containerCross = contentRight - contentX;   // for row: width; used as line width
+        int containerMainSize = row ? containerCross : 0;
+        int mainGap = row ? cstyle.GapCol : cstyle.GapRow;
+        int crossGap = row ? cstyle.GapRow : cstyle.GapCol;
+
+        // ---- determine base main size per item ----
+        if (row)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                FlexItem it = items[i]; CssComputed s = it.Style;
+                if (s.HasW)
+                    it.BaseSize = s.BoxSizing == CssBox.Border ? s.W - it.PadMain - it.BorderMain : s.W;
+                else if (s.HasFlexBasis)
+                    it.BaseSize = s.FlexBasis;
+                else
+                    it.BaseSize = MeasureNaturalWidth(it, ctx);
+            }
+        }
+        else
+        {
+            // column: cross (width) first
+            for (int i = 0; i < items.Count; i++)
+            {
+                FlexItem it = items[i]; CssComputed s = it.Style;
+                CssAlignItems al = ResolveAlign(it.AlignSelf, contAlign);
+                if (s.HasW)
+                    it.CrossSize = s.BoxSizing == CssBox.Border ? s.W - it.PadCross - it.BorderCross : s.W;
+                else if (al == CssAlignItems.Stretch)
+                    it.CrossSize = Math.Max(1, containerCross - it.PadCross - it.BorderCross);
+                else
+                    it.CrossSize = Math.Max(1, MeasureNaturalWidth(it, ctx));
+            }
+            for (int i = 0; i < items.Count; i++)
+            {
+                FlexItem it = items[i]; CssComputed s = it.Style;
+                if (s.HasH)
+                    it.BaseSize = s.BoxSizing == CssBox.Border ? s.H - it.PadMain - it.BorderMain : s.H;
+                else if (s.HasFlexBasis)
+                    it.BaseSize = s.FlexBasis;
+                else
+                    it.BaseSize = MeasureBorderHeightAt(it, it.CrossSize, ctx) - it.PadMain - it.BorderMain;
+            }
+        }
+
+        // ---- build lines (main-axis grouping) ----
+        List<int> lineStart = new List<int>();
+        List<int> lineEnd = new List<int>();
+        if (!wrap)
+        {
+            lineStart.Add(0); lineEnd.Add(items.Count);
+        }
+        else
+        {
+            long runOuter = 0; int start = 0;
+            for (int i = 0; i < items.Count; i++)
+            {
+                FlexItem it = items[i];
+                int outer = it.BaseSize + it.PadMain + it.BorderMain + it.MarginMain0 + it.MarginMain1;
+                long needed = runOuter + outer + (i > start ? mainGap : 0);
+                if (i > start && needed > containerMainSize)
+                {
+                    lineStart.Add(start); lineEnd.Add(i);
+                    start = i; runOuter = outer;
+                }
+                else runOuter = needed;
+            }
+            lineStart.Add(start); lineEnd.Add(items.Count);
+        }
+
+        // ---- resolve flexible lengths + position items line by line ----
+        int mainCursor = 0;   // accumulated main offset across lines (for column) / cross lines stacked in y
+        int totalCross = 0;   // sum of line cross sizes (+ gaps) — becomes the content height for column, or lines for row wrap
+
+        for (int l = 0; l < lineStart.Count; l++)
+        {
+            int lo = lineStart[l], hi = lineEnd[l];
+
+            if (row)
+            {
+                ResolveFlexLine(items, lo, hi, containerMainSize, mainGap);
+
+                // measure each item's cross (height) at its resolved content width
+                int lineCross = 0;
+                for (int i = lo; i < hi; i++)
+                {
+                    FlexItem it = items[i];
+                    int bw = it.BaseSize + it.PadMain + it.BorderMain;
+                    if (it.Style.HasH)
+                        it.CrossSize = it.Style.BoxSizing == CssBox.Border
+                            ? it.Style.H - it.PadCross - it.BorderCross
+                            : it.Style.H;
+                    else
+                        it.CrossSize = MeasureBorderHeightAt(it, it.BaseSize, ctx) - it.PadCross - it.BorderCross;
+                    if (it.CrossSize < 1) it.CrossSize = 1;
+                    int outerCross = it.CrossSize + it.PadCross + it.BorderCross + it.MarginCross0 + it.MarginCross1;
+                    if (outerCross > lineCross) lineCross = outerCross;
+                }
+                // A single-line container with a definite cross (height) size: the line
+                // fills it, so align-items:center/stretch center against the container,
+                // not against the tallest item.
+                if (lineStart.Count == 1 && cstyle.HasH && cstyle.H > lineCross) lineCross = cstyle.H;
+
+                // leftover + justify-content
+                long usedOuter = 0;
+                for (int i = lo; i < hi; i++)
+                {
+                    FlexItem it = items[i];
+                    usedOuter += it.BaseSize + it.PadMain + it.BorderMain + it.MarginMain0 + it.MarginMain1;
+                }
+                long gaps = (long)mainGap * (hi - lo - 1);
+                int leftover = (int)(containerMainSize - usedOuter - gaps);
+                int lead = 0, extraGap = 0; int n = hi - lo;
+                switch (cstyle.JustifyContent)
+                {
+                    case CssJustify.FlexEnd: lead = leftover; break;
+                    case CssJustify.Center: lead = leftover / 2; break;
+                    case CssJustify.SpaceBetween: if (n > 1) extraGap = leftover / (n - 1); else lead = leftover / 2; break;
+                    case CssJustify.SpaceAround: lead = leftover / (2 * n); extraGap = n > 0 ? leftover / n : 0; break;
+                    case CssJustify.SpaceEvenly: lead = leftover / (n + 1); extraGap = leftover / (n + 1); break;
+                    default: lead = 0; break;
+                }
+                if (leftover < 0) { lead = 0; extraGap = 0; }
+
+                // place items
+                int cur = lead;
+                int orderStart = lo, orderEnd = hi, orderStep = 1;
+                if (reverseMain) { cur = leftover - lead; orderStart = hi - 1; orderEnd = -1; orderStep = -1; }
+                for (int idx = orderStart; idx != orderEnd; idx += orderStep)
+                {
+                    FlexItem it = items[idx];
+                    int bw = it.BaseSize + it.PadMain + it.BorderMain;
+                    if (reverseMain) cur -= (it.MarginMain1 + bw + it.MarginMain0 + mainGap + extraGap);
+                    int boxLeft = contentX + cur + it.MarginMain0;
+                    if (!reverseMain) cur += it.MarginMain0 + bw + it.MarginMain1 + mainGap + extraGap;
+
+                    // cross position within the line
+                    int outerCross = it.CrossSize + it.PadCross + it.BorderCross;
+                    int targetH = outerCross;
+                    CssAlignItems al = ResolveAlign(it.AlignSelf, contAlign);
+                    bool stretch = al == CssAlignItems.Stretch && !it.Style.HasH;
+                    if (stretch) targetH = lineCross - it.MarginCross0 - it.MarginCross1;
+                    if (targetH < 1) targetH = 1;
+                    int crossTop;
+                    switch (al)
+                    {
+                        case CssAlignItems.FlexEnd: crossTop = lineCross - it.MarginCross1 - targetH; break;
+                        case CssAlignItems.Center: crossTop = (lineCross - targetH) / 2; break;
+                        default: crossTop = it.MarginCross0; break;   // flex-start / stretch / baseline
+                    }
+                    int boxTop = y + mainCursor + crossTop;
+                    int contentH = targetH - it.PadCross - it.BorderCross;
+                    if (contentH < 1) contentH = 1;
+
+                    LayFlexItem(it, boxLeft, boxTop, bw, targetH, ctx);
+                }
+
+                totalCross += lineCross;
+                mainCursor += lineCross;
+            }
+            else
+            {
+                // column
+                ResolveFlexLine(items, lo, hi, cstyle.HasH ? cstyle.H : int.MaxValue, mainGap);
+
+                // measure natural main (height) for auto items already done; compute leftover if definite height
+                long usedOuter = 0;
+                for (int i = lo; i < hi; i++)
+                {
+                    FlexItem it = items[i];
+                    usedOuter += it.BaseSize + it.PadMain + it.BorderMain + it.MarginMain0 + it.MarginMain1;
+                }
+                long gaps = (long)mainGap * (hi - lo - 1);
+                int leftover = cstyle.HasH ? (int)(cstyle.H - usedOuter - gaps) : 0;
+                int lead = 0, extraGap = 0; int n = hi - lo;
+                if (cstyle.HasH)
+                {
+                    switch (cstyle.JustifyContent)
+                    {
+                        case CssJustify.FlexEnd: lead = leftover; break;
+                        case CssJustify.Center: lead = leftover / 2; break;
+                        case CssJustify.SpaceBetween: if (n > 1) extraGap = leftover / (n - 1); else lead = leftover / 2; break;
+                        case CssJustify.SpaceAround: lead = leftover / (2 * n); extraGap = n > 0 ? leftover / n : 0; break;
+                        case CssJustify.SpaceEvenly: lead = leftover / (n + 1); extraGap = leftover / (n + 1); break;
+                        default: lead = 0; break;
+                    }
+                    if (leftover < 0) { lead = 0; extraGap = 0; }
+                }
+
+                int cur = lead;
+                int orderStart = lo, orderEnd = hi, orderStep = 1;
+                if (reverseMain) { cur = (cstyle.HasH ? leftover : 0) - lead; orderStart = hi - 1; orderEnd = -1; orderStep = -1; }
+                for (int idx = orderStart; idx != orderEnd; idx += orderStep)
+                {
+                    FlexItem it = items[idx];
+                    int bw = it.CrossSize + it.PadCross + it.BorderCross;   // width
+                    int bh = it.BaseSize + it.PadMain + it.BorderMain;       // height
+                    if (reverseMain) cur -= (it.MarginMain1 + bh + it.MarginMain0 + mainGap + extraGap);
+                    int boxTop = y + cur + it.MarginMain0;
+                    if (!reverseMain) cur += it.MarginMain0 + bh + it.MarginMain1 + mainGap + extraGap;
+
+                    CssAlignItems al = ResolveAlign(it.AlignSelf, contAlign);
+                    int boxLeft;
+                    switch (al)
+                    {
+                        case CssAlignItems.FlexEnd: boxLeft = contentRight - it.MarginCross1 - bw; break;
+                        case CssAlignItems.Center: boxLeft = contentX + (containerCross - bw) / 2; break;
+                        default: boxLeft = contentX + it.MarginCross0; break;
+                    }
+
+                    LayFlexItem(it, boxLeft, boxTop, bw, bh, ctx);
+                }
+
+                totalCross += 0;   // column main axis already advanced via cur
+                // for column, the content height is the consumed main length
+                int consumed = lead;
+                for (int i = lo; i < hi; i++)
+                {
+                    FlexItem it = items[i];
+                    consumed += it.MarginMain0 + it.BaseSize + it.PadMain + it.BorderMain + it.MarginMain1 + mainGap + extraGap;
+                }
+                if (hi - lo > 0) consumed -= mainGap + extraGap;
+                mainCursor += consumed;
+            }
+        }
+
+        if (row) y += totalCross;
+        else y += mainCursor;
     }
 
     // ---- lists -----------------------------------------------------------
