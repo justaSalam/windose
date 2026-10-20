@@ -4,8 +4,11 @@ using System.Threading;
 using Cosmos.Kernel.System.Graphics;
 using HttpClient = Cosmos.Network.Http.HttpClient;
 using HttpResponseMessage = Cosmos.Network.Http.HttpResponseMessage;
-using SslVerification = Cosmos.Network.Http.SslVerification;
+using HttpContent = Cosmos.Network.Http.HttpContent;
+using StringContent = Cosmos.Network.Http.StringContent;
+using HttpRequestHeaders = Cosmos.Network.Http.Headers.HttpRequestHeaders;
 using HttpWebRequest = Cosmos.Network.Http.HttpWebRequest;
+using SslVerification = Cosmos.Network.Http.SslVerification;
 
 namespace Windose.Programs
 {
@@ -47,6 +50,15 @@ fn main() {
         private readonly List<string> backStack = new List<string>();
         private readonly List<string> forwardStack = new List<string>();
         private string currentUrl = "";
+
+        // One cookie jar shared by the page pipeline and the script fetch/XHR
+        // pipeline (stage 4). Workers lock it internally.
+        private readonly CookieJar cookies = new CookieJar();
+
+        // ---- script -> shell hooks (used by the WebView's networking thread) ----
+
+        private string JsGetCookies(string url) { return cookies.DocumentCookieFor(url); }
+        private void JsSetCookie(string cookie, string url) { cookies.AddFromSetCookie(cookie, url); }
 
         // Worker -> UI handoff (the worker only fills these and flips resultReady;
         // the update thread consumes them so all GUI mutation stays on one thread).
@@ -130,6 +142,15 @@ fn main() {
             // ---- wiring ----
             addressBar.addressField.EnterPressed += () => Navigate(addressBar.Address);
             webView.LinkActivated += href => Navigate(WebUrl.Resolve(currentUrl, href));
+
+            // JS engine -> shell: script-driven navigation, reload, history, HTTP.
+            webView.NavigateRequested += url => Navigate(WebUrl.Resolve(currentUrl, url));
+            webView.ReloadRequested += Refresh;
+            webView.HistoryBackRequested += GoBack;
+            webView.HistoryForwardRequested += GoForward;
+            webView.HttpFetch = HttpFetchJs;
+            webView.GetCookies = JsGetCookies;
+            webView.SetCookie = JsSetCookie;
 
             Navigate(HomeUrl);
         }
@@ -336,6 +357,16 @@ fn main() {
             HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
             // A hobby OS ships no root-CA store, so skip certificate validation for HTTPS.
             client.SslVerification = SslVerification.NoVerification;
+            // Browser identity (stage 4): sites gate content on UA + Accept.
+            try
+            {
+                client.DefaultRequestHeaders.Add("User-Agent",
+                    "Mozilla/5.0 (Windose; x86) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36");
+                client.DefaultRequestHeaders.Add("Accept",
+                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+                client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
+            }
+            catch { /* header rejection must not stop the request */ }
             return client;
         }
 
@@ -347,8 +378,10 @@ fn main() {
             for (int hop = 0; hop < 6; hop++)
             {
                 HttpClient client = NewClient();
+                AddCookieHeader(client, current);
                 HttpResponseMessage response = client.Get(current);
                 if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
+                StoreCookies(response, current);
 
                 int code = (int)response.StatusCode;
                 if (code >= 300 && code < 400)
@@ -381,6 +414,216 @@ fn main() {
             string final;
             HttpResponseMessage response = GetFollowingRedirects(url, out final);
             return response.Content != null ? response.Content.ReadAsByteArray() : null;
+        }
+
+        // ---- JS fetch / XHR (runs on the WebView's fetch worker thread) -----
+
+        /// <summary>Called by the WebView's networking thread for every script
+        /// fetch()/XHR. Follows redirects, applies the browser's UA/Accept
+        /// headers and merges the script's own headers. Never throws.</summary>
+        private JsFetchResult HttpFetchJs(string method, string url, string headers, string body)
+        {
+            JsFetchResult result = new JsFetchResult();
+            result.Url = url;
+
+            try
+            {
+                string scheme = WebUrl.SchemeOf(url);
+                if (scheme != "http" && scheme != "https")
+                {
+                    result.Error = "Unsupported protocol: " + scheme;
+                    return result;
+                }
+
+                string finalUrl;
+                HttpResponseMessage response = SendWithRedirects(method, url, headers, body, out finalUrl);
+
+                int code = (int)response.StatusCode;
+                result.Status = code;
+                result.StatusText = response.ReasonPhrase != null ? response.ReasonPhrase : "";
+                result.Ok = code >= 200 && code < 300;
+                result.Url = finalUrl;
+                result.Headers = CollectResponseHeaders(response);
+                result.Body = response.Content != null ? response.Content.ReadAsString() : "";
+            }
+            catch (Exception ex)
+            {
+                result.Error = DeepestMessage(ex);
+            }
+            return result;
+        }
+
+        /// <summary>Send a request of any method (with optional body and script
+        /// headers), following up to 6 redirects. 301/302/303 turn POST into
+        /// GET (browser behaviour); 307/308 keep method and body.</summary>
+        private HttpResponseMessage SendWithRedirects(string method, string url,
+            string requestHeaders, string body, out string finalUrl)
+        {
+            string current = url;
+            string m = string.IsNullOrEmpty(method) ? "GET" : method.ToUpperInvariant();
+            string mediaType = ExtractHeaderValue(requestHeaders, "content-type");
+            if (mediaType == null || mediaType.Length == 0)
+                mediaType = "application/x-www-form-urlencoded";
+
+            for (int hop = 0; hop < 6; hop++)
+            {
+                HttpClient client = NewClient();
+                AddCookieHeader(client, current);
+                AddRequestHeaders(client.DefaultRequestHeaders, requestHeaders);
+
+                HttpResponseMessage response;
+                if (m == "POST") response = client.Post(current, MakeContent(body, mediaType));
+                else if (m == "PUT") response = client.Put(current, MakeContent(body, mediaType));
+                else if (m == "PATCH") response = client.Patch(current, MakeContent(body, mediaType));
+                else if (m == "DELETE") response = client.Delete(current);
+                else response = client.Get(current);
+
+                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
+                StoreCookies(response, current);
+
+                int code = (int)response.StatusCode;
+                if (code >= 300 && code < 400)
+                {
+                    string location = ReadHeader(response, "Location");
+                    if (string.IsNullOrEmpty(location))
+                        throw new Exception("HTTP " + code + " redirect with no Location header.");
+                    if (code == 301 || code == 302 || code == 303)
+                    {
+                        if (m == "POST" || m == "PUT" || m == "PATCH") m = "GET";
+                    }
+                    current = WebUrl.Resolve(current, location);
+                    continue;
+                }
+
+                finalUrl = current;
+                return response;
+            }
+            throw new Exception("Too many redirects.");
+        }
+
+        private static HttpContent MakeContent(string body, string mediaType)
+        {
+            if (body == null) body = "";
+            return new StringContent(body, new global::System.Text.UTF8Encoding(false), mediaType);
+        }
+
+        /// <summary>Add the script-supplied "Name: value" lines to the request
+        /// (the browser's own UA/Accept stay unless a script overrides them).</summary>
+        private static void AddRequestHeaders(HttpRequestHeaders headers, string headerLines)
+        {
+            if (headers == null || string.IsNullOrEmpty(headerLines)) return;
+            int start = 0;
+            while (start < headerLines.Length)
+            {
+                int nl = headerLines.IndexOf('\n', start);
+                if (nl < 0) nl = headerLines.Length;
+                string line = headerLines.Substring(start, nl - start);
+                if (line.Length > 0 && line[line.Length - 1] == '\r') line = line.Substring(0, line.Length - 1);
+                start = nl + 1;
+
+                int colon = line.IndexOf(':');
+                if (colon <= 0) continue;
+                string name = line.Substring(0, colon).Trim();
+                string value = line.Substring(colon + 1).Trim();
+                if (name.Length == 0 || value.Length == 0) continue;
+                // Content-Type is carried by the body content, not the header list
+                if (name.ToLowerInvariant() == "content-type") continue;
+                // User-Agent is a forbidden header name (browsers block script spoofing)
+                if (name.ToLowerInvariant() == "user-agent") continue;
+                try { headers.Add(name, value); }
+                catch { /* a bad header must not fail the whole request */ }
+            }
+        }
+
+        /// <summary>Pull one "Name: value" line out of a script header block.</summary>
+        private static string ExtractHeaderValue(string headerLines, string name)
+        {
+            if (string.IsNullOrEmpty(headerLines)) return null;
+            string lower = name.ToLowerInvariant();
+            int start = 0;
+            while (start < headerLines.Length)
+            {
+                int nl = headerLines.IndexOf('\n', start);
+                if (nl < 0) nl = headerLines.Length;
+                string line = headerLines.Substring(start, nl - start);
+                if (line.Length > 0 && line[line.Length - 1] == '\r') line = line.Substring(0, line.Length - 1);
+                start = nl + 1;
+
+                int colon = line.IndexOf(':');
+                if (colon <= 0) continue;
+                if (line.Substring(0, colon).Trim().ToLowerInvariant() == lower)
+                    return line.Substring(colon + 1).Trim();
+            }
+            return null;
+        }
+
+        /// <summary>Flatten the (fixed) set of headers we care about into
+        /// "Name: value\r\n" lines for the JS Headers object. HttpHeaders has
+        /// no enumerator, so probe by name in both header stores.</summary>
+        private static string CollectResponseHeaders(HttpResponseMessage response)
+        {
+            string outp = "";
+            string[] names = new string[]
+            {
+                "Content-Type", "Content-Length", "Location", "Set-Cookie",
+                "Content-Encoding", "Content-Language", "Cache-Control", "Expires",
+                "Last-Modified", "ETag", "Server", "Date", "WWW-Authenticate",
+                "Content-Disposition", "Refresh", "X-Frame-Options",
+            };
+            for (int i = 0; i < names.Length; i++)
+            {
+                string v = ReadHeaderBestEffort(response, names[i]);
+                if (v != null && v.Length > 0) outp += names[i] + ": " + v + "\r\n";
+            }
+            return outp;
+        }
+
+        /// <summary>Read a header from the response, falling back to the content
+        /// headers (Content-Type and friends live there) and to the lowercase
+        /// spelling for servers that send lowercase names.</summary>
+        private static string ReadHeaderBestEffort(HttpResponseMessage response, string name)
+        {
+            string v = ReadHeader(response, name);
+            if (v != null) return v;
+            v = ReadHeader(response, name.ToLowerInvariant());
+            if (v != null) return v;
+            if (response.Content != null && response.Content.Headers != null)
+            {
+                v = ReadHeader(response.Content, name);
+                if (v != null) return v;
+                v = ReadHeader(response.Content, name.ToLowerInvariant());
+                if (v != null) return v;
+            }
+            return null;
+        }
+
+        private static string ReadHeader(HttpContent content, string name)
+        {
+            if (content == null || content.Headers == null) return null;
+            if (!content.Headers.Contains(name)) return null;
+            global::System.Collections.Generic.IEnumerable<string> values = content.Headers.GetValues(name);
+            foreach (string s in values) return s;
+            return null;
+        }
+
+        /// <summary>Attach the jar's cookies for this URL to the request.</summary>
+        private void AddCookieHeader(HttpClient client, string url)
+        {
+            string cookie = cookies.HeaderFor(url);
+            if (cookie == null || cookie.Length == 0) return;
+            try { client.DefaultRequestHeaders.Add("Cookie", cookie); }
+            catch { /* a rejected cookie header must not fail the request */ }
+        }
+
+        /// <summary>Capture every Set-Cookie the response carries (a response
+        /// may hold several, so walk all values rather than the first).</summary>
+        private void StoreCookies(HttpResponseMessage response, string url)
+        {
+            if (response.Headers != null && response.Headers.Contains("Set-Cookie"))
+            {
+                global::System.Collections.Generic.IEnumerable<string> values = response.Headers.GetValues("Set-Cookie");
+                foreach (string s in values) cookies.AddFromSetCookie(s, url);
+            }
         }
 
         private void FetchStylesheets(HtmlPage page, string baseUrl)

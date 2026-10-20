@@ -81,4 +81,18 @@ public static class WebUrl
         int colon = authority.IndexOf(':');
         return colon > 0 ? authority.Substring(0, colon) : authority;
     }
+
+    /// <summary>The path portion of a URL (always starts with '/'; "/" when absent).</summary>
+    public static string PathOf(string url)
+    {
+        string origin = OriginOf(url);
+        if (origin.Length == 0 || url.Length <= origin.Length) return "/";
+        string rest = url.Substring(origin.Length);
+        int q = rest.IndexOf('?');
+        if (q >= 0) rest = rest.Substring(0, q);
+        int h = rest.IndexOf('#');
+        if (h >= 0) rest = rest.Substring(0, h);
+        if (rest.Length == 0) return "/";
+        return rest[0] == '/' ? rest : "/" + rest;
+    }
 }

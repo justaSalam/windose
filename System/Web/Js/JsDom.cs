@@ -624,6 +624,24 @@ public sealed class JsDom
         return JsUndefined.Instance;
     }
 
+    private object DocCookieGet(JsCallArgs a)
+    {
+        // document.cookie reads the host jar for the current page URL
+        JsEventLoop loop = Interp.Loop;
+        if (loop == null || loop.CookieGetter == null) return "";
+        string v = loop.CookieGetter(loop.LocationHref);
+        return v != null ? (object)v : (object)"";
+    }
+
+    private object DocCookieSet(JsCallArgs a)
+    {
+        // an assignment stores one cookie ("name=value; Path=/; Secure")
+        JsEventLoop loop = Interp.Loop;
+        if (loop != null && loop.CookieSetter != null)
+            loop.CookieSetter(JsValueOps.ToStringValue(a.Get(0)), loop.LocationHref);
+        return JsUndefined.Instance;
+    }
+
     /// <summary>Wrap a node (cached so identity and listeners survive queries).</summary>
     public JsElementObject Wrap(DomNode node)
     {
@@ -992,6 +1010,7 @@ public sealed class JsDom
         DefineAccessor(doc, "nodeType", DocNodeType, null);
         DefineAccessor(doc, "URL", DocUrl, null);
         DefineAccessor(doc, "location", DocLocationGet, DocLocationSet);
+        DefineAccessor(doc, "cookie", DocCookieGet, DocCookieSet);
 
         DefineOn(doc, "querySelector", DocQuerySelector, 1);
         DefineOn(doc, "querySelectorAll", DocQuerySelectorAll, 1);

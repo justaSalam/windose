@@ -73,6 +73,13 @@ public sealed class JsEventLoop
     public Action<string> HistoryBackHook;
     public Action<string> HistoryForwardHook;
 
+    // document.cookie, backed by the host's jar (url -> "a=b; c=d", and the
+    // reverse for assignments). Both run on the UI thread.
+    public delegate string CookieGetterDelegate(string url);
+    public delegate void CookieSetterDelegate(string cookie, string url);
+    public CookieGetterDelegate CookieGetter;
+    public CookieSetterDelegate CookieSetter;
+
     public string LocationHref = "about:blank";
     public string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +

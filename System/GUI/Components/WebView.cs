@@ -31,6 +31,12 @@ public class WebView : Component
     public delegate JsFetchResult HttpFetchDelegate(string method, string url, string headers, string body);
     public HttpFetchDelegate HttpFetch;
 
+    /// <summary>Host cookie jar access for document.cookie (UI thread).</summary>
+    public delegate string JsCookieGetter(string url);
+    public delegate void JsCookieSetter(string cookie, string url);
+    public JsCookieGetter GetCookies;
+    public JsCookieSetter SetCookie;
+
     private HtmlPage document;
     private RenderPlan plan = new RenderPlan();
     private string baseHref = "";
@@ -99,6 +105,8 @@ public class WebView : Component
         loop.HistoryForwardHook = OnJsHistoryForward;
         loop.ViewportWidth = Width;
         loop.ViewportHeight = Height;
+        loop.CookieGetter = OnJsGetCookies;
+        loop.CookieSetter = OnJsSetCookie;
 
         dom = new JsDom(js, document.Root);
         dom.OnDomChanged = OnDomMutated;
@@ -124,6 +132,8 @@ public class WebView : Component
     private void OnJsReload() { if (ReloadRequested != null) ReloadRequested(); }
     private void OnJsHistoryBack(string url) { if (HistoryBackRequested != null) HistoryBackRequested(); }
     private void OnJsHistoryForward(string url) { if (HistoryForwardRequested != null) HistoryForwardRequested(); }
+    private string OnJsGetCookies(string url) { return GetCookies != null ? GetCookies(url) : null; }
+    private void OnJsSetCookie(string cookie, string url) { if (SetCookie != null) SetCookie(cookie, url); }
 
     private void RunScripts()
     {
