@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Threading;
 using Cosmos.Kernel.System.Input;
 using Cosmos.Kernel.System.Graphics;
 
@@ -19,6 +20,17 @@ public class WebView : Component
     /// <summary>Raised with the raw href when the user clicks a link.</summary>
     public Action<string> LinkActivated;
 
+    /// <summary>Script-requested navigation (location.href = ..., window.open).</summary>
+    public Action<string> NavigateRequested;
+    public Action ReloadRequested;
+    public Action HistoryBackRequested;
+    public Action HistoryForwardRequested;
+
+    /// <summary>Host-provided HTTP used by fetch()/XHR. Runs on a worker thread;
+    /// return null (or throw) to signal a network failure.</summary>
+    public delegate JsFetchResult HttpFetchDelegate(string method, string url, string headers, string body);
+    public HttpFetchDelegate HttpFetch;
+
     private HtmlPage document;
     private RenderPlan plan = new RenderPlan();
     private string baseHref = "";
@@ -30,6 +42,14 @@ public class WebView : Component
     private JsInterpreter js;
     private JsDom dom;
     private bool layoutDirty;
+
+    // JS fetch/XHR: requests are executed on a worker thread and delivered
+    // back on the UI thread (same handoff pattern as page loads), so scripts
+    // never block and all engine code stays on one thread.
+    private List<JsFetchRequest> fetchBatch;
+    private List<JsFetchResult> fetchResults;
+    private bool fetchResultsReady;
+    private bool fetchBusy;
 
     public string DocumentTitle => document != null ? document.Title : "";
     public string BaseHref => baseHref;
@@ -69,12 +89,25 @@ public class WebView : Component
 
         js = new JsInterpreter();
         js.InitGlobal();
+
+        // Event loop: location, viewport and host hooks (navigation, history).
+        JsEventLoop loop = js.EnsureLoop();
+        loop.LocationHref = baseHref;
+        loop.NavigateHook = OnJsNavigate;
+        loop.ReloadHook = OnJsReload;
+        loop.HistoryBackHook = OnJsHistoryBack;
+        loop.HistoryForwardHook = OnJsHistoryForward;
+        loop.ViewportWidth = Width;
+        loop.ViewportHeight = Height;
+
         dom = new JsDom(js, document.Root);
         dom.OnDomChanged = OnDomMutated;
         dom.Install();
+        dom.SetStylesheet(document.CssText, Width, Height);
 
         RunScripts();
         dom.FireReadyEvents();
+        js.DrainJobs();   // DOMContentLoaded/load handlers may have queued reactions
 
         // scripts may have mutated the tree; relayout once at the end
         if (layoutDirty)
@@ -83,6 +116,14 @@ public class WebView : Component
             RebuildLayout();
         }
     }
+
+    private void OnJsNavigate(string url)
+    {
+        if (NavigateRequested != null) NavigateRequested(url);
+    }
+    private void OnJsReload() { if (ReloadRequested != null) ReloadRequested(); }
+    private void OnJsHistoryBack(string url) { if (HistoryBackRequested != null) HistoryBackRequested(); }
+    private void OnJsHistoryForward(string url) { if (HistoryForwardRequested != null) HistoryForwardRequested(); }
 
     private void RunScripts()
     {
@@ -95,6 +136,7 @@ public class WebView : Component
             {
                 JsProgram prog = JsParser.ParseProgram(s.Code);
                 js.RunProgram(prog);
+                js.DrainJobs();   // microtask checkpoint after each script
             }
             catch (JsThrown) { /* a syntax/runtime error in one script must not stop the rest */ }
             catch (Exception) { }
@@ -114,7 +156,9 @@ public class WebView : Component
         if (dom == null) return false;
         DomNode node = plan.HitTestNode(contentX, contentY);
         if (node == null) return false;
-        return !dom.Dispatch(node, "click"); // Dispatch returns !defaultPrevented
+        bool defaultPrevented = !dom.Dispatch(node, "click"); // Dispatch returns !defaultPrevented
+        js.DrainJobs();   // handler may have queued Promise reactions
+        return defaultPrevented;
     }
 
     /// <summary>Show a plain error/blank page without touching the network.</summary>
@@ -132,9 +176,87 @@ public class WebView : Component
         RebuildLayout();
     }
 
+    /// <summary>Pump the JS event loop: deliver network results, fire timers
+    /// and hand new fetch/XHR requests to the host's networking thread.</summary>
+    public override void Update()
+    {
+        base.Update();
+        if (js == null || js.Loop == null) return;
+        PumpJs();
+    }
+
+    private void PumpJs()
+    {
+        JsEventLoop loop = js.Loop;
+
+        // 1. results completed by the fetch worker -> resolve promises / XHR
+        if (fetchResultsReady)
+        {
+            fetchResultsReady = false;
+            List<JsFetchRequest> reqs = fetchBatch;
+            List<JsFetchResult> results = fetchResults;
+            fetchBatch = null;
+            fetchResults = null;
+            fetchBusy = false;
+            if (reqs != null && results != null)
+            {
+                for (int i = 0; i < reqs.Count && i < results.Count; i++)
+                    loop.DeliverFetch(reqs[i], results[i]);
+            }
+        }
+
+        // 2. fire due timers (each fires -> drain microtasks inside RunDue)
+        loop.RunDue(DateTime.UtcNow.Ticks);
+        js.DrainJobs();
+
+        // 3. hand newly queued requests to the networking thread
+        if (!fetchBusy && loop.HasPendingFetches)
+        {
+            if (HttpFetch == null)
+            {
+                loop.FailAllFetches("network unavailable");
+            }
+            else
+            {
+                List<JsFetchRequest> batch = new List<JsFetchRequest>();
+                loop.TakeFetches(batch);
+                if (batch.Count > 0)
+                {
+                    fetchBatch = batch;
+                    fetchBusy = true;
+                    HttpFetchDelegate handler = HttpFetch;
+                    new Thread(delegate ()
+                    {
+                        List<JsFetchResult> results = new List<JsFetchResult>(batch.Count);
+                        for (int i = 0; i < batch.Count; i++)
+                        {
+                            JsFetchRequest req = batch[i];
+                            JsFetchResult r;
+                            try { r = handler(req.Method, req.Url, req.Headers, req.Body); }
+                            catch (Exception ex) { r = new JsFetchResult(); r.Error = ex.Message; r.Url = req.Url; }
+                            if (r == null) { r = new JsFetchResult(); r.Error = "no response"; r.Url = req.Url; }
+                            results.Add(r);
+                        }
+                        fetchResults = results;
+                        fetchResultsReady = true;
+                    }).Start();
+                }
+            }
+        }
+
+        // 4. scripts may have mutated the tree (timers, handlers, fetch)
+        if (layoutDirty) { layoutDirty = false; RebuildLayout(); }
+    }
+
     private void RebuildLayout()
     {
         layoutWidth = Width;
+        if (js != null && js.Loop != null)
+        {
+            js.Loop.ViewportWidth = Width;
+            js.Loop.ViewportHeight = Height;
+            if (dom != null) dom.SetStylesheet(document != null ? document.CssText : "", Width, Height);
+        }
         if (document == null) { plan = new RenderPlan(); return; }
         plan = HtmlLayout.Build(document.Root, document.CssText, Width, Height, fontSize,
             (s, sz) => MeasureTextWidth(s, sz), images, baseHref);

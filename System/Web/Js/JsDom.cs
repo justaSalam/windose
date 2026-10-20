@@ -64,6 +64,319 @@ public sealed class JsStyleObject : JsObject
     public override string ClassTag { get { return "CSSStyleDeclaration"; } }
 }
 
+/// <summary>A snapshot of an element's computed style (window.getComputedStyle).
+/// Read-only: assignments through accessors are ignored.</summary>
+public sealed class JsComputedStyleObject : JsObject
+{
+    public CssComputed Style;
+
+    public JsComputedStyleObject(JsObject prototype, CssComputed style) : base(prototype)
+    {
+        Style = style;
+    }
+
+    public override string ClassTag { get { return "CSSStyleDeclaration"; } }
+
+    public static string ColorToHex(uint c)
+    {
+        int r = (int)((c >> 16) & 0xFF);
+        int g = (int)((c >> 8) & 0xFF);
+        int b = (int)(c & 0xFF);
+        return "#" + Hex2(r) + Hex2(g) + Hex2(b);
+    }
+
+    private static string Hex2(int v)
+    {
+        const string digits = "0123456789abcdef";
+        char[] buf = new char[2];
+        buf[0] = digits[(v >> 4) & 15];
+        buf[1] = digits[v & 15];
+        return new string(buf);
+    }
+
+    /// <summary>Format a fractional number the way CSS does (0.5, 1, 2.25).</summary>
+    public static string NumStr(float f)
+    {
+        bool neg = f < 0;
+        if (neg) f = -f;
+        int whole = (int)f;
+        int h = (int)((f - whole) * 100 + 0.5f);
+        if (h >= 100) { whole++; h = 0; }
+        string s = neg ? "-" : "";
+        s += whole.ToString();
+        if (h == 0) return s;
+        string hs = h.ToString();
+        if (h < 10) hs = "0" + hs;
+        if (hs.Length == 2 && hs[1] == '0') hs = hs.Substring(0, 1);
+        return s + "." + hs;
+    }
+
+    private static string BorderForm(CssBorder b)
+    {
+        switch (b)
+        {
+            case CssBorder.Solid: return "solid";
+            case CssBorder.Dashed: return "dashed";
+            case CssBorder.Dotted: return "dotted";
+            case CssBorder.Double: return "double";
+            case CssBorder.Groove: return "groove";
+            case CssBorder.Ridge: return "ridge";
+            case CssBorder.Inset: return "inset";
+            case CssBorder.Outset: return "outset";
+        }
+        return "none";
+    }
+
+    /// <summary>Format a CSS longhand (kebab-case) from the computed style.
+    /// Unknown-to-the-engine properties report their initial value.</summary>
+    public string Get(string name)
+    {
+        CssComputed s = Style;
+        if (s == null) return "";
+        switch (name)
+        {
+            // ---- flow / box ----
+            case "display":
+                switch (s.Display)
+                {
+                    case CssDisplay.Block: return "block";
+                    case CssDisplay.InlineBlock: return "inline-block";
+                    case CssDisplay.ListItem: return "list-item";
+                    case CssDisplay.None: return "none";
+                    case CssDisplay.Flex: return "flex";
+                    case CssDisplay.Table: return "table";
+                    case CssDisplay.TableRow: return "table-row";
+                    case CssDisplay.TableCell: return "table-cell";
+                    case CssDisplay.TableCaption: return "table-caption";
+                }
+                return "inline";
+            case "position":
+                switch (s.Position)
+                {
+                    case CssPos.Relative: return "relative";
+                    case CssPos.Absolute: return "absolute";
+                    case CssPos.Fixed: return "fixed";
+                }
+                return "static";
+            case "float":
+                return s.Float == CssFloat.Left ? "left" : (s.Float == CssFloat.Right ? "right" : "none");
+            case "clear":
+                switch (s.Clear)
+                {
+                    case CssClear.Left: return "left";
+                    case CssClear.Right: return "right";
+                    case CssClear.Both: return "both";
+                }
+                return "none";
+            case "box-sizing":
+                return s.BoxSizing == CssBox.Border ? "border-box" : "content-box";
+            case "visibility":
+                return s.Visibility == CssVis.Hidden ? "hidden"
+                    : (s.Visibility == CssVis.Collapse ? "collapse" : "visible");
+            case "overflow":
+                if (s.OverflowX == s.OverflowY) return Overf(s.OverflowX);
+                return Overf(s.OverflowX) + " " + Overf(s.OverflowY);
+            case "overflow-x": return Overf(s.OverflowX);
+            case "overflow-y": return Overf(s.OverflowY);
+
+            // ---- sizing ----
+            case "width": return s.HasW ? s.W + "px" : "auto";
+            case "height": return s.HasH ? s.H + "px" : "auto";
+            case "min-width": return s.MinW + "px";
+            case "max-width": return s.MaxW == int.MaxValue ? "none" : s.MaxW + "px";
+            case "min-height": return s.MinH + "px";
+            case "max-height": return s.MaxH == int.MaxValue ? "none" : s.MaxH + "px";
+
+            // ---- spacing ----
+            case "margin-top": return s.MarginT + "px";
+            case "margin-right": return s.MarginR + "px";
+            case "margin-bottom": return s.MarginB + "px";
+            case "margin-left": return s.MarginL + "px";
+            case "padding-top": return s.PadT + "px";
+            case "padding-right": return s.PadR + "px";
+            case "padding-bottom": return s.PadB + "px";
+            case "padding-left": return s.PadL + "px";
+
+            // ---- borders ----
+            case "border-top-width": return s.BorderTW + "px";
+            case "border-right-width": return s.BorderRW + "px";
+            case "border-bottom-width": return s.BorderBW + "px";
+            case "border-left-width": return s.BorderLW + "px";
+            case "border-top-style": return BorderForm(s.BorderTT);
+            case "border-right-style": return BorderForm(s.BorderRR);
+            case "border-bottom-style": return BorderForm(s.BorderBB);
+            case "border-left-style": return BorderForm(s.BorderLL);
+            case "border-top-color": return ColorToHex(s.BorderTC);
+            case "border-right-color": return ColorToHex(s.BorderRC);
+            case "border-bottom-color": return ColorToHex(s.BorderBC);
+            case "border-left-color": return ColorToHex(s.BorderLC);
+            case "border-width":
+                return Same4(s.BorderTW, s.BorderRW, s.BorderBW, s.BorderLW)
+                    ? s.BorderTW + "px"
+                    : s.BorderTW + "px " + s.BorderRW + "px " + s.BorderBW + "px " + s.BorderLW + "px";
+            case "border-style":
+                return (s.BorderTT == s.BorderRR && s.BorderRR == s.BorderBB && s.BorderBB == s.BorderLL)
+                    ? BorderForm(s.BorderTT)
+                    : BorderForm(s.BorderTT) + " " + BorderForm(s.BorderRR) + " " +
+                      BorderForm(s.BorderBB) + " " + BorderForm(s.BorderLL);
+            case "border-color":
+                return (s.BorderTC == s.BorderRC && s.BorderRC == s.BorderBC && s.BorderBC == s.BorderLC)
+                    ? ColorToHex(s.BorderTC)
+                    : ColorToHex(s.BorderTC) + " " + ColorToHex(s.BorderRC) + " " +
+                      ColorToHex(s.BorderBC) + " " + ColorToHex(s.BorderLC);
+            case "border-radius": return s.BorderRadius + "px";
+
+            // ---- background ----
+            case "background-color":
+                return s.HasBg ? ColorToHex(s.BgColor) : "rgba(0, 0, 0, 0)";
+            case "background-image":
+                return !string.IsNullOrEmpty(s.BgImage) ? s.BgImage : "none";
+            case "background-repeat":
+                switch (s.BgRepeat)
+                {
+                    case CssRepeat.NoRepeat: return "no-repeat";
+                    case CssRepeat.RepeatX: return "repeat-x";
+                    case CssRepeat.RepeatY: return "repeat-y";
+                }
+                return "repeat";
+            case "background-position": return s.BgPos != null ? s.BgPos : "0% 0%";
+
+            // ---- text ----
+            case "color": return s.HasColor ? ColorToHex(s.Color) : "#000000";
+            case "font-size": return s.FontSize + "px";
+            case "font-weight": return s.FontWeight.ToString();
+            case "font-style": return s.Italic ? "italic" : "normal";
+            case "font-family": return "sans-serif";   // engine does not track families
+            case "line-height": return s.LineHeight > 0 ? NumStr(s.LineHeight) : "normal";
+            case "letter-spacing": return s.LetterSpacing == 0 ? "normal" : s.LetterSpacing + "px";
+            case "word-spacing": return s.WordSpacing == 0 ? "normal" : s.WordSpacing + "px";
+            case "text-indent": return s.TextIndent + "px";
+            case "text-align":
+                switch (s.TextAlign)
+                {
+                    case CssAlign.Center: return "center";
+                    case CssAlign.Right: return "right";
+                    case CssAlign.Justify: return "justify";
+                }
+                return "left";
+            case "text-transform":
+                switch (s.TextTransform)
+                {
+                    case CssTransform.Upper: return "uppercase";
+                    case CssTransform.Lower: return "lowercase";
+                    case CssTransform.Capitalize: return "capitalize";
+                }
+                return "none";
+            case "text-decoration":
+                if (!s.Underline && !s.LineThrough && !s.Overline) return "none";
+                {
+                    string d = "";
+                    if (s.Underline) d = "underline";
+                    if (s.LineThrough) d = d.Length > 0 ? d + " line-through" : "line-through";
+                    if (s.Overline) d = d.Length > 0 ? d + " overline" : "overline";
+                    return d;
+                }
+            case "white-space":
+                switch (s.WhiteSpace)
+                {
+                    case CssWhite.Pre: return "pre";
+                    case CssWhite.PreWrap: return "pre-wrap";
+                    case CssWhite.PreLine: return "pre-line";
+                    case CssWhite.Nowrap: return "nowrap";
+                }
+                return "normal";
+            case "vertical-align":
+                switch (s.VerticalAlign)
+                {
+                    case CssVAlign.Top: return "top";
+                    case CssVAlign.Middle: return "middle";
+                    case CssVAlign.Bottom: return "bottom";
+                    case CssVAlign.Super: return "super";
+                    case CssVAlign.Sub: return "sub";
+                }
+                return "baseline";
+
+            // ---- paint ----
+            case "opacity": return NumStr(s.Opacity);
+            // not tracked by the engine yet: report initial values
+            case "z-index": return "auto";
+            case "cursor": return "auto";
+            case "top": case "left": case "right": case "bottom": return "auto";
+
+            // ---- flexbox ----
+            case "flex-direction":
+                switch (s.FlexDirection)
+                {
+                    case CssFlexDir.RowReverse: return "row-reverse";
+                    case CssFlexDir.Column: return "column";
+                    case CssFlexDir.ColumnReverse: return "column-reverse";
+                }
+                return "row";
+            case "flex-wrap":
+                switch (s.FlexWrap)
+                {
+                    case CssFlexWrap.Wrap: return "wrap";
+                    case CssFlexWrap.WrapReverse: return "wrap-reverse";
+                }
+                return "nowrap";
+            case "justify-content":
+                switch (s.JustifyContent)
+                {
+                    case CssJustify.FlexEnd: return "flex-end";
+                    case CssJustify.Center: return "center";
+                    case CssJustify.SpaceBetween: return "space-between";
+                    case CssJustify.SpaceAround: return "space-around";
+                    case CssJustify.SpaceEvenly: return "space-evenly";
+                }
+                return "flex-start";
+            case "align-items":
+                switch (s.AlignItems)
+                {
+                    case CssAlignItems.FlexStart: return "flex-start";
+                    case CssAlignItems.FlexEnd: return "flex-end";
+                    case CssAlignItems.Center: return "center";
+                    case CssAlignItems.Baseline: return "baseline";
+                }
+                return "normal";
+            case "align-self":
+                if (s.AlignSelf == CssAlignItems.Auto) return "auto";
+                switch (s.AlignSelf)
+                {
+                    case CssAlignItems.FlexStart: return "flex-start";
+                    case CssAlignItems.FlexEnd: return "flex-end";
+                    case CssAlignItems.Center: return "center";
+                    case CssAlignItems.Baseline: return "baseline";
+                }
+                return "stretch";
+            case "flex-grow": return NumStr(s.FlexGrow);
+            case "flex-shrink": return NumStr(s.FlexShrink);
+            case "flex-basis": return s.HasFlexBasis ? s.FlexBasis + "px" : "auto";
+            case "order": return s.Order.ToString();
+            case "gap":
+                return s.GapRow == s.GapCol ? s.GapRow + "px" : s.GapRow + "px " + s.GapCol + "px";
+            case "row-gap": return s.GapRow + "px";
+            case "column-gap": return s.GapCol + "px";
+        }
+        return "";
+    }
+
+    private static string Overf(CssOverflow o)
+    {
+        switch (o)
+        {
+            case CssOverflow.Hidden: return "hidden";
+            case CssOverflow.Scroll: return "scroll";
+            case CssOverflow.Auto: return "auto";
+        }
+        return "visible";
+    }
+
+    private static bool Same4(int a, int b, int c, int d)
+    {
+        return a == b && b == c && c == d;
+    }
+}
+
 public sealed class JsDom
 {
     public JsInterpreter Interp;
@@ -82,6 +395,14 @@ public sealed class JsDom
 
     /// <summary>Raised after any DOM mutation the scripts cause (host relayouts).</summary>
     public Action OnDomChanged;
+
+    // computed-style queries (window.getComputedStyle): the host pushes the
+    // document stylesheet + viewport via SetStylesheet; the sheet is parsed
+    // lazily and only re-parsed when that changes.
+    public JsObject ComputedPrototype;
+    private CssSheet styleSheet;
+    private string styleCss = "";
+    private int styleVw = 1024, styleVh = 768;
 
     private static readonly string[] StyleProps = new string[]
     {
@@ -116,10 +437,12 @@ public sealed class JsDom
         TextPrototype = Realm.NewObject();
         EventPrototype = Realm.NewObject();
         StylePrototype = Realm.NewObject();
+        Realm.EventPrototype = EventPrototype;   // shared with XHR events
 
         BuildElementPrototype();
         BuildTextPrototype();
         BuildEventPrototype();
+        BuildComputedPrototype();
 
         // document object
         Document = Realm.NewObject();
@@ -129,6 +452,7 @@ public sealed class JsDom
         Realm.Global.Define("document", JsProperty.Data(Document));
         DefineOn(Realm.Global, "addEventListener", WindowAddListener, 2);
         DefineOn(Realm.Global, "removeEventListener", WindowRemoveListener, 2);
+        DefineOn(Realm.Global, "getComputedStyle", WindowGetComputedStyle, 2);
 
         // `new Event(type)` constructor
         Realm.Global.Define("Event", JsProperty.Data(
@@ -159,6 +483,145 @@ public sealed class JsDom
     private void MarkChanged()
     {
         if (OnDomChanged != null) OnDomChanged();
+    }
+
+    // ---- stylesheet context (for window.getComputedStyle) ------------------
+
+    /// <summary>Give the DOM the document stylesheet + viewport size so scripts
+    /// can query computed styles. Called by the host on load and on resize.</summary>
+    public void SetStylesheet(string cssText, int viewportW, int viewportH)
+    {
+        styleCss = cssText != null ? cssText : "";
+        styleVw = viewportW > 0 ? viewportW : 1024;
+        styleVh = viewportH > 0 ? viewportH : 768;
+        styleSheet = null; // rebuilt lazily on next getComputedStyle
+    }
+
+    /// <summary>Walk up to the document element computing a parent style chain.</summary>
+    private CssComputed ComputeStyleChain(DomNode el)
+    {
+        if (el == null || !el.IsElement) return null;
+        if (styleSheet == null)
+        {
+            // If the host hasn't pushed CSS, self-discover <style> elements so
+            // getComputedStyle still sees the page's rules (harness / no host).
+            if (styleCss.Length == 0) styleCss = CollectStyleText(Root);
+            styleSheet = CssSheet.Parse(styleCss);
+        }
+        // Build the ancestor chain (root -> el) so inherited props resolve.
+        List<DomNode> chain = new List<DomNode>();
+        DomNode cur = el;
+        while (cur != null && cur.IsElement) { chain.Add(cur); cur = cur.Parent; }
+        CssComputed parent = null;
+        for (int i = chain.Count - 1; i >= 0; i--)
+            parent = styleSheet.Compute(chain[i], parent, styleVw, styleVh);
+        return parent;
+    }
+
+    /// <summary>Concatenate the text of every &lt;style&gt; element in the tree.</summary>
+    private string CollectStyleText(DomNode node)
+    {
+        StringBuilder sb = new StringBuilder();
+        CollectStyleTextInto(node, sb);
+        return sb.ToString();
+    }
+
+    private void CollectStyleTextInto(DomNode node, StringBuilder sb)
+    {
+        if (node == null) return;
+        if (node.IsElement && node.Tag == "style")
+        {
+            string t = node.TextContent;
+            if (!string.IsNullOrEmpty(t)) { sb.Append(t); sb.Append('\n'); }
+        }
+        for (DomNode c = node.FirstChild; c != null; c = c.Next)
+            CollectStyleTextInto(c, sb);
+    }
+
+    private object WindowGetComputedStyle(JsCallArgs a)
+    {
+        JsElementObject el = a.Get(0) as JsElementObject;
+        if (el == null || el.Node == null || !el.Node.IsElement) return new JsComputedStyleObject(ComputedPrototype, null);
+        CssComputed c = ComputeStyleChain(el.Node);
+        return new JsComputedStyleObject(ComputedPrototype, c);
+    }
+
+    // ---- computed style prototype (window.getComputedStyle) ---------------
+
+    private void BuildComputedPrototype()
+    {
+        ComputedPrototype = Realm.NewObject();
+        DefineOn(ComputedPrototype, "getPropertyValue", CsGetProperty, 1);
+        DefineOn(ComputedPrototype, "getPropertyPriority", CsGetPriority, 1);
+
+        // camelCase IDL accessors backed by the kebab-case formatter
+        for (int i = 0; i < ComputedProps.Length; i += 2)
+        {
+            string camel = ComputedProps[i];
+            string kebab = ComputedProps[i + 1];
+            DefineAccessor(ComputedPrototype, camel,
+                delegate (JsCallArgs a)
+                {
+                    JsComputedStyleObject c = a.ThisValue as JsComputedStyleObject;
+                    return c != null ? (object)c.Get(kebab) : (object)"";
+                }, null);
+        }
+    }
+
+    // camel name, kebab name pairs for the common IDL attributes
+    private static readonly string[] ComputedProps = new string[]
+    {
+        "display", "display",
+        "position", "position",
+        "top", "top", "left", "left", "right", "right", "bottom", "bottom",
+        "width", "width", "height", "height",
+        "minWidth", "min-width", "minHeight", "min-height",
+        "maxWidth", "max-width", "maxHeight", "max-height",
+        "marginTop", "margin-top", "marginRight", "margin-right",
+        "marginBottom", "margin-bottom", "marginLeft", "margin-left",
+        "paddingTop", "padding-top", "paddingRight", "padding-right",
+        "paddingBottom", "padding-bottom", "paddingLeft", "padding-left",
+        "color", "color",
+        "backgroundColor", "background-color",
+        "fontSize", "font-size", "fontWeight", "font-weight", "fontStyle", "font-style",
+        "fontFamily", "font-family", "lineHeight", "line-height",
+        "textAlign", "text-align", "letterSpacing", "letter-spacing",
+        "textTransform", "text-transform", "textDecoration", "text-decoration",
+        "whiteSpace", "white-space", "visibility", "visibility",
+        "overflow", "overflow", "opacity", "opacity",
+        "zIndex", "z-index", "float", "float", "clear", "clear",
+        "borderRadius", "border-radius",
+        "flexDirection", "flex-direction", "flexWrap", "flex-wrap",
+        "justifyContent", "justify-content", "alignItems", "align-items",
+        "alignSelf", "align-self", "flexGrow", "flex-grow",
+        "flexShrink", "flex-shrink", "flexBasis", "flex-basis",
+        "gap", "gap", "rowGap", "row-gap", "columnGap", "column-gap",
+    };
+
+    private object CsGetProperty(JsCallArgs a)
+    {
+        JsComputedStyleObject c = a.ThisValue as JsComputedStyleObject;
+        if (c == null) return "";
+        return c.Get(JsValueOps.ToStringValue(a.Get(0)));
+    }
+
+    private object CsGetPriority(JsCallArgs a) { return ""; }
+
+    private object DocUrl(JsCallArgs a)
+    {
+        JsEventLoop loop = Interp.Loop;
+        return loop != null ? (object)loop.LocationHref : (object)"";
+    }
+    private object DocLocationGet(JsCallArgs a)
+    {
+        return Realm.LocationObj != null ? (object)Realm.LocationObj : JsNull.Instance;
+    }
+    private object DocLocationSet(JsCallArgs a)
+    {
+        // document.location = "url" navigates, same as window.location
+        JsEventLoop loop = Interp.Loop;
+        if (loop != null) loop.Navigate(JsValueOps.ToStringValue(a.Get(0)));
+        return JsUndefined.Instance;
     }
 
     /// <summary>Wrap a node (cached so identity and listeners survive queries).</summary>
@@ -527,6 +990,8 @@ public sealed class JsDom
         DefineAccessor(doc, "title", DocTitleGet, DocTitleSet);
         DefineAccessor(doc, "readyState", DocReadyState, null);
         DefineAccessor(doc, "nodeType", DocNodeType, null);
+        DefineAccessor(doc, "URL", DocUrl, null);
+        DefineAccessor(doc, "location", DocLocationGet, DocLocationSet);
 
         DefineOn(doc, "querySelector", DocQuerySelector, 1);
         DefineOn(doc, "querySelectorAll", DocQuerySelectorAll, 1);

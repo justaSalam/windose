@@ -66,6 +66,9 @@ public static class JsBuiltins
         BuildDate(realm);
         BuildMapSet(realm);
         BuildGlobalFunctions(realm);
+        // browser globals: Promise, timers, fetch, XHR, location, navigator...
+        // (needs realm.Interp so it can attach the event loop)
+        JsBrowser.Install(realm);
         HideIntrinsicMembers(realm);
     }
 
@@ -94,6 +97,9 @@ public static class JsBuiltins
         HideOn(realm.MapPrototype);
         HideOn(realm.SetPrototype);
         HideOn(realm.IteratorPrototype);
+        HideOn(realm.PromisePrototype);
+        HideOn(realm.ResponsePrototype);
+        HideOn(realm.XhrPrototype);
 
         // namespace objects: Math, JSON, console keep their methods non-enumerable too
         HideOn(realm.MathObj);

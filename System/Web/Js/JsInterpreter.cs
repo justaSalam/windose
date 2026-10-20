@@ -19,6 +19,12 @@ public sealed class JsRealm
     public JsObject IteratorPrototype;
     public JsArray IteratorPrototypeArray; // unused placeholder
 
+    // browser globals (JsBrowser): response/XHR prototypes + shared singletons
+    public JsObject ResponsePrototype, XhrPrototype;
+    public JsObject LocationObj, NavigatorObj;
+    // published by JsDom.Install (XHR events need it even before listeners exist)
+    public JsObject EventPrototype;
+
     // namespace objects + global
     public JsObject Global;
     public JsObject MathObj, JsonObj, ConsoleObj, ReflectObj, AtomicsObj;
@@ -114,6 +120,27 @@ public class JsInterpreter
 
     // completion value of the last expression statement (eval/repl semantics)
     private object _lastValue = JsUndefined.Instance;
+
+    // browser event loop: timers, Promise microtasks and the fetch queue
+    public JsEventLoop Loop;
+
+    public JsEventLoop EnsureLoop()
+    {
+        if (Loop == null)
+        {
+            Loop = new JsEventLoop();
+            Loop.Interp = this;
+        }
+        return Loop;
+    }
+
+    /// <summary>Run queued Promise reactions. The host calls this whenever the
+    /// JS stack is empty (after scripts, events, timers, network results).</summary>
+    public void DrainJobs()
+    {
+        JsValueOps.Active = this;
+        EnsureLoop().DrainJobs();
+    }
 
     // Labels are attached by a Labeled statement to its body only; a loop/block
     // that owns a label passes this empty list to its nested children so an inner
