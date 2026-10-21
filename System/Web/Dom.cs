@@ -355,6 +355,7 @@ public static class HtmlDom
 
             if (IsRawText(name))
             {
+                FlushText(cur, text);   // text before the element belongs before it
                 cur.AppendChild(el);
                 // capture verbatim until </name>
                 int close = IndexOfNoCase(html, "</" + name, pos);
@@ -367,9 +368,15 @@ public static class HtmlDom
                 continue;
             }
 
-            if (IsVoid(name) || selfClosing) { cur.AppendChild(el); continue; }   // no children, stay in place
+            if (IsVoid(name) || selfClosing)
+            {
+                FlushText(cur, text);   // "Name: <input>" keeps source order
+                cur.AppendChild(el);
+                continue;               // no children, stay in place
+            }
 
             // HTML implied-end-tag rules for common block containers
+            FlushText(cur, text);       // pending text belongs to the old parent
             cur = AutoClose(cur, name);
             cur.AppendChild(el);
             cur = el;

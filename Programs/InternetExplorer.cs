@@ -55,6 +55,11 @@ fn main() {
         // pipeline (stage 4). Workers lock it internally.
         private readonly CookieJar cookies = new CookieJar();
 
+        // A form submitted with method=post sets this before the worker starts;
+        // Fetch consumes it and posts instead of getting. Cleared on completion.
+        private string pendingPostBody;
+        private string pendingPostType = "application/x-www-form-urlencoded";
+
         // ---- script -> shell hooks (used by the WebView's networking thread) ----
 
         private string JsGetCookies(string url) { return cookies.DocumentCookieFor(url); }
@@ -151,6 +156,7 @@ fn main() {
             webView.HttpFetch = HttpFetchJs;
             webView.GetCookies = JsGetCookies;
             webView.SetCookie = JsSetCookie;
+            webView.FormPostRequested = BeginPostNavigation;
 
             Navigate(HomeUrl);
         }
@@ -229,6 +235,27 @@ fn main() {
 
             currentUrl = url;
             addressBar.Address = url;
+            BeginFetch(url);
+        }
+
+        /// <summary>A form was submitted with method=post. Record the body so the
+        /// worker posts instead of gets, then fetch like any other navigation.</summary>
+        private void BeginPostNavigation(string rawUrl, string body)
+        {
+            string url = WebUrl.Normalize(rawUrl);
+            if (url == null) { SetStatus("Invalid address"); return; }
+
+            if (!string.IsNullOrEmpty(currentUrl))
+            {
+                backStack.Add(currentUrl);
+                if (backStack.Count > 50) backStack.RemoveAt(0);
+            }
+            forwardStack.Clear();
+
+            currentUrl = url;
+            addressBar.Address = url;
+
+            pendingPostBody = body != null ? body : "";
             BeginFetch(url);
         }
 
@@ -316,26 +343,47 @@ fn main() {
         {
             try
             {
-                string html = FetchString(url);
+                string html;
+                string finalUrl = url;
+
+                // A pending form POST is sent through the script fetch pipeline
+                // (it already handles redirects, cookies and headers).
+                string postBody = pendingPostBody;
+                pendingPostBody = null;
+                if (postBody != null)
+                {
+                    JsFetchResult posted = HttpFetchJs("POST", url,
+                        "Content-Type: " + pendingPostType, postBody);
+                    if (posted.Error != null && posted.Error.Length > 0)
+                        throw new Exception(posted.Error);
+                    html = posted.Body;
+                    finalUrl = posted.Url != null ? posted.Url : url;
+                    currentUrl = finalUrl;
+                }
+                else
+                {
+                    html = FetchString(url);
+                }
+
                 int chars = html != null ? html.Length : 0;
                 PublishProgress(25, "Received " + chars + " chars, parsing…");
 
                 HtmlPage page = HtmlPageBuilder.Parse(html ?? "");
-                if (string.IsNullOrEmpty(page.Title)) page.Title = WebUrl.HostOf(url);
+                if (string.IsNullOrEmpty(page.Title)) page.Title = WebUrl.HostOf(finalUrl);
                 PublishProgress(45, "Loading stylesheets…");
 
-                FetchStylesheets(page, url);
+                FetchStylesheets(page, finalUrl);
                 PublishProgress(65, "Loading scripts…");
 
-                FetchScripts(page, url);
+                FetchScripts(page, finalUrl);
                 PublishProgress(80, "Loading images…");
 
-                Dictionary<string, Image> images = FetchImages(page, url);
+                Dictionary<string, Image> images = FetchImages(page, finalUrl);
                 PublishProgress(95, "Rendering…");
 
                 string status = "Done — " + chars + " chars";
                 if (images.Count > 0) status += ", " + images.Count + " img";
-                Publish(page, url, page.Title, status, images);
+                Publish(page, finalUrl, page.Title, status, images);
             }
             catch (Exception ex)
             {

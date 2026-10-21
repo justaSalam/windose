@@ -58,10 +58,42 @@ public sealed class RenderLine
     public DomNode Node;   // img element for image lines (click targeting)
 }
 
+/// <summary>Form-control widget kinds (byte constants; no enums so the OS
+/// build never needs Enum.ToString).</summary>
+public static class WidgetKind
+{
+    public const byte Text = 0;        // <input type=text|search|email|...>
+    public const byte Password = 1;
+    public const byte Checkbox = 2;
+    public const byte Radio = 3;
+    public const byte Button = 4;      // <input type=submit|button|reset>, <button>
+    public const byte Textarea = 5;
+    public const byte Select = 6;
+    public const byte NotAWidget = 255; // hidden input / unknown
+}
+
+/// <summary>A laid-out form control. The WebView draws it, hit-tests it for
+/// focus/clicks and routes typing at it; live state (value/checked/selected)
+/// lives on the DomNode so scripts and layout always agree.</summary>
+public sealed class RenderWidget
+{
+    public DomNode Node;
+    public byte Kind;
+    public int X, Y, W, H;
+    public string Text;       // displayed text: value, button label, select label
+    public bool Checked;      // checkbox / radio
+    public bool Disabled;
+    public int FontSize;
+    public int TextX, TextY;  // origin of the text inside the control
+    public int TextW;         // measured width of Text (caret math)
+    public bool Hidden;
+}
+
 public sealed class RenderPlan
 {
     public List<RenderLine> Lines = new List<RenderLine>();
     public List<RenderBox> Boxes = new List<RenderBox>();
+    public List<RenderWidget> Widgets = new List<RenderWidget>();
     public List<LinkRect> Links = new List<LinkRect>();
     public int ContentHeight;
     public Color PageBg = Color.White;
@@ -83,11 +115,33 @@ public sealed class RenderPlan
         return null;
     }
 
+    /// <summary>The form control under a content-space point (topmost wins).</summary>
+    public RenderWidget HitTestWidget(int x, int y)
+    {
+        for (int i = Widgets.Count - 1; i >= 0; i--)
+        {
+            RenderWidget w = Widgets[i];
+            if (w.Hidden) continue;
+            if (x >= w.X && x < w.X + w.W && y >= w.Y && y < w.Y + w.H)
+                return w;
+        }
+        return null;
+    }
+
     /// <summary>Deepest DOM node under a content-space point (for click events).
-    /// Text spans take priority (they sit on top of block boxes); block boxes
-    /// are emitted children-first so the first hit is the innermost element.</summary>
+    /// Widgets and text spans take priority (they sit on top of block boxes);
+    /// block boxes are emitted children-first so the first hit is the
+    /// innermost element.</summary>
     public DomNode HitTestNode(int x, int y)
     {
+        // form controls sit on top of everything else
+        for (int i = Widgets.Count - 1; i >= 0; i--)
+        {
+            RenderWidget w = Widgets[i];
+            if (w.Hidden) continue;
+            if (x >= w.X && x < w.X + w.W && y >= w.Y && y < w.Y + w.H)
+                return w.Node;
+        }
         // inline text spans first
         for (int i = 0; i < Lines.Count; i++)
         {
@@ -147,6 +201,9 @@ public static class HtmlLayout
         public bool IsImage;
         public string ImageSrc, ImageAlt;
         public int ImageW, ImageH;
+        public bool IsWidget;   // form control flowing inline
+        public byte WidgetKind;
+        public int WidgetW, WidgetH;
         public DomNode Node;    // owning element for click targeting
     }
 
@@ -160,6 +217,9 @@ public static class HtmlLayout
         public bool IsImage;
         public string ImageSrc, ImageAlt;
         public int ImageW, ImageH;
+        public bool IsWidget;
+        public byte WidgetKind;
+        public int WidgetW, WidgetH;
         public DomNode Node;    // owning element for click targeting
     }
 
@@ -277,6 +337,33 @@ public static class HtmlLayout
                         FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
                         runs.Add(new Run { Break = true });
                         break;
+                    case "input": case "button": case "select": case "textarea":
+                        // form controls: inline-block flow, or their own line
+                        // when a rule made them block-level
+                        if (IsBlockLevel(cs))
+                        {
+                            FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
+                            EmitBlockWidget(child, cs, contentX, ref y, ctx);
+                        }
+                        else
+                        {
+                            byte wkind = WidgetKindOf(child);
+                            if (wkind != WidgetKind.NotAWidget)
+                            {
+                                int ww, wh;
+                                MeasureWidget(child, wkind, cs, ctx, out ww, out wh);
+                                runs.Add(new Run
+                                {
+                                    IsWidget = true,
+                                    WidgetKind = wkind,
+                                    WidgetW = ww,
+                                    WidgetH = wh,
+                                    Style = cs,
+                                    Node = child,
+                                });
+                            }
+                        }
+                        break;
                     case "img":
                         FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
                         EmitImage(child, cs, contentX, ref y, ctx);
@@ -331,6 +418,10 @@ public static class HtmlLayout
             case "td": case "th": case "caption":
                 // Structural table parts reached directly: lay out children as a container.
                 break;
+            case "input": case "button": case "select": case "textarea":
+                // Block-level form control (display:block): its own line.
+                EmitBlockWidget(node, style, availX, ref y, ctx);
+                return;
         }
 
         // --- box model ---
@@ -1113,6 +1204,24 @@ public static class HtmlLayout
                 if (cs.Display == CssDisplay.None) { child = child.Next; continue; }
 
                 if (tag == "br") { runs.Add(new Run { Break = true }); }
+                else if (IsWidgetTag(tag))
+                {
+                    byte kind = WidgetKindOf(child);
+                    if (kind != WidgetKind.NotAWidget)
+                    {
+                        int ww, wh;
+                        MeasureWidget(child, kind, cs, ctx, out ww, out wh);
+                        runs.Add(new Run
+                        {
+                            IsWidget = true,
+                            WidgetKind = kind,
+                            WidgetW = ww,
+                            WidgetH = wh,
+                            Style = cs,
+                            Node = child,
+                        });
+                    }
+                }
                 else if (tag == "img")
                 {
                     runs.Add(new Run
@@ -1214,6 +1323,11 @@ public static class HtmlLayout
                 toks.Add(new Tok { IsImage = true, ImageSrc = r.ImageSrc, ImageAlt = r.ImageAlt, ImageW = r.ImageW, ImageH = r.ImageH, Style = r.Style, Href = r.Href, Node = r.Node });
                 continue;
             }
+            if (r.IsWidget)
+            {
+                toks.Add(new Tok { IsWidget = true, WidgetKind = r.WidgetKind, WidgetW = r.WidgetW, WidgetH = r.WidgetH, Style = r.Style, Href = r.Href, Node = r.Node });
+                continue;
+            }
             TokenizeText(toks, r.Text, r.Style, r.Href, r.Node);
         }
         runs.Clear();
@@ -1258,6 +1372,29 @@ public static class HtmlLayout
                 hasContent = false;
                 firstLine = false;
                 curBullet = null;
+                continue;
+            }
+
+            if (tok.IsWidget)
+            {
+                // form controls flow inline (inline-block): wrap like a word,
+                // grow the line when the control is taller than the text.
+                int ww = tok.WidgetW, wh = tok.WidgetH;
+                if (!nowrap && hasContent && curX + ww > contentRight)
+                {
+                    EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX);
+                    lineTop += lineH;
+                    spans = new List<RenderSpan>();
+                    curX = contentX;
+                    hasContent = false;
+                    firstLine = false;
+                    curBullet = null;
+                    lineH = LineHeightOf(baseStyle);
+                }
+                if (wh > lineH) lineH = wh;
+                EmitWidget(ctx, tok, curX, lineTop, lineH);
+                curX += ww + 4;
+                hasContent = true;
                 continue;
             }
 
@@ -1411,6 +1548,221 @@ public static class HtmlLayout
         };
         ctx.Plan.Lines.Add(line);
         return h;
+    }
+
+    // ---- form-control widgets --------------------------------------------
+
+    private static bool IsWidgetTag(string tag)
+    {
+        return tag == "input" || tag == "button" || tag == "select" || tag == "textarea";
+    }
+
+    /// <summary>Map an element to a widget kind (NotAWidget = don't render,
+    /// e.g. hidden inputs, which still take part in form submission).</summary>
+    private static byte WidgetKindOf(DomNode node)
+    {
+        string tag = node.Tag;
+        if (tag == "input")
+        {
+            string t = node.GetAttr("type");
+            if (t == null || t.Length == 0) t = "text";
+            t = t.ToLowerInvariant();
+            if (t == "hidden") return WidgetKind.NotAWidget;
+            if (t == "password") return WidgetKind.Password;
+            if (t == "checkbox") return WidgetKind.Checkbox;
+            if (t == "radio") return WidgetKind.Radio;
+            if (t == "submit" || t == "button" || t == "reset" || t == "image" || t == "file")
+                return WidgetKind.Button;
+            return WidgetKind.Text;   // text, search, email, url, tel, number, ...
+        }
+        if (tag == "button") return WidgetKind.Button;
+        if (tag == "textarea") return WidgetKind.Textarea;
+        if (tag == "select") return WidgetKind.Select;
+        return WidgetKind.NotAWidget;
+    }
+
+    /// <summary>Natural size of a control from its attributes and style.</summary>
+    private static void MeasureWidget(DomNode node, byte kind, CssComputed st, Ctx ctx,
+        out int w, out int h)
+    {
+        int size = st.FontSize > 0 ? st.FontSize : 13;
+        int lh = LineHeightOf(st);
+        int padY = Math.Max(size + 8, lh + 4);
+
+        switch (kind)
+        {
+            case WidgetKind.Text:
+            case WidgetKind.Password:
+            {
+                int cols = ParseInt(node.GetAttr("size"), 20);
+                if (cols < 1) cols = 1;
+                if (cols > 200) cols = 200;
+                w = Math.Max(70, ctx.Measure(MakeFill(cols), size) + 10);
+                h = padY;
+                break;
+            }
+            case WidgetKind.Checkbox:
+            case WidgetKind.Radio:
+                w = 13; h = 13;
+                break;
+            case WidgetKind.Button:
+            {
+                string label = ButtonLabel(node);
+                w = Math.Max(44, ctx.Measure(label, size) + 22);
+                h = padY;
+                break;
+            }
+            case WidgetKind.Textarea:
+            {
+                int cols = ParseInt(node.GetAttr("cols"), 20);
+                if (cols < 1) cols = 1;
+                if (cols > 200) cols = 200;
+                int rows = ParseInt(node.GetAttr("rows"), 2);
+                if (rows < 1) rows = 1;
+                if (rows > 50) rows = 50;
+                w = Math.Max(90, ctx.Measure(MakeFill(cols), size) + 10);
+                h = Math.Max(size + 10, (lh + 2) * rows + 8);
+                break;
+            }
+            case WidgetKind.Select:
+            {
+                string label = SelectedOptionLabel(node);
+                w = Math.Max(90, ctx.Measure(label, size) + 34);
+                h = padY;
+                break;
+            }
+            default:
+                w = 0; h = 0;
+                break;
+        }
+    }
+
+    private static string MakeFill(int n)
+    {
+        char[] buf = new char[n];
+        for (int i = 0; i < n; i++) buf[i] = 'n';
+        return new string(buf);
+    }
+
+    /// <summary>A button's visible label: its value attr, else its text.</summary>
+    public static string ButtonLabel(DomNode node)
+    {
+        if (node.Tag == "input")
+        {
+            string v = node.GetAttr("value");
+            if (v != null) return v;
+            string t = node.GetAttr("type");
+            if (t != null && t.Length > 0)
+            {
+                t = t.ToLowerInvariant();
+                if (t == "submit") return "Submit";
+                if (t == "reset") return "Reset";
+                if (t == "button") return "Button";
+            }
+            return "Button";
+        }
+        string text = node.TextContent;
+        if (string.IsNullOrEmpty(text)) return "Button";
+        return CollapseWs(text).Trim();
+    }
+
+    /// <summary>The label of a select's current option (value attr, else text).</summary>
+    public static string SelectedOptionLabel(DomNode node)
+    {
+        DomNode opt = SelectedOption(node);
+        return opt != null ? OptionLabel(opt) : "";
+    }
+
+    /// <summary>The select's selected option element (selected attr, else first,
+    /// else none).</summary>
+    public static DomNode SelectedOption(DomNode select)
+    {
+        DomNode first = null;
+        DomNode opt = select.FirstChild;
+        while (opt != null)
+        {
+            if (opt.IsElement && opt.Tag == "option")
+            {
+                if (first == null) first = opt;
+                if (opt.GetAttr("selected") != null) return opt;
+            }
+            opt = opt.Next;
+        }
+        return first;
+    }
+
+    public static string OptionLabel(DomNode opt)
+    {
+        string v = opt.GetAttr("value");
+        if (v != null) return v;
+        string t = opt.TextContent;
+        return t != null ? CollapseWs(t).Trim() : "";
+    }
+
+    /// <summary>Emit a form control as a positioned widget on the plan.</summary>
+    private static void EmitWidget(Ctx ctx, Tok tok, int x, int lineTop, int lineH)
+    {
+        DomNode node = tok.Node;
+        if (node == null) return;
+        byte kind = tok.WidgetKind;
+        CssComputed st = tok.Style;
+        int size = st.FontSize > 0 ? st.FontSize : 13;
+        int w = tok.WidgetW, h = tok.WidgetH;
+
+        string text;
+        switch (kind)
+        {
+            case WidgetKind.Text:
+            case WidgetKind.Password:
+                text = node.GetAttr("value");
+                if (text == null) text = "";
+                break;
+            case WidgetKind.Textarea:
+                text = node.GetAttr("value");
+                if (text == null) text = node.TextContent;
+                if (text == null) text = "";
+                break;
+            case WidgetKind.Button:
+                text = ButtonLabel(node);
+                break;
+            case WidgetKind.Select:
+                text = SelectedOptionLabel(node);
+                break;
+            default:
+                text = "";
+                break;
+        }
+
+        RenderWidget rw = new RenderWidget();
+        rw.Node = node;
+        rw.Kind = kind;
+        rw.W = w;
+        rw.H = h;
+        rw.X = x;
+        rw.Y = lineTop + Math.Max(0, (lineH - h) / 2);
+        rw.Text = text;
+        rw.Checked = node.GetAttr("checked") != null;
+        rw.Disabled = node.GetAttr("disabled") != null;
+        rw.FontSize = size;
+        rw.Hidden = st.Visibility != CssVis.Visible;
+
+        int pad = (kind == WidgetKind.Checkbox || kind == WidgetKind.Radio) ? 0 : 5;
+        rw.TextX = x + pad;
+        rw.TextY = rw.Y + Math.Max(1, (h - size) / 2);
+        rw.TextW = ctx.Measure(text, size);
+        ctx.Plan.Widgets.Add(rw);
+    }
+
+    /// <summary>Block-level widget (display:block control): its own line.</summary>
+    private static void EmitBlockWidget(DomNode node, CssComputed style, int x, ref int y, Ctx ctx)
+    {
+        byte kind = WidgetKindOf(node);
+        if (kind == WidgetKind.NotAWidget) return;
+        int w, h;
+        MeasureWidget(node, kind, style, ctx, out w, out h);
+        Tok tok = new Tok { IsWidget = true, WidgetKind = kind, WidgetW = w, WidgetH = h, Style = style, Node = node };
+        EmitWidget(ctx, tok, x, y, Math.Max(h, LineHeightOf(style)));
+        y += h + 4;
     }
 
     private static void EmitLine(Ctx ctx, List<RenderSpan> spans, int top, int height, int textX,

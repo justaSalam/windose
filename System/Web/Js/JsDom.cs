@@ -396,6 +396,19 @@ public sealed class JsDom
     /// <summary>Raised after any DOM mutation the scripts cause (host relayouts).</summary>
     public Action OnDomChanged;
 
+    /// <summary>The element the host currently gives the caret to (document.activeElement).</summary>
+    public DomNode ActiveElementNode;
+
+    /// <summary>element.focus()/blur(): the host moves its caret to the node (or null).</summary>
+    public delegate void FocusRequestDelegate(DomNode node);
+    public FocusRequestDelegate OnFocusRequest;
+
+    /// <summary>form.submit()/form.reset(): the host performs the submission or reset.</summary>
+    public delegate void FormSubmitDelegate(DomNode form, DomNode submitter);
+    public delegate void FormResetDelegate(DomNode form);
+    public FormSubmitDelegate OnFormSubmit;
+    public FormResetDelegate OnFormReset;
+
     // computed-style queries (window.getComputedStyle): the host pushes the
     // document stylesheet + viewport via SetStylesheet; the sheet is parsed
     // lazily and only re-parsed when that changes.
@@ -642,6 +655,12 @@ public sealed class JsDom
         return JsUndefined.Instance;
     }
 
+    private object DocActiveElement(JsCallArgs a)
+    {
+        // the control the host currently gives the caret to (or <body>/null)
+        return ActiveElementNode != null ? (object)Wrap(ActiveElementNode) : JsNull.Instance;
+    }
+
     /// <summary>Wrap a node (cached so identity and listeners survive queries).</summary>
     public JsElementObject Wrap(DomNode node)
     {
@@ -718,6 +737,247 @@ public sealed class JsDom
         DefineOn(ElementPrototype, "removeEventListener", ElRemoveEventListener, 2);
         DefineOn(ElementPrototype, "dispatchEvent", ElDispatchEvent, 1);
         DefineOn(ElementPrototype, "click", ElClick, 0);
+
+        // form controls (stage 3)
+        DefineAccessor(ElementPrototype, "checked", ElCheckedGet, ElCheckedSet);
+        DefineAccessor(ElementPrototype, "defaultChecked", ElCheckedGet, null);
+        DefineAccessor(ElementPrototype, "disabled", ElDisabledGet, ElDisabledSet);
+        DefineAccessor(ElementPrototype, "readOnly", ElReadonlyGet, null);
+        DefineAccessor(ElementPrototype, "type", ElTypeGet, null);
+        DefineAccessor(ElementPrototype, "name", ElNameGet, ElNameSet);
+        DefineAccessor(ElementPrototype, "defaultValue", ElDefaultValueGet, null);
+        DefineAccessor(ElementPrototype, "placeholder", ElPlaceholderGet, null);
+        DefineAccessor(ElementPrototype, "selectedIndex", ElSelectedIndexGet, ElSelectedIndexSet);
+        DefineAccessor(ElementPrototype, "options", ElOptions, null);
+        DefineAccessor(ElementPrototype, "length", ElOptionsLength, null);
+        DefineAccessor(ElementPrototype, "form", ElForm, null);
+        DefineAccessor(ElementPrototype, "elements", ElFormElements, null);
+        DefineAccessor(ElementPrototype, "selectionStart", ElSelectionStart, null);
+        DefineAccessor(ElementPrototype, "selectionEnd", ElSelectionEnd, null);
+        DefineOn(ElementPrototype, "focus", ElFocus, 0);
+        DefineOn(ElementPrototype, "blur", ElBlur, 0);
+        DefineOn(ElementPrototype, "select", ElSelectText, 0);
+        DefineOn(ElementPrototype, "setSelectionRange", ElSetSelectionRange, 2);
+        DefineOn(ElementPrototype, "submit", ElSubmit, 0);
+        DefineOn(ElementPrototype, "reset", ElReset, 0);
+        DefineOn(ElementPrototype, "clickSubmit", ElClickSubmit, 0);
+    }
+
+    // ---- form-control accessors (stage 3) ---------------------------------
+
+    private object ElCheckedGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node.GetAttr("checked") != null;
+    }
+
+    private object ElCheckedSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        bool on = JsValueOps.ToBoolean(a.Get(0));
+        bool was = e.Node.GetAttr("checked") != null;
+        if (on == was) return JsUndefined.Instance;
+        if (on) SetAttribute(e.Node, "checked", "");
+        else e.Node.Attrs.Remove("checked");
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElDisabledGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("disabled") != null; }
+    private object ElReadonlyGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("readonly") != null; }
+
+    private object ElDisabledSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (JsValueOps.ToBoolean(a.Get(0))) SetAttribute(e.Node, "disabled", "");
+        else e.Node.Attrs.Remove("disabled");
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElTypeGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string tag = e.Node.Tag;
+        if (tag == "input") { string t = e.Node.GetAttr("type"); return t != null && t.Length > 0 ? t.ToLowerInvariant() : "text"; }
+        if (tag == "button") { string t = e.Node.GetAttr("type"); return t != null && t.Length > 0 ? t.ToLowerInvariant() : "submit"; }
+        return tag;
+    }
+
+    private object ElNameGet(JsCallArgs a) { JsElementObject e = A(a); string v = e.Node.GetAttr("name"); return v != null ? v : ""; }
+    private object ElNameSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "name", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElDefaultValueGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node.Tag == "textarea") { string t = e.Node.TextContent; return t != null ? t : ""; }
+        string v = e.Node.GetAttr("value");
+        return v != null ? v : "";
+    }
+
+    private object ElPlaceholderGet(JsCallArgs a) { JsElementObject e = A(a); string v = e.Node.GetAttr("placeholder"); return v != null ? v : ""; }
+
+    private object ElSelectedIndexGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node.Tag != "select") return (double)(-1);
+        DomNode sel = SelectedOption(e.Node);
+        int i = 0;
+        for (DomNode opt = e.Node.FirstChild; opt != null; opt = opt.Next)
+        {
+            if (!opt.IsElement || opt.Tag != "option") continue;
+            if (opt == sel) return (double)i;
+            i++;
+        }
+        return (double)(-1);
+    }
+
+    private object ElSelectedIndexSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node.Tag != "select") return JsUndefined.Instance;
+        int want = (int)JsValueOps.ToNumber(a.Get(0));
+        int i = 0;
+        DomNode chosen = null;
+        for (DomNode opt = e.Node.FirstChild; opt != null; opt = opt.Next)
+        {
+            if (!opt.IsElement || opt.Tag != "option") continue;
+            if (i == want) { chosen = opt; break; }
+            i++;
+        }
+        if (chosen != null) { SelectOption(e.Node, chosen); MarkChanged(); }
+        return JsUndefined.Instance;
+    }
+
+    private object ElOptions(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsArray arr = Realm.NewArray();
+        if (e.Node.Tag == "select")
+            for (DomNode opt = e.Node.FirstChild; opt != null; opt = opt.Next)
+                if (opt.IsElement && opt.Tag == "option") arr.Items.Add(Wrap(opt));
+        return arr;
+    }
+
+    private object ElOptionsLength(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node.Tag != "select") return (double)0;
+        int n = 0;
+        for (DomNode opt = e.Node.FirstChild; opt != null; opt = opt.Next)
+            if (opt.IsElement && opt.Tag == "option") n++;
+        return (double)n;
+    }
+
+    private object ElForm(JsCallArgs a) { JsElementObject e = A(a); return WrapOrJsNull(AncestorForm(e.Node)); }
+
+    private object ElFormElements(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsArray arr = Realm.NewArray();
+        DomNode form = AncestorForm(e.Node);
+        if (form != null) CollectControls(form, arr);
+        return arr;
+    }
+
+    private static DomNode AncestorForm(DomNode node)
+    {
+        DomNode n = node;
+        while (n != null && !(n.IsElement && n.Tag == "form")) n = n.Parent;
+        return n;
+    }
+
+    private void CollectControls(DomNode node, JsArray arr)
+    {
+        for (DomNode c = node.FirstChild; c != null; c = c.Next)
+        {
+            if (!c.IsElement) continue;
+            if (c.Tag == "input" || c.Tag == "select" || c.Tag == "textarea" || c.Tag == "button")
+                arr.Items.Add(Wrap(c));
+            CollectControls(c, arr);
+        }
+    }
+
+    private object ElSelectionStart(JsCallArgs a) { JsElementObject e = A(a); return (double)SelectionOf(e.Node, "start"); }
+    private object ElSelectionEnd(JsCallArgs a) { JsElementObject e = A(a); return (double)SelectionOf(e.Node, "end"); }
+
+    private static int SelectionOf(DomNode node, string which)
+    {
+        if (node.Attrs == null) return 0;
+        string key = "data-sel-" + which;
+        string v;
+        if (node.Attrs.ContainsKey(key))
+        {
+            int.TryParse(node.Attrs[key], out int parsed);
+            return parsed;
+        }
+        return which == "end" ? (LiveValue(node)).Length : 0;
+    }
+
+    private object ElFocus(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        ActiveElementNode = e.Node;   // document.activeElement, even without a host
+        if (OnFocusRequest != null) OnFocusRequest(e.Node);
+        return JsUndefined.Instance;
+    }
+
+    private object ElBlur(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (ActiveElementNode == e.Node) ActiveElementNode = null;
+        if (OnFocusRequest != null) OnFocusRequest(null);
+        return JsUndefined.Instance;
+    }
+
+    private object ElSelectText(JsCallArgs a)
+    {
+        // select() highlights the whole value; we model it as a caret at the end
+        JsElementObject e = A(a);
+        string v = LiveValue(e.Node);
+        if (e.Node.Attrs == null) e.Node.Attrs = new Dictionary<string, string>();
+        e.Node.Attrs["data-sel-start"] = "0";
+        e.Node.Attrs["data-sel-end"] = v.Length.ToString();
+        return JsUndefined.Instance;
+    }
+
+    private object ElSetSelectionRange(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        int start = (int)JsValueOps.ToNumber(a.Get(0));
+        int end = (int)JsValueOps.ToNumber(a.Get(1));
+        string v = LiveValue(e.Node);
+        if (start < 0) start = 0;
+        if (end < start) end = start;
+        if (end > v.Length) end = v.Length;
+        if (start > v.Length) start = v.Length;
+        if (e.Node.Attrs == null) e.Node.Attrs = new Dictionary<string, string>();
+        e.Node.Attrs["data-sel-start"] = start.ToString();
+        e.Node.Attrs["data-sel-end"] = end.ToString();
+        return JsUndefined.Instance;
+    }
+
+    private object ElSubmit(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        DomNode form = e.Node.Tag == "form" ? e.Node : AncestorForm(e.Node);
+        if (form != null && OnFormSubmit != null) OnFormSubmit(form, null);
+        return JsUndefined.Instance;
+    }
+
+    private object ElReset(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        DomNode form = e.Node.Tag == "form" ? e.Node : AncestorForm(e.Node);
+        if (form != null && OnFormReset != null) OnFormReset(form);
+        return JsUndefined.Instance;
+    }
+
+    private object ElClickSubmit(JsCallArgs a)
+    {
+        // a script calling .click() on a submit button should submit
+        JsElementObject e = A(a);
+        return JsUndefined.Instance;
     }
 
     // identity
@@ -731,8 +991,87 @@ public sealed class JsDom
     private object ElClassGet(JsCallArgs a) { JsElementObject e = A(a); string v = e.Node.GetAttr("class"); return v != null ? v : ""; }
     private object ElClassSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "class", JsValueOps.ToStringValue(a.Get(0))); MarkChanged(); return JsUndefined.Instance; }
 
-    private object ElValueGet(JsCallArgs a) { JsElementObject e = A(a); string v = e.Node.GetAttr("value"); return v != null ? v : ""; }
-    private object ElValueSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "value", JsValueOps.ToStringValue(a.Get(0))); MarkChanged(); return JsUndefined.Instance; }
+    // value: tag-aware like a real DOM. textarea falls back to its text, and
+    // select reflects the chosen option, so scripts see what layout draws.
+    private object ElValueGet(JsCallArgs a) { JsElementObject e = A(a); return LiveValue(e.Node); }
+    private object ElValueSet(JsCallArgs a) { JsElementObject e = A(a); SetLiveValue(e.Node, JsValueOps.ToStringValue(a.Get(0))); MarkChanged(); return JsUndefined.Instance; }
+
+    /// <summary>The control's live value (textarea -> text, select -> option).</summary>
+    public static string LiveValue(DomNode node)
+    {
+        if (node == null || !node.IsElement) return "";
+        string tag = node.Tag;
+        if (tag == "textarea")
+        {
+            string v = node.GetAttr("value");
+            return v != null ? v : (node.TextContent ?? "");
+        }
+        if (tag == "select")
+        {
+            DomNode opt = SelectedOption(node);
+            return opt != null ? OptionValue(opt) : "";
+        }
+        string val = node.GetAttr("value");
+        return val != null ? val : "";
+    }
+
+    /// <summary>Write a control's live value. A select picks the matching option.</summary>
+    public static void SetLiveValue(DomNode node, string value)
+    {
+        if (node == null) return;
+        if (node.Tag == "select")
+        {
+            DomNode chosen = null;
+            for (DomNode opt = node.FirstChild; opt != null; opt = opt.Next)
+                if (opt.IsElement && opt.Tag == "option" && OptionValue(opt) == value) { chosen = opt; break; }
+            if (chosen != null) SelectOption(node, chosen);
+            return;
+        }
+        if (node.Tag == "textarea")
+        {
+            // keep the text and the value attribute in sync so both layout and
+            // serialization agree after a script assignment
+            SetAttribute(node, "value", value);
+            node.RemoveAllChildren();
+            if (value.Length > 0) node.AddText(value);
+            return;
+        }
+        SetAttribute(node, "value", value);
+    }
+
+    /// <summary>The value a select option submits (value attr, else its text).</summary>
+    public static string OptionValue(DomNode opt)
+    {
+        string v = opt.GetAttr("value");
+        return v != null ? v : (opt.TextContent ?? "");
+    }
+
+    /// <summary>A select's chosen option element (selected attr, else the first).</summary>
+    public static DomNode SelectedOption(DomNode select)
+    {
+        DomNode first = null;
+        for (DomNode opt = select.FirstChild; opt != null; opt = opt.Next)
+        {
+            if (!opt.IsElement || opt.Tag != "option") continue;
+            if (first == null) first = opt;
+            if (opt.GetAttr("selected") != null) return opt;
+        }
+        return first;
+    }
+
+    /// <summary>Mark one option selected and clear the rest of its select.</summary>
+    public static void SelectOption(DomNode select, DomNode chosen)
+    {
+        for (DomNode opt = select.FirstChild; opt != null; opt = opt.Next)
+        {
+            if (!opt.IsElement || opt.Tag != "option") continue;
+            if (opt == chosen)
+            {
+                if (opt.GetAttr("selected") == null) SetAttribute(opt, "selected", "");
+            }
+            else if (opt.GetAttr("selected") != null) opt.Attrs.Remove("selected");
+        }
+    }
 
     // content
     private object ElInnerGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.SerializeChildren(); }
@@ -1011,6 +1350,7 @@ public sealed class JsDom
         DefineAccessor(doc, "URL", DocUrl, null);
         DefineAccessor(doc, "location", DocLocationGet, DocLocationSet);
         DefineAccessor(doc, "cookie", DocCookieGet, DocCookieSet);
+        DefineAccessor(doc, "activeElement", DocActiveElement, null);
 
         DefineOn(doc, "querySelector", DocQuerySelector, 1);
         DefineOn(doc, "querySelectorAll", DocQuerySelectorAll, 1);
