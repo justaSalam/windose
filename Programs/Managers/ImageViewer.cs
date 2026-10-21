@@ -4,6 +4,7 @@ using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 using Windose;
 using Windose.System.Kernel.Attributes;
+using Windose.System.Kernel;
 
 [FileAssociation(".png")]
 [FileAssociation(".webp")]
@@ -61,7 +62,7 @@ public sealed class ImageViewer : Window
                     root.RemoveChild(imageView);
                     imageView = new ImageView(loaded, 0, 0, Width - 20, Height - 20);
                     root.AddDockChild(imageView, Dock.Fill);
-                    Text = $"Image Viewer - {Path.GetFileName(path)}";
+                    text = $"Image Viewer - {Path.GetFileName(path)}";
                 }
             }));
         });

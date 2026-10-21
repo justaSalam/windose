@@ -51,24 +51,28 @@ namespace Windose.Web.Tls
 
         private bool FillAppBuffer()
         {
-            byte ct;
-            byte[] frag = Record.ReadRecord(out ct);
-            if (frag == null) return false;
-            if (ct == TlsContent.Alert)
+            while (true)
             {
-                if (frag.Length >= 2 && frag[1] != 0)
-                    throw new Exception("TLS alert: " + frag[1]);
-                return false; // close_notify
+                byte ct;
+                byte[] frag = Record.ReadRecord(out ct);
+                if (frag == null) return false;
+                if (ct == TlsContent.Alert)
+                {
+                    if (frag.Length >= 2 && frag[1] != 0)
+                        throw new Exception("TLS alert: " + frag[1]);
+                    return false; // close_notify
+                }
+                if (ct != TlsContent.ApplicationData)
+                    continue; // ignore non-application-data records (e.g. NewSessionTicket, renegotiation) and read next record
+
+                // append to appBuf
+                byte[] nb = new byte[appLen + frag.Length];
+                Array.Copy(appBuf, 0, nb, 0, appLen);
+                Array.Copy(frag, 0, nb, appLen, frag.Length);
+                appBuf = nb;
+                appLen += frag.Length;
+                return true;
             }
-            if (ct != TlsContent.ApplicationData)
-                return true; // ignore stray records (e.g. renegotiation) — retry
-            // append to appBuf
-            byte[] nb = new byte[appLen + frag.Length];
-            Array.Copy(appBuf, 0, nb, 0, appLen);
-            Array.Copy(frag, 0, nb, appLen, frag.Length);
-            appBuf = nb;
-            appLen += frag.Length;
-            return appLen > 0 || FillAppBuffer();
         }
 
         public void Close()
@@ -162,8 +166,8 @@ namespace Windose.Web.Tls
                 }
                 else if (type == 0) // HelloRequest — ignore
                 { }
-                else if (type == 4) // NewSessionTicket — ignore (still transcript? no, sent before CCS)
-                { AppendTranscript(transcript, msg); }
+                else if (type == 4) // NewSessionTicket — RFC 5077: MUST NOT be included in transcript hash
+                { }
                 else
                 {
                     // Unknown handshake message — record in transcript, continue.
@@ -226,6 +230,10 @@ namespace Windose.Web.Tls
             record.EnableReadProtection(serverKey, serverIv);
 
             byte[] serverFinishedMsg = reader.ReadHandshakeMessage();
+            while (serverFinishedMsg != null && serverFinishedMsg[0] == 4) // Skip NewSessionTicket if sent between CCS and Finished
+            {
+                serverFinishedMsg = reader.ReadHandshakeMessage();
+            }
             if (serverFinishedMsg == null || serverFinishedMsg[0] != 20)
                 throw new Exception("TLS: expected server Finished");
             byte[] serverVerifyBody = SubBody(serverFinishedMsg);
@@ -457,8 +465,8 @@ namespace Windose.Web.Tls
             AddU16(exts, hostBytes.Length);
             for (int i = 0; i < hostBytes.Length; i++) exts.Add(hostBytes[i]);
 
-            // supported_groups — secp256r1, secp384r1
-            byte[] groups = new byte[] { 0x00, 0x17, 0x00, 0x18 };
+            // supported_groups — secp256r1 only (P256.cs only implements curve 0x0017)
+            byte[] groups = new byte[] { 0x00, 0x17 };
             AddU16(exts, 10);
             AddU16(exts, 2 + groups.Length);
             AddU16(exts, groups.Length);

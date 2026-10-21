@@ -67,6 +67,7 @@ public sealed class CssComputed
 
     // box spacing
     public int MarginT, MarginB, MarginL, MarginR;
+    public bool MarginTAuto, MarginBAuto, MarginLAuto, MarginRAuto;
     public int PadT, PadB, PadL, PadR;
 
     // positioned offsets (top/right/bottom/left). auto is stored as
@@ -311,13 +312,16 @@ public sealed class CssMedia
 
     public bool Matches(int viewportW, int viewportH)
     {
-        if (Type != null && Type != "all" && Type != "screen") return false; // only screen/all render
-        if (Features == null) return true;
-        for (int i = 0; i < Features.Count; i++)
+        bool matches = true;
+        if (Type != null && Type != "all" && Type != "screen") matches = false;
+        if (matches && Features != null)
         {
-            if (!Features[i].Matches(viewportW, viewportH)) return false;
+            for (int i = 0; i < Features.Count; i++)
+            {
+                if (!Features[i].Matches(viewportW, viewportH)) { matches = false; break; }
+            }
         }
-        return true;
+        return Negated ? !matches : matches;
     }
 }
 
@@ -392,7 +396,14 @@ public sealed class CssSheet
 
             // qualified rule: selectors { decls }
             int brace = FindBlockStart(css, i, end);
-            if (brace < 0) break;
+            if (brace < 0)
+            {
+                // Recovery: don't break out of the whole stylesheet on a stray character
+                int nextSemi = css.IndexOf(';', i, Math.Min(500, end - i));
+                if (nextSemi >= 0) i = nextSemi + 1;
+                else i++;
+                continue;
+            }
             string selText = css.Substring(i, brace - i).Trim();
             int close = MatchBrace(css, brace, end);
             if (close < 0) close = end;
@@ -416,19 +427,20 @@ public sealed class CssSheet
         int j = i + 1;
         StringBuilder name = new StringBuilder();
         while (j < end && IsIdentChar(css[j])) { name.Append(css[j]); j++; }
-        string at = name.ToString();
+        string at = name.ToString().ToLowerInvariant();
 
-        // skip whitespace before the prelude end
-        int preludeStart = j;
+        int stmtSemi = FindStatementEnd(css, j, end);
         int brace = FindBlockStart(css, j, end);
-        int semi = css.IndexOf(';', j, Math.Min(end, (brace < 0 ? end : brace)) - j);
-        if (brace < 0 || (semi >= 0 && semi < brace))
+
+        if (stmtSemi >= 0 && (brace < 0 || stmtSemi < brace))
         {
-            // statement at-rule (@import, @charset) -> ignore (we don't fetch imports here)
-            return semi < 0 ? end : semi + 1;
+            // statement at-rule (@import, @charset, @namespace) -> skip past semicolon
+            return stmtSemi + 1;
         }
 
-        string prelude = css.Substring(preludeStart, brace - preludeStart).Trim();
+        if (brace < 0) return end;
+
+        string prelude = css.Substring(j, brace - j).Trim();
         int close = MatchBrace(css, brace, end);
         if (close < 0) close = end;
         string body = css.Substring(brace + 1, Math.Max(0, close - brace - 1));
@@ -440,13 +452,39 @@ public sealed class CssSheet
             if (outerMedia != null && m != null) { /* keep inner */ }
             ParseBlock(sheet, body, 0, body.Length, m, ref order);
         }
-        else if (at == "supports")
+        else if (at == "supports" || at == "layer")
         {
             // treat as always-true (we support most of what pages feature-test)
             ParseBlock(sheet, body, 0, body.Length, outerMedia, ref order);
         }
         // @font-face, @keyframes, @page, @import: parsed away / ignored
         return close + 1;
+    }
+
+    private static int FindStatementEnd(string s, int i, int end)
+    {
+        int depth = 0;
+        while (i < end)
+        {
+            char c = s[i];
+            if (c == '/' && i + 1 < end && s[i + 1] == '*')
+            {
+                int ce = s.IndexOf("*/", i + 2, end - i - 2);
+                i = ce < 0 ? end : ce + 2;
+                continue;
+            }
+            if (c == '"' || c == '\'')
+            {
+                i = SkipString(s, i, end);
+                continue;
+            }
+            if (c == '(') { depth++; i++; continue; }
+            if (c == ')') { if (depth > 0) depth--; i++; continue; }
+            if (c == ';' && depth == 0) return i;
+            if (c == '{' && depth == 0) return -1;
+            i++;
+        }
+        return -1;
     }
 
     private static CssMedia ParseMediaQuery(string prelude)
@@ -490,7 +528,8 @@ public sealed class CssSheet
         string s = text.Trim();
         if (s.Length == 0) { cl.Type = "all"; return cl; }
         int i = 0;
-        if (s.Length > 4 && s.Substring(0, 4) == "not") { cl.Negated = true; i = 4; }
+        if (s.StartsWith("not ", StringComparison.OrdinalIgnoreCase)) { cl.Negated = true; i = 4; }
+        else if (s.Equals("not", StringComparison.OrdinalIgnoreCase)) { cl.Negated = true; i = 3; }
         while (i < s.Length && s[i] == ' ') i++;
         // type
         int ts = i;
@@ -630,14 +669,19 @@ public sealed class CssSheet
             sel.Compounds.Add(cp);
             pend = CssComb.None;
 
-            // pseudo-element at the end
-            if (i + 1 < s.Length && s[i] == ':' && s[i + 1] == ':')
+            // pseudo-element at the end (CSS3 :: or CSS2 :)
+            if (i < s.Length && s[i] == ':')
             {
-                int ps = i + 2;
+                bool dbl = i + 1 < s.Length && s[i + 1] == ':';
+                int ps = dbl ? i + 2 : i + 1;
                 int pe = ps;
                 while (pe < s.Length && IsIdentChar(s[pe])) pe++;
-                sel.PseudoElement = s.Substring(ps, pe - ps).ToLowerInvariant();
-                i = pe;
+                string pName = s.Substring(ps, pe - ps).ToLowerInvariant();
+                if (dbl || pName == "before" || pName == "after" || pName == "first-line" || pName == "first-letter" || pName == "placeholder")
+                {
+                    sel.PseudoElement = pName;
+                    i = pe;
+                }
             }
         }
         if (sel.Compounds.Count == 0) return null;
@@ -658,17 +702,51 @@ public sealed class CssSheet
 
             if (c == '.')
             {
-                int st = ++i;
-                while (i < s.Length && IsIdentChar(s[i])) i++;
-                if (i > st) { CssCond cd = new CssCond { Kind = CssCondKind.Class, Str = s.Substring(st, i - st) }; cp.Add(cd); any = true; }
+                i++;
+                StringBuilder sb = new StringBuilder();
+                while (i < s.Length)
+                {
+                    if (s[i] == '\\' && i + 1 < s.Length)
+                    {
+                        i++;
+                        sb.Append(s[i]);
+                        i++;
+                        continue;
+                    }
+                    if (IsIdentChar(s[i]))
+                    {
+                        sb.Append(s[i]);
+                        i++;
+                        continue;
+                    }
+                    break;
+                }
+                if (sb.Length > 0) { CssCond cd = new CssCond { Kind = CssCondKind.Class, Str = sb.ToString() }; cp.Add(cd); any = true; }
                 continue;
             }
 
             if (c == '#')
             {
-                int st = ++i;
-                while (i < s.Length && IsIdentChar(s[i])) i++;
-                if (i > st) { CssCond cd = new CssCond { Kind = CssCondKind.Id, Str = s.Substring(st, i - st) }; cp.Add(cd); any = true; }
+                i++;
+                StringBuilder sb = new StringBuilder();
+                while (i < s.Length)
+                {
+                    if (s[i] == '\\' && i + 1 < s.Length)
+                    {
+                        i++;
+                        sb.Append(s[i]);
+                        i++;
+                        continue;
+                    }
+                    if (IsIdentChar(s[i]))
+                    {
+                        sb.Append(s[i]);
+                        i++;
+                        continue;
+                    }
+                    break;
+                }
+                if (sb.Length > 0) { CssCond cd = new CssCond { Kind = CssCondKind.Id, Str = sb.ToString() }; cp.Add(cd); any = true; }
                 continue;
             }
 
@@ -840,7 +918,12 @@ public sealed class CssSheet
                 continue;
             }
             int colon = FindDeclColon(body, i, len);
-            if (colon < 0) break;
+            if (colon < 0)
+            {
+                int nextSemi = body.IndexOf(';', i);
+                if (nextSemi >= 0) { i = nextSemi + 1; continue; }
+                break;
+            }
             string prop = body.Substring(i, colon - i).Trim().ToLowerInvariant();
 
             int semi = FindDeclEnd(body, colon + 1, len);
@@ -874,7 +957,7 @@ public sealed class CssSheet
             char c = s[i];
             if (c == '(') depth++;
             else if (c == ')') depth--;
-            else if (c == '"' || c == '\'') { i = SkipString(s, i, end); }
+            else if (c == '"' || c == '\'') { i = SkipString(s, i, end) - 1; }
             else if (c == ':' && depth == 0) return i;
             else if (c == ';' && depth == 0) return -1;
             else if (c == '{' && depth == 0) return -1;
@@ -890,7 +973,7 @@ public sealed class CssSheet
             char c = s[i];
             if (c == '(') depth++;
             else if (c == ')') depth--;
-            else if (c == '"' || c == '\'') { i = SkipString(s, i, end); }
+            else if (c == '"' || c == '\'') { i = SkipString(s, i, end) - 1; }
             else if (c == ';' && depth == 0) return i;
             else if (c == '}' && depth == 0) return i;
         }
@@ -908,6 +991,7 @@ public sealed class CssSheet
         CssComputed c = CssComputed.Initial();
         ApplyUaDefaults(c, el != null ? el.Tag : null);
         c.InheritFrom(parent);
+        if (el != null && el.IsElement) ApplyPresentationalHints(c, el, viewportW);
 
         // gather matching declarations
         List<CssDecl> decls = new List<CssDecl>();
@@ -986,7 +1070,7 @@ public sealed class CssSheet
             if (p.Length > 1 && p[0] == '-' && p[1] == '-') continue;   // already collected
             string val = SubstituteVars(decls[i].Value, vars, 0);
             if (val == null) continue;   // invalid var() -> declaration becomes unset
-            ApplyDecl(c, p, val, viewportW);
+            ApplyDecl(c, p, val, viewportW, parent);
         }
 
         // inline style="" (highest author priority, still below !important)
@@ -1005,7 +1089,7 @@ public sealed class CssSheet
                 if (p.Length > 1 && p[0] == '-' && p[1] == '-') continue;   // already collected
                 string val = SubstituteVars(inline[i].Value, vars, 0);
                 if (val == null) continue;
-                ApplyDecl(c, p, val, viewportW);
+                ApplyDecl(c, p, val, viewportW, parent);
             }
         }
 
@@ -1040,9 +1124,9 @@ public sealed class CssSheet
             else { name = inner; fallback = null; }
 
             string repl = null;
+            string key = name.Trim();
             if (vars != null)
             {
-                string key = name.Trim();
                 vars.TryGetValue(key, out repl);
             }
             if (repl != null && repl.Length > 0)
@@ -1055,7 +1139,12 @@ public sealed class CssSheet
             }
             else
             {
-                return null;   // missing custom property, no fallback -> invalid
+                // Tailwind CSS sets --tw-bg-opacity / --tw-text-opacity / --tw-border-opacity.
+                // If referenced without a fallback and unset, default to 1 (full opacity).
+                if (key == "--tw-bg-opacity" || key == "--tw-text-opacity" || key == "--tw-border-opacity")
+                    repl = "1";
+                else
+                    return null;   // missing custom property, no fallback -> invalid
             }
             if (repl == null) return null;
             sb.Append(repl);
@@ -1229,7 +1318,7 @@ public sealed class CssSheet
             case CssCondKind.OnlyChild:
                 return FirstElementChild(el.Parent) == el && LastElementChild(el.Parent) == el;
             case CssCondKind.Root:
-                return el.Parent == null || el.Parent.Tag == "#document";
+                return el.Parent == null || el.Parent.Tag == "#document" || el.Tag == "html";
 
             case CssCondKind.NthChild:
                 { int pos = ElementPosition(el); return MatchNth(cd.A, cd.B, pos); }
@@ -1340,6 +1429,133 @@ public sealed class CssSheet
         return pos;
     }
 
+    private static bool IsAllHex(string s)
+    {
+        for (int i = 0; i < s.Length; i++)
+        {
+            char ch = s[i];
+            if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')))
+                return false;
+        }
+        return true;
+    }
+
+    private static void ApplyPresentationalHints(CssComputed c, DomNode el, int viewportW)
+    {
+        string tag = el.Tag != null ? el.Tag.ToLowerInvariant() : "";
+
+        // align attribute
+        string align = el.GetAttr("align");
+        if (!string.IsNullOrEmpty(align))
+        {
+            align = align.Trim().ToLowerInvariant();
+            if (tag == "table")
+            {
+                if (align == "center") { c.MarginLAuto = true; c.MarginRAuto = true; }
+                else if (align == "left") c.Float = CssFloat.Left;
+                else if (align == "right") c.Float = CssFloat.Right;
+            }
+            else if (tag == "img" || tag == "input" || tag == "object")
+            {
+                if (align == "left") c.Float = CssFloat.Left;
+                else if (align == "right") c.Float = CssFloat.Right;
+                else if (align == "middle") c.VerticalAlign = CssVAlign.Middle;
+                else if (align == "top") c.VerticalAlign = CssVAlign.Top;
+                else if (align == "bottom") c.VerticalAlign = CssVAlign.Bottom;
+            }
+            else
+            {
+                if (align == "center") c.TextAlign = CssAlign.Center;
+                else if (align == "right") c.TextAlign = CssAlign.Right;
+                else if (align == "justify") c.TextAlign = CssAlign.Justify;
+                else if (align == "left") c.TextAlign = CssAlign.Left;
+            }
+        }
+
+        // valign attribute
+        string valign = el.GetAttr("valign");
+        if (!string.IsNullOrEmpty(valign))
+        {
+            valign = valign.Trim().ToLowerInvariant();
+            if (valign == "top") c.VerticalAlign = CssVAlign.Top;
+            else if (valign == "middle" || valign == "center") c.VerticalAlign = CssVAlign.Middle;
+            else if (valign == "bottom") c.VerticalAlign = CssVAlign.Bottom;
+            else if (valign == "baseline") c.VerticalAlign = CssVAlign.Baseline;
+        }
+
+        // bgcolor attribute
+        string bgcolor = el.GetAttr("bgcolor");
+        if (!string.IsNullOrEmpty(bgcolor))
+        {
+            bgcolor = bgcolor.Trim();
+            if (bgcolor.Length == 6 && !bgcolor.StartsWith("#") && IsAllHex(bgcolor))
+                bgcolor = "#" + bgcolor;
+            if (CssValue.TryColor(bgcolor, viewportW, 0, out uint bgCol))
+            {
+                c.BgColor = bgCol;
+                c.HasBg = true;
+            }
+        }
+
+        // color attribute (e.g. <font color="...">)
+        string colorAttr = el.GetAttr("color");
+        if (!string.IsNullOrEmpty(colorAttr))
+        {
+            colorAttr = colorAttr.Trim();
+            if (colorAttr.Length == 6 && !colorAttr.StartsWith("#") && IsAllHex(colorAttr))
+                colorAttr = "#" + colorAttr;
+            if (CssValue.TryColor(colorAttr, viewportW, 0, out uint fgCol))
+            {
+                c.Color = fgCol;
+                c.HasColor = true;
+            }
+        }
+
+        // width and height attributes (tables, cells, images, hr)
+        if (tag == "table" || tag == "td" || tag == "th" || tag == "hr" || tag == "img" || tag == "iframe")
+        {
+            string wAttr = el.GetAttr("width");
+            if (!string.IsNullOrEmpty(wAttr))
+            {
+                if (CssValue.TryLengthPx(wAttr, c.FontSize, viewportW, out int wpx) && wpx > 0)
+                {
+                    c.W = wpx;
+                    c.HasW = true;
+                }
+            }
+            string hAttr = el.GetAttr("height");
+            if (!string.IsNullOrEmpty(hAttr))
+            {
+                if (CssValue.TryLengthPx(hAttr, c.FontSize, viewportW, out int hpx) && hpx > 0)
+                {
+                    c.H = hpx;
+                    c.HasH = true;
+                }
+            }
+        }
+
+        // border attribute (tables)
+        if (tag == "table")
+        {
+            string borderAttr = el.GetAttr("border");
+            if (!string.IsNullOrEmpty(borderAttr) && int.TryParse(borderAttr.Trim(), out int bwidth))
+            {
+                if (bwidth > 0)
+                {
+                    c.BorderTW = c.BorderBW = c.BorderLW = c.BorderRW = bwidth;
+                    c.BorderTT = c.BorderBB = c.BorderLL = c.BorderRR = CssBorder.Solid;
+                    c.BorderTC = c.BorderBC = c.BorderLC = c.BorderRC = 0xFF888888;
+                }
+            }
+        }
+
+        // nowrap attribute
+        if (el.GetAttr("nowrap") != null)
+        {
+            c.WhiteSpace = CssWhite.Nowrap;
+        }
+    }
+
     // ---- UA defaults -----------------------------------------------------
 
     public static void ApplyUaDefaults(CssComputed c, string tag)
@@ -1357,9 +1573,13 @@ public sealed class CssSheet
                 break;
             case "div": case "section": case "article": case "aside": case "header": case "footer":
             case "nav": case "main": case "figure": case "figcaption": case "details": case "summary":
-            case "fieldset": case "center": case "p": case "form":
+            case "fieldset": case "p": case "form":
             case "hgroup": case "search":
                 c.Display = CssDisplay.Block;
+                break;
+            case "center":
+                c.Display = CssDisplay.Block;
+                c.TextAlign = CssAlign.Center;
                 break;
             case "h1": c.Display = CssDisplay.Block; c.FontSize = 32; c.FontWeight = 700; c.MarginT = 19; c.MarginB = 19; break;
             case "h2": c.Display = CssDisplay.Block; c.FontSize = 24; c.FontWeight = 700; c.MarginT = 18; c.MarginB = 18; break;
@@ -1462,7 +1682,7 @@ public sealed class CssSheet
             string val = SubstituteVars(decls[i].Value, c.ResolvedVars, 0);
             if (val == null) continue;
             if (p == "content") content = Unquote(val);
-            else ApplyDecl(c, p, val, vw);
+            else ApplyDecl(c, p, val, vw, elStyle);
         }
         if (content == null) return null; // ::before/::after require content
         if (content == "none" || content == "normal") return null;
@@ -1471,7 +1691,7 @@ public sealed class CssSheet
 
     // ---- property application --------------------------------------------
 
-    private static void ApplyDecl(CssComputed c, string prop, string value, int vw)
+    private static void ApplyDecl(CssComputed c, string prop, string value, int vw, CssComputed parent = null)
     {
         string v = value;
         if (prop.Length > 1 && prop[0] == '-' && prop[1] == '-') return;   // custom props handled in Compute
@@ -1486,7 +1706,7 @@ public sealed class CssSheet
                     else if (w == "inline-block") c.Display = CssDisplay.InlineBlock;
                     else if (w == "list-item") c.Display = CssDisplay.ListItem;
                     else if (w == "flex" || w == "inline-flex") c.Display = CssDisplay.Flex;
-                    else if (w == "grid" || w == "inline-grid") c.Display = CssDisplay.Block;
+                    else if (w == "grid" || w == "inline-grid" || w == "flow-root") c.Display = CssDisplay.Block;
                     else if (w == "table") c.Display = CssDisplay.Table;
                     else if (w == "table-row") c.Display = CssDisplay.TableRow;
                     else if (w == "table-cell") c.Display = CssDisplay.TableCell;
@@ -1537,16 +1757,56 @@ public sealed class CssSheet
                 break;
 
             case "color":
-                { if (CssValue.TryColor(v, vw, 0, out uint col)) { c.Color = col; c.HasColor = true; } break; }
+                {
+                    if (v == "inherit")
+                    {
+                        if (parent != null && parent.HasColor) { c.Color = parent.Color; c.HasColor = true; }
+                        break;
+                    }
+                    uint backdrop = c.HasColor ? c.Color : (parent != null && parent.HasColor ? parent.Color : 0xFF000000);
+                    if (CssValue.TryColor(v, vw, backdrop, out uint col)) { c.Color = col; c.HasColor = true; }
+                    break;
+                }
             case "background": case "background-color":
                 {
                     // "background" shorthand may carry image/position/repeat/color
                     if (prop == "background-color")
                     {
-                        if (CssValue.TryColor(v, vw, 0, out uint bg)) { c.HasBg = true; c.BgColor = bg; }
+                        uint backdrop = c.HasColor ? c.Color : (parent != null && parent.HasColor ? parent.Color : 0xFF000000);
+                        if (CssValue.TryColor(v, vw, backdrop, out uint bg)) { c.HasBg = true; c.BgColor = bg; }
                         break;
                     }
                     ApplyBackgroundShorthand(c, v, vw);
+                    break;
+                }
+            case "background-image":
+                {
+                    string p = v.Trim();
+                    if (p.StartsWith("url("))
+                    {
+                        string url = p.Substring(4).TrimEnd(')');
+                        c.BgImage = Unquote(url.Trim());
+                    }
+                    else if (p == "none")
+                    {
+                        c.BgImage = null;
+                    }
+                    break;
+                }
+            case "background-repeat":
+                {
+                    string p = FirstWord(v);
+                    if (p == "no-repeat") c.BgRepeat = CssRepeat.NoRepeat;
+                    else if (p == "repeat-x") c.BgRepeat = CssRepeat.RepeatX;
+                    else if (p == "repeat-y") c.BgRepeat = CssRepeat.RepeatY;
+                    else if (p == "repeat") c.BgRepeat = CssRepeat.Repeat;
+                    break;
+                }
+            case "background-position":
+            case "background-position-x":
+            case "background-position-y":
+                {
+                    c.BgPos = v.Trim();
                     break;
                 }
 
@@ -1654,10 +1914,30 @@ public sealed class CssSheet
             case "overflow-y": { string w = FirstWord(v); c.OverflowY = w == "hidden" ? CssOverflow.Hidden : (w == "scroll" ? CssOverflow.Scroll : (w == "auto" ? CssOverflow.Auto : CssOverflow.Visible)); break; }
 
             case "margin": ApplyMarginShorthand(c, v, c.FontSize, vw); break;
-            case "margin-top": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MarginT = px; break; }
-            case "margin-bottom": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MarginB = px; break; }
-            case "margin-left": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MarginL = px; break; }
-            case "margin-right": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MarginR = px; break; }
+            case "margin-top":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginT = 0; c.MarginTAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginT = px; c.MarginTAuto = false; }
+                    break;
+                }
+            case "margin-bottom":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginB = 0; c.MarginBAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginB = px; c.MarginBAuto = false; }
+                    break;
+                }
+            case "margin-left":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginL = 0; c.MarginLAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginL = px; c.MarginLAuto = false; }
+                    break;
+                }
+            case "margin-right":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginR = 0; c.MarginRAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginR = px; c.MarginRAuto = false; }
+                    break;
+                }
 
             case "padding": ApplyPaddingShorthand(c, v, c.FontSize, vw); break;
             case "padding-top": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadT = px; break; }
@@ -1691,7 +1971,11 @@ public sealed class CssSheet
             case "border-radius":
             case "border-top-left-radius": case "border-top-right-radius":
             case "border-bottom-left-radius": case "border-bottom-right-radius":
-                { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.BorderRadius = px; break; }
+                {
+                    string first = FirstWord(v);
+                    if (CssValue.TryLengthPx(first, c.FontSize, vw, out int px)) c.BorderRadius = px;
+                    break;
+                }
 
             case "width": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.W = px; c.HasW = true; } break; }
             case "height": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.H = px; c.HasH = true; } break; }
@@ -1804,6 +2088,8 @@ public sealed class CssSheet
                 string url = p.Substring(4).TrimEnd(')');
                 c.BgImage = Unquote(url.Trim());
             }
+            else if (p == "none") { c.BgImage = null; }
+            else if (p == "transparent") { c.HasBg = false; }
             else if (p == "scroll" || p == "fixed" || p == "local") { }
             else if (p == "cover" || p == "contain") { }
             else if (p.Contains("%") || p.Contains("px")) c.BgPos = p;
@@ -1838,18 +2124,45 @@ public sealed class CssSheet
         }
     }
 
+    private static bool ParseMarginValue(string s, int fs, int vw, out int px, out bool isAuto)
+    {
+        if (s == "auto") { px = 0; isAuto = true; return true; }
+        isAuto = false;
+        return CssValue.TryLengthPx(s, fs, vw, out px);
+    }
+
     private static void ApplyMarginShorthand(CssComputed c, string v, int fs, int vw)
     {
         List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
         int t = 0, r = 0, b = 0, l = 0;
-        if (CssValue.TryLengthPx(parts[0], fs, vw, out t))
+        bool tAuto = false, rAuto = false, bAuto = false, lAuto = false;
+        ParseMarginValue(parts[0], fs, vw, out t, out tAuto);
+        if (parts.Count == 1)
         {
-            if (parts.Count == 1) { r = b = l = t; }
-            else if (parts.Count == 2) { CssValue.TryLengthPx(parts[1], fs, vw, out r); b = t; l = r; }
-            else if (parts.Count == 3) { CssValue.TryLengthPx(parts[1], fs, vw, out r); CssValue.TryLengthPx(parts[2], fs, vw, out b); l = r; }
-            else { CssValue.TryLengthPx(parts[1], fs, vw, out r); CssValue.TryLengthPx(parts[2], fs, vw, out b); CssValue.TryLengthPx(parts[3], fs, vw, out l); }
+            r = b = l = t;
+            rAuto = bAuto = lAuto = tAuto;
+        }
+        else if (parts.Count == 2)
+        {
+            ParseMarginValue(parts[1], fs, vw, out r, out rAuto);
+            b = t; bAuto = tAuto;
+            l = r; lAuto = rAuto;
+        }
+        else if (parts.Count == 3)
+        {
+            ParseMarginValue(parts[1], fs, vw, out r, out rAuto);
+            ParseMarginValue(parts[2], fs, vw, out b, out bAuto);
+            l = r; lAuto = rAuto;
+        }
+        else
+        {
+            ParseMarginValue(parts[1], fs, vw, out r, out rAuto);
+            ParseMarginValue(parts[2], fs, vw, out b, out bAuto);
+            if (parts.Count >= 4) ParseMarginValue(parts[3], fs, vw, out l, out lAuto);
         }
         c.MarginT = t; c.MarginR = r; c.MarginB = b; c.MarginL = l;
+        c.MarginTAuto = tAuto; c.MarginRAuto = rAuto; c.MarginBAuto = bAuto; c.MarginLAuto = lAuto;
     }
 
     private static void ApplyPaddingShorthand(CssComputed c, string v, int fs, int vw)
@@ -2065,8 +2378,12 @@ public sealed class CssSheet
     private static int SkipString(string s, int i, int end)
     {
         char q = s[i]; i++;
-        while (i < end && s[i] != q) i++;
-        return i;
+        while (i < end && s[i] != q)
+        {
+            if (s[i] == '\\' && i + 1 < end) i++;
+            i++;
+        }
+        return i < end ? i + 1 : end;
     }
 
     private static int FindBlockStart(string s, int i, int end)
@@ -2076,7 +2393,7 @@ public sealed class CssSheet
         {
             char c = s[i];
             if (c == '/' && i + 1 < end && s[i + 1] == '*') { int ce = s.IndexOf("*/", i + 2, end - i - 2); i = ce < 0 ? end : ce + 1; continue; }
-            if (c == '"' || c == '\'') { i = SkipString(s, i, end); continue; }
+            if (c == '"' || c == '\'') { i = SkipString(s, i, end) - 1; continue; }
             if (c == '{') return i;
             if (c == '}' && depth == 0) return -1;   // stray close before our block
             if (c == ';' && depth == 0) return -1;   // statement rule with no block
@@ -2091,7 +2408,7 @@ public sealed class CssSheet
         {
             char c = s[i];
             if (c == '/' && i + 1 < end && s[i + 1] == '*') { int ce = s.IndexOf("*/", i + 2, end - i - 2); i = ce < 0 ? end : ce + 1; continue; }
-            if (c == '"' || c == '\'') { i = SkipString(s, i, end); continue; }
+            if (c == '"' || c == '\'') { i = SkipString(s, i, end) - 1; continue; }
             if (c == '{') depth++;
             else if (c == '}') { depth--; if (depth == 0) return i; }
         }
@@ -2464,6 +2781,7 @@ public static class CssValue
         if (s.Length == 0) return false;
 
         if (s == "transparent") { color = 0x00000000; return true; }
+        if (s == "currentcolor") { color = backdrop != 0 ? backdrop : 0xFF000000; return true; }
 
         // named colors
         uint named;
@@ -2498,9 +2816,28 @@ public static class CssValue
             bool hsl = s.StartsWith("hsl");
             string inner = s.Substring(open + 1, close - open - 1);
             List<string> parts = new List<string>();
-            int st = 0;
-            for (int i = 0; i < inner.Length; i++) if (inner[i] == ',' || inner[i] == '/') { parts.Add(inner.Substring(st, i - st).Trim()); st = i + 1; }
-            parts.Add(inner.Substring(st).Trim());
+            StringBuilder curPart = new StringBuilder();
+            int parenDepth = 0;
+            for (int i = 0; i < inner.Length; i++)
+            {
+                char ch = inner[i];
+                if (ch == '(') parenDepth++;
+                else if (ch == ')') { if (parenDepth > 0) parenDepth--; }
+
+                if (parenDepth == 0 && (ch == ',' || ch == '/' || ch == ' ' || ch == '\t'))
+                {
+                    if (curPart.Length > 0)
+                    {
+                        parts.Add(curPart.ToString());
+                        curPart.Length = 0;
+                    }
+                }
+                else
+                {
+                    curPart.Append(ch);
+                }
+            }
+            if (curPart.Length > 0) parts.Add(curPart.ToString());
             if (parts.Count < 3) return false;
 
             double c1, c2, c3;

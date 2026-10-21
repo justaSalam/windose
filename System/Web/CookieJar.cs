@@ -176,6 +176,25 @@ public sealed class CookieJar
                 cookies.RemoveAt(i);
     }
 
+    /// <summary>Return a snapshot of all active cookies.</summary>
+    public List<Cookie> GetAll()
+    {
+        lock (gate)
+        {
+            PruneExpired();
+            return new List<Cookie>(cookies);
+        }
+    }
+
+    /// <summary>Clear all cookies in the jar.</summary>
+    public void Clear()
+    {
+        lock (gate)
+        {
+            cookies.Clear();
+        }
+    }
+
     /// <summary>host == domain, or host is a subdomain of domain.</summary>
     private static bool DomainMatches(string domain, string host)
     {

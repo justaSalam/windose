@@ -316,8 +316,16 @@ public static class HtmlDom
                 continue;
             }
 
-            // read the tag
-            int end = html.IndexOf('>', lt + 1);
+            // read the tag (skip '>' that appear inside quoted attribute strings)
+            int end = -1;
+            bool inSingle = false, inDouble = false;
+            for (int i = lt + 1; i < len; i++)
+            {
+                char ch = html[i];
+                if (ch == '"' && !inSingle) inDouble = !inDouble;
+                else if (ch == '\'' && !inDouble) inSingle = !inSingle;
+                else if (ch == '>' && !inSingle && !inDouble) { end = i; break; }
+            }
             if (end < 0) { FlushText(cur, text); pos = len; break; }
 
             string raw = html.Substring(lt + 1, end - lt - 1).Trim();
@@ -565,13 +573,26 @@ public static class HtmlDom
 // relative resources.
 // ---------------------------------------------------------------------------
 
+public sealed class HtmlStyleItem
+{
+    public bool IsExternal;
+    public string Href;
+    public string InlineCss;
+}
+
 public sealed class HtmlPage
 {
     public DomNode Root;
     public string Title = "";
     public string CssText = "";
     public List<string> StyleSheetHrefs = new List<string>();
+    public List<HtmlStyleItem> StyleItems = new List<HtmlStyleItem>();
     public string BaseHref = "";
+    public int RefreshSeconds = -1;
+    public string RefreshUrl;
+    public string FaviconHref;
+    public string ThemeColor;
+    public bool IsDarkMode;
 
     /// <summary>Scripts in document order. Inline scripts carry Code;
     /// external scripts carry Src (the browser fetches and fills Code).</summary>
@@ -608,9 +629,13 @@ public static class HtmlPageBuilder
                         if (page.Title.Length == 0) page.Title = TextOf(n);
                         break;
                     case "style":
-                        if (page.CssText.Length > 0) page.CssText += "\n";
-                        page.CssText += TextOf(n);
-                        break;
+                        {
+                            string cssContent = TextOf(n);
+                            if (page.CssText.Length > 0) page.CssText += "\n";
+                            page.CssText += cssContent;
+                            page.StyleItems.Add(new HtmlStyleItem { IsExternal = false, InlineCss = cssContent });
+                            break;
+                        }
                     case "script":
                         {
                             string src = n.GetAttr("src");
@@ -630,8 +655,44 @@ public static class HtmlPageBuilder
                         {
                             string rel = n.GetAttr("rel");
                             string href = n.GetAttr("href");
-                            if (rel != null && href != null && rel.ToLowerInvariant().IndexOf("stylesheet") >= 0)
-                                page.StyleSheetHrefs.Add(href);
+                            if (href != null && href.Length > 0)
+                            {
+                                string relLower = rel != null ? rel.ToLowerInvariant() : "";
+                                string asAttr = (n.GetAttr("as") ?? "").ToLowerInvariant();
+                                string typeAttr = (n.GetAttr("type") ?? "").ToLowerInvariant();
+                                string mediaAttr = (n.GetAttr("media") ?? "").ToLowerInvariant();
+
+                                bool isStylesheet = relLower.IndexOf("stylesheet") >= 0 ||
+                                                    asAttr == "style" ||
+                                                    typeAttr == "text/css" ||
+                                                    (relLower.IndexOf("preload") >= 0 && (asAttr == "style" || href.EndsWith(".css", StringComparison.OrdinalIgnoreCase)));
+
+                                if (isStylesheet && mediaAttr != "print")
+                                {
+                                    if (!page.StyleSheetHrefs.Contains(href))
+                                        page.StyleSheetHrefs.Add(href);
+                                    page.StyleItems.Add(new HtmlStyleItem { IsExternal = true, Href = href });
+                                }
+
+                                if (relLower.IndexOf("icon") >= 0 && string.IsNullOrEmpty(page.FaviconHref))
+                                    page.FaviconHref = href;
+                            }
+                            break;
+                        }
+                    case "meta":
+                        {
+                            string equiv = n.GetAttr("http-equiv");
+                            if (!string.IsNullOrEmpty(equiv) && string.Equals(equiv, "refresh", StringComparison.OrdinalIgnoreCase))
+                            {
+                                string content = n.GetAttr("content");
+                                if (!string.IsNullOrEmpty(content) && page.RefreshSeconds < 0)
+                                {
+                                    ParseRefresh(content, out page.RefreshSeconds, out page.RefreshUrl);
+                                }
+                            }
+                            string metaName = (n.GetAttr("name") ?? "").ToLowerInvariant();
+                            if (metaName == "theme-color") page.ThemeColor = n.GetAttr("content");
+                            else if (metaName == "color-scheme" && (n.GetAttr("content") ?? "").IndexOf("dark", StringComparison.OrdinalIgnoreCase) >= 0) page.IsDarkMode = true;
                             break;
                         }
                     case "base":
@@ -644,6 +705,39 @@ public static class HtmlPageBuilder
                 Collect(page, n);
             }
             n = n.Next;
+        }
+    }
+
+    private static void ParseRefresh(string content, out int seconds, out string url)
+    {
+        seconds = -1;
+        url = null;
+        if (string.IsNullOrEmpty(content)) return;
+
+        string c = content.Trim();
+        int semi = c.IndexOf(';');
+        string secStr = semi >= 0 ? c.Substring(0, semi).Trim() : c;
+        int s;
+        if (int.TryParse(secStr, out s))
+        {
+            seconds = s;
+        }
+        else
+        {
+            int d = 0;
+            while (d < secStr.Length && char.IsDigit(secStr[d])) d++;
+            if (d > 0 && int.TryParse(secStr.Substring(0, d), out s)) seconds = s;
+        }
+
+        if (semi >= 0 && semi + 1 < c.Length)
+        {
+            string rest = c.Substring(semi + 1).Trim();
+            int eq = rest.IndexOf('=');
+            if (eq >= 0 && eq + 1 < rest.Length)
+            {
+                string target = rest.Substring(eq + 1).Trim(' ', '\'', '"');
+                if (target.Length > 0) url = target;
+            }
         }
     }
 
@@ -754,6 +848,40 @@ public static class HtmlText
             case "uarr": return "\u2191";
             case "rarr": return "\u2192";
             case "darr": return "\u2193";
+            case "harr": return "\u2194";
+            case "crarr": return "\u21b5";
+            case "larr2": case "lArr": return "\u21d0";
+            case "uarr2": case "uArr": return "\u21d1";
+            case "rarr2": case "rArr": return "\u21d2";
+            case "darr2": case "dArr": return "\u21d3";
+            case "harr2": case "hArr": return "\u21d4";
+            case "bullet": return "\u2022";
+            case "check": return "\u2713";
+            case "cross": return "\u2717";
+            case "star": return "\u2605";
+            case "hearts": return "\u2665";
+            case "diams": return "\u2666";
+            case "clubs": return "\u2663";
+            case "spades": return "\u2660";
+            case "le": return "\u2264";
+            case "ge": return "\u2265";
+            case "ne": return "\u2260";
+            case "asymp": return "\u2248";
+            case "infin": return "\u221e";
+            case "prime": return "\u2032";
+            case "alpha": return "\u03b1";
+            case "beta": return "\u03b2";
+            case "gamma": return "\u03b3";
+            case "delta": return "\u03b4";
+            case "epsilon": return "\u03b5";
+            case "theta": return "\u03b8";
+            case "lambda": return "\u03bb";
+            case "mu": return "\u03bc";
+            case "pi": return "\u03c0";
+            case "sigma": return "\u03c3";
+            case "tau": return "\u03c4";
+            case "phi": return "\u03c6";
+            case "omega": return "\u03c9";
             default: return null;
         }
     }

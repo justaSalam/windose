@@ -114,8 +114,8 @@ namespace Windose.Web.Tls
             if (port == 443) sb.Append("Host: ").Append(host).Append("\r\n");
             else sb.Append("Host: ").Append(host).Append(':').Append(port).Append("\r\n");
             sb.Append("Connection: close\r\n");
-            sb.Append("User-Agent: Mozilla/5.0 (Windose; x86) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36\r\n");
-            sb.Append("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n");
+            sb.Append("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36\r\n");
+            sb.Append("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,text/css,*/*;q=0.8\r\n");
             sb.Append("Accept-Language: en-US,en;q=0.9\r\n");
 
             if (cookieHeader != null && cookieHeader.Length > 0)
@@ -239,7 +239,9 @@ namespace Windose.Web.Tls
             int n;
             while ((n = reader.ReadSome(buf, 0, buf.Length)) > 0)
             {
-                for (int i = 0; i < n; i++) acc.Add(buf[i]);
+                byte[] chunk = new byte[n];
+                global::System.Array.Copy(buf, 0, chunk, 0, n);
+                acc.AddRange(chunk);
             }
             return acc.ToArray();
         }
@@ -252,12 +254,14 @@ namespace Windose.Web.Tls
             {
                 string sizeLine = reader.ReadLine();
                 if (sizeLine == null) break;
+                sizeLine = sizeLine.Trim();
+                if (sizeLine.Length == 0) continue; // skip blank lines between chunks
                 int semi = sizeLine.IndexOf(';');
                 string hex = (semi < 0 ? sizeLine : sizeLine.Substring(0, semi)).Trim();
                 int size = ParseHex(hex);
                 if (size == 0) break;   // terminal chunk
                 byte[] chunk = reader.ReadExactly(size);
-                for (int i = 0; i < chunk.Length; i++) acc.Add(chunk[i]);
+                acc.AddRange(chunk);
                 reader.ReadLine();      // trailing CRLF after each chunk
             }
             return acc.ToArray();

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 /// <summary>Minimal URL normalisation / relative-resolution for the browser.</summary>
 public static class WebUrl
@@ -11,11 +12,46 @@ public static class WebUrl
         if (s.Length == 0) return null;
 
         string lower = s.ToLowerInvariant();
-        if (lower.StartsWith("about:")) return s;
+        if (lower.StartsWith("about:") || lower.StartsWith("file:") || lower.StartsWith("data:") || lower.StartsWith("javascript:") || lower.StartsWith("mailto:")) return s;
         if (s.IndexOf("://") >= 0) return s;
         if (s.StartsWith("//")) return "http:" + s;
 
+        // Local file system paths
+        if (s.StartsWith("/") || (s.Length >= 2 && s[1] == ':'))
+        {
+            return "file:///" + s.Replace('\\', '/').TrimStart('/');
+        }
+
+        // Search query if explicit search prefix '?' or contains whitespace or no dots and not localhost
+        if (s.StartsWith("?"))
+        {
+            return "https://html.duckduckgo.com/html/?q=" + UriEscape(s.Substring(1).Trim());
+        }
+        if (s.IndexOf(' ') >= 0 || (!s.Contains(".") && !lower.StartsWith("localhost") && !s.Contains(":")))
+        {
+            return "https://html.duckduckgo.com/html/?q=" + UriEscape(s);
+        }
+
         return "http://" + s;
+    }
+
+    private static string UriEscape(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return "";
+        string outp = "";
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+                || c == '-' || c == '_' || c == '.' || c == '~')
+                outp += c;
+            else if (c == ' ') outp += "+";
+            else
+            {
+                outp += "%" + ((int)c).ToString("X2");
+            }
+        }
+        return outp;
     }
 
     /// <summary>Resolve a (possibly relative) href against the current page URL.</summary>
@@ -26,27 +62,100 @@ public static class WebUrl
         if (h.Length == 0) return baseHref;
 
         string lower = h.ToLowerInvariant();
-        if (lower.StartsWith("about:") || h.IndexOf("://") >= 0) return h;
+        if (lower.StartsWith("about:") || lower.StartsWith("data:") || lower.StartsWith("javascript:") || lower.StartsWith("mailto:") || lower.StartsWith("file:") || h.IndexOf("://") >= 0) return h;
         if (h.StartsWith("//"))
         {
             string scheme = SchemeOf(baseHref);
             if (scheme.Length == 0) scheme = "http";
             return scheme + ":" + h;
         }
-        if (h.StartsWith("#")) return baseHref;
+        if (h.StartsWith("#"))
+        {
+            int hashIdx = baseHref.IndexOf('#');
+            string baseNoHash = hashIdx >= 0 ? baseHref.Substring(0, hashIdx) : baseHref;
+            return baseNoHash + h;
+        }
+        if (h.StartsWith("?"))
+        {
+            int qIdx = baseHref.IndexOf('?');
+            int hashIdx = baseHref.IndexOf('#');
+            int cut = baseHref.Length;
+            if (qIdx >= 0) cut = qIdx;
+            else if (hashIdx >= 0 && hashIdx < cut) cut = hashIdx;
+            return baseHref.Substring(0, cut) + h;
+        }
 
-        string origin = OriginOf(baseHref);
-        if (h.StartsWith("/")) return origin + h;
+        string raw;
+        if (h.StartsWith("/"))
+        {
+            raw = OriginOf(baseHref) + h;
+        }
+        else
+        {
+            string dir = DirOf(baseHref);
+            raw = dir + h;
+        }
 
-        string dir = DirOf(baseHref);
-        return dir + h;
+        return NormalizeDotSegments(raw);
+    }
+
+    private static string NormalizeDotSegments(string url)
+    {
+        if (string.IsNullOrEmpty(url) || url.IndexOf("/.") < 0) return url;
+
+        string origin = OriginOf(url);
+        if (origin.Length == 0 || url.Length <= origin.Length) return url;
+
+        string path = url.Substring(origin.Length);
+        string queryAndHash = "";
+        int q = path.IndexOf('?');
+        int hash = path.IndexOf('#');
+        int split = -1;
+        if (q >= 0 && hash >= 0) split = Math.Min(q, hash);
+        else if (q >= 0) split = q;
+        else if (hash >= 0) split = hash;
+
+        if (split >= 0)
+        {
+            queryAndHash = path.Substring(split);
+            path = path.Substring(0, split);
+        }
+
+        string[] parts = path.Split('/');
+        List<string> stack = new List<string>();
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string part = parts[i];
+            if (part == "." || (part == "" && i > 0 && i < parts.Length - 1)) continue;
+            if (part == "..")
+            {
+                if (stack.Count > 0 && stack[stack.Count - 1] != "")
+                    stack.RemoveAt(stack.Count - 1);
+            }
+            else
+            {
+                stack.Add(part);
+            }
+        }
+
+        string newPath = string.Join("/", stack.ToArray());
+        if (!newPath.StartsWith("/")) newPath = "/" + newPath;
+        if (path.EndsWith("/") && !newPath.EndsWith("/")) newPath += "/";
+
+        return origin + newPath + queryAndHash;
     }
 
     public static string SchemeOf(string url)
     {
         if (string.IsNullOrEmpty(url)) return "";
         int idx = url.IndexOf("://");
-        return idx > 0 ? url.Substring(0, idx) : "";
+        if (idx > 0) return url.Substring(0, idx).ToLowerInvariant();
+        if (url.StartsWith("about:", StringComparison.OrdinalIgnoreCase)) return "about";
+        if (url.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return "data";
+        if (url.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase)) return "javascript";
+        if (url.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)) return "mailto";
+        if (url.StartsWith("file:", StringComparison.OrdinalIgnoreCase)) return "file";
+        return "";
     }
 
     /// <summary>scheme://host[:port]</summary>
@@ -66,9 +175,15 @@ public static class WebUrl
     {
         string origin = OriginOf(url);
         if (string.IsNullOrEmpty(url) || url.Length <= origin.Length) return origin + "/";
-        int lastSlash = url.LastIndexOf('/');
+        string pathOnly = url;
+        int q = pathOnly.IndexOf('?');
+        if (q >= 0) pathOnly = pathOnly.Substring(0, q);
+        int h = pathOnly.IndexOf('#');
+        if (h >= 0) pathOnly = pathOnly.Substring(0, h);
+
+        int lastSlash = pathOnly.LastIndexOf('/');
         if (lastSlash < origin.Length) return origin + "/";
-        return url.Substring(0, lastSlash + 1);
+        return pathOnly.Substring(0, lastSlash + 1);
     }
 
     /// <summary>host[:port] for status messages.</summary>

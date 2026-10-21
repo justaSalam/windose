@@ -5,6 +5,7 @@ using Cosmos.Kernel.System.Input;
 using Cosmos.Kernel.System.Storage;
 using System.Drawing;
 using Windose;
+using Windose.Programs;
 using Windose.System.Kernel;
 using Windose.System.Kernel.FileSystem;
 using Windose.System.Kernel.Subsystem;
@@ -374,6 +375,18 @@ public class FileExplorer : Window
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
 
         string ext = Path.GetExtension(path).ToLowerInvariant();
+        switch(ext)
+        {
+            case ".png":
+            case ".jpg":
+            case ".jpeg":
+            case ".bmp":
+            case ".gif":
+                LaunchTracker.Start(() => new ImageViewer(path, 120, 120, 640, 480));
+                return;
+
+
+        }
         if (!FileAssociations.TryGetApplication(ext, out Type program)) return;
 
         if (program == typeof(BreezeEditor))
@@ -385,6 +398,12 @@ public class FileExplorer : Window
         if (program == typeof(ImageViewer))
         {
             LaunchTracker.Start(() => new ImageViewer(path, 120, 120, 640, 480));
+            return;
+        }
+
+        if (program == typeof(InternetExplorer))
+        {
+            LaunchTracker.Start(() => new InternetExplorer(path, 80, 60));
             return;
         }
 

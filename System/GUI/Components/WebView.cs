@@ -20,6 +20,13 @@ public class WebView : Component
     /// <summary>Raised with the raw href when the user clicks a link.</summary>
     public Action<string> LinkActivated;
 
+    /// <summary>Raised with the raw href when the user hovers over a link, or null when mouse leaves links.</summary>
+    public Action<string> LinkHovered;
+    private string lastHoveredLink;
+
+    /// <summary>True when an input, textarea or button holds focus inside the page.</summary>
+    public bool HasFocusedWidget => focusWidget != null;
+
     /// <summary>Script-requested navigation (location.href = ..., window.open).</summary>
     public Action<string> NavigateRequested;
     public Action ReloadRequested;
@@ -99,6 +106,11 @@ public class WebView : Component
         focusWidget = null;
         openSelect = null;
         caret = 0;
+        if (lastHoveredLink != null)
+        {
+            lastHoveredLink = null;
+            if (LinkHovered != null) LinkHovered(null);
+        }
 
         StartEngine();
         RebuildLayout();
@@ -791,7 +803,7 @@ public class WebView : Component
         if (layoutDirty) { layoutDirty = false; RebuildLayout(); }
     }
 
-    private void RebuildLayout()
+    public void RebuildLayout()
     {
         layoutWidth = Width;
         if (js != null && js.Loop != null)
@@ -806,6 +818,122 @@ public class WebView : Component
         scrollY = Math.Max(0, Math.Min(scrollY, MaxScroll()));
     }
 
+    public void ZoomIn()
+    {
+        if (fontSize < 32)
+        {
+            fontSize += 2;
+            RebuildLayout();
+            MarkDirty();
+        }
+    }
+
+    public void ZoomOut()
+    {
+        if (fontSize > 10)
+        {
+            fontSize -= 2;
+            RebuildLayout();
+            MarkDirty();
+        }
+    }
+
+    public void ResetZoom()
+    {
+        if (fontSize != 16)
+        {
+            fontSize = 16;
+            RebuildLayout();
+            MarkDirty();
+        }
+    }
+
+    public void EvaluateScript(string code)
+    {
+        if (js == null || string.IsNullOrEmpty(code)) return;
+        try
+        {
+            JsProgram prog = JsParser.ParseProgram(code);
+            js.RunProgram(prog);
+            js.DrainJobs();
+            if (layoutDirty)
+            {
+                layoutDirty = false;
+                RebuildLayout();
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>Scroll to an element by its ID or name attribute.</summary>
+    public bool ScrollToAnchor(string anchor)
+    {
+        if (string.IsNullOrEmpty(anchor) || document == null || document.Root == null) return false;
+        string target = anchor.TrimStart('#');
+        if (target.Length == 0)
+        {
+            scrollY = 0;
+            CloseSelectPopup();
+            MarkDirty();
+            return true;
+        }
+
+        DomNode node = FindNodeByIdOrName(document.Root, target);
+        if (node == null) return false;
+
+        int targetY = -1;
+        for (int i = 0; i < plan.Widgets.Count; i++)
+        {
+            if (plan.Widgets[i].Node == node) { targetY = plan.Widgets[i].Y; break; }
+        }
+        if (targetY < 0)
+        {
+            for (int i = 0; i < plan.Lines.Count; i++)
+            {
+                RenderLine l = plan.Lines[i];
+                if (l.Node == node) { targetY = l.Y; break; }
+                for (int j = 0; j < l.Spans.Count; j++)
+                {
+                    if (l.Spans[j].Node == node) { targetY = l.Y; break; }
+                }
+                if (targetY >= 0) break;
+            }
+        }
+        if (targetY < 0)
+        {
+            for (int i = 0; i < plan.Boxes.Count; i++)
+            {
+                if (plan.Boxes[i].Node == node) { targetY = plan.Boxes[i].Y; break; }
+            }
+        }
+
+        if (targetY >= 0)
+        {
+            scrollY = Math.Max(0, Math.Min(targetY - 8, MaxScroll()));
+            CloseSelectPopup();
+            MarkDirty();
+            return true;
+        }
+        return false;
+    }
+
+    private static DomNode FindNodeByIdOrName(DomNode parent, string idOrName)
+    {
+        if (parent == null) return null;
+        if (parent.IsElement)
+        {
+            if (string.Equals(parent.Id, idOrName, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(parent.GetAttr("name"), idOrName, StringComparison.OrdinalIgnoreCase))
+                return parent;
+        }
+        for (DomNode c = parent.FirstChild; c != null; c = c.Next)
+        {
+            DomNode found = FindNodeByIdOrName(c, idOrName);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
     public override void DrawLocal()
     {
         if (layoutWidth != Width || layoutDirty)
@@ -815,6 +943,10 @@ public class WebView : Component
         }
 
         DrawFilledRectangle(plan.PageBg, 0, 0, Width, Height);
+        if (plan.PageBgImage != null)
+        {
+            DrawImageStretch(plan.PageBgImage, new Rectangle(0, 0, Width, Height));
+        }
 
         int viewTop = 2;
         int viewHeight = Height - 4;
@@ -1062,13 +1194,29 @@ public class WebView : Component
 
     private void DrawBox(RenderBox box, int by, int viewportWidth)
     {
+        int r = box.BorderRadius > 0 ? Math.Min(box.BorderRadius, Math.Min(box.W, box.H) / 2) : 0;
         if (box.HasBg)
-            DrawFilledRectangle(box.Bg, box.X, by, box.W, box.H);
+        {
+            if (r > 0) DrawFilledRoundedRectangle(box.Bg, box.X, by, box.W, box.H, r);
+            else DrawFilledRectangle(box.Bg, box.X, by, box.W, box.H);
+        }
 
-        if (box.BorderT > 0) DrawBorderSide(box.StyleT, box.BorderCT, box.X, by, box.W, box.BorderT, 0);
-        if (box.BorderB > 0) DrawBorderSide(box.StyleB, box.BorderCB, box.X, by + box.H - box.BorderB, box.W, box.BorderB, 2);
-        if (box.BorderL > 0) DrawBorderSide(box.StyleL, box.BorderCL, box.X, by, box.BorderL, box.H, 3);
-        if (box.BorderR > 0) DrawBorderSide(box.StyleR, box.BorderCR, box.X + box.W - box.BorderR, by, box.BorderR, box.H, 1);
+        if (box.BgImage != null && box.W > 0 && box.H > 0)
+        {
+            DrawImageStretch(box.BgImage, new Rectangle(box.X, by, box.W, box.H));
+        }
+
+        if (r > 0 && box.BorderT > 0)
+        {
+            DrawRoundedRectangle(box.BorderCT, box.X, by, box.W, box.H, r);
+        }
+        else
+        {
+            if (box.BorderT > 0) DrawBorderSide(box.StyleT, box.BorderCT, box.X, by, box.W, box.BorderT, 0);
+            if (box.BorderB > 0) DrawBorderSide(box.StyleB, box.BorderCB, box.X, by + box.H - box.BorderB, box.W, box.BorderB, 2);
+            if (box.BorderL > 0) DrawBorderSide(box.StyleL, box.BorderCL, box.X, by, box.BorderL, box.H, 3);
+            if (box.BorderR > 0) DrawBorderSide(box.StyleR, box.BorderCR, box.X + box.W - box.BorderR, by, box.BorderR, box.H, 1);
+        }
     }
 
     // side: 0=top,1=right,2=bottom,3=left
@@ -1159,13 +1307,23 @@ public class WebView : Component
             int size = s.Size > 0 ? s.Size : fontSize;
             int ty = ly + 2 + s.YOff;
             if (s.HasBg)
-                DrawFilledRectangle(s.Bg, s.X, ty, s.Width, size + 2);
+            {
+                int bx = s.X;
+                int by = ty - s.PadT;
+                int bw = s.Width;
+                int bh = size + 2 + s.PadT + s.PadB;
+                DrawFilledRectangle(s.Bg, bx, by, bw, bh);
+                if (s.BorderRadius > 0)
+                {
+                    DrawRectangle(Color.FromArgb(s.Bg.A, Math.Max(0, s.Bg.R - 25), Math.Max(0, s.Bg.G - 25), Math.Max(0, s.Bg.B - 25)), bx, by, bw, bh);
+                }
+            }
 
-            DrawString(s.Text, s.Color, s.X, ty, size);
-            if (s.Bold) DrawString(s.Text, s.Color, s.X + 1, ty, size); // faux bold
-            if (s.Underline) DrawLine(s.Color, s.X, ty + size, s.X + s.Width, ty + size);
-            if (s.Overline) DrawLine(s.Color, s.X, ty, s.X + s.Width, ty);
-            if (s.LineThrough) DrawLine(s.Color, s.X, ty + size / 2, s.X + s.Width, ty + size / 2);
+            DrawString(s.Text, s.Color, s.X + s.PadL, ty, size);
+            if (s.Bold) DrawString(s.Text, s.Color, s.X + s.PadL + 1, ty, size); // faux bold
+            if (s.Underline) DrawLine(s.Color, s.X + s.PadL, ty + size, s.X + s.Width - s.PadR, ty + size);
+            if (s.Overline) DrawLine(s.Color, s.X + s.PadL, ty, s.X + s.Width - s.PadR, ty);
+            if (s.LineThrough) DrawLine(s.Color, s.X + s.PadL, ty + size / 2, s.X + s.Width - s.PadR, ty + size / 2);
         }
     }
 
@@ -1190,7 +1348,27 @@ public class WebView : Component
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
-        if (!IsInsideAbsolute(mouseX, mouseY)) return false;
+        if (!IsInsideAbsolute(mouseX, mouseY))
+        {
+            if (lastHoveredLink != null)
+            {
+                lastHoveredLink = null;
+                if (LinkHovered != null) LinkHovered(null);
+            }
+            return false;
+        }
+
+        int localX = mouseX - AbsoluteX;
+        int localY = mouseY - AbsoluteY;
+        int contentX = localX;
+        int contentY = localY - 2 + scrollY;
+
+        string hovered = plan.HitTestLink(contentX, contentY);
+        if (hovered != lastHoveredLink)
+        {
+            lastHoveredLink = hovered;
+            if (LinkHovered != null) LinkHovered(hovered);
+        }
 
         if (Mouse.scroll != 0)
         {
@@ -1200,9 +1378,6 @@ public class WebView : Component
 
         if (mouse.left == MouseEvents.Press)
         {
-            int localX = mouseX - AbsoluteX;
-            int localY = mouseY - AbsoluteY;
-
             if (localX >= Width - scrollbarSize)
             {
                 if (localY < scrollbarSize) ScrollBy(-48);
@@ -1211,10 +1386,6 @@ public class WebView : Component
                 else if (localY > GetThumb().Bottom) ScrollBy(ViewportHeight());
                 return true;
             }
-
-            // DOM click event dispatch (content coords)
-            int contentX = localX;
-            int contentY = localY - 2 + scrollY;
 
             // A script listener may mutate the tree; relayout before hit-testing
             // so the plan matches what's on screen.

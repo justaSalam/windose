@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Threading;
 using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Input;
 using HttpClient = Cosmos.Network.Http.HttpClient;
 using HttpResponseMessage = Cosmos.Network.Http.HttpResponseMessage;
 using HttpContent = Cosmos.Network.Http.HttpContent;
@@ -10,36 +11,87 @@ using StringContent = Cosmos.Network.Http.StringContent;
 using HttpRequestHeaders = Cosmos.Network.Http.Headers.HttpRequestHeaders;
 using HttpWebRequest = Cosmos.Network.Http.HttpWebRequest;
 using SslVerification = Cosmos.Network.Http.SslVerification;
+using System.IO;
+using Windose.System.Kernel.Attributes;
 using Windose.Web.Tls;
+using System.Text;
+using System.Globalization;
 
 namespace Windose.Programs
 {
-    internal class InternetExplorer : Window
+    [FileAssociation(".html")]
+    [FileAssociation(".htm")]
+    public class InternetExplorer : Window
     {
         private const string HomeUrl = "about:home";
 
         private const string HomeHtml = @"<html>
-<head><title>Windose Home</title></head>
+<head><title>Internet Explorer</title><style>
+body { font-family: sans-serif; margin: 30px; background: #ffffff; color: #222; text-align: center; }
+.hero { margin: 15px auto 25px auto; }
+h1 { color: #003366; font-size: 26px; margin-bottom: 4px; }
+.tagline { color: #666; font-size: 13px; margin-bottom: 20px; }
+.searchbox { margin: 15px auto; }
+.searchbox input[type=text] { width: 360px; padding: 6px 10px; font-size: 14px; border: 1px solid #7799bb; }
+.searchbox input[type=submit] { padding: 6px 14px; font-size: 14px; background: #0066cc; color: #fff; border: 1px solid #0055aa; cursor: pointer; }
+.cards { display: inline-block; text-align: left; margin-top: 15px; }
+.card { display: inline-block; width: 130px; margin: 6px; padding: 10px; border: 1px solid #d0d8e0; border-radius: 4px; background: #f8fafc; text-align: center; vertical-align: top; }
+.card a { color: #004499; text-decoration: none; font-weight: bold; font-size: 13px; display: block; }
+.card a:hover { text-decoration: underline; }
+.card .sub { color: #777; font-size: 11px; margin-top: 4px; }
+.info { margin-top: 30px; color: #888; font-size: 11px; border-top: 1px solid #eee; padding-top: 12px; }
+</style></head>
 <body>
-<h1>Welcome to Windose</h1>
-<p>This page is built in and works with <b>no network</b>. Type an address above and press <b>Enter</b> to browse.</p>
-<h2>What works</h2>
-<ul>
-<li>Static HTML pages (headings, paragraphs, lists)</li>
-<li><b>Bold</b>, <i>italic</i> and <code>inline code</code></li>
-<li>Clickable <a href='http://example.com'>links</a></li>
-<li>Preformatted blocks and horizontal rules</li>
-</ul>
-<hr>
-<pre>
-// A preformatted code sample
-fn main() {
-    println(""Hello from Windose"");
-}
-</pre>
-<p>Modern JavaScript-heavy sites will not render, but plain HTML does.</p>
-</body>
-</html>";
+<div class=""hero"">
+<h1>Internet Explorer</h1>
+<div class=""tagline"">Windose Web Browser</div>
+
+<div class=""searchbox"">
+<form action=""https://html.duckduckgo.com/html/"" method=""get"">
+<input type=""text"" name=""q"" placeholder=""Search the web with DuckDuckGo...""> &nbsp;
+<input type=""submit"" value=""Search"">
+</form>
+</div>
+
+<div class=""cards"">
+<div class=""card""><a href=""https://html.duckduckgo.com/html/"">DuckDuckGo</a><div class=""sub"">Web Search</div></div>
+<div class=""card""><a href=""http://frogfind.com"">FrogFind</a><div class=""sub"">Lightweight Search</div></div>
+<div class=""card""><a href=""https://en.wikipedia.org/wiki/Main_Page"">Wikipedia</a><div class=""sub"">Free Encyclopedia</div></div>
+<div class=""card""><a href=""https://news.ycombinator.com/"">Hacker News</a><div class=""sub"">Tech News</div></div>
+<div class=""card""><a href=""file:///mnt/"">Local Files</a><div class=""sub"">Storage (/mnt)</div></div>
+<div class=""card""><a href=""about:favorites"">Favorites</a><div class=""sub"">Saved Bookmarks</div></div>
+<div class=""card""><a href=""about:history"">History</a><div class=""sub"">Visited Pages</div></div>
+<div class=""card""><a href=""about:cookies"">Cookies</a><div class=""sub"">Cookie Jar</div></div>
+</div>
+
+<div class=""info"">
+Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; JavaScript Support
+</div>
+</div>
+</body></html>";
+
+        private class FavoriteItem
+        {
+            public string Title;
+            public string Url;
+        }
+
+        private class HistoryItem
+        {
+            public string Title;
+            public string Url;
+            public DateTime VisitedAt;
+        }
+
+        private readonly List<FavoriteItem> favoritesList = new List<FavoriteItem>();
+        private readonly List<HistoryItem> historyList = new List<HistoryItem>();
+        private const string FavoritesFilePath = "/mnt/user/favorites.txt";
+        private const string AltFavoritesFilePath = "/mnt/favorites.txt";
+
+        private int refreshCountdownSeconds = -1;
+        private string refreshTargetUrl = null;
+        private long lastRefreshTick = 0;
+        private string currentStatus = "Ready";
 
         private DockPanel root;
         private Toolbar toolbar;
@@ -82,6 +134,8 @@ fn main() {
         private int pendingProgress = -1;
         private string pendingProgressText = "";
         private bool progressReady;
+        private volatile bool cancelPendingFetch;
+        private string lastRawHtml = "";
 
         static InternetExplorer()
         {
@@ -92,7 +146,15 @@ fn main() {
             HttpWebRequest.DefaultMaximumResponseHeadersLength = 128; // KB
         }
 
-        public InternetExplorer(int x, int y) : base(x, y, 800, 600, "Internet Explorer", true, null)
+        public InternetExplorer() : this(null, 80, 60)
+        {
+        }
+
+        public InternetExplorer(int x, int y) : this(null, x, y)
+        {
+        }
+
+        public InternetExplorer(string initialUrl = null, int x = 80, int y = 60) : base(x, y, 800, 600, "Internet Explorer", true, null)
         {
             root = new DockPanel(0, 0, Width, Height)
             {
@@ -109,8 +171,17 @@ fn main() {
 
             toolbar.AddButton("Back", GoBack);
             toolbar.AddButton("Forward", GoForward);
+            toolbar.AddButton("Stop", StopLoading);
             toolbar.AddButton("Refresh", Refresh);
             toolbar.AddButton("Home", Home);
+            toolbar.AddButton("Go", () => Navigate(addressBar.Address));
+            toolbar.AddButton("Favorites", ShowFavorites);
+            toolbar.AddButton("+ Fav", AddCurrentToFavorites);
+            toolbar.AddButton("History", ShowHistory);
+            toolbar.AddButton("Save", SavePage);
+            toolbar.AddButton("Source", ViewSource);
+            toolbar.AddButton("Zoom +", () => webView.ZoomIn());
+            toolbar.AddButton("Zoom -", () => webView.ZoomOut());
 
             addressBar = new AddressBar(0, 0, Width);
             statusBar = new StatusBar(0, 0, Width);
@@ -146,9 +217,52 @@ fn main() {
 
             AddChild(root);
 
+            LoadFavorites();
+
             // ---- wiring ----
             addressBar.addressField.EnterPressed += () => Navigate(addressBar.Address);
-            webView.LinkActivated += href => Navigate(WebUrl.Resolve(currentUrl, href));
+            addressBar.dropDownButton.leftClickAction = () => Navigate("about:history");
+
+            webView.LinkHovered += href =>
+            {
+                if (!string.IsNullOrEmpty(href))
+                {
+                    statusBar.SetPanelText(0, WebUrl.Resolve(currentUrl, href));
+                }
+                else
+                {
+                    statusBar.SetPanelText(0, currentStatus);
+                }
+            };
+
+            webView.LinkActivated += href =>
+            {
+                string target = WebUrl.Resolve(currentUrl, href);
+                if (target.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase))
+                {
+                    string jsCode = target.Substring(11).Trim();
+                    if (jsCode == "void(0)" || jsCode == "void(0);" || jsCode.Length == 0 || jsCode == ";")
+                        return;
+                    webView.EvaluateScript(jsCode);
+                    return;
+                }
+                if (target.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+                {
+                    SetStatus("Mail to: " + target.Substring(7));
+                    return;
+                }
+                if (href.StartsWith("#") || (target.IndexOf('#') >= 0 && WebUrl.OriginOf(target) == WebUrl.OriginOf(currentUrl) && WebUrl.PathOf(target) == WebUrl.PathOf(currentUrl)))
+                {
+                    string hash = target.Substring(target.IndexOf('#') + 1);
+                    if (webView.ScrollToAnchor(hash))
+                    {
+                        currentUrl = target;
+                        addressBar.Address = target;
+                        return;
+                    }
+                }
+                Navigate(target);
+            };
 
             // JS engine -> shell: script-driven navigation, reload, history, HTTP.
             webView.NavigateRequested += url => Navigate(WebUrl.Resolve(currentUrl, url));
@@ -160,12 +274,29 @@ fn main() {
             webView.SetCookie = JsSetCookie;
             webView.FormPostRequested = BeginPostNavigation;
 
-            Navigate(HomeUrl);
+            Navigate(!string.IsNullOrEmpty(initialUrl) ? initialUrl : HomeUrl);
         }
 
         public override void Update()
         {
             base.Update();
+
+            if (refreshCountdownSeconds >= 0 && !string.IsNullOrEmpty(refreshTargetUrl))
+            {
+                long now = DateTime.UtcNow.Ticks;
+                if (now - lastRefreshTick >= 10000000L) // 1 second
+                {
+                    lastRefreshTick = now;
+                    refreshCountdownSeconds--;
+                    if (refreshCountdownSeconds <= 0)
+                    {
+                        string target = refreshTargetUrl;
+                        refreshCountdownSeconds = -1;
+                        refreshTargetUrl = null;
+                        Navigate(target);
+                    }
+                }
+            }
 
             if (progressReady)
             {
@@ -204,9 +335,25 @@ fn main() {
 
                 if (doc != null)
                 {
+                    currentUrl = url;
+                    addressBar.Address = url;
                     webView.SetDocument(doc, url, imgs);
                     if (!string.IsNullOrEmpty(title))
                         SetTitle(title + " - Internet Explorer");
+
+                    RecordHistory(url, title);
+
+                    if (doc.RefreshSeconds >= 0)
+                    {
+                        refreshCountdownSeconds = doc.RefreshSeconds;
+                        refreshTargetUrl = !string.IsNullOrEmpty(doc.RefreshUrl) ? WebUrl.Resolve(url, doc.RefreshUrl) : url;
+                        lastRefreshTick = DateTime.UtcNow.Ticks;
+                    }
+                    else
+                    {
+                        refreshCountdownSeconds = -1;
+                        refreshTargetUrl = null;
+                    }
                 }
                 if (!string.IsNullOrEmpty(status)) SetStatus(status);
             }
@@ -214,13 +361,17 @@ fn main() {
 
         private void SetStatus(string text)
         {
-            statusBar.SetPanelText(0, text ?? "");
+            currentStatus = text ?? "";
+            statusBar.SetPanelText(0, currentStatus);
         }
 
         // ---- navigation ----
 
         private void Navigate(string rawUrl)
         {
+            refreshCountdownSeconds = -1;
+            refreshTargetUrl = null;
+
             string url = WebUrl.Normalize(rawUrl);
             if (url == null)
             {
@@ -293,8 +444,320 @@ fn main() {
             Navigate(HomeUrl);
         }
 
+        private void StopLoading()
+        {
+            cancelPendingFetch = true;
+            progressBar.Visible = false;
+            progressBar.Indeterminate = false;
+            SetStatus("Stopped.");
+        }
+
+        private void ShowFavorites()
+        {
+            Navigate("about:favorites");
+        }
+
+        private void ShowHistory()
+        {
+            Navigate("about:history");
+        }
+
+        private void ViewSource()
+        {
+            Navigate("about:source");
+        }
+
+        private void SavePage()
+        {
+            if (string.IsNullOrEmpty(lastRawHtml))
+            {
+                SetStatus("Nothing to save.");
+                return;
+            }
+
+            try
+            {
+                string dir = "/mnt/user/downloads/";
+                if (!Directory.Exists(dir))
+                {
+                    try { Directory.CreateDirectory(dir); }
+                    catch { dir = "/mnt/"; }
+                }
+
+                string host = WebUrl.HostOf(currentUrl);
+                if (string.IsNullOrEmpty(host)) host = "page";
+                char[] invalid = Path.GetInvalidFileNameChars();
+                for (int i = 0; i < invalid.Length; i++) host = host.Replace(invalid[i], '_');
+                string filePath = Path.Combine(dir, host + ".html");
+
+                File.WriteAllText(filePath, lastRawHtml);
+                SetStatus("Saved page to " + filePath);
+            }
+            catch (Exception ex)
+            {
+                SetStatus("Save failed: " + ex.Message);
+            }
+        }
+
+        private void LoadFavorites()
+        {
+            favoritesList.Clear();
+            string path = File.Exists(FavoritesFilePath) ? FavoritesFilePath
+                : (File.Exists(AltFavoritesFilePath) ? AltFavoritesFilePath : null);
+
+            if (path != null)
+            {
+                try
+                {
+                    string[] lines = File.ReadAllLines(path);
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        string line = lines[i].Trim();
+                        if (string.IsNullOrEmpty(line) || line.StartsWith("#")) continue;
+                        int pipe = line.IndexOf('|');
+                        if (pipe > 0)
+                        {
+                            string title = line.Substring(0, pipe).Trim();
+                            string fUrl = line.Substring(pipe + 1).Trim();
+                            if (fUrl.Length > 0)
+                                favoritesList.Add(new FavoriteItem { Title = title, Url = fUrl });
+                        }
+                        else
+                        {
+                            favoritesList.Add(new FavoriteItem { Title = line, Url = line });
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (favoritesList.Count == 0)
+            {
+                favoritesList.Add(new FavoriteItem { Title = "DuckDuckGo", Url = "https://html.duckduckgo.com/html/" });
+                favoritesList.Add(new FavoriteItem { Title = "FrogFind", Url = "http://frogfind.com" });
+                favoritesList.Add(new FavoriteItem { Title = "Wikipedia", Url = "https://en.wikipedia.org/wiki/Main_Page" });
+                favoritesList.Add(new FavoriteItem { Title = "Hacker News", Url = "https://news.ycombinator.com/" });
+                favoritesList.Add(new FavoriteItem { Title = "Local Files (/mnt)", Url = "file:///mnt/" });
+                favoritesList.Add(new FavoriteItem { Title = "Internet Explorer Start Page", Url = "about:home" });
+                SaveFavorites();
+            }
+        }
+
+        private void SaveFavorites()
+        {
+            try
+            {
+                string dir = "/mnt/user/";
+                if (!Directory.Exists(dir))
+                {
+                    try { Directory.CreateDirectory(dir); }
+                    catch { dir = "/mnt/"; }
+                }
+                string path = Path.Combine(dir, "favorites.txt");
+                List<string> lines = new List<string>();
+                for (int i = 0; i < favoritesList.Count; i++)
+                {
+                    lines.Add(favoritesList[i].Title + "|" + favoritesList[i].Url);
+                }
+                File.WriteAllLines(path, lines.ToArray());
+            }
+            catch { }
+        }
+
+        private void AddCurrentToFavorites()
+        {
+            if (string.IsNullOrEmpty(currentUrl) || currentUrl == "about:blank")
+            {
+                SetStatus("Cannot add blank page to favorites.");
+                return;
+            }
+
+            string title = webView.DocumentTitle;
+            if (string.IsNullOrEmpty(title)) title = WebUrl.HostOf(currentUrl);
+            if (string.IsNullOrEmpty(title)) title = currentUrl;
+
+            for (int i = 0; i < favoritesList.Count; i++)
+            {
+                if (favoritesList[i].Url.Equals(currentUrl, StringComparison.OrdinalIgnoreCase))
+                {
+                    SetStatus("Already in Favorites: " + title);
+                    return;
+                }
+            }
+
+            favoritesList.Add(new FavoriteItem { Title = title, Url = currentUrl });
+            SaveFavorites();
+            SetStatus("Added to Favorites: " + title);
+        }
+
+        private void RecordHistory(string url, string title)
+        {
+            if (string.IsNullOrEmpty(url) || url.StartsWith("about:")) return;
+
+            for (int i = historyList.Count - 1; i >= 0; i--)
+            {
+                if (historyList[i].Url.Equals(url, StringComparison.OrdinalIgnoreCase))
+                {
+                    historyList.RemoveAt(i);
+                    break;
+                }
+            }
+
+            historyList.Insert(0, new HistoryItem
+            {
+                Url = url,
+                Title = !string.IsNullOrEmpty(title) ? title : url,
+                VisitedAt = DateTime.Now
+            });
+
+            if (historyList.Count > 100)
+            {
+                historyList.RemoveAt(historyList.Count - 1);
+            }
+        }
+
+        public override void HandleKeyboard(KeyEvent keyEvent)
+        {
+            bool ctrl = IsControlPressed(keyEvent);
+            bool alt = (keyEvent.Modifiers & ConsoleModifiers.Alt) != 0;
+
+            if (keyEvent.Key == Key.F5 || (ctrl && (keyEvent.Key == Key.R || keyEvent.KeyChar == 'r' || keyEvent.KeyChar == 'R')))
+            {
+                Refresh();
+                return;
+            }
+
+            if (keyEvent.Key == Key.Escape)
+            {
+                StopLoading();
+                return;
+            }
+
+            if (alt && keyEvent.Key == Key.LeftArrow)
+            {
+                GoBack();
+                return;
+            }
+
+            if (alt && keyEvent.Key == Key.RightArrow)
+            {
+                GoForward();
+                return;
+            }
+
+            if (keyEvent.Key == Key.Backspace && !IsInputFocused())
+            {
+                GoBack();
+                return;
+            }
+
+            if (ctrl && (keyEvent.Key == Key.D || keyEvent.KeyChar == 'd' || keyEvent.KeyChar == 'D'))
+            {
+                AddCurrentToFavorites();
+                return;
+            }
+
+            if (ctrl && (keyEvent.Key == Key.H || keyEvent.KeyChar == 'h' || keyEvent.KeyChar == 'H'))
+            {
+                Navigate("about:history");
+                return;
+            }
+
+            if (ctrl && (keyEvent.Key == Key.U || keyEvent.KeyChar == 'u' || keyEvent.KeyChar == 'U'))
+            {
+                ViewSource();
+                return;
+            }
+
+            if (ctrl && (keyEvent.Key == Key.S || keyEvent.KeyChar == 's' || keyEvent.KeyChar == 'S'))
+            {
+                SavePage();
+                return;
+            }
+
+            if (ctrl && (keyEvent.Key == Key.L || keyEvent.KeyChar == 'l' || keyEvent.KeyChar == 'L'))
+            {
+                addressBar.addressField.RequestFocus();
+                return;
+            }
+
+            if (ctrl && (keyEvent.KeyChar == '+' || keyEvent.KeyChar == '='))
+            {
+                webView.ZoomIn();
+                return;
+            }
+
+            if (ctrl && keyEvent.KeyChar == '-')
+            {
+                webView.ZoomOut();
+                return;
+            }
+
+            if (ctrl && keyEvent.KeyChar == '0')
+            {
+                webView.ResetZoom();
+                return;
+            }
+
+            base.HandleKeyboard(keyEvent);
+        }
+
+        private bool IsInputFocused()
+        {
+            if (addressBar.addressField != null && addressBar.addressField.Focused) return true;
+            if (webView != null && webView.HasFocusedWidget) return true;
+            return false;
+        }
+
+        private static string ExtractQueryParam(string query, string paramName)
+        {
+            if (string.IsNullOrEmpty(query)) return "";
+            string[] pairs = query.Split('&');
+            for (int i = 0; i < pairs.Length; i++)
+            {
+                string p = pairs[i];
+                int eq = p.IndexOf('=');
+                if (eq > 0)
+                {
+                    string key = p.Substring(0, eq).Trim();
+                    if (string.Equals(key, paramName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string val = p.Substring(eq + 1).Trim();
+                        return UriUnescape(val);
+                    }
+                }
+            }
+            return "";
+        }
+
+        private static string UriUnescape(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            string r = s.Replace('+', ' ');
+            int idx = r.IndexOf('%');
+            if (idx < 0) return r;
+            StringBuilder sb = new StringBuilder(r.Length);
+            for (int i = 0; i < r.Length; i++)
+            {
+                if (r[i] == '%' && i + 2 < r.Length)
+                {
+                    string hex = r.Substring(i + 1, 2);
+                    int code;
+                    if (int.TryParse(hex, NumberStyles.HexNumber, null, out code))
+                    {
+                        sb.Append((char)code);
+                        i += 2;
+                        continue;
+                    }
+                }
+                sb.Append(r[i]);
+            }
+            return sb.ToString();
+        }
+
         private void BeginFetch(string url)
         {
+            cancelPendingFetch = false;
             string host = WebUrl.HostOf(url);
             SetStatus("Connecting to " + (host.Length > 0 ? host : url) + "...");
 
@@ -307,10 +770,10 @@ fn main() {
             }
 
             string scheme = WebUrl.SchemeOf(url);
-            if (scheme != "http" && scheme != "https")
+            if (scheme != "http" && scheme != "https" && scheme != "file")
             {
                 PublishError(url, "Unsupported protocol",
-                    "This browser can only open http, https and about: addresses.");
+                    "This browser can only open http, https, file, and about: addresses.");
                 return;
             }
 
@@ -335,16 +798,320 @@ fn main() {
             {
                 Publish(new HtmlPage(), url, "Blank page", "Done");
             }
+            else if (lower.StartsWith("about:favorites"))
+            {
+                int q = url.IndexOf('?');
+                if (q >= 0)
+                {
+                    string query = url.Substring(q + 1);
+                    if (query.StartsWith("delete="))
+                    {
+                        int idx;
+                        if (int.TryParse(query.Substring(7), out idx) && idx >= 0 && idx < favoritesList.Count)
+                        {
+                            favoritesList.RemoveAt(idx);
+                            SaveFavorites();
+                        }
+                    }
+                    else if (query.IndexOf("name=") >= 0 && query.IndexOf("url=") >= 0)
+                    {
+                        string name = ExtractQueryParam(query, "name");
+                        string fUrl = ExtractQueryParam(query, "url");
+                        if (!string.IsNullOrEmpty(fUrl))
+                        {
+                            fUrl = WebUrl.Normalize(fUrl);
+                            if (string.IsNullOrEmpty(name)) name = WebUrl.HostOf(fUrl);
+                            if (string.IsNullOrEmpty(name)) name = fUrl;
+                            favoritesList.Add(new FavoriteItem { Title = name, Url = fUrl });
+                            SaveFavorites();
+                        }
+                    }
+                }
+
+                string favHtml = @"<html>
+<head><title>Favorites</title><style>
+body { font-family: sans-serif; margin: 20px; background: #ffffff; color: #222; }
+h1 { color: #003366; border-bottom: 2px solid #003366; padding-bottom: 5px; font-size: 20px; }
+table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #ddd; }
+th { background-color: #f2f5f8; color: #333; }
+tr:hover { background-color: #f8f9fa; }
+a { color: #0066cc; text-decoration: none; font-weight: bold; }
+a:hover { text-decoration: underline; }
+.btn { display: inline-block; padding: 3px 8px; background: #e0e0e0; border: 1px solid #999; border-radius: 3px; color: #000; text-decoration: none; font-size: 11px; }
+.btn-del { color: #cc0000; }
+.form-box { background: #f5f8fb; border: 1px solid #c0d0e0; padding: 12px; margin-top: 15px; border-radius: 4px; }
+</style></head>
+<body>
+<h1>Favorites &amp; Bookmarks</h1>
+<div class=""form-box"">
+<form action=""about:favorites"" method=""get"">
+<b>Add a Bookmark:</b> &nbsp;
+Name: <input type=""text"" name=""name"" size=""20""> &nbsp;
+URL: <input type=""text"" name=""url"" size=""30"" value=""http://""> &nbsp;
+<input type=""submit"" value=""Add to Favorites"">
+</form>
+</div>
+<table>
+<tr><th>Title</th><th>Address</th><th>Action</th></tr>";
+
+                for (int i = 0; i < favoritesList.Count; i++)
+                {
+                    FavoriteItem fav = favoritesList[i];
+                    favHtml += "<tr>"
+                        + "<td><a href=\"" + EscapeHtml(fav.Url) + "\">" + EscapeHtml(fav.Title) + "</a></td>"
+                        + "<td style=\"color:#555; font-size:12px;\">" + EscapeHtml(fav.Url) + "</td>"
+                        + "<td><a class=\"btn btn-del\" href=\"about:favorites?delete=" + i + "\">Remove</a></td>"
+                        + "</tr>";
+                }
+
+                if (favoritesList.Count == 0)
+                {
+                    favHtml += "<tr><td colspan=\"3\" style=\"color:#888;\">No favorites saved yet.</td></tr>";
+                }
+
+                favHtml += "</table><p style=\"color:#888; font-size:11px; margin-top:20px;\">Saved to " + FavoritesFilePath + "</p></body></html>";
+
+                HtmlPage page = HtmlPageBuilder.Parse(favHtml);
+                Publish(page, "about:favorites", "Favorites", "Done");
+            }
+            else if (lower.StartsWith("about:history"))
+            {
+                int q = url.IndexOf('?');
+                if (q >= 0 && url.Substring(q + 1).Contains("clear=1"))
+                {
+                    historyList.Clear();
+                }
+
+                string histHtml = @"<html>
+<head><title>History</title><style>
+body { font-family: sans-serif; margin: 20px; background: #ffffff; color: #222; }
+h1 { color: #003366; border-bottom: 2px solid #003366; padding-bottom: 5px; font-size: 20px; }
+table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #ddd; }
+th { background-color: #f2f5f8; color: #333; }
+tr:hover { background-color: #f8f9fa; }
+a { color: #0066cc; text-decoration: none; font-weight: bold; }
+a:hover { text-decoration: underline; }
+.btn { display: inline-block; padding: 4px 10px; background: #eee; border: 1px solid #999; border-radius: 3px; color: #333; text-decoration: none; font-size: 12px; }
+.btn:hover { background: #ddd; }
+</style></head>
+<body>
+<h1>Browsing History</h1>
+<p><a class=""btn"" href=""about:history?clear=1"">Clear All History</a></p>
+<table>
+<tr><th>Time</th><th>Page Title</th><th>Address</th></tr>";
+
+                for (int i = 0; i < historyList.Count; i++)
+                {
+                    HistoryItem item = historyList[i];
+                    histHtml += "<tr>"
+                        + "<td style=\"color:#888; font-size:12px; width:80px;\">" + item.VisitedAt.ToString("HH:mm:ss") + "</td>"
+                        + "<td><a href=\"" + EscapeHtml(item.Url) + "\">" + EscapeHtml(item.Title) + "</a></td>"
+                        + "<td style=\"color:#555; font-size:12px;\">" + EscapeHtml(item.Url) + "</td>"
+                        + "</tr>";
+                }
+
+                if (historyList.Count == 0)
+                {
+                    histHtml += "<tr><td colspan=\"3\" style=\"color:#888;\">No history entries recorded yet.</td></tr>";
+                }
+
+                histHtml += "</table></body></html>";
+
+                HtmlPage page = HtmlPageBuilder.Parse(histHtml);
+                Publish(page, "about:history", "Browsing History", "Done");
+            }
+            else if (lower.StartsWith("about:cookies"))
+            {
+                int q = url.IndexOf('?');
+                if (q >= 0 && url.Substring(q + 1).Contains("clear=1"))
+                {
+                    cookies.Clear();
+                }
+
+                List<Cookie> allCookies = cookies.GetAll();
+
+                string cookieHtml = @"<html>
+<head><title>Cookies</title><style>
+body { font-family: sans-serif; margin: 20px; background: #ffffff; color: #222; }
+h1 { color: #003366; border-bottom: 2px solid #003366; padding-bottom: 5px; font-size: 20px; }
+table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #ddd; font-size: 13px; }
+th { background-color: #f2f5f8; color: #333; }
+tr:hover { background-color: #f8f9fa; }
+.btn { display: inline-block; padding: 4px 10px; background: #eee; border: 1px solid #999; border-radius: 3px; color: #333; text-decoration: none; font-size: 12px; }
+.badge { display: inline-block; padding: 2px 5px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+.sec { background: #d4edda; color: #155724; }
+.http { background: #cce5ff; color: #004085; }
+</style></head>
+<body>
+<h1>Stored Cookies</h1>
+<p><a class=""btn"" href=""about:cookies?clear=1"">Clear All Cookies</a></p>
+<table>
+<tr><th>Domain</th><th>Path</th><th>Name</th><th>Value</th><th>Flags</th></tr>";
+
+                for (int i = 0; i < allCookies.Count; i++)
+                {
+                    Cookie c = allCookies[i];
+                    string flags = "";
+                    if (c.Secure) flags += "<span class=\"badge sec\">Secure</span> ";
+                    if (c.HttpOnly) flags += "<span class=\"badge http\">HttpOnly</span>";
+                    if (flags == "") flags = "-";
+
+                    cookieHtml += "<tr>"
+                        + "<td><b>" + EscapeHtml(c.Domain) + "</b></td>"
+                        + "<td>" + EscapeHtml(c.Path) + "</td>"
+                        + "<td>" + EscapeHtml(c.Name) + "</td>"
+                        + "<td style=\"max-width:200px; word-break:break-all;\">" + EscapeHtml(c.Value) + "</td>"
+                        + "<td>" + flags + "</td>"
+                        + "</tr>";
+                }
+
+                if (allCookies.Count == 0)
+                {
+                    cookieHtml += "<tr><td colspan=\"5\" style=\"color:#888;\">No cookies in jar.</td></tr>";
+                }
+
+                cookieHtml += "</table></body></html>";
+
+                HtmlPage page = HtmlPageBuilder.Parse(cookieHtml);
+                Publish(page, "about:cookies", "Cookies", "Done");
+            }
+            else if (lower == "about:source")
+            {
+                string srcText = string.IsNullOrEmpty(lastRawHtml)
+                    ? "<em>No HTML source available for this page. Navigate to a page first, then view source.</em>"
+                    : "<pre style=\"background:#f5f5f5; border:1px solid #ccc; padding:10px; font-family:monospace; font-size:12px; word-wrap:break-word; white-space:pre-wrap;\">" + EscapeHtml(lastRawHtml) + "</pre>";
+                string srcHtml = "<html><head><title>Page Source</title></head><body style=\"font-family:sans-serif; margin:15px;\">"
+                    + "<h3>HTML Source for " + EscapeHtml(currentUrl) + "</h3>"
+                    + "<p><a href=\"#\" onclick=\"window.location.href='about:home'\" style=\"color:#0066cc;\">Back to Home</a></p>"
+                    + srcText + "</body></html>";
+                HtmlPage page = HtmlPageBuilder.Parse(srcHtml);
+                Publish(page, url, "Page Source - " + currentUrl, "Done");
+            }
             else
             {
                 PublishError(url, "Unknown page", "No built-in page named " + url + ".");
             }
         }
 
+        private static string FileUrlToLocalPath(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return "";
+            string path = url;
+            if (path.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            {
+                path = path.Substring(7);
+                if (path.StartsWith("/") && path.Length >= 3 && path[2] == ':')
+                    path = path.Substring(1);
+            }
+            else if (path.StartsWith("file:", StringComparison.OrdinalIgnoreCase))
+            {
+                path = path.Substring(5);
+                if (path.StartsWith("/") && path.Length >= 3 && path[2] == ':')
+                    path = path.Substring(1);
+            }
+
+            path = path.Replace("%20", " ");
+            int hash = path.IndexOf('#');
+            if (hash >= 0) path = path.Substring(0, hash);
+            int q = path.IndexOf('?');
+            if (q >= 0) path = path.Substring(0, q);
+
+            if (File.Exists(path) || Directory.Exists(path)) return path;
+            string alt = path.Replace('/', '\\');
+            if (File.Exists(alt) || Directory.Exists(alt)) return alt;
+            return path;
+        }
+
+        private string LoadLocalUrl(string url, out string finalUrl)
+        {
+            finalUrl = url;
+            string localPath = FileUrlToLocalPath(url);
+
+            if (Directory.Exists(localPath))
+            {
+                return GenerateDirectoryListing(localPath, url);
+            }
+
+            if (File.Exists(localPath))
+            {
+                return File.ReadAllText(localPath);
+            }
+
+            throw new FileNotFoundException("Local file not found: " + localPath, localPath);
+        }
+
+        private string GenerateDirectoryListing(string dirPath, string baseUrl)
+        {
+            string title = "Index of " + dirPath.Replace('\\', '/');
+            string html = "<html><head><title>" + EscapeHtml(title) + "</title><style>"
+                + "body { font-family: monospace; margin: 20px; }"
+                + "h2 { font-family: sans-serif; }"
+                + "table { width: 100%; border-collapse: collapse; }"
+                + "th, td { text-align: left; padding: 4px 8px; }"
+                + "tr:hover { background-color: #f0f0f0; }"
+                + "a { text-decoration: none; color: #0066cc; }"
+                + "a:hover { text-decoration: underline; }"
+                + "</style></head><body>"
+                + "<h2>" + EscapeHtml(title) + "</h2><hr>"
+                + "<table>"
+                + "<tr><th>Name</th><th>Type</th><th>Size</th></tr>";
+
+            string normBase = baseUrl.Replace('\\', '/');
+            if (!normBase.EndsWith("/")) normBase += "/";
+
+            if (dirPath != "/" && dirPath != "0:\\" && dirPath != "0:/" && dirPath != "/mnt")
+            {
+                string parentUrl = WebUrl.Resolve(normBase, "../");
+                html += "<tr><td><a href=\"" + parentUrl + "\">[.. Parent Directory]</a></td><td>DIR</td><td>-</td></tr>";
+            }
+
+            try
+            {
+                string[] dirs = Directory.GetDirectories(dirPath);
+                for (int i = 0; i < dirs.Length; i++)
+                {
+                    string d = dirs[i];
+                    string name = Path.GetFileName(d);
+                    if (string.IsNullOrEmpty(name)) name = d;
+                    string target = normBase + UriEscapeSimple(name) + "/";
+                    html += "<tr><td><a href=\"" + target + "\">[DIR] " + EscapeHtml(name) + "/</a></td><td>DIR</td><td>-</td></tr>";
+                }
+
+                string[] files = Directory.GetFiles(dirPath);
+                for (int i = 0; i < files.Length; i++)
+                {
+                    string f = files[i];
+                    string name = Path.GetFileName(f);
+                    if (string.IsNullOrEmpty(name)) name = f;
+                    string target = normBase + UriEscapeSimple(name);
+                    long len = 0;
+                    try { len = new FileInfo(f).Length; } catch { }
+                    html += "<tr><td><a href=\"" + target + "\">" + EscapeHtml(name) + "</a></td><td>FILE</td><td>" + len + " B</td></tr>";
+                }
+            }
+            catch (Exception ex)
+            {
+                html += "<tr><td colspan=\"3\" style=\"color:red;\">Error listing directory: " + EscapeHtml(ex.Message) + "</td></tr>";
+            }
+
+            html += "</table><hr><p style=\"color:#888; font-size:11px;\">Windose Internet Explorer Local Browser</p></body></html>";
+            return html;
+        }
+
+        private static string UriEscapeSimple(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "";
+            return s.Replace(" ", "%20").Replace("#", "%23");
+        }
+
         private void Fetch(string url)
         {
             try
             {
+                cancelPendingFetch = false;
                 string html;
                 string finalUrl = url;
 
@@ -362,40 +1129,99 @@ fn main() {
                     finalUrl = posted.Url != null ? posted.Url : url;
                     currentUrl = finalUrl;
                 }
+                else if (WebUrl.SchemeOf(url) == "file")
+                {
+                    PublishProgress(10, "Opening local file…");
+                    html = LoadLocalUrl(url, out finalUrl);
+                }
                 else
                 {
-                    html = FetchString(url);
+                    html = FetchString(url, out finalUrl);
                 }
+
+                if (cancelPendingFetch) return;
+
+                lastRawHtml = html ?? "";
 
                 int chars = html != null ? html.Length : 0;
                 PublishProgress(25, "Received " + chars + " chars, parsing…");
 
                 HtmlPage page = HtmlPageBuilder.Parse(html ?? "");
-                if (string.IsNullOrEmpty(page.Title)) page.Title = WebUrl.HostOf(finalUrl);
+                if (string.IsNullOrEmpty(page.Title))
+                {
+                    if (WebUrl.SchemeOf(finalUrl) == "file")
+                    {
+                        string localPath = FileUrlToLocalPath(finalUrl);
+                        string fileName = Path.GetFileName(localPath);
+                        page.Title = !string.IsNullOrEmpty(fileName) ? fileName : localPath;
+                    }
+                    else
+                    {
+                        page.Title = WebUrl.HostOf(finalUrl);
+                    }
+                }
+
+                if (cancelPendingFetch) return;
+
                 PublishProgress(45, "Loading stylesheets…");
+                string cssErr;
+                int cssLoaded = FetchStylesheets(page, finalUrl, out cssErr);
 
-                FetchStylesheets(page, finalUrl);
+                if (cancelPendingFetch) return;
+
                 PublishProgress(65, "Loading scripts…");
-
                 FetchScripts(page, finalUrl);
-                PublishProgress(80, "Loading images…");
 
+                if (cancelPendingFetch) return;
+
+                PublishProgress(80, "Loading images…");
                 Dictionary<string, Image> images = FetchImages(page, finalUrl);
+
+                if (cancelPendingFetch) return;
+
                 PublishProgress(95, "Rendering…");
 
                 string status = "Done — " + chars + " chars";
+                if (cssLoaded > 0) status += ", " + cssLoaded + " css";
+                else if (page.StyleSheetHrefs != null && page.StyleSheetHrefs.Count > 0 && cssErr != null)
+                    status += " (CSS: " + cssErr + ")";
                 if (images.Count > 0) status += ", " + images.Count + " img";
                 Publish(page, finalUrl, page.Title, status, images);
             }
             catch (Exception ex)
             {
+                if (cancelPendingFetch) return;
                 string host = WebUrl.HostOf(url);
                 string reason = DeepestMessage(ex);
                 string name = host.Length > 0 ? host : url;
-                string html = "<h2>Cannot display " + EscapeHtml(name) + "</h2>"
-                    + "<p>" + EscapeHtml(reason) + "</p>";
-                if (url.StartsWith("https://"))
-                    html += "<p>Note: this site uses HTTPS. If the native TLS stack is unavailable the handshake will fail.</p>";
+                string httpsNote = url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+                    ? "<p style=\"color:#666;\">Note: This site uses HTTPS. The native TLS 1.2 handshake or server cipher suite negotiation may have failed.</p>"
+                    : "";
+
+                string html = @"<html><head><title>Cannot display page</title><style>
+body { font-family: sans-serif; margin: 30px; background: #ffffff; color: #222; }
+h1 { color: #b30000; font-size: 22px; border-bottom: 2px solid #b30000; padding-bottom: 6px; }
+.box { background: #fdf7f7; border: 1px solid #eed0d0; padding: 12px; margin: 15px 0; border-radius: 4px; }
+ul { margin: 15px 0; padding-left: 20px; }
+li { margin: 8px 0; }
+a { color: #0066cc; text-decoration: none; font-weight: bold; }
+a:hover { text-decoration: underline; }
+</style></head><body>
+<h1>The page cannot be displayed</h1>
+<div class=""box"">
+<p><b>Address:</b> " + EscapeHtml(url) + @"</p>
+<p><b>Reason:</b> " + EscapeHtml(reason) + @"</p>
+" + httpsNote + @"
+</div>
+<p><b>What you can try:</b></p>
+<ul>
+<li><a href=""" + EscapeHtml(url) + @""">Try connecting again (Refresh)</a></li>
+<li>Go to the <a href=""about:home"">Internet Explorer Start Page</a></li>
+<li>Open your <a href=""about:favorites"">Favorites</a> or <a href=""about:history"">History</a></li>
+<li>Browse <a href=""file:///mnt/"">Local Files (/mnt)</a></li>
+</ul>
+</body></html>";
+
                 HtmlPage page = HtmlPageBuilder.Parse(html);
                 page.Title = "Cannot display page";
                 Publish(page, url, "Cannot display page", "Error");
@@ -454,37 +1280,84 @@ fn main() {
 
         private string FetchString(string url)
         {
-            // https:// goes through the OS's own TLS 1.2 client first; only when
-            // it cannot even open a connection do we hand the URL to the Cosmos
-            // HttpClient (which ships no working TLS of its own).
-            if (WebUrl.SchemeOf(url) == "https")
-            {
-                string nativeError;
-                string nativeFinal;
-                TlsHttpResponse native = TryNativeHttps("GET", url, null, null, out nativeFinal, out nativeError);
-                if (native != null)
-                {
-                    if (native.Status < 200 || native.Status >= 300)
-                        throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
-                    return DecodeBody(native.Body, ExtractHeaderValue(native.HeaderBlock, "content-type"));
-                }
-                return FallbackString(url, nativeError);
-            }
-
-            string final;
-            HttpResponseMessage response = GetFollowingRedirects(url, out final);
-            return response.Content != null ? response.Content.ReadAsString() : null;
+            string dummy;
+            return FetchString(url, out dummy);
         }
 
-        /// <summary>The plain-HttpClient route used when the native TLS stack
-        /// could not carry the request; if it fails too, say what the native
-        /// stack saw (that is the real cause).</summary>
-        private string FallbackString(string url, string nativeError)
+        private string FetchString(string url, out string finalUrl)
+        {
+            string current = url;
+            finalUrl = url;
+
+            for (int hop = 0; hop < 6; hop++)
+            {
+                if (cancelPendingFetch) throw new Exception("Operation cancelled by user.");
+
+                string scheme = WebUrl.SchemeOf(current);
+                if (scheme == "file")
+                {
+                    finalUrl = current;
+                    string path = FileUrlToLocalPath(current);
+                    return File.Exists(path) ? File.ReadAllText(path) : null;
+                }
+
+                if (scheme == "https")
+                {
+                    string nativeError;
+                    string nativeFinal;
+                    TlsHttpResponse native = TryNativeHttps("GET", current, null, null, out nativeFinal, out nativeError);
+                    if (native != null)
+                    {
+                        if (native.Status >= 300 && native.Status < 400)
+                        {
+                            string location = ExtractHeaderValue(native.HeaderBlock, "location");
+                            if (string.IsNullOrEmpty(location))
+                                throw new Exception("HTTP " + native.Status + " redirect with no Location header.");
+                            current = WebUrl.Resolve(nativeFinal, location);
+                            continue;
+                        }
+
+                        if (native.Status < 200 || native.Status >= 300)
+                            throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
+
+                        finalUrl = nativeFinal;
+                        return DecodeBody(native.Body, ExtractHeaderValue(native.HeaderBlock, "content-type"));
+                    }
+                    return FallbackString(current, nativeError, out finalUrl);
+                }
+
+                // Plain HTTP via Cosmos HttpClient
+                HttpClient client = NewClient();
+                AddCookieHeader(client, current);
+                HttpResponseMessage response = client.Get(current);
+                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
+                StoreCookies(response, current);
+
+                int code = (int)response.StatusCode;
+                if (code >= 300 && code < 400)
+                {
+                    string location = ReadHeader(response, "Location");
+                    if (string.IsNullOrEmpty(location))
+                        throw new Exception("HTTP " + code + " redirect with no Location header.");
+                    current = WebUrl.Resolve(current, location);
+                    continue;
+                }
+
+                if (code < 200 || code >= 300)
+                    throw new Exception("HTTP " + code + " from " + WebUrl.HostOf(current));
+
+                finalUrl = current;
+                return response.Content != null ? response.Content.ReadAsString() : null;
+            }
+
+            throw new Exception("Too many redirects.");
+        }
+
+        private string FallbackString(string url, string nativeError, out string finalUrl)
         {
             try
             {
-                string final;
-                HttpResponseMessage response = GetFollowingRedirects(url, out final);
+                HttpResponseMessage response = GetFollowingRedirects(url, out finalUrl);
                 return response.Content != null ? response.Content.ReadAsString() : null;
             }
             catch (Exception ex)
@@ -495,31 +1368,83 @@ fn main() {
 
         private byte[] FetchBytes(string url)
         {
-            if (WebUrl.SchemeOf(url) == "https")
-            {
-                string nativeError;
-                string nativeFinal;
-                TlsHttpResponse native = TryNativeHttps("GET", url, null, null, out nativeFinal, out nativeError);
-                if (native != null)
-                {
-                    if (native.Status < 200 || native.Status >= 300)
-                        throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
-                    return native.Body;
-                }
-                return FallbackBytes(url, nativeError);
-            }
-
-            string final;
-            HttpResponseMessage response = GetFollowingRedirects(url, out final);
-            return response.Content != null ? response.Content.ReadAsByteArray() : null;
+            string dummy;
+            return FetchBytes(url, out dummy);
         }
 
-        private byte[] FallbackBytes(string url, string nativeError)
+        private byte[] FetchBytes(string url, out string finalUrl)
+        {
+            string current = url;
+            finalUrl = url;
+
+            for (int hop = 0; hop < 6; hop++)
+            {
+                if (cancelPendingFetch) return null;
+
+                string scheme = WebUrl.SchemeOf(current);
+                if (scheme == "file")
+                {
+                    finalUrl = current;
+                    string path = FileUrlToLocalPath(current);
+                    return File.Exists(path) ? File.ReadAllBytes(path) : null;
+                }
+
+                if (scheme == "https")
+                {
+                    string nativeError;
+                    string nativeFinal;
+                    TlsHttpResponse native = TryNativeHttps("GET", current, null, null, out nativeFinal, out nativeError);
+                    if (native != null)
+                    {
+                        if (native.Status >= 300 && native.Status < 400)
+                        {
+                            string location = ExtractHeaderValue(native.HeaderBlock, "location");
+                            if (string.IsNullOrEmpty(location))
+                                throw new Exception("HTTP " + native.Status + " redirect with no Location header.");
+                            current = WebUrl.Resolve(nativeFinal, location);
+                            continue;
+                        }
+
+                        if (native.Status < 200 || native.Status >= 300)
+                            throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
+
+                        finalUrl = nativeFinal;
+                        return native.Body;
+                    }
+                    return FallbackBytes(current, nativeError, out finalUrl);
+                }
+
+                HttpClient client = NewClient();
+                AddCookieHeader(client, current);
+                HttpResponseMessage response = client.Get(current);
+                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
+                StoreCookies(response, current);
+
+                int code = (int)response.StatusCode;
+                if (code >= 300 && code < 400)
+                {
+                    string location = ReadHeader(response, "Location");
+                    if (string.IsNullOrEmpty(location))
+                        throw new Exception("HTTP " + code + " redirect with no Location header.");
+                    current = WebUrl.Resolve(current, location);
+                    continue;
+                }
+
+                if (code < 200 || code >= 300)
+                    throw new Exception("HTTP " + code + " from " + WebUrl.HostOf(current));
+
+                finalUrl = current;
+                return response.Content != null ? response.Content.ReadAsByteArray() : null;
+            }
+
+            throw new Exception("Too many redirects.");
+        }
+
+        private byte[] FallbackBytes(string url, string nativeError, out string finalUrl)
         {
             try
             {
-                string final;
-                HttpResponseMessage response = GetFollowingRedirects(url, out final);
+                HttpResponseMessage response = GetFollowingRedirects(url, out finalUrl);
                 return response.Content != null ? response.Content.ReadAsByteArray() : null;
             }
             catch (Exception ex)
@@ -629,16 +1554,26 @@ fn main() {
                 }
                 catch (Exception ex)
                 {
-                    // Transport-level failure. First hop => nothing worked at
-                    // all (signal fallback); a later hop means the native path
-                    // was healthy, so report rather than retry elsewhere.
-                    if (hop == 0)
+                    // Transport-level failure. If a later redirect hop fails, attempt
+                    // one retry in case the server closed the keep-alive connection.
+                    if (hop > 0)
+                    {
+                        try
+                        {
+                            response = TlsHttpFetch.Fetch(m, current, requestHeaders, bodyBytes,
+                                mediaType, cookies.HeaderFor(current));
+                        }
+                        catch
+                        {
+                            throw new Exception("Native TLS fetch failed during redirect: " + DeepestMessage(ex));
+                        }
+                    }
+                    else
                     {
                         finalUrl = url;
                         nativeError = DeepestMessage(ex);
                         return null;
                     }
-                    throw new Exception("Native TLS fetch failed during redirect: " + DeepestMessage(ex));
                 }
 
                 for (int i = 0; i < response.SetCookies.Count; i++)
@@ -848,25 +1783,80 @@ fn main() {
             }
         }
 
-        private void FetchStylesheets(HtmlPage page, string baseUrl)
+        private int FetchStylesheets(HtmlPage page, string baseUrl, out string lastError)
         {
-            if (page.StyleSheetHrefs == null || page.StyleSheetHrefs.Count == 0) return;
+            lastError = null;
+            if (page == null) return 0;
+
             string baseForCss = !string.IsNullOrEmpty(page.BaseHref) ? WebUrl.Resolve(baseUrl, page.BaseHref) : baseUrl;
-            int limit = Math.Min(page.StyleSheetHrefs.Count, 8);
-            for (int i = 0; i < limit; i++)
+            int loaded = 0;
+
+            if (page.StyleItems != null && page.StyleItems.Count > 0)
             {
-                string abs = WebUrl.Resolve(baseForCss, page.StyleSheetHrefs[i]);
-                try
+                StringBuilder combined = new StringBuilder();
+                int extCount = 0;
+                for (int i = 0; i < page.StyleItems.Count; i++)
                 {
-                    string css = FetchString(abs);
-                    if (!string.IsNullOrEmpty(css))
+                    if (cancelPendingFetch) break;
+                    HtmlStyleItem item = page.StyleItems[i];
+                    if (!item.IsExternal)
                     {
-                        if (page.CssText.Length > 0) page.CssText += "\n";
-                        page.CssText += css;
+                        if (!string.IsNullOrEmpty(item.InlineCss))
+                        {
+                            if (combined.Length > 0) combined.Append("\n");
+                            combined.Append(item.InlineCss);
+                        }
+                    }
+                    else if (extCount < 16)
+                    {
+                        extCount++;
+                        string abs = WebUrl.Resolve(baseForCss, item.Href);
+                        try
+                        {
+                            PublishProgress(45 + (extCount * 18 / 16), "Loading CSS " + extCount + "…");
+                            string css = FetchString(abs);
+                            if (!string.IsNullOrEmpty(css))
+                            {
+                                if (combined.Length > 0) combined.Append("\n");
+                                combined.Append(css);
+                                loaded++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            lastError = DeepestMessage(ex);
+                        }
                     }
                 }
-                catch { /* a missing stylesheet is not fatal */ }
+                page.CssText = combined.ToString();
+                return loaded;
             }
+
+            if (page.StyleSheetHrefs != null && page.StyleSheetHrefs.Count > 0)
+            {
+                int limit = Math.Min(page.StyleSheetHrefs.Count, 16);
+                for (int i = 0; i < limit; i++)
+                {
+                    if (cancelPendingFetch) break;
+                    string abs = WebUrl.Resolve(baseForCss, page.StyleSheetHrefs[i]);
+                    try
+                    {
+                        PublishProgress(45 + (i * 18 / limit), "Loading CSS " + (i + 1) + "/" + limit + "…");
+                        string css = FetchString(abs);
+                        if (!string.IsNullOrEmpty(css))
+                        {
+                            if (page.CssText.Length > 0) page.CssText += "\n";
+                            page.CssText += css;
+                            loaded++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        lastError = DeepestMessage(ex);
+                    }
+                }
+            }
+            return loaded;
         }
 
         // Fetch external <script src> sources (in document order) so the page
@@ -878,6 +1868,7 @@ fn main() {
             int limit = Math.Min(page.Scripts.Count, 8);
             for (int i = 0; i < limit; i++)
             {
+                if (cancelPendingFetch) break;
                 HtmlScript s = page.Scripts[i];
                 if (s.Src == null || s.Code != null) continue; // inline or already fetched
                 string abs = WebUrl.Resolve(baseForJs, s.Src);
@@ -898,13 +1889,43 @@ fn main() {
             string baseForImages = !string.IsNullOrEmpty(page.BaseHref) ? WebUrl.Resolve(baseUrl, page.BaseHref) : baseUrl;
             List<string> srcs = new List<string>();
             CollectImgSrcs(page.Root, srcs);
+            CollectCssUrls(page.CssText, srcs);
 
             int fetched = 0;
-            for (int i = 0; i < srcs.Count && fetched < 12; i++)
+            for (int i = 0; i < srcs.Count && fetched < 32; i++)
             {
+                if (cancelPendingFetch) break;
                 string src = srcs[i];
                 if (string.IsNullOrEmpty(src)) continue;
-                if (src.StartsWith("data:")) continue; // data: URIs unsupported
+
+                if (src.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (images.ContainsKey(src)) continue;
+                    try
+                    {
+                        int comma = src.IndexOf(',');
+                        if (comma > 0)
+                        {
+                            string meta = src.Substring(5, comma - 5);
+                            if (meta.IndexOf("base64", StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                string b64 = src.Substring(comma + 1).Trim();
+                                byte[] data = Convert.FromBase64String(b64);
+                                if (data != null && data.Length > 0)
+                                {
+                                    Image img = ImageLoader.FromBytes(data);
+                                    if (img != null && img.Width > 0 && img.Height > 0)
+                                    {
+                                        images[src] = img;
+                                        fetched++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch { /* invalid base64 or unsupported image data */ }
+                    continue;
+                }
 
                 string abs = WebUrl.Resolve(baseForImages, src);
                 if (images.ContainsKey(abs)) continue;
@@ -917,6 +1938,7 @@ fn main() {
                     if (img != null && img.Width > 0 && img.Height > 0)
                     {
                         images[abs] = img;
+                        images[src] = img;
                         fetched++;
                     }
                 }
@@ -932,14 +1954,63 @@ fn main() {
             {
                 if (n.IsElement)
                 {
-                    if (n.Tag == "img")
+                    if (n.Tag == "img" || n.Tag == "source")
                     {
                         string s = n.GetAttr("src");
-                        if (!string.IsNullOrEmpty(s)) srcs.Add(s);
+                        if (!string.IsNullOrEmpty(s) && !srcs.Contains(s)) srcs.Add(s);
+                        string dataSrc = n.GetAttr("data-src");
+                        if (!string.IsNullOrEmpty(dataSrc) && !srcs.Contains(dataSrc)) srcs.Add(dataSrc);
+                        string srcset = n.GetAttr("srcset");
+                        if (!string.IsNullOrEmpty(srcset))
+                        {
+                            string first = srcset.Trim();
+                            int sp = first.IndexOf(' ');
+                            int comma = first.IndexOf(',');
+                            int cut = (sp > 0 && (comma < 0 || sp < comma)) ? sp : comma;
+                            if (cut > 0) first = first.Substring(0, cut).Trim();
+                            if (!string.IsNullOrEmpty(first) && !srcs.Contains(first)) srcs.Add(first);
+                        }
+                    }
+                    else
+                    {
+                        string style = n.GetAttr("style");
+                        if (!string.IsNullOrEmpty(style) && style.IndexOf("url(", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            CollectCssUrls(style, srcs);
+                        }
                     }
                     CollectImgSrcs(n, srcs);
                 }
                 n = n.Next;
+            }
+        }
+
+        private static void CollectCssUrls(string css, List<string> srcs)
+        {
+            if (string.IsNullOrEmpty(css)) return;
+            int pos = 0;
+            while (pos < css.Length)
+            {
+                int u = css.IndexOf("url(", pos, StringComparison.OrdinalIgnoreCase);
+                if (u < 0) break;
+                int start = u + 4;
+                int end = css.IndexOf(')', start);
+                if (end < 0) break;
+                string raw = css.Substring(start, end - start).Trim().Trim('\'', '"');
+                pos = end + 1;
+                if (string.IsNullOrEmpty(raw)) continue;
+                if (raw.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) continue;
+                string lower = raw.ToLowerInvariant();
+                int q = lower.IndexOf('?');
+                if (q >= 0) lower = lower.Substring(0, q);
+                int h = lower.IndexOf('#');
+                if (h >= 0) lower = lower.Substring(0, h);
+                if (lower.EndsWith(".png") || lower.EndsWith(".jpg") || lower.EndsWith(".jpeg") ||
+                    lower.EndsWith(".webp") || lower.EndsWith(".gif") || lower.EndsWith(".bmp") ||
+                    lower.EndsWith(".ico") || lower.EndsWith(".svg"))
+                {
+                    if (!srcs.Contains(raw)) srcs.Add(raw);
+                }
             }
         }
 
@@ -978,7 +2049,27 @@ fn main() {
 
         private void PublishError(string url, string title, string message)
         {
-            string html = "<h2>" + EscapeHtml(title) + "</h2><p>" + EscapeHtml(message) + "</p>";
+            string html = @"<html><head><title>" + EscapeHtml(title) + @"</title><style>
+body { font-family: sans-serif; margin: 30px; background: #ffffff; color: #222; }
+h1 { color: #b30000; font-size: 22px; border-bottom: 2px solid #b30000; padding-bottom: 6px; }
+.box { background: #fdf7f7; border: 1px solid #eed0d0; padding: 12px; margin: 15px 0; border-radius: 4px; }
+ul { margin: 15px 0; padding-left: 20px; }
+li { margin: 8px 0; }
+a { color: #0066cc; text-decoration: none; font-weight: bold; }
+a:hover { text-decoration: underline; }
+</style></head><body>
+<h1>" + EscapeHtml(title) + @"</h1>
+<div class=""box"">
+<p><b>Address:</b> " + EscapeHtml(url) + @"</p>
+<p><b>Message:</b> " + EscapeHtml(message) + @"</p>
+</div>
+<p><b>What you can try:</b></p>
+<ul>
+<li>Go to the <a href=""about:home"">Internet Explorer Start Page</a></li>
+<li>Open your <a href=""about:favorites"">Favorites</a> or <a href=""about:history"">History</a></li>
+<li>Browse <a href=""file:///mnt/"">Local Files (/mnt)</a></li>
+</ul>
+</body></html>";
             HtmlPage page = HtmlPageBuilder.Parse(html);
             page.Title = title;
             Publish(page, url, title, "Error");

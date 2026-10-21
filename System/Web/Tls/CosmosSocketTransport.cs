@@ -20,12 +20,20 @@ namespace Windose.Web.Tls
         {
             if (len <= 0) return 0;
 
-            // Block until the peer has something for us.
+            // Block until the peer has something for us (with 15s timeout).
+            int waitedMs = 0;
             while (socket.Available == 0)
             {
                 if (socket.Poll(0, SelectMode.SelectRead))
-                    return 0;   // readable with nothing buffered => the peer closed
+                {
+                    if (socket.Available == 0)
+                        return 0;   // readable with nothing buffered => the peer closed
+                    break;
+                }
                 Thread.Sleep(1);
+                waitedMs++;
+                if (waitedMs > 15000)
+                    throw new global::System.TimeoutException("TLS transport: socket read timed out");
             }
 
             int want = len;

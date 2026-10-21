@@ -1,6 +1,7 @@
 ///TODO Implement lua scripts instead of hardcoded programs for terminal;
 using Cosmos.Executable.Lua;
 using Cosmos.Kernel.Core.Scheduler;
+using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
@@ -26,6 +27,11 @@ public class Kernel : Sys.Kernel
 
     private WindowManager windowManager;
     public Drivers.DisplayManager displayDriver;
+
+    [global::System.Runtime.InteropServices.UnmanagedCallersOnly(EntryPoint = "RhDebugBreak")]
+    public static void RhDebugBreak()
+    {
+    }
 
     protected override void OnBoot()
     {
@@ -192,6 +198,22 @@ public class Kernel : Sys.Kernel
     {
         try
         {
+
+            ulong freeMemoryMb = MemoryDiagnostics.FreePages * MemoryDiagnostics.PageSizeBytes / ByteSize.Megabyte;
+
+
+            if (freeMemoryMb < 32)
+            {
+                Console.Clear();
+                Console.BackgroundColor = ConsoleColor.Red;
+                Console.ForegroundColor = ConsoleColor.White;
+                SystemLogger.WriteLine("KERNEL", "Panic", ConsoleMessageType.Warning, true);
+                SystemLogger.WriteLine("KERNEL", "Low memory warning: " + freeMemoryMb + " MB free", ConsoleMessageType.Warning, true);
+                SystemLogger.WriteLine("KERNEL", "Insufficient memory available", ConsoleMessageType.Fatal, true);
+                Power.Halt();
+                return;
+            }
+
             int nowTick = Environment.TickCount;
             if (FrameCount > 0)
             {
