@@ -101,7 +101,7 @@ public class Desktop : Component
 
     public static void SetWallpaper(string path)
     {
-        wallpaper = new Png(path);
+        wallpaper = ImageLoader.Load(path);
     }
     public override void DrawLocal()
     {

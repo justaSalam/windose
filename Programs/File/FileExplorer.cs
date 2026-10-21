@@ -382,6 +382,12 @@ public class FileExplorer : Window
             return;
         }
 
+        if (program == typeof(ImageViewer))
+        {
+            LaunchTracker.Start(() => new ImageViewer(path, 120, 120, 640, 480));
+            return;
+        }
+
         LaunchTracker.Start(() => (Window)Activator.CreateInstance(program)!);
     }
 

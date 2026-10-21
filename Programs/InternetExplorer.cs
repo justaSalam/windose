@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading;
@@ -913,7 +913,7 @@ fn main() {
                 {
                     byte[] data = FetchBytes(abs);
                     if (data == null || data.Length == 0) continue;
-                    Image img = new Png(data);
+                    Image img = ImageLoader.FromBytes(data, abs);
                     if (img != null && img.Width > 0 && img.Height > 0)
                     {
                         images[abs] = img;

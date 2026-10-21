@@ -78,6 +78,15 @@ public static class Registry
 
             Define($"{StaticRegistry.FileAssociation}/fallback", "/mnt/System/Icons/file_question.png");
             Define($"{StaticRegistry.FileAssociation}/.png", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.webp", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.jpg", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.jpeg", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.gif", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.bmp", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.qoi", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.tga", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.ico", "/mnt/System/Icons/paint_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.ppm", "/mnt/System/Icons/paint_file.png");
             Define($"{StaticRegistry.FileAssociation}/.breeze", "/mnt/System/Icons/script_file_blue.png");
             Define($"{StaticRegistry.FileAssociation}/.db", "/mnt/System/Icons/regedit_file.png");
             Define($"{StaticRegistry.FileAssociation}/.log", "/mnt/System/Icons/event_log.png");
