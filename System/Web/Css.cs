@@ -69,6 +69,11 @@ public sealed class CssComputed
     public int MarginT, MarginB, MarginL, MarginR;
     public int PadT, PadB, PadL, PadR;
 
+    // positioned offsets (top/right/bottom/left). auto is stored as
+    // int.MinValue so "0" stays a real, distinct value.
+    public int PosT, PosR, PosB, PosL;
+    public const int Auto = int.MinValue;
+
     // borders (per side)
     public CssBorder BorderTT; public uint BorderTC; public int BorderTW;
     public CssBorder BorderBB; public uint BorderBC; public int BorderBW;
@@ -118,6 +123,7 @@ public sealed class CssComputed
         c.Display = CssDisplay.Inline;
         c.Position = CssPos.Static;
         c.Float = CssFloat.None;
+        c.PosT = c.PosR = c.PosB = c.PosL = CssComputed.Auto;
         c.BoxSizing = CssBox.Content;
         c.HasColor = false;
         c.FontSize = 13;
@@ -1658,6 +1664,13 @@ public sealed class CssSheet
             case "padding-bottom": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadB = px; break; }
             case "padding-left": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadL = px; break; }
             case "padding-right": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadR = px; break; }
+
+            // positioned offsets. Percentages resolve against the viewport width
+            // (documented approximation: really they use the containing block).
+            case "top": { if (FirstWord(v) == "auto") c.PosT = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosT = px; break; }
+            case "right": { if (FirstWord(v) == "auto") c.PosR = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosR = px; break; }
+            case "bottom": { if (FirstWord(v) == "auto") c.PosB = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosB = px; break; }
+            case "left": { if (FirstWord(v) == "auto") c.PosL = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosL = px; break; }
 
             case "border": ApplyBorderShorthand(c, v, c.FontSize, vw, 0); break;
             case "border-top": ApplyBorderShorthand(c, v, c.FontSize, vw, 1); break;

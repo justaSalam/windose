@@ -190,6 +190,16 @@ public static class HtmlLayout
         public string BaseHref;
         public int Vw, Vh;
         public RenderPlan Plan;
+
+        // The containing block for absolutely/fixed positioned descendants:
+        // the nearest positioned (relative/absolute/fixed) ancestor's padding
+        // box, or the initial containing block (viewport) at the top. Pushed
+        // and popped around a positioned element's children. CbBValid is false
+        // when the bottom is circular (an auto-height positioned ancestor), so
+        // bottom-anchored absolute children fall back to top instead of
+        // collapsing against a placeholder bound.
+        public int CbL, CbT, CbR, CbB;
+        public bool CbBValid;
     }
 
     private sealed class Run
@@ -278,6 +288,15 @@ public static class HtmlLayout
 
         int contentWidth = Math.Max(60, viewWidth - LeftMargin * 2 - ScrollbarReserve);
         int y = 4;
+
+        // The initial containing block is the viewport (used by position:fixed
+        // and by absolute elements with no positioned ancestor).
+        ctx.CbL = 0;
+        ctx.CbT = 0;
+        ctx.CbR = ctx.Vw;
+        ctx.CbB = ctx.Vh;
+        ctx.CbBValid = true;
+
         LayoutContainer(body, bodyStyle, bodyStyle, LeftMargin + bodyStyle.MarginL,
             LeftMargin + contentWidth - bodyStyle.MarginR, ref y, ctx);
         plan.ContentHeight = y + 8;
@@ -392,6 +411,8 @@ public static class HtmlLayout
 
     private static bool IsBlockLevel(CssComputed cs)
     {
+        // absolutely/fixed positioned elements are blockified (CSS 2.1 §9.7)
+        if (cs.Position == CssPos.Absolute || cs.Position == CssPos.Fixed) return true;
         return cs.Display == CssDisplay.Block || cs.Display == CssDisplay.ListItem ||
                cs.Display == CssDisplay.Flex || cs.Display == CssDisplay.Table ||
                cs.Display == CssDisplay.TableRow || cs.Display == CssDisplay.TableCell ||
@@ -430,22 +451,83 @@ public static class HtmlLayout
         int bl = style.BorderLW, br = style.BorderRW, bt = style.BorderTW, bb = style.BorderBW;
         int pl = style.PadL, pr = style.PadR, pt = style.PadT, pb = style.PadB;
 
+        bool absolute = style.Position == CssPos.Absolute;
+        bool fixedPos = style.Position == CssPos.Fixed;
+        bool outOfFlow = absolute || fixedPos;
+        bool positioned = style.Position != CssPos.Static;
+
+        // containing block this element is placed against (fixed uses the viewport)
+        int cbL = ctx.CbL, cbT = ctx.CbT, cbR = ctx.CbR, cbB = ctx.CbB;
+        bool cbBValid = ctx.CbBValid;
+        if (fixedPos) { cbL = 0; cbT = 0; cbR = ctx.Vw; cbB = ctx.Vh; cbBValid = true; }
+
         int availW = Math.Max(60, availRight - availX);
         int boxW;
         if (style.HasW) boxW = style.W + (style.BoxSizing == CssBox.Border ? 0 : pl + pr + bl + br);
         else boxW = availW - marginLeft - marginRight;
-        if (style.MaxW < int.MaxValue && boxW > style.MaxW) boxW = style.MaxW;
-        if (boxW < 40) boxW = Math.Min(40, availW);
-        if (boxW < 20) boxW = 20;
 
-        int boxX = availX + marginLeft;
-        int boxTop = y + marginTop;
+        // absolute/fixed with left+right and auto width: stretch to fit
+        if (outOfFlow && !style.HasW
+            && style.PosL != CssComputed.Auto && style.PosR != CssComputed.Auto)
+        {
+            int borders = (style.BoxSizing == CssBox.Border ? 0 : pl + pr + bl + br);
+            boxW = (cbR - style.PosR) - (cbL + style.PosL) - borders;
+        }
+        if (style.MaxW < int.MaxValue && boxW > style.MaxW) boxW = style.MaxW;
+        if (outOfFlow) { if (boxW < 1) boxW = 1; }
+        else { if (boxW < 40) boxW = Math.Min(40, availW); if (boxW < 20) boxW = 20; }
+
+        int boxX, boxTop;
+        if (outOfFlow)
+        {
+            if (style.PosL != CssComputed.Auto) boxX = cbL + style.PosL;
+            else if (style.PosR != CssComputed.Auto) boxX = cbR - style.PosR - boxW;
+            else boxX = cbL + marginLeft;
+            // top-anchored here; bottom-only is corrected after measuring height
+            boxTop = style.PosT != CssComputed.Auto ? cbT + style.PosT : cbT;
+        }
+        else
+        {
+            // relative offsets the rendering but keeps the flow position
+            int dx = 0, dy = 0;
+            if (style.Position == CssPos.Relative)
+            {
+                if (style.PosL != CssComputed.Auto) dx = style.PosL;
+                else if (style.PosR != CssComputed.Auto) dx = -style.PosR;
+                if (style.PosT != CssComputed.Auto) dy = style.PosT;
+                else if (style.PosB != CssComputed.Auto) dy = -style.PosB;
+            }
+            boxX = availX + marginLeft + dx;
+            boxTop = y + marginTop + dy;
+        }
+
         int contentX = boxX + bl + pl;
         int contentRight = boxX + boxW - br - pr;
-        if (contentRight - contentX < 40) contentRight = contentX + 40;
+        if (contentRight - contentX < 40 && !outOfFlow) contentRight = contentX + 40;
         int contentTop = boxTop + bt + pt;
 
         bool hidden = style.Visibility != CssVis.Visible;
+
+        // A positioned element's padding box becomes the containing block for
+        // its absolutely positioned descendants. With an explicit height the
+        // bottom edge is known; with auto height it is circular, so mark the
+        // bound unreliable and let bottom-anchored children fall back to top.
+        int savedCbL = ctx.CbL, savedCbT = ctx.CbT, savedCbR = ctx.CbR, savedCbB = ctx.CbB;
+        bool savedCbBValid = ctx.CbBValid;
+        if (positioned)
+        {
+            ctx.CbL = boxX + bl;
+            ctx.CbT = boxTop + bt;
+            ctx.CbR = boxX + boxW - br;
+            if (style.HasH) { ctx.CbB = contentTop + style.H + pb; ctx.CbBValid = true; }
+            else { ctx.CbB = int.MaxValue / 2; ctx.CbBValid = false; }
+        }
+
+        // remember where this subtree's rendered items start (for bottom-anchoring)
+        int boxStart = ctx.Plan.Boxes.Count;
+        int lineStart = ctx.Plan.Lines.Count;
+        int widgetStart = ctx.Plan.Widgets.Count;
+        int linkStart = ctx.Plan.Links.Count;
 
         int cy = contentTop;
         CssComputed containerStyle = style;
@@ -463,6 +545,28 @@ public static class HtmlLayout
         int boxBottom = contentBottom + pb + bb;
         int boxHeight = boxBottom - boxTop;
         if (boxHeight < 1) boxHeight = 1;
+
+        // bottom-anchored absolute/fixed (no top): shift the measured subtree
+        // up/down into place once the real height is known. Only when the
+        // containing block's bottom edge is trustworthy.
+        if (outOfFlow && style.PosT == CssComputed.Auto && style.PosB != CssComputed.Auto && cbBValid)
+        {
+            int finalTop = cbB - style.PosB - boxHeight;
+            int shift = finalTop - boxTop;
+            if (shift != 0)
+            {
+                ShiftRange(ctx.Plan, boxStart, lineStart, widgetStart, linkStart, 0, shift);
+                boxTop = finalTop;
+                contentTop += shift;
+            }
+        }
+
+        // restore the containing block for following siblings
+        if (positioned)
+        {
+            ctx.CbL = savedCbL; ctx.CbT = savedCbT; ctx.CbR = savedCbR; ctx.CbB = savedCbB;
+            ctx.CbBValid = savedCbBValid;
+        }
 
         bool paintBox = style.HasBg || bt + bb + bl + br > 0;
         if (paintBox)
@@ -487,7 +591,34 @@ public static class HtmlLayout
             ctx.Plan.Boxes.Add(box);
         }
 
-        y = boxBottom + marginBottom;
+        // absolute/fixed are out of normal flow: leave the flow cursor alone.
+        // relative shifts rendering but must not move the flow position.
+        if (!outOfFlow)
+        {
+            int flowDy = 0;
+            if (style.Position == CssPos.Relative)
+            {
+                if (style.PosT != CssComputed.Auto) flowDy = style.PosT;
+                else if (style.PosB != CssComputed.Auto) flowDy = -style.PosB;
+            }
+            y = (boxBottom - flowDy) + marginBottom;
+        }
+    }
+
+    /// <summary>Translate every rendered item a subtree produced (used to nudge a
+    /// bottom-anchored absolute box into place after its height is known).</summary>
+    private static void ShiftRange(RenderPlan plan, int boxStart, int lineStart,
+        int widgetStart, int linkStart, int dx, int dy)
+    {
+        for (int i = boxStart; i < plan.Boxes.Count; i++) { plan.Boxes[i].X += dx; plan.Boxes[i].Y += dy; }
+        for (int i = lineStart; i < plan.Lines.Count; i++)
+        {
+            RenderLine l = plan.Lines[i];
+            l.Y += dy; l.TextX += dx; l.BulletX += dx;
+            for (int j = 0; j < l.Spans.Count; j++) { l.Spans[j].X += dx; l.Spans[j].Y += dy; }
+        }
+        for (int i = widgetStart; i < plan.Widgets.Count; i++) { plan.Widgets[i].X += dx; plan.Widgets[i].Y += dy; }
+        for (int i = linkStart; i < plan.Links.Count; i++) { plan.Links[i].X += dx; plan.Links[i].Y += dy; }
     }
 
     // ---- flexbox ---------------------------------------------------------
