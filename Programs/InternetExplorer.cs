@@ -9,6 +9,7 @@ using StringContent = Cosmos.Network.Http.StringContent;
 using HttpRequestHeaders = Cosmos.Network.Http.Headers.HttpRequestHeaders;
 using HttpWebRequest = Cosmos.Network.Http.HttpWebRequest;
 using SslVerification = Cosmos.Network.Http.SslVerification;
+using Windose.Web.Tls;
 
 namespace Windose.Programs
 {
@@ -452,16 +453,78 @@ fn main() {
 
         private string FetchString(string url)
         {
+            // https:// goes through the OS's own TLS 1.2 client first; only when
+            // it cannot even open a connection do we hand the URL to the Cosmos
+            // HttpClient (which ships no working TLS of its own).
+            if (WebUrl.SchemeOf(url) == "https")
+            {
+                string nativeError;
+                string nativeFinal;
+                TlsHttpResponse native = TryNativeHttps("GET", url, null, null, out nativeFinal, out nativeError);
+                if (native != null)
+                {
+                    if (native.Status < 200 || native.Status >= 300)
+                        throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
+                    return DecodeBody(native.Body, ExtractHeaderValue(native.HeaderBlock, "content-type"));
+                }
+                return FallbackString(url, nativeError);
+            }
+
             string final;
             HttpResponseMessage response = GetFollowingRedirects(url, out final);
             return response.Content != null ? response.Content.ReadAsString() : null;
         }
 
+        /// <summary>The plain-HttpClient route used when the native TLS stack
+        /// could not carry the request; if it fails too, say what the native
+        /// stack saw (that is the real cause).</summary>
+        private string FallbackString(string url, string nativeError)
+        {
+            try
+            {
+                string final;
+                HttpResponseMessage response = GetFollowingRedirects(url, out final);
+                return response.Content != null ? response.Content.ReadAsString() : null;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(nativeError + "; HttpClient: " + DeepestMessage(ex));
+            }
+        }
+
         private byte[] FetchBytes(string url)
         {
+            if (WebUrl.SchemeOf(url) == "https")
+            {
+                string nativeError;
+                string nativeFinal;
+                TlsHttpResponse native = TryNativeHttps("GET", url, null, null, out nativeFinal, out nativeError);
+                if (native != null)
+                {
+                    if (native.Status < 200 || native.Status >= 300)
+                        throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
+                    return native.Body;
+                }
+                return FallbackBytes(url, nativeError);
+            }
+
             string final;
             HttpResponseMessage response = GetFollowingRedirects(url, out final);
             return response.Content != null ? response.Content.ReadAsByteArray() : null;
+        }
+
+        private byte[] FallbackBytes(string url, string nativeError)
+        {
+            try
+            {
+                string final;
+                HttpResponseMessage response = GetFollowingRedirects(url, out final);
+                return response.Content != null ? response.Content.ReadAsByteArray() : null;
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(nativeError + "; HttpClient: " + DeepestMessage(ex));
+            }
         }
 
         // ---- JS fetch / XHR (runs on the WebView's fetch worker thread) -----
@@ -474,6 +537,10 @@ fn main() {
             JsFetchResult result = new JsFetchResult();
             result.Url = url;
 
+            // Captured when the native TLS stack declines, so a dead Cosmos
+            // fallback can still show the real (native) cause.
+            string nativeError = null;
+
             try
             {
                 string scheme = WebUrl.SchemeOf(url);
@@ -484,6 +551,22 @@ fn main() {
                 }
 
                 string finalUrl;
+                if (scheme == "https")
+                {
+                    TlsHttpResponse native = TryNativeHttps(method, url, headers, body, out finalUrl, out nativeError);
+                    if (native != null)
+                    {
+                        result.Status = native.Status;
+                        result.StatusText = native.Reason != null ? native.Reason : "";
+                        result.Ok = native.Status >= 200 && native.Status < 300;
+                        result.Url = finalUrl;
+                        result.Headers = native.HeaderBlock;
+                        result.Body = DecodeBody(native.Body, ExtractHeaderValue(native.HeaderBlock, "content-type"));
+                        return result;
+                    }
+                    // native could not carry it — fall back to the Cosmos client
+                }
+
                 HttpResponseMessage response = SendWithRedirects(method, url, headers, body, out finalUrl);
 
                 int code = (int)response.StatusCode;
@@ -496,9 +579,99 @@ fn main() {
             }
             catch (Exception ex)
             {
-                result.Error = DeepestMessage(ex);
+                result.Error = nativeError != null
+                    ? nativeError + "; HttpClient: " + DeepestMessage(ex)
+                    : DeepestMessage(ex);
             }
             return result;
+        }
+
+        // ---- native TLS (https://) ----------------------------------------
+        // The OS ships its own TLS 1.2 client (System/Web/Tls) because the
+        // Cosmos networking library offers no working handshake of its own.
+        // TryNativeHttps mirrors SendWithRedirects — same redirect rules, same
+        // cookie jar — but every hop rides a native TLS session.
+
+        /// <summary>Perform an HTTP request through the native TLS stack,
+        /// following up to 6 redirects and updating the cookie jar per hop.
+        /// Returns null (with nativeError set) when even the first connection
+        /// cannot be made — DNS, TCP connect or handshake — so the caller can
+        /// fall back to the Cosmos HttpClient. HTTP status codes are NOT an
+        /// error: any final response (404 included) comes back for the caller
+        /// to judge, exactly like GetFollowingRedirects.</summary>
+        private TlsHttpResponse TryNativeHttps(string method, string url,
+            string requestHeaders, string body, out string finalUrl, out string nativeError)
+        {
+            finalUrl = url;
+            nativeError = null;
+
+            string current = url;
+            string m = string.IsNullOrEmpty(method) ? "GET" : method.ToUpperInvariant();
+            string mediaType = ExtractHeaderValue(requestHeaders, "content-type");
+            if (mediaType == null || mediaType.Length == 0)
+                mediaType = "application/x-www-form-urlencoded";
+
+            for (int hop = 0; hop < 6; hop++)
+            {
+                if (WebUrl.SchemeOf(current) != "https")
+                    throw new Exception("Refusing to downgrade from https:// to plain http:// after a redirect.");
+
+                byte[] bodyBytes = null;
+                if (body != null && body.Length > 0 && (m == "POST" || m == "PUT" || m == "PATCH"))
+                    bodyBytes = global::System.Text.Encoding.UTF8.GetBytes(body);
+
+                TlsHttpResponse response;
+                try
+                {
+                    response = TlsHttpFetch.Fetch(m, current, requestHeaders, bodyBytes,
+                        mediaType, cookies.HeaderFor(current));
+                }
+                catch (Exception ex)
+                {
+                    // Transport-level failure. First hop => nothing worked at
+                    // all (signal fallback); a later hop means the native path
+                    // was healthy, so report rather than retry elsewhere.
+                    if (hop == 0)
+                    {
+                        finalUrl = url;
+                        nativeError = DeepestMessage(ex);
+                        return null;
+                    }
+                    throw new Exception("Native TLS fetch failed during redirect: " + DeepestMessage(ex));
+                }
+
+                for (int i = 0; i < response.SetCookies.Count; i++)
+                    cookies.AddFromSetCookie(response.SetCookies[i], current);
+
+                int code = response.Status;
+                if (code >= 300 && code < 400)
+                {
+                    string location = ExtractHeaderValue(response.HeaderBlock, "location");
+                    if (string.IsNullOrEmpty(location))
+                        throw new Exception("HTTP " + code + " redirect with no Location header.");
+                    if (code == 301 || code == 302 || code == 303)
+                    {
+                        if (m == "POST" || m == "PUT" || m == "PATCH") m = "GET";
+                    }
+                    current = WebUrl.Resolve(current, location);
+                    continue;
+                }
+
+                finalUrl = current;
+                return response;
+            }
+            throw new Exception("Too many redirects.");
+        }
+
+        /// <summary>Response body -> string. The native path always receives the
+        /// body untouched (no Accept-Encoding is ever sent), so a UTF-8 decode
+        /// with BOM stripping covers the modern web.</summary>
+        private static string DecodeBody(byte[] bytes, string contentType)
+        {
+            if (bytes == null || bytes.Length == 0) return "";
+            int off = 0;
+            if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) off = 3;
+            return global::System.Text.Encoding.UTF8.GetString(bytes, off, bytes.Length - off);
         }
 
         /// <summary>Send a request of any method (with optional body and script
