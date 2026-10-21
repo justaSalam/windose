@@ -38,7 +38,6 @@ public partial class WindowManager
         if (LockManager.IsLocked)
         {
             LockManager.RouteLockedInput(mx, my, mouseState);
-            DispatchMessages();
             ComposeDirtyRegions();
             DrawPreviewRect();
             PerformanceMetrics.AddWindowManager(updateStartedAt);
@@ -227,19 +226,19 @@ public partial class WindowManager
         return null;
     }
 
+    private static readonly Comparison<Component> componentZIndexCompare = (a, b) =>
+    {
+        int layer = a.zLayer.CompareTo(b.zLayer);
+        return layer != 0 ? layer : a.zIndex.CompareTo(b.zIndex);
+    };
+
     private void ComponentZSort()
     {
         if (!zOrderDirty) return;
         zOrderDirty = false;
         lock (Component.components)
         {
-            components.Sort((component1, component2) =>
-            {
-                int zLayer = component1.zLayer.CompareTo(component2.zLayer);
-                if (zLayer != 0) return zLayer;
-
-                return component1.zIndex.CompareTo(component2.zIndex);
-            });
+            components.Sort(componentZIndexCompare);
             windows.Sort(zIndexCompare);
         }
     }

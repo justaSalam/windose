@@ -25,7 +25,7 @@ namespace Windose.System.Kernel
                 }
 
                 byte[] buffer = new byte[stream.Length];
-                stream.Read(buffer, 0, buffer.Length);
+                stream.ReadExactly(buffer);
                 return buffer;
             }
         }

@@ -15,13 +15,13 @@ public class Explorer : SingleThreadedProcess
         this.canvas = canvas;
     }
 
-    private const int taskbarHeight = 30;
+    private const int taskbarHeight = 36;
     public override void Start()
     {
         base.Start();
         desktop = new Desktop(0, 0, Kernel.canvas.Width, Kernel.canvas.Height);
         taskbar = new Taskbar(0, Math.Max(0, canvas.Height - taskbarHeight), canvas.Width, taskbarHeight);
-        startMenu = new StartMenu(taskbar.X, taskbar.Y - 500, 300, 500, "Start Menu", false);
+        startMenu = new StartMenu(taskbar.X, taskbar.Y - 500, 360, 500, "Start Menu", false);
         LaunchTracker.Start(() => startMenu);
 
     }

@@ -1,4 +1,5 @@
 ﻿
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Windose.System.Kernel.Attributes;
 using static System.Net.Mime.MediaTypeNames;
@@ -31,6 +32,8 @@ namespace Windose.System.Kernel.Subsystem
 
             return extension.ToLowerInvariant();
         }
+
+        [RequiresUnreferencedCode("File associations are discovered through reflection.")]
         public static void DiscoverPrograms(Assembly assembly)
         {
             foreach (Type type in assembly.GetTypes())
@@ -40,7 +43,7 @@ namespace Windose.System.Kernel.Subsystem
                     continue;
                 }
 
-                IEnumerable<FileAssociationAttribute> associations =type.GetCustomAttributes<FileAssociationAttribute>();
+                IEnumerable<FileAssociationAttribute> associations = type.GetCustomAttributes<FileAssociationAttribute>();
 
                 foreach (var association in associations)
                 {

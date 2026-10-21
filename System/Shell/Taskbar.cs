@@ -26,6 +26,11 @@ public class Taskbar : Component
     public Taskbar(int x, int y, int width, int height) : base(x, y, width, height)
     {
         zLayer = DrawLayer.Taskbar;
+        if (Palette.GlassEnabled)
+        {
+            useGlass = true;
+            glassStyle = GlassStyle.AeroTaskbar();
+        }
         int trayWidth = Math.Min(TrayWidth, Width);
         bar = new StackPanel(Palette.ControlFace, 0, 0, Width - trayWidth, Height)
         {
@@ -68,17 +73,23 @@ public class Taskbar : Component
 
 
 
-        startButton = new Button(new Png("/mnt/System/Icons/start_menu_xp.png"), "Start", 0, 0, 72, Height - 6)
+        bool modern = Palette.FlatControls || Palette.GlassEnabled;
+        int startBtnWidth = modern ? 48 : 72;
+        string startText = modern ? "" : "Start";
+        int startIconSize = modern ? 28 : 18;
+
+        startButton = new Button(new Png("/mnt/System/Icons/start_menu_xp.png"), startText, 0, 0, startBtnWidth, Height - 4)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Left,
-            contentAlignment = HorizontalAlignment.Left,
-            iconSize = 18,
+            contentAlignment = HorizontalAlignment.Center,
+            iconSize = startIconSize,
             iconTextGap = 4,
-            textColor = Color.Black,
-            useBorders = true,
-            Margin = new Thickness(1, 1, 2, 2),
-            Padding = new Thickness(3),
+            textColor = Color.White,
+            useBorders = !modern,
+            useBackground = !modern,
+            Margin = new Thickness(modern ? 2 : 1, 1, 2, 2),
+            Padding = new Thickness(modern ? 1 : 3),
             leftClickAction = () =>
             {
                 Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
@@ -86,17 +97,18 @@ public class Taskbar : Component
         };
         bar.AddStackChild(startButton);
 
-        timeLabel = new Label(0, 0, 82, Height - 8)
+        timeLabel = new Label(0, 0, 82, Height - 6)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Right,
             horizontalTextAlignment = HorizontalAlignment.Center,
             verticalTextAlignment = VerticalAlignment.Center,
             text = DateTime.Now.ToString("hh:mm tt"),
-            fontSize = 14,
-            Margin = new Thickness(2, 2, 2, 2),
+            fontSize = modern ? 12 : 14,
+            textColor = modern ? Color.White : Palette.ControlBlack,
+            Margin = new Thickness(2),
             Padding = new Thickness(2),
-            useBackground = true,
+            useBackground = !modern,
             useForeground = false,
             capturesInput = true,
             leftClickAction = CalendarFlyout.Toggle
@@ -107,7 +119,8 @@ public class Taskbar : Component
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
-            useBorders = true,
+            useBorders = !modern,
+            useBackground = !modern,
             iconSize = 18,
             leftClickAction = ToggleTray
         };
@@ -118,18 +131,20 @@ public class Taskbar : Component
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
-            useBorders = true,
+            useBorders = !modern,
+            useBackground = !modern,
             iconSize = 18,
             leftClickAction = () => LaunchTracker.Start(() => new NotificationCenter())
         };
         trayPanel.AddStackChild(notifyButton);
         TooltipService.Attach(notifyButton, "Notifications");
 
-        Button showDesktopButton = new Button("", 0, 0, 10, Height - 8)
+        Button showDesktopButton = new Button("", 0, 0, modern ? 14 : 10, Height - 4)
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
-            useBorders = true,
+            useBorders = !modern,
+            useBackground = !modern,
             leftClickAction = WindowManager.ToggleShowDesktop
         };
         trayPanel.AddStackChild(showDesktopButton);
@@ -163,10 +178,26 @@ public class Taskbar : Component
 
     public override void DrawLocal()
     {
+        if (useGlass)
+        {
+            // Windows 7 Aero glass Superbar: translucent dark slate blue with glossy top highlight
+            FillRaw(Color.FromArgb(0, 0, 0, 0), 0, 0, Width, Height);
+            DrawOverGradientVertical(Color.FromArgb(185, 30, 46, 68), Color.FromArgb(235, 14, 22, 34), 0, 0, Width, Height);
+            DrawLine(Color.FromArgb(140, 255, 255, 255), 0, 0, Width - 1, 0);
+            DrawLine(Color.FromArgb(50, 255, 255, 255), 0, 1, Width - 1, 1);
+            DrawLine(Color.FromArgb(200, 10, 15, 22), 0, Height - 1, Width - 1, Height - 1);
 
-        DrawRaisedRectangle(0, 0, Width, Height);
-        DrawLine(Color.Black, 0, 0, Width - 1, 0);
-        DrawLine(Palette.ControlWhite, 0, 1, Width - 1, 1);
+            // Windows 7 Aero Peek divider line before Show Desktop button
+            int peekX = Width - 16;
+            DrawLine(Color.FromArgb(100, 255, 255, 255), peekX, 2, peekX, Height - 3);
+            DrawLine(Color.FromArgb(120, 10, 15, 20), peekX + 1, 2, peekX + 1, Height - 3);
+        }
+        else
+        {
+            DrawRaisedRectangle(0, 0, Width, Height);
+            DrawLine(Color.Black, 0, 0, Width - 1, 0);
+            DrawLine(Palette.ControlWhite, 0, 1, Width - 1, 1);
+        }
 
         foreach (Component child in children)
         {

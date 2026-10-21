@@ -81,7 +81,8 @@ public class Kernel : Sys.Kernel
         }
 
         displayDriver = new Drivers.DisplayManager();
-
+        
+        
 
         Console.WriteLine("Canvas:     " + canvas.Name);
         Console.WriteLine("Resolution: " + canvas.Width + "x" + canvas.Height);

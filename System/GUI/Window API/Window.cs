@@ -23,6 +23,16 @@ public class Window : Component
     public bool canMove = true;
     public bool showInTaskbar = true;
 
+    /// <summary>
+    /// Draws a Windows-7-style glass frame (blurred, tinted backdrop showing through the
+    /// border and title bar) instead of the plain raised one. Opt-in per window.
+    /// </summary>
+    public bool glassFrame
+    {
+        get => useGlass;
+        set => useGlass = value;
+    }
+
     /// <summary>Virtual desktop index. -1 pins the window to all desktops (taskbar, menus).</summary>
     public int desktop;
 
@@ -70,6 +80,11 @@ public class Window : Component
         };
         process.onUpdate += Update;
 
+        if (Palette.GlassEnabled && useTitleBar)
+        {
+            useGlass = true;
+            glassStyle = GlassStyle.AeroDefault();
+        }
         TitlebarSetup(useTitleBar, title);
     }
 
@@ -83,7 +98,13 @@ public class Window : Component
     {
         try
         {
-            base.Update();
+            // Do not let Window itself toggle state on hover; only update visible children.
+            for (int i = 0; i < children.Count; i++)
+            {
+                Component child = children[i];
+                if (child.Visible)
+                    child.Update();
+            }
         }
         catch (Exception ex)
         {
@@ -100,7 +121,8 @@ public class Window : Component
     /// </summary>
     public override void DrawLocal()
     {
-        DrawRaisedRectangle(0, 0, Width, Height);
+        if (useGlass) DrawGlassFrame();
+        else DrawRaisedRectangle(0, 0, Width, Height);
 
 
         foreach (Component child in children)
@@ -120,6 +142,90 @@ public class Window : Component
             //    Width - WindowFrameInset * 2, Height - WindowFrameInset * 2);
     }
 
+    private static readonly List<Rectangle> frameBands = new List<Rectangle>();
+
+    /// <summary>
+    /// Paints the glass frame that replaces the plain raised rectangle. Override this to draw
+    /// custom chrome (gloss sweeps, bevels, reflections, per-pixel opacity ramps): the frame
+    /// bands just have to keep their alpha, and the compositor shows the blurred backdrop
+    /// through them. The default punches the bands to transparent, keeps the client area
+    /// opaque, lays the style's tint over the bands and adds a crisp bevel.
+    /// </summary>
+    protected virtual void DrawGlassFrame()
+    {
+        frameBands.Clear();
+        GetGlassRegions(frameBands);
+
+        Color tint = windowFocused ? glassStyle.Tint : Color.FromArgb(60, 110, 135, 160);
+        for (int i = 0; i < frameBands.Count; i++)
+        {
+            Rectangle band = frameBands[i];
+            FillRaw(Color.FromArgb(0, 0, 0, 0), band.X, band.Y, band.Width, band.Height);
+            if (tint.A > 0)
+                DrawOverRectangle(tint, band.X, band.Y, band.Width, band.Height);
+        }
+
+        int r = 5; // rounded top corners radius
+
+        // Clear outer corner pixels at the top so desktop shows through rounded top corners
+        for (int row = 0; row < r && row < Height; row++)
+        {
+            ComponentBuffer.GetRoundedTopSpan(row, Width, Height, r, out int sX, out int eX);
+            if (sX > 0)
+            {
+                FillRaw(Color.FromArgb(0, 0, 0, 0), 0, row, sX, 1);
+                FillRaw(Color.FromArgb(0, 0, 0, 0), eX, row, Width - eX, 1);
+            }
+        }
+
+        // Windows 7 Aero glossy top reflection sweep across the titlebar
+        int topHeight = Math.Min(Height, Palette.TitleBarHeight);
+        if (topHeight > 4)
+        {
+            DrawOverGradientVertical(Color.FromArgb(90, 255, 255, 255), Color.FromArgb(15, 255, 255, 255), r, 1, Math.Max(1, Width - r * 2), topHeight / 2);
+        }
+
+        // The client body stays opaque so content remains readable on top of the glass.
+        Rectangle client = ClientRectangle();
+        FillRaw(Palette.WindowBackground, client.X, client.Y, client.Width, client.Height);
+
+        // Crisp edges: dark outline outside, bright bevel inside, with rounded top corners
+        DrawRoundedTopOutline(glassStyle.BorderDark, 0, 0, Width, Height, r);
+        if (Width > 2 && Height > 2)
+            DrawRoundedTopOutline(glassStyle.BorderBright, 1, 1, Width - 2, Height - 2, r - 1);
+
+        // Subtle 1px client area inner border separating client area from glass
+        if (client.Width > 0 && client.Height > 0)
+        {
+            DrawRectangle(Color.FromArgb(180, 195, 215), client.X - 1, client.Y - 1, client.Width + 2, client.Height + 2);
+        }
+    }
+
+    /// <summary>Opaque client area of a titled window, in window-local coordinates.</summary>
+    protected Rectangle ClientRectangle()
+    {
+        int border = Palette.BorderSize;
+        int top = Math.Min(Height, Palette.TitleBarHeight);
+        return new Rectangle(border, top,
+            Math.Max(0, Width - border * 2),
+            Math.Max(0, Height - top - border));
+    }
+
+    /// <summary>Only the frame is see-through, so only the frame band gets the backdrop blur.</summary>
+    public override void GetGlassRegions(List<Rectangle> regions)
+    {
+        int border = Palette.BorderSize;
+        int top = Math.Min(Height, Palette.TitleBarHeight);
+
+        regions.Add(new Rectangle(0, 0, Width, top));
+        if (border > 0)
+        {
+            regions.Add(new Rectangle(0, top, border, Height - top));
+            regions.Add(new Rectangle(Width - border, top, border, Height - top));
+            regions.Add(new Rectangle(0, Height - border, Width, border));
+        }
+    }
+
 
     private void TitlebarSetup(bool useTitleBar, string title)
     {
@@ -128,16 +234,18 @@ public class Window : Component
             int border = Palette.BorderSize;
             int titleHeight = Palette.TitleBarHeight;
 
-            titlebar = new StackPanel(Palette.InactiveTitle, border, border, Width - (border * 2), titleHeight - border)
+            titlebar = new StackPanel(Palette.InactiveTitle, border, 0, Width - (border * 2), titleHeight)
             {
-                useBackground = true,
+                useBackground = !useGlass,
                 textColor = Palette.TitleTextInactive,
                 clampSize = false,
                 text = title,
-                fontSize = 16,
+                fontSize = 15,
                 horizontalAlignment = HorizontalAlignment.Stretch,
                 orientation = StackOrientation.Horizontal,
-                Margin = new Thickness(border)
+                Margin = new Thickness(border, 0, border, 0),
+                Padding = new Thickness(0),
+                spacing = 1
             };
 
             if (Icon != null) titlebar.textOffsetX = 25;
@@ -146,53 +254,68 @@ public class Window : Component
             hasTitleBar = true;
 
             int titleButtonSize = titleHeight - 4;
-            int titleButtonTop = Math.Max(2, border + 2);
+            int titleButtonTop = 0;
 
             CreateTitleControls(titleButtonSize, titleButtonTop);
         }
-
     }
 
     private void CreateTitleControls(int titleButtonSize, int titleButtonTop)
     {
-        titlebar.AddStackChild(new Button("x", 0, 4, titleButtonSize, titleButtonSize)
+        bool modern = useGlass || Palette.FlatControls;
+        int closeWidth = modern ? 47 : titleButtonSize;
+        int normWidth = modern ? 29 : titleButtonSize;
+        int btnHeight = modern ? 21 : titleButtonSize;
+
+        Button closeBtn = new Button("", 0, 0, closeWidth, btnHeight)
         {
-            verticalAlignment = VerticalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Top,
             horizontalAlignment = HorizontalAlignment.Right,
-            useBorders = true,
-            borderColor = Palette.ControlHighlight,
-            textColor = Palette.ControlWhite,
+            useBorders = false,
+            useBackground = false,
+            Margin = new Thickness(0, 1, 1, 0),
+            Padding = new Thickness(0),
             leftClickAction = () =>
             {
                 RequestClose();
             }
-        });
+        };
+        closeBtn.isCloseButton = true;
+        titlebar.AddStackChild(closeBtn);
 
-        titlebar.AddStackChild(new Button("o", 25, 4, titleButtonSize, titleButtonSize)
+        Button maxBtn = new Button("", 0, 0, normWidth, btnHeight)
         {
-            verticalAlignment = VerticalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Top,
             horizontalAlignment = HorizontalAlignment.Right,
-            useBorders = true,
-            borderColor = Palette.ControlHighlight,
-            textColor = Palette.ControlWhite,
+            useBorders = false,
+            useBackground = false,
+            Margin = new Thickness(0, 1, 1, 0),
+            Padding = new Thickness(0),
             leftClickAction = () =>
             {
                 WindowManager.ToggleMaximize(this);
             }
-        });
+        };
+        maxBtn.isCaptionButton = true;
+        maxBtn.isMaximizeButton = true;
+        titlebar.AddStackChild(maxBtn);
 
-        titlebar.AddStackChild(new Button("_", 50, 4, titleButtonSize, titleButtonSize)
+        Button minBtn = new Button("", 0, 0, normWidth, btnHeight)
         {
-            verticalAlignment = VerticalAlignment.Center,
+            verticalAlignment = VerticalAlignment.Top,
             horizontalAlignment = HorizontalAlignment.Right,
-            useBorders = true,
-            borderColor = Palette.ControlHighlight,
-            textColor = Palette.ControlWhite,
+            useBorders = false,
+            useBackground = false,
+            Margin = new Thickness(0, 1, 1, 0),
+            Padding = new Thickness(0),
             leftClickAction = () =>
             {
                 WindowManager.Minimize(this);
             }
-        });
+        };
+        minBtn.isCaptionButton = true;
+        minBtn.isMinimizeButton = true;
+        titlebar.AddStackChild(minBtn);
     }
 
     private void ApplyTitlebarTheme()
@@ -200,7 +323,17 @@ public class Window : Component
         if (!hasTitleBar || titlebar == null) return;
 
 
-        titlebar.color1 = windowFocused ? Palette.ActiveTitle : Palette.InactiveTitle;
+        if (useGlass)
+        {
+            titlebar.blendBackground = true;
+            titlebar.useBackground = false;
+            titlebar.color1 = Color.FromArgb(0, 0, 0, 0);
+        }
+        else
+        {
+            titlebar.blendBackground = false;
+            titlebar.color1 = windowFocused ? Palette.ActiveTitle : Palette.InactiveTitle;
+        }
 
         titlebar.textColor = windowFocused ? Palette.TitleText : Palette.TitleTextInactive;
         titlebar.MarkDirty();
@@ -269,12 +402,14 @@ public class Window : Component
 
     public void SetFocused(bool focused)
     {
+        if (windowFocused == focused) return;
         windowFocused = focused;
         if (!focused) OnLoseFocus();
 
         if (!hasTitleBar) return;
 
         ApplyTitlebarTheme();
+        ForceDirty();
     }
 
     public virtual void OnLoseFocus()
@@ -499,7 +634,8 @@ public class Window : Component
 
     public bool TitleHitTest(int mouseX, int mouseY)
     {
-        return mouseX >= bounds.X && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y && mouseY < bounds.Y + 20;
+        int titleHeight = hasTitleBar && titlebar != null ? titlebar.Height : Palette.TitleBarHeight;
+        return mouseX >= bounds.X && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y && mouseY < bounds.Y + titleHeight;
     }
     public bool ResizeHitTest(int mouseX, int mouseY)
     {

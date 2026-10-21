@@ -101,31 +101,69 @@ public class ProgressBar : Component
 
     public override void DrawLocal()
     {
-
-        // Classic: sunken track
-        DrawSunkenRectangle(0, 0, Width, Height);
-
-        if (_indeterminate)
+        if (Palette.FlatControls)
         {
-            int barWidth = Math.Max(20, Width / 4);
-            int barX = (int)_marqueeOffset;
-            DrawFilledRectangle(barColor, barX + 2, 2, barWidth, Height - 4);
+            int r = 3;
+            // Windows 7 Aero styled progress track with rounded edges
+            DrawFilledRoundedRectangle(Color.FromArgb(232, 232, 232), 0, 0, Width, Height, r);
+            DrawRoundedRectangle(Color.FromArgb(188, 188, 188), 0, 0, Width, Height, r);
+            if (Width > 4 && Height > 2)
+                DrawHorizontalSpan(Color.FromArgb(215, 215, 215), 2, 1, Width - 4);
+
+            int barHeight = Math.Max(1, Height - 4);
+            int halfBarHeight = barHeight / 2;
+
+            if (_indeterminate)
+            {
+                int barWidth = Math.Max(20, Width / 4);
+                int barX = Math.Max(2, (int)_marqueeOffset);
+                barWidth = Math.Min(barWidth, Width - 2 - barX);
+                if (barWidth > 0)
+                {
+                    DrawGradientVerticalRounded(Color.FromArgb(210, 245, 180), Color.FromArgb(130, 225, 90), barX, 2, barWidth, halfBarHeight, 2);
+                    DrawGradientVerticalRounded(Color.FromArgb(60, 190, 45), Color.FromArgb(90, 220, 75), barX, 2 + halfBarHeight, barWidth, barHeight - halfBarHeight, 2);
+                    DrawRoundedRectangle(Color.FromArgb(45, 160, 35), barX, 2, barWidth, barHeight, 2);
+                }
+            }
+            else
+            {
+                float range = _max - _min;
+                if (range > 0)
+                {
+                    int barWidth = (int)((Width - 4) * ((_value - _min) / range));
+                    if (barWidth > 0)
+                    {
+                        // Signature Windows 7 Aero glossy emerald green progress bar with rounded edges
+                        DrawGradientVerticalRounded(Color.FromArgb(210, 245, 180), Color.FromArgb(130, 225, 90), 2, 2, barWidth, halfBarHeight, 2);
+                        DrawGradientVerticalRounded(Color.FromArgb(60, 190, 45), Color.FromArgb(90, 220, 75), 2, 2 + halfBarHeight, barWidth, barHeight - halfBarHeight, 2);
+                        DrawRoundedRectangle(Color.FromArgb(45, 160, 35), 2, 2, barWidth, barHeight, 2);
+                    }
+                }
+            }
         }
         else
         {
-            float range = _max - _min;
-            if (range > 0)
+            // Classic: sunken track
+            DrawSunkenRectangle(0, 0, Width, Height);
+
+            if (_indeterminate)
             {
-                int barWidth = (int)((Width - 4) * ((_value - _min) / range));
-                if (barWidth > 0)
+                int barWidth = Math.Max(20, Width / 4);
+                int barX = (int)_marqueeOffset;
+                DrawFilledRectangle(barColor, barX + 2, 2, barWidth, Height - 4);
+            }
+            else
+            {
+                float range = _max - _min;
+                if (range > 0)
                 {
-                    DrawFilledRectangle(barColor, 2, 2, barWidth, Height - 4);
-                    // Add segments for classic look
-                    for (int x = 2; x < barWidth; x += 4)
-                        DrawLine(Palette.ControlHighlight, x, 2, 1, Height - 4);
+                    int barWidth = (int)((Width - 4) * ((_value - _min) / range));
+                    if (barWidth > 0)
+                    {
+                        DrawFilledRectangle(barColor, 2, 2, barWidth, Height - 4);
+                    }
                 }
             }
-
         }
 
         if (showText && text != "")

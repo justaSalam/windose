@@ -26,6 +26,18 @@ public class ComponentBuffer : Canvas
     }
     public bool HasVisibleClip => clipBounds.Width > 0 && clipBounds.Height > 0;
 
+    /// <summary>
+    /// Resolves a buffer-local rectangle to the clipped pixel region it actually covers
+    /// (origin applied, intersected with the current clip context and the buffer itself).
+    /// </summary>
+    public Rectangle ClippedRegion(int x, int y, int width, int height)
+    {
+        Rectangle target = new Rectangle(originX + x, originY + y, width, height);
+        target = Rectangle.Intersect(target, clipBounds);
+        target = Rectangle.Intersect(target, new Rectangle(0, 0, Width, Height));
+        return target;
+    }
+
     public void ResetContext(Rectangle clip)
     {
         contextDepth = 0;
@@ -121,22 +133,22 @@ public class ComponentBuffer : Canvas
         float scaleX = (float)sourceRect.Width / destRect.Width;
         float scaleY = (float)sourceRect.Height / destRect.Height;
 
-        for (int xi = 0; xi < destRect.Width; xi++)
+        for (int yi = 0; yi < destRect.Height; yi++)
         {
-            for (int yi = 0; yi < destRect.Height; yi++)
+            int srcY = (int)(yi * scaleY) + sourceRect.Top;
+            if (srcY >= sourceRect.Bottom) srcY = sourceRect.Bottom - 1;
+            if (srcY < 0 || srcY >= image.Height) continue;
+            int srcRowOffset = srcY * (int)image.Width;
+            int destY = destRect.Top + yi;
+
+            for (int xi = 0; xi < destRect.Width; xi++)
             {
                 int srcX = (int)(xi * scaleX) + sourceRect.Left;
-                int srcY = (int)(yi * scaleY) + sourceRect.Top;
+                if (srcX >= sourceRect.Right) srcX = sourceRect.Right - 1;
+                if (srcX < 0 || srcX >= image.Width) continue;
 
-                srcX = Math.Min(srcX, sourceRect.Right - 1);
-                srcY = Math.Min(srcY, sourceRect.Bottom - 1);
-
-                if (srcX < 0 || srcY < 0 || srcX >= image.Width || srcY >= image.Height)
-                    continue;
-
-                int color = image.RawData[srcX + srcY * image.Width];
-                SetPixelAlpha(destRect.Left + xi, destRect.Top + yi, color);
-
+                int color = image.RawData[srcX + srcRowOffset];
+                SetPixelAlpha(destRect.Left + xi, destY, color);
             }
         }
     }
@@ -189,37 +201,190 @@ public class ComponentBuffer : Canvas
         }
     }
 
-    public void Test_DrawFilledAlphaRectangle(Color color, int xStart, int yStart, int width, int height, int alpha)
+    /// <summary>
+    /// Writes exact ARGB values (alpha included) with no blending. This is how transparency
+    /// is punched into a surface: pixels written as 0x00000000 stay see-through when the
+    /// buffer is composited with DrawArrayAlphaClipped.
+    /// </summary>
+    public void FillRaw(Color color, int x, int y, int width, int height)
     {
-        if (height == -1)
-        {
-            height = width;
-        }
-
-        Rectangle target = new Rectangle(originX + xStart, originY + yStart, width, height);
-        target = Rectangle.Intersect(target, clipBounds);
-        target = Rectangle.Intersect(target, new Rectangle(0, 0, Width, Height));
+        Rectangle target = ClippedRegion(x, y, width, height);
         if (target.Width <= 0 || target.Height <= 0) return;
 
         int argb = color.ToArgb();
         int[] buffer = GetBuffer();
-        if (color.A == byte.MaxValue)
+
+        for (int y2 = target.Top; y2 < target.Bottom; y2++)
+            Array.Fill(buffer, argb, y2 * Width + target.Left, target.Width);
+    }
+
+    /// <summary>
+    /// Source-over fill that keeps the accumulated alpha, so translucent glass tints can be
+    /// layered on a see-through surface without turning it opaque.
+    /// </summary>
+    public void DrawOverRectangle(Color color, int x, int y, int width, int height)
+    {
+        Rectangle target = ClippedRegion(x, y, width, height);
+        if (target.Width <= 0 || target.Height <= 0) return;
+
+        int argb = color.ToArgb();
+        int alpha = (argb >> 24) & 0xff;
+        if (alpha == 0) return;
+
+        int[] buffer = GetBuffer();
+        if (alpha == 0xff)
         {
-            for (int y = target.Top; y < target.Bottom; y++)
-                Array.Fill(buffer, argb, y * Width + target.Left, target.Width);
+            for (int y2 = target.Top; y2 < target.Bottom; y2++)
+                Array.Fill(buffer, argb, y2 * Width + target.Left, target.Width);
             return;
         }
 
         int rowStart = target.Top * Width + target.Left;
-        for (int y = 0; y < target.Height; y++, rowStart += Width)
+        for (int y2 = 0; y2 < target.Height; y2++, rowStart += Width)
         {
             int index = rowStart;
             int end = index + target.Width;
             for (; index < end; index++)
+                buffer[index] = BlendOverPixel(buffer[index], argb);
+        }
+    }
+
+    /// <summary>Horizontal source-over gradient, same alpha rules as DrawOverRectangle.</summary>
+    public void DrawOverGradient(Color from, Color to, int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0) return;
+
+        Rectangle target = ClippedRegion(x, y, width, height);
+        if (target.Width <= 0 || target.Height <= 0) return;
+
+        int[] buffer = GetBuffer();
+        int originX_abs = originX + x;
+
+        for (int x2 = target.Left; x2 < target.Right; x2++)
+        {
+            float ratio = (float)(x2 - originX_abs) / width;
+            byte red = (byte)((to.R - from.R) * ratio + from.R);
+            byte green = (byte)((to.G - from.G) * ratio + from.G);
+            byte blue = (byte)((to.B - from.B) * ratio + from.B);
+            byte alpha = (byte)((to.A - from.A) * ratio + from.A);
+
+            if (alpha == 0) continue;
+            int argb = (alpha << 24) | (red << 16) | (green << 8) | blue;
+
+            if (alpha == 0xff)
             {
-                BlendPixel(buffer, index, argb, alpha);
+                for (int y2 = target.Top; y2 < target.Bottom; y2++)
+                    buffer[y2 * Width + x2] = argb;
+            }
+            else
+            {
+                for (int y2 = target.Top; y2 < target.Bottom; y2++)
+                {
+                    int idx = y2 * Width + x2;
+                    buffer[idx] = BlendOverPixel(buffer[idx], argb);
+                }
             }
         }
+    }
+
+    /// <summary>Vertical source-over gradient, same alpha rules as DrawOverRectangle.</summary>
+    public void DrawOverGradientVertical(Color from, Color to, int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0) return;
+
+        Rectangle target = ClippedRegion(x, y, width, height);
+        if (target.Width <= 0 || target.Height <= 0) return;
+
+        int[] buffer = GetBuffer();
+        int originY_abs = originY + y;
+
+        for (int y2 = target.Top; y2 < target.Bottom; y2++)
+        {
+            float ratio = (float)(y2 - originY_abs) / height;
+            byte red = (byte)((to.R - from.R) * ratio + from.R);
+            byte green = (byte)((to.G - from.G) * ratio + from.G);
+            byte blue = (byte)((to.B - from.B) * ratio + from.B);
+            byte alpha = (byte)((to.A - from.A) * ratio + from.A);
+
+            if (alpha == 0) continue;
+            int argb = (alpha << 24) | (red << 16) | (green << 8) | blue;
+            int rowStart = y2 * Width + target.Left;
+            int rowEnd = rowStart + target.Width;
+
+            if (alpha == 0xff)
+            {
+                Array.Fill(buffer, argb, rowStart, target.Width);
+            }
+            else
+            {
+                for (int idx = rowStart; idx < rowEnd; idx++)
+                    buffer[idx] = BlendOverPixel(buffer[idx], argb);
+            }
+        }
+    }
+
+    /// <summary>Vertical gradient fill.</summary>
+    public void DrawGradientVertical(Color top, Color bottom, int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0) return;
+
+        Rectangle target = ClippedRegion(x, y, width, height);
+        if (target.Width <= 0 || target.Height <= 0) return;
+
+        int[] buffer = GetBuffer();
+        int originY_abs = originY + y;
+
+        for (int y2 = target.Top; y2 < target.Bottom; y2++)
+        {
+            float ratio = (float)(y2 - originY_abs) / height;
+            byte red = (byte)((bottom.R - top.R) * ratio + top.R);
+            byte green = (byte)((bottom.G - top.G) * ratio + top.G);
+            byte blue = (byte)((bottom.B - top.B) * ratio + top.B);
+            byte alpha = (byte)((bottom.A - top.A) * ratio + top.A);
+
+            int argb = (alpha << 24) | (red << 16) | (green << 8) | blue;
+            int rowStart = y2 * Width + target.Left;
+
+            if (alpha == 0xff)
+            {
+                Array.Fill(buffer, argb, rowStart, target.Width);
+            }
+            else
+            {
+                int rowEnd = rowStart + target.Width;
+                for (int idx = rowStart; idx < rowEnd; idx++)
+                    BlendPixel(buffer, idx, argb);
+            }
+        }
+    }
+
+    /// <summary>Blurs whatever is currently drawn inside this region of the buffer (frosted glass).</summary>
+    public void BlurArea(int x, int y, int width, int height, int radius, int passes)
+    {
+        Rectangle region = ClippedRegion(x, y, width, height);
+        if (region.Width <= 0 || region.Height <= 0) return;
+
+        GlassRenderer.BlurPixels(GetBuffer(), Width, region, radius, passes);
+    }
+
+    /// <summary>Source-over blend of one pixel that preserves the destination's alpha.</summary>
+    private static int BlendOverPixel(int destination, int source)
+    {
+        int sourceAlpha = (source >> 24) & 0xff;
+        if (sourceAlpha == 0) return destination;
+        if (sourceAlpha == 0xff) return source;
+
+        int destinationAlpha = (destination >> 24) & 0xff;
+        int inverse = 255 - sourceAlpha;
+        int mixedAlpha = (destinationAlpha * inverse) >> 8;
+        int outputAlpha = sourceAlpha + mixedAlpha;
+        if (outputAlpha <= 0) return 0;
+
+        int red = (((source >> 16) & 0xff) * sourceAlpha + ((destination >> 16) & 0xff) * mixedAlpha) / outputAlpha;
+        int green = (((source >> 8) & 0xff) * sourceAlpha + ((destination >> 8) & 0xff) * mixedAlpha) / outputAlpha;
+        int blue = ((source & 0xff) * sourceAlpha + (destination & 0xff) * mixedAlpha) / outputAlpha;
+
+        return (outputAlpha << 24) | (red << 16) | (green << 8) | blue;
     }
 
     public new void DrawRectangle(Color color, int x, int y, int width, int height)
@@ -402,7 +567,7 @@ public class ComponentBuffer : Canvas
         }
     }
 
-    private void DrawHorizontalSpan(Color color, int x, int y, int length)
+    public void DrawHorizontalSpan(Color color, int x, int y, int length)
     {
         if (length <= 0 || color.A == 0) return;
 
@@ -524,6 +689,16 @@ public class ComponentBuffer : Canvas
 
     public virtual void DrawRaisedRect(int x, int y, int width, int height)
     {
+        if (Palette.FlatControls)
+        {
+            if (width <= 0 || height <= 0) return;
+            int r = 3;
+            DrawGradientVerticalRounded(Color.FromArgb(248, 248, 248), Color.FromArgb(236, 236, 236), x, y, width, height, r);
+            DrawRoundedRectangle(Color.FromArgb(175, 175, 175), x, y, width, height, r);
+            if (width > 4 && height > 2)
+                DrawHorizontalSpan(Color.FromArgb(255, 255, 255), x + 2, y + 1, width - 4);
+            return;
+        }
         DrawRaisedRect(x, y, width, height, Palette.ControlFace, Palette.ControlWhite, Palette.ControlShadow, Palette.ControlBlack);
     }
 
@@ -551,6 +726,16 @@ public class ComponentBuffer : Canvas
 
     public virtual void DrawSunkenRect(int x, int y, int width, int height)
     {
+        if (Palette.FlatControls)
+        {
+            if (width <= 0 || height <= 0) return;
+            int r = 2;
+            DrawFilledRoundedRectangle(Palette.WindowBackground, x, y, width, height, r);
+            DrawRoundedRectangle(Color.FromArgb(171, 173, 179), x, y, width, height, r);
+            if (width > 4 && height > 2)
+                DrawHorizontalSpan(Color.FromArgb(226, 227, 234), x + 2, y + 1, width - 4);
+            return;
+        }
         DrawSunkenRect(x, y, width, height, Palette.ControlFace, Palette.ControlBlack, Palette.ControlShadow, Palette.ControlHighlight);
     }
 
@@ -581,6 +766,374 @@ public class ComponentBuffer : Canvas
         DrawEtchedRect(x, y, width, height, Palette.ControlShadow, Palette.ControlWhite);
     }
 
+
+    // ---- Rounded Primitives (Windows 7 Aero) ----
+
+    public static void GetRoundedRowSpan(int row, int w, int h, int r, out int startX, out int endX)
+    {
+        startX = 0;
+        endX = w;
+        if (r <= 0) return;
+
+        int dy = -1;
+        if (row < r)
+            dy = r - 1 - row;
+        else if (row >= h - r)
+            dy = row - (h - r);
+
+        if (dy >= 0)
+        {
+            int r2 = r * r;
+            int dy2 = dy * dy;
+            int dx = 0;
+            while (dx < r && (r - dx) * (r - dx) + dy2 > r2)
+                dx++;
+            startX = dx;
+            endX = Math.Max(dx, w - dx);
+        }
+    }
+
+    public static void GetRoundedBottomSpan(int row, int w, int h, int r, out int startX, out int endX)
+    {
+        startX = 0;
+        endX = w;
+        if (r <= 0) return;
+
+        if (row >= h - r)
+        {
+            int dy = row - (h - r);
+            int r2 = r * r;
+            int dy2 = dy * dy;
+            int dx = 0;
+            while (dx < r && (r - dx) * (r - dx) + dy2 > r2)
+                dx++;
+            startX = dx;
+            endX = Math.Max(dx, w - dx);
+        }
+    }
+
+    public static void GetRoundedTopSpan(int row, int w, int h, int r, out int startX, out int endX)
+    {
+        startX = 0;
+        endX = w;
+        if (r <= 0) return;
+
+        if (row < r)
+        {
+            int dy = r - 1 - row;
+            int r2 = r * r;
+            int dy2 = dy * dy;
+            int dx = 0;
+            while (dx < r && (r - dx) * (r - dx) + dy2 > r2)
+                dx++;
+            startX = dx;
+            endX = Math.Max(dx, w - dx);
+        }
+    }
+
+    private static int IntSqrt(int n)
+    {
+        if (n <= 0) return 0;
+        int x = n;
+        int y = (x + 1) / 2;
+        while (y < x)
+        {
+            x = y;
+            y = (x + n / x) / 2;
+        }
+        return x;
+    }
+
+    public void DrawRoundedRectangle(Color color, int x, int y, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawRectangle(color, x, y, width, height);
+            return;
+        }
+
+        // Horizontal segments between corners
+        if (width > radius * 2)
+        {
+            DrawHorizontalSpan(color, x + radius, y, width - radius * 2);
+            if (height > 1)
+                DrawHorizontalSpan(color, x + radius, y + height - 1, width - radius * 2);
+        }
+
+        // Vertical segments between corners
+        if (height > radius * 2)
+        {
+            DrawVerticalLine(color, height - radius * 2, x, y + radius);
+            if (width > 1)
+                DrawVerticalLine(color, height - radius * 2, x + width - 1, y + radius);
+        }
+
+        // Smooth anti-aliased corners
+        int r256 = radius * 256;
+        int targetDist = r256 - 128;
+        int baseA = color.A;
+        int cr = color.R, cg = color.G, cb = color.B;
+
+        for (int row = 0; row < radius && row < height; row++)
+        {
+            int dy = (radius - row) * 256 - 128;
+            for (int col = 0; col < radius && col < width; col++)
+            {
+                int dx = (radius - col) * 256 - 128;
+                int dist = IntSqrt(dx * dx + dy * dy);
+                int diff = Math.Abs(dist - targetDist);
+                int cov = 255 - (diff * 255 / 256);
+                if (cov > 15)
+                {
+                    cov = Math.Min(255, cov);
+                    int alpha = (baseA * cov) / 255;
+                    Color aaColor = Color.FromArgb(alpha, cr, cg, cb);
+
+                    // Top-Left corner
+                    DrawPoint(aaColor, x + col, y + row);
+                    // Top-Right corner
+                    DrawPoint(aaColor, x + width - 1 - col, y + row);
+                    // Bottom-Left corner
+                    DrawPoint(aaColor, x + col, y + height - 1 - row);
+                    // Bottom-Right corner
+                    DrawPoint(aaColor, x + width - 1 - col, y + height - 1 - row);
+                }
+            }
+        }
+    }
+
+    public void DrawFilledRoundedRectangle(Color color, int xStart, int yStart, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawFilledRectangle(color, xStart, yStart, width, height);
+            return;
+        }
+
+        for (int row = 0; row < height; row++)
+        {
+            GetRoundedRowSpan(row, width, height, radius, out int sX, out int eX);
+            int spanW = eX - sX;
+            if (spanW > 0)
+                DrawFilledRectangle(color, xStart + sX, yStart + row, spanW, 1);
+        }
+    }
+
+    public void DrawGradientVerticalRounded(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawGradientVertical(top, bottom, xStart, yStart, width, height);
+            return;
+        }
+
+        for (int row = 0; row < height; row++)
+        {
+            GetRoundedRowSpan(row, width, height, radius, out int sX, out int eX);
+            int spanW = eX - sX;
+            if (spanW > 0)
+            {
+                float ratio = (float)row / height;
+                byte red = (byte)((bottom.R - top.R) * ratio + top.R);
+                byte green = (byte)((bottom.G - top.G) * ratio + top.G);
+                byte blue = (byte)((bottom.B - top.B) * ratio + top.B);
+                byte alpha = (byte)((bottom.A - top.A) * ratio + top.A);
+
+                DrawFilledRectangle(Color.FromArgb(alpha, red, green, blue), xStart + sX, yStart + row, spanW, 1);
+            }
+        }
+    }
+
+    public void DrawOverGradientVerticalRounded(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawOverGradientVertical(top, bottom, xStart, yStart, width, height);
+            return;
+        }
+
+        for (int row = 0; row < height; row++)
+        {
+            GetRoundedRowSpan(row, width, height, radius, out int sX, out int eX);
+            int spanW = eX - sX;
+            if (spanW > 0)
+            {
+                float ratio = (float)row / height;
+                byte red = (byte)((bottom.R - top.R) * ratio + top.R);
+                byte green = (byte)((bottom.G - top.G) * ratio + top.G);
+                byte blue = (byte)((bottom.B - top.B) * ratio + top.B);
+                byte alpha = (byte)((bottom.A - top.A) * ratio + top.A);
+
+                DrawOverRectangle(Color.FromArgb(alpha, red, green, blue), xStart + sX, yStart + row, spanW, 1);
+            }
+        }
+    }
+
+    public void DrawGradientVerticalRoundedBottom(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawGradientVertical(top, bottom, xStart, yStart, width, height);
+            return;
+        }
+
+        for (int row = 0; row < height; row++)
+        {
+            GetRoundedBottomSpan(row, width, height, radius, out int sX, out int eX);
+            int spanW = eX - sX;
+            if (spanW > 0)
+            {
+                float ratio = (float)row / height;
+                byte red = (byte)((bottom.R - top.R) * ratio + top.R);
+                byte green = (byte)((bottom.G - top.G) * ratio + top.G);
+                byte blue = (byte)((bottom.B - top.B) * ratio + top.B);
+                byte alpha = (byte)((bottom.A - top.A) * ratio + top.A);
+
+                DrawFilledRectangle(Color.FromArgb(alpha, red, green, blue), xStart + sX, yStart + row, spanW, 1);
+            }
+        }
+    }
+
+    public void DrawOverGradientVerticalRoundedBottom(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawOverGradientVertical(top, bottom, xStart, yStart, width, height);
+            return;
+        }
+
+        for (int row = 0; row < height; row++)
+        {
+            GetRoundedBottomSpan(row, width, height, radius, out int sX, out int eX);
+            int spanW = eX - sX;
+            if (spanW > 0)
+            {
+                float ratio = (float)row / height;
+                byte red = (byte)((bottom.R - top.R) * ratio + top.R);
+                byte green = (byte)((bottom.G - top.G) * ratio + top.G);
+                byte blue = (byte)((bottom.B - top.B) * ratio + top.B);
+                byte alpha = (byte)((bottom.A - top.A) * ratio + top.A);
+
+                DrawOverRectangle(Color.FromArgb(alpha, red, green, blue), xStart + sX, yStart + row, spanW, 1);
+            }
+        }
+    }
+
+    public void DrawRoundedBottomOutline(Color color, int x, int y, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawRectangle(color, x, y, width, height);
+            return;
+        }
+
+        // Top horizontal line
+        DrawHorizontalSpan(color, x, y, width);
+
+        // Left & right lines (above rounded bottom)
+        if (height > radius)
+        {
+            DrawVerticalLine(color, height - radius, x, y);
+            if (width > 1)
+                DrawVerticalLine(color, height - radius, x + width - 1, y);
+        }
+
+        // Bottom horizontal line
+        if (width > radius * 2 && height > 1)
+            DrawHorizontalSpan(color, x + radius, y + height - 1, width - radius * 2);
+
+        // Smooth anti-aliased bottom corners
+        int r256 = radius * 256;
+        int targetDist = r256 - 128;
+        int baseA = color.A;
+        int cr = color.R, cg = color.G, cb = color.B;
+
+        for (int row = 0; row < radius && row < height; row++)
+        {
+            int dy = (radius - row) * 256 - 128;
+            for (int col = 0; col < radius && col < width; col++)
+            {
+                int dx = (radius - col) * 256 - 128;
+                int dist = IntSqrt(dx * dx + dy * dy);
+                int diff = Math.Abs(dist - targetDist);
+                int cov = 255 - (diff * 255 / 256);
+                if (cov > 15)
+                {
+                    cov = Math.Min(255, cov);
+                    int alpha = (baseA * cov) / 255;
+                    Color aaColor = Color.FromArgb(alpha, cr, cg, cb);
+
+                    // Bottom-Left corner
+                    DrawPoint(aaColor, x + col, y + height - 1 - row);
+                    // Bottom-Right corner
+                    DrawPoint(aaColor, x + width - 1 - col, y + height - 1 - row);
+                }
+            }
+        }
+    }
+
+    public void DrawRoundedTopOutline(Color color, int x, int y, int width, int height, int radius)
+    {
+        if (width <= 0 || height <= 0) return;
+        if (radius <= 0)
+        {
+            DrawRectangle(color, x, y, width, height);
+            return;
+        }
+
+        // Top horizontal segment
+        if (width > radius * 2)
+            DrawHorizontalSpan(color, x + radius, y, width - radius * 2);
+
+        // Left & right vertical segments
+        if (height > radius)
+        {
+            DrawVerticalLine(color, height - radius, x, y + radius);
+            if (width > 1)
+                DrawVerticalLine(color, height - radius, x + width - 1, y + radius);
+        }
+
+        // Bottom horizontal line
+        if (height > 1)
+            DrawHorizontalSpan(color, x, y + height - 1, width);
+
+        // Smooth anti-aliased top corners
+        int r256 = radius * 256;
+        int targetDist = r256 - 128;
+        int baseA = color.A;
+        int cr = color.R, cg = color.G, cb = color.B;
+
+        for (int row = 0; row < radius && row < height; row++)
+        {
+            int dy = (radius - row) * 256 - 128;
+            for (int col = 0; col < radius && col < width; col++)
+            {
+                int dx = (radius - col) * 256 - 128;
+                int dist = IntSqrt(dx * dx + dy * dy);
+                int diff = Math.Abs(dist - targetDist);
+                int cov = 255 - (diff * 255 / 256);
+                if (cov > 15)
+                {
+                    cov = Math.Min(255, cov);
+                    int alpha = (baseA * cov) / 255;
+                    Color aaColor = Color.FromArgb(alpha, cr, cg, cb);
+
+                    // Top-Left corner
+                    DrawPoint(aaColor, x + col, y + row);
+                    // Top-Right corner
+                    DrawPoint(aaColor, x + width - 1 - col, y + row);
+                }
+            }
+        }
+    }
+
     public virtual void DrawEtchedRect(int x, int y, int width, int height, Color shadow, Color highlight)
     {
         if (width <= 1 || height <= 1) return;
@@ -596,8 +1149,7 @@ public class ComponentBuffer : Canvas
 
     private bool ContainsClipped(int x, int y)
     {
-        return x >= 0 && x < Width && y >= 0 && y < Height &&
-            x >= clipBounds.Left && x < clipBounds.Right &&
+        return x >= clipBounds.Left && x < clipBounds.Right &&
             y >= clipBounds.Top && y < clipBounds.Bottom;
     }
 
@@ -605,36 +1157,6 @@ public class ComponentBuffer : Canvas
     {
         if ((uint)index >= (uint)buffer.Length) return;
         int alpha = (color >> 24) & 0xff;
-        if (alpha == 0) return;
-        if (alpha == 0xff)
-        {
-            buffer[index] = color;
-            return;
-        }
-
-        int background = buffer[index];
-        int inverse = 255 - alpha;
-        int red = (((color >> 16) & 0xff) * alpha + ((background >> 16) & 0xff) * inverse) >> 8;
-        int green = (((color >> 8) & 0xff) * alpha + ((background >> 8) & 0xff) * inverse) >> 8;
-        int blue = ((color & 0xff) * alpha + (background & 0xff) * inverse) >> 8;
-        buffer[index] = (0xff << 24) | (red << 16) | (green << 8) | blue;
-    }
-
-    /// <summary>
-    /// TEST Alpha blending
-    /// </summary>
-    /// <param name="buffer"></param>
-    /// <param name="index"></param>
-    /// <param name="color"></param>
-    /// <param name="alpha"></param>
-    private void BlendPixel(int[] buffer, int index, int color, int alpha)
-    {
-        if ((uint)index >= (uint)buffer.Length)
-        {
-            return;
-        }
-        alpha = Math.Clamp(alpha, 0, 255);
-
         if (alpha == 0) return;
         if (alpha == 0xff)
         {

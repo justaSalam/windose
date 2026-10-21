@@ -171,9 +171,18 @@ public class MenuPopup : Component
 
     public override void DrawLocal()
     {
-        //TODO: finish icons
-        DrawRaisedRectangle(0, 0, Width, Height);
-
+        if (Palette.FlatControls)
+        {
+            int r = 3;
+            DrawFilledRoundedRectangle(Palette.MenuBackground, 0, 0, Width, Height, r);
+            DrawRoundedRectangle(Color.FromArgb(170, 170, 170), 0, 0, Width, Height, r);
+            if (Width > 4 && Height > 2)
+                DrawHorizontalSpan(Color.FromArgb(255, 255, 255), 2, 1, Width - 4);
+        }
+        else
+        {
+            DrawRaisedRectangle(0, 0, Width, Height);
+        }
 
         foreach (Component child in children)
         {

@@ -58,10 +58,6 @@ public sealed class DisplayManager
         DrawCursor(cursorX, cursorY);
         PerformanceMetrics.OverlayTicks = PerformanceMetrics.Now - overlayStartedAt;
 
-        test.Test_DrawFilledRectangle(Color.LightSkyBlue,0, 0, 200, 200, 128);
-        test.MarkDirty(true);
-
-
         long displayStartedAt = PerformanceMetrics.Now;
         canvas.Display();
 

@@ -8,6 +8,61 @@ public static class CompositorSelfTests
         TestClippedAlphaBlit();
         TestNestedClipContext();
         TestPartialRegionComposition();
+        TestGlassTransparency();
+        TestGlassBlurImpulse();
+        TestGlassBlurKeepsUniformColor();
+    }
+
+    /// <summary>Glass surfaces depend on alpha surviving raw fills and source-over layers.</summary>
+    private static void TestGlassTransparency()
+    {
+        ComponentBuffer bitmap = new ComponentBuffer(4, 1);
+        bitmap.Clear(Color.Black);
+
+        // Punch two pixels to fully transparent, then tint one of them.
+        bitmap.FillRaw(Color.FromArgb(0, 0, 0, 0), 0, 0, 2, 1);
+        bitmap.DrawOverRectangle(Color.FromArgb(128, 255, 0, 0), 0, 0, 1, 1);
+
+        AssertPixel(bitmap, 0, 0, unchecked((int)0x80FF0000)); // tint kept its alpha
+        AssertPixel(bitmap, 1, 0, 0x00000000);                 // still see-through
+        AssertPixel(bitmap, 2, 0, Color.Black.ToArgb());       // untouched
+    }
+
+    /// <summary>A blurred impulse spreads across its box window with clamped edges.</summary>
+    private static void TestGlassBlurImpulse()
+    {
+        ComponentBuffer bitmap = new ComponentBuffer(6, 1);
+        bitmap.Clear(Color.Black);
+        bitmap.FillRaw(Color.White, 2, 0, 1, 1);
+
+        bitmap.BlurArea(0, 0, 6, 1, 1, 1);
+
+        int[] expected =
+        {
+            Color.Black.ToArgb(),
+            Color.FromArgb(255, 85, 85, 85).ToArgb(),
+            Color.FromArgb(255, 85, 85, 85).ToArgb(),
+            Color.FromArgb(255, 85, 85, 85).ToArgb(),
+            Color.Black.ToArgb(),
+            Color.Black.ToArgb(),
+        };
+
+        for (int x = 0; x < expected.Length; x++)
+            AssertPixel(bitmap, x, 0, expected[x]);
+    }
+
+    /// <summary>Blurring a flat colour must leave it untouched (index and clamping maths).</summary>
+    private static void TestGlassBlurKeepsUniformColor()
+    {
+        ComponentBuffer bitmap = new ComponentBuffer(6, 3);
+        Color flat = Color.FromArgb(255, 0x30, 0x50, 0x70);
+        bitmap.Clear(flat);
+
+        bitmap.BlurArea(0, 0, 6, 3, 3, 2);
+
+        for (int y = 0; y < 3; y++)
+            for (int x = 0; x < 6; x++)
+                AssertPixel(bitmap, x, y, flat.ToArgb());
     }
 
     private static void TestAlphaDrawing()

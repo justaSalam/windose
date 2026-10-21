@@ -41,8 +41,15 @@ public class MenuItem : Component
         {
             int y = Height / 2;
 
-            DrawLine(Palette.ControlShadow, 2, y, Width - 3, y);
-            DrawLine(Palette.ControlWhite, 2, y + 1, Width - 3, y + 1);
+            if (Palette.FlatControls)
+            {
+                DrawLine(Color.FromArgb(220, 220, 220), 4, y, Width - 5, y);
+            }
+            else
+            {
+                DrawLine(Palette.ControlShadow, 2, y, Width - 3, y);
+                DrawLine(Palette.ControlWhite, 2, y + 1, Width - 3, y + 1);
+            }
 
             return;
         }
@@ -58,8 +65,18 @@ public class MenuItem : Component
 
         if (highlighted)
         {
-            DrawFilledRectangle(Palette.Highlight,2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2));
-            DrawAlignedText(text, Palette.HighlightText, fontSize, textBounds);
+            if (Palette.FlatControls)
+            {
+                int r = 3;
+                DrawGradientVerticalRounded(Color.FromArgb(240, 246, 254), Color.FromArgb(220, 235, 252), 2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2), r);
+                DrawRoundedRectangle(Color.FromArgb(184, 214, 251), 2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2), r);
+                DrawAlignedText(text, Palette.ControlBlack, fontSize, textBounds);
+            }
+            else
+            {
+                DrawFilledRectangle(Palette.Highlight, 2, 1, Math.Max(1, Width - 4), Math.Max(1, Height - 2));
+                DrawAlignedText(text, Palette.HighlightText, fontSize, textBounds);
+            }
         }
         else
         {

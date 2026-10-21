@@ -268,13 +268,11 @@ public class Component : IDisposable
     {
         lock (components)
         {
-
             rectangle = new Rectangle(x, y, width, height);
             buffer = new ComponentBuffer(rectangle.Width, rectangle.Height);
             ownsRenderSurface = true;
 
             children = new List<Component>();
-
 
             dirty = false;
             visible = true;
@@ -295,7 +293,6 @@ public class Component : IDisposable
             }
 
             zIndex = currentZIndex;
-
             state = State.Normal;
 
             components.Add(this);
@@ -320,11 +317,32 @@ public class Component : IDisposable
     }
 
 
+    public virtual bool IsMouseOver(int mx, int my)
+    {
+        if (!IsInsideAbsolute(mx, my)) return false;
+
+        Window? owner = GetOwningWindow();
+        if (owner != null)
+        {
+            Window? topWin = WindowManager.GetTopWindowAt(mx, my);
+            if (topWin != null && topWin != owner)
+                return false;
+        }
+        else if (this is not Window)
+        {
+            Window? topWin = WindowManager.GetTopWindowAt(mx, my);
+            if (topWin != null && zLayer <= topWin.zLayer)
+                return false;
+        }
+
+        return true;
+    }
+
     public virtual void Update()
     {
         if (Visible)
         {
-            bool isInside = IsInsideAbsolute(MouseManager.X, MouseManager.Y);
+            bool isInside = IsMouseOver(MouseManager.X, MouseManager.Y);
             State prevState = state;
 
             if (isInside && state != State.Highlighted)
@@ -609,7 +627,53 @@ public class Component : IDisposable
             clipped.Width,
             clipped.Height);
     }
-    public bool IsInsideAbsolute(int x, int y) => x >= AbsoluteX && x < AbsoluteX + Width && y >= AbsoluteY && y < AbsoluteY + Height;
+
+    /// <summary>
+    /// Alpha-blits this surface onto the screen instead of copying it opaquely. Pixels with
+    /// alpha 0 stay see-through, which is what lets a glass surface show its blurred backdrop.
+    /// </summary>
+    public void DrawToScreenAlpha(Rectangle dirtyRect)
+    {
+        Rectangle clipped = Rectangle.Intersect(AbsoluteRectangle, dirtyRect);
+        if (clipped.Width <= 0 || clipped.Height <= 0) return;
+
+        Kernel.mainBuffer.DrawArrayAlphaClipped(
+            buffer.GetBuffer(),
+            buffer.Width,
+            clipped.X - AbsoluteX,
+            clipped.Y - AbsoluteY,
+            clipped.X,
+            clipped.Y,
+            clipped.Width,
+            clipped.Height);
+    }
+
+    // ---- glass (Windows-7-like transparency) ----
+
+    /// <summary>
+    /// When true, this root is composited over a blurred, washed backdrop and blitted with
+    /// alpha instead of the plain opaque copy. Set it on windows, the taskbar, menus, ...
+    /// </summary>
+    public bool useGlass;
+
+    /// <summary>How the backdrop under this surface is blurred and tinted.</summary>
+    public GlassStyle glassStyle = GlassStyle.AeroDefault();
+
+    /// <summary>
+    /// Buffer-local rectangles that are see-through and therefore need the blurred backdrop.
+    /// The default is the whole surface; override to restrict it (a window only blurs its frame).
+    /// </summary>
+    public virtual void GetGlassRegions(List<Rectangle> regions)
+    {
+        regions.Add(new Rectangle(0, 0, Width, Height));
+    }
+
+    public bool IsInsideAbsolute(int x, int y)
+    {
+        int ax = AbsoluteX;
+        int ay = AbsoluteY;
+        return x >= ax && x < ax + Width && y >= ay && y < ay + Height;
+    }
 
     public bool IsInsideLocal(int x, int y) => x >= X && x < X + Width && y >= Y && y < Y + Height;
 
@@ -724,13 +788,7 @@ public class Component : IDisposable
             children[i].InvalidateAbsolute();
     }
 
-    public void ComputeAbsoluteCoordinates() { }
-
-    public void ComputeAbsoluteX() { }
-
-    public void ComputeAbsoluteY() { }
-
-    // ---- replace AddChild / RemoveChild ----
+    // ---- AddChild / RemoveChild ----
     public virtual Component AddChild(Component child)
     {
         lock (children) { if (children.Contains(child)) return child; }
@@ -876,10 +934,35 @@ public class Component : IDisposable
         buffer.DrawFilledRectangle(color, xStart, yStart, width, height);
     }
 
-    public void Test_DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, int alpha)
+    /// <summary>Exact ARGB write, alpha included. Use to punch see-through pixels (0x00000000).</summary>
+    public void FillRaw(Color color, int x, int y, int width, int height)
     {
-        buffer.Test_DrawFilledAlphaRectangle(color, xStart, yStart, width, height, alpha);
+        buffer.FillRaw(color, x, y, width, height);
     }
+
+    /// <summary>Source-over fill that preserves transparency, for layering glass tints.</summary>
+    public void DrawOverRectangle(Color color, int x, int y, int width, int height)
+    {
+        buffer.DrawOverRectangle(color, x, y, width, height);
+    }
+
+    /// <summary>Horizontal source-over gradient that preserves transparency.</summary>
+    public void DrawOverGradient(Color from, Color to, int x, int y, int width, int height)
+    {
+        buffer.DrawOverGradient(from, to, x, y, width, height);
+    }
+
+    /// <summary>Blurs whatever is currently drawn in this region of the surface (frosted glass).</summary>
+    public void BlurArea(int x, int y, int width, int height, int radius, int passes)
+    {
+        buffer.BlurArea(x, y, width, height, radius, passes);
+    }
+
+    public void DrawHorizontalSpan(Color color, int y, int xStart, int xEnd)
+    {
+        buffer.DrawHorizontalSpan(color, y, xStart, xEnd);
+    }
+
 
     public void DrawRectangle(Color color, int x, int y, int width, int height)
     {
@@ -944,6 +1027,56 @@ public class Component : IDisposable
 
             DrawFilledRectangle(Color.FromArgb(0xff, r, g, b), x + i, y, 1, height);
         }
+    }
+
+    public void DrawGradientVertical(Color top, Color bottom, int x, int y, int width, int height)
+    {
+        buffer.DrawGradientVertical(top, bottom, x, y, width, height);
+    }
+
+    public void DrawOverGradientVertical(Color top, Color bottom, int x, int y, int width, int height)
+    {
+        buffer.DrawOverGradientVertical(top, bottom, x, y, width, height);
+    }
+
+    public void DrawRoundedRectangle(Color color, int x, int y, int width, int height, int radius)
+    {
+        buffer.DrawRoundedRectangle(color, x, y, width, height, radius);
+    }
+
+    public void DrawFilledRoundedRectangle(Color color, int xStart, int yStart, int width, int height, int radius)
+    {
+        buffer.DrawFilledRoundedRectangle(color, xStart, yStart, width, height, radius);
+    }
+
+    public void DrawGradientVerticalRounded(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        buffer.DrawGradientVerticalRounded(top, bottom, xStart, yStart, width, height, radius);
+    }
+
+    public void DrawOverGradientVerticalRounded(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        buffer.DrawOverGradientVerticalRounded(top, bottom, xStart, yStart, width, height, radius);
+    }
+
+    public void DrawGradientVerticalRoundedBottom(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        buffer.DrawGradientVerticalRoundedBottom(top, bottom, xStart, yStart, width, height, radius);
+    }
+
+    public void DrawOverGradientVerticalRoundedBottom(Color top, Color bottom, int xStart, int yStart, int width, int height, int radius)
+    {
+        buffer.DrawOverGradientVerticalRoundedBottom(top, bottom, xStart, yStart, width, height, radius);
+    }
+
+    public void DrawRoundedBottomOutline(Color color, int x, int y, int width, int height, int radius)
+    {
+        buffer.DrawRoundedBottomOutline(color, x, y, width, height, radius);
+    }
+
+    public void DrawRoundedTopOutline(Color color, int x, int y, int width, int height, int radius)
+    {
+        buffer.DrawRoundedTopOutline(color, x, y, width, height, radius);
     }
 
     public virtual bool HasDirtyTree() => dirty || childrenDirty;

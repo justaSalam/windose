@@ -33,6 +33,7 @@ public sealed class UiTheme
     public int TitleBarHeight;
     public int BorderSize;
     public bool FlatControls;
+    public bool GlassEnabled;
 }
 
 public static class Palette
@@ -57,10 +58,16 @@ public static class Palette
     public static Color MenuBackground { get; private set; }
     public static Color TitleText { get; private set; }
     public static Color TitleTextInactive { get; private set; }
+    public static Color TaskbarGlass { get; private set; }
+    public static Color WindowGlass { get; private set; }
+    public static Color MenuGlass { get; private set; }
+    public static Color TitleBarGlass { get; private set; }
     public static int TitleBarHeight { get; private set; }
     public static int BorderSize { get; private set; }
-    public static string ThemeName { get; private set; } = "classic";
-    public static string ThemeDisplayName { get; private set; } = "Classic Windows";
+    public static bool FlatControls { get; private set; }
+    public static bool GlassEnabled { get; private set; }
+    public static string ThemeName { get; private set; } = "modern";
+    public static string ThemeDisplayName { get; private set; } = "Aero";
 
     public static event Action ThemeChanged;
 
@@ -68,7 +75,7 @@ public static class Palette
 
     static Palette()
     {
-        ApplyTheme(CreateClassicTheme());
+        ApplyTheme(CreateModernTheme());
     }
 
     public static void Initialize()
@@ -81,12 +88,18 @@ public static class Palette
 
     public static void ApplyFromRegistry()
     {
-        Apply(Registry.GetString(ThemeRegistryKey, "classic"), persist: false);
+        Apply(Registry.GetString(ThemeRegistryKey, "modern"), persist: false);
     }
 
     public static bool Apply(string name, bool persist = true)
     {
-        UiTheme theme = CreateClassicTheme();
+        string normalized = (name ?? "").Trim().ToLowerInvariant();
+        UiTheme theme;
+        if (normalized == "classic")
+            theme = CreateClassicTheme();
+        else
+            theme = CreateModernTheme();
+
         ApplyTheme(theme);
 
         if (persist)
@@ -136,8 +149,14 @@ public static class Palette
         MenuBackground = theme.MenuBackground;
         TitleText = theme.TitleText;
         TitleTextInactive = theme.TitleTextInactive;
+        TaskbarGlass = theme.TaskbarGlass;
+        WindowGlass = theme.WindowGlass;
+        MenuGlass = theme.MenuGlass;
+        TitleBarGlass = theme.TitleBarGlass;
         TitleBarHeight = theme.TitleBarHeight;
         BorderSize = theme.BorderSize;
+        FlatControls = theme.FlatControls;
+        GlassEnabled = theme.GlassEnabled;
 
         ThemeChanged?.Invoke();
     }
@@ -172,7 +191,53 @@ public static class Palette
             TitleBarHeight = 20,
             BorderSize = 2,
             FlatControls = false,
+            GlassEnabled = false,
+        };
+    }
+
+    private static UiTheme CreateModernTheme()
+    {
+        return new UiTheme
+        {
+            Name = "modern",
+            DisplayName = "Aero",
+            Description = "Windows 7-style translucent glass, blue title bars, and soft gradients.",
+            // Controls: soft neutral grey like Win7
+            ControlFace = Color.FromArgb(240, 240, 240),
+            ControlWhite = Color.FromArgb(255, 255, 255),
+            ControlHighlight = Color.FromArgb(229, 243, 255),
+            ControlShadow = Color.FromArgb(160, 160, 160),
+            ControlBlack = Color.FromArgb(0, 0, 0),
+            // Title bars: Win7 blue
+            ActiveTitle = Color.FromArgb(52, 100, 168),
+            InactiveTitle = Color.FromArgb(131, 151, 180),
+            // Selection highlight: Win7 blue
+            Highlight = Color.FromArgb(51, 153, 255),
+            HighlightText = Color.FromArgb(255, 255, 255),
+            // Desktop
+            DesktopBackground = Color.FromArgb(58, 110, 165),
+            // Window body
+            WindowBackground = Color.FromArgb(245, 246, 247),
+            WindowBorder = Color.FromArgb(100, 130, 180),
+            // Taskbar: dark translucent
+            TaskbarBackground = Color.FromArgb(28, 42, 58),
+            // Menus
+            MenuBackground = Color.FromArgb(245, 246, 247),
+            // Title text
+            TitleText = Color.FromArgb(255, 255, 255),
+            TitleTextInactive = Color.FromArgb(200, 206, 216),
+            // Glass colours
+            TaskbarGlass = Color.FromArgb(180, 28, 42, 58),
+            WindowGlass = Color.FromArgb(140, 116, 150, 194),
+            MenuGlass = Color.FromArgb(220, 245, 246, 247),
+            TitleBarGlass = Color.FromArgb(120, 52, 100, 168),
+            // Frame dimensions
+            TitleBarHeight = 28,
+            BorderSize = 4,
+            FlatControls = true,
+            GlassEnabled = true,
         };
     }
 
 }
+

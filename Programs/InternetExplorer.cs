@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Threading;
 using Cosmos.Kernel.System.Graphics;
 using HttpClient = Cosmos.Network.Http.HttpClient;
@@ -88,7 +89,7 @@ fn main() {
             // modern sites exceed (large Set-Cookie / tracking headers) -> "headers size
             // exceeded limits". HttpClient builds an HttpWebRequest per request that reads
             // this static default, so raise it globally.
-            HttpWebRequest.DefaultMaximumResponseHeadersLength = 64; // KB
+            HttpWebRequest.DefaultMaximumResponseHeadersLength = 128; // KB
         }
 
         public InternetExplorer(int x, int y) : base(x, y, 800, 600, "Internet Explorer", true, null)
@@ -106,10 +107,10 @@ fn main() {
 
             toolbar = new Toolbar(0, 0, Width, 28);
 
-            toolbar.AddButton(new Png("/mnt/System/Icons/msg_error.png"), "Back", GoBack, 100);
-            toolbar.AddButton(new Png("/mnt/System/Icons/msg_error.png"), "Forward", GoForward, 120);
-            toolbar.AddButton(new Png("/mnt/System/Icons/msg_error.png"), "Refresh", Refresh, 120);
-            toolbar.AddButton(new Png("/mnt/System/Icons/homepage_alt.png"), "Home", Home, 100);
+            toolbar.AddButton("Back", GoBack);
+            toolbar.AddButton("Forward", GoForward);
+            toolbar.AddButton("Refresh", Refresh);
+            toolbar.AddButton("Home", Home);
 
             addressBar = new AddressBar(0, 0, Width);
             statusBar = new StatusBar(0, 0, Width);

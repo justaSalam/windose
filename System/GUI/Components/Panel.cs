@@ -6,6 +6,8 @@ public class Panel : Component
 
     public bool useBackground = false;
     public bool useBorders = false;
+    /// <summary>Draw the background source-over so transparency survives (glass title bars).</summary>
+    public bool blendBackground = false;
     private bool useGradient = false;
     public Color borderColor = Color.White;
     public string text = "";
@@ -35,7 +37,12 @@ public class Panel : Component
 
         if (useBackground)
         {
-            if (useGradient) DrawGradient(color1, color2, 0, 0, Width, Height);
+            if (blendBackground)
+            {
+                if (useGradient) DrawOverGradient(color1, color2, 0, 0, Width, Height);
+                else DrawOverRectangle(color1, 0, 0, Width, Height);
+            }
+            else if (useGradient) DrawGradient(color1, color2, 0, 0, Width, Height);
             else DrawFilledRectangle(color1, 0, 0, Width, Height);
         }
 

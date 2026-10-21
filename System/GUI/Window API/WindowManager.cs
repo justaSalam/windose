@@ -253,7 +253,19 @@ public partial class WindowManager : SingleThreadedProcess
                         component.DrawDirtyLocal(region);
                         component.MarkCleaned();
                     }
-                    component.DrawToScreen(region);
+
+                    if (component.useGlass)
+                    {
+                        // Everything below the glass surface is already composited, so the
+                        // backbuffer now holds its real backdrop: blur it, then blit the
+                        // surface with alpha so its transparent pixels show through.
+                        ComposeGlassBackdrop(component, region);
+                        component.DrawToScreenAlpha(region);
+                    }
+                    else
+                    {
+                        component.DrawToScreen(region);
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -299,19 +311,79 @@ public partial class WindowManager : SingleThreadedProcess
         }
     }
 
+    public static Window? GetTopWindowAt(int x, int y)
+    {
+        lock (windows)
+        {
+            for (int i = windows.Count - 1; i >= 0; i--)
+            {
+                Window win = windows[i];
+                if (win == null || !win.Visible || win.isMinimized || failedWindows.Contains(win)) continue;
+                if (win.desktop >= 0 && win.desktop != CurrentDesktop) continue;
+                if (win.HitTest(x, y)) return win;
+            }
+        }
+        return null;
+    }
+
     private void ExpandRegionForDirtyRoots(ref Rectangle region)
     {
         Rectangle screenBounds = new Rectangle(0, 0, Global.screenWidth, Global.screenHeight);
-        for (int i = 0; i < components.Count; i++)
+        bool expanded = true;
+        while (expanded)
         {
-            Component component = components[i];
-            if (component == null || !component.Visible || !component.isRoot || !component.HasDirtyTree()) continue;
-            if (component is Window hidden && !IsOnCurrentDesktop(hidden)) continue;
+            expanded = false;
+            for (int i = 0; i < components.Count; i++)
+            {
+                Component component = components[i];
+                if (component == null || !component.Visible || !component.isRoot) continue;
+                if (component is Window hidden && !IsOnCurrentDesktop(hidden)) continue;
 
-            Rectangle bounds = Rectangle.Intersect(component.AbsoluteRectangle, screenBounds);
-            if (bounds.Width <= 0 || bounds.Height <= 0 || !bounds.IntersectsWith(region)) continue;
+                Rectangle bounds = Rectangle.Intersect(component.AbsoluteRectangle, screenBounds);
+                if (bounds.Width <= 0 || bounds.Height <= 0 || !bounds.IntersectsWith(region)) continue;
 
-            region = Rectangle.Union(region, bounds);
+                // Expand if the root has dirty content, or if it uses glass transparency.
+                // Glass surfaces (like window title bars) sample and blur what is already in the backbuffer.
+                // If only a partial slice of a glass frame is composed, the blur clamps at the slice
+                // edge and leaves stale pixels outside, causing the title blur to flicker/switch between
+                // blurred and unblurred states.
+                if (component.HasDirtyTree() || component.useGlass)
+                {
+                    Rectangle union = Rectangle.Union(region, bounds);
+                    if (union.Width != region.Width || union.Height != region.Height || union.X != region.X || union.Y != region.Y)
+                    {
+                        region = union;
+                        expanded = true;
+                    }
+                }
+            }
+        }
+    }
+
+    private static readonly List<Rectangle> glassRegions = new List<Rectangle>();
+
+    /// <summary>
+    /// Turns what is already in the backbuffer under a glass surface into its blurred,
+    /// washed backdrop. Only the composed region is touched, and the blur clamps its samples
+    /// to that region, so stale pixels outside it are never pulled in.
+    /// </summary>
+    private static void ComposeGlassBackdrop(Component component, Rectangle region)
+    {
+        if (Kernel.mainBuffer == null) return;
+
+        glassRegions.Clear();
+        component.GetGlassRegions(glassRegions);
+        if (glassRegions.Count == 0) return;
+
+        Rectangle bounds = component.AbsoluteRectangle;
+        for (int i = 0; i < glassRegions.Count; i++)
+        {
+            Rectangle local = glassRegions[i];
+            Rectangle absolute = new Rectangle(bounds.X + local.X, bounds.Y + local.Y, local.Width, local.Height);
+            Rectangle clipped = Rectangle.Intersect(absolute, region);
+            if (clipped.Width <= 0 || clipped.Height <= 0) continue;
+
+            GlassRenderer.ComposeBackdrop(clipped, component.glassStyle);
         }
     }
 
@@ -386,7 +458,7 @@ public partial class WindowManager : SingleThreadedProcess
 
             int taskbarButtonWidth = Math.Max(84, window.text.Length * 7 + (window.Icon == null ? 18 : 38));
             taskbarButtonWidth = Math.Min(taskbarButtonWidth, 180);
-            int taskbarButtonHeight = Math.Max(20, Explorer.taskbar.Height - 10);
+            int taskbarButtonHeight = Math.Max(24, Explorer.taskbar.Height - 6);
 
             Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
             {
@@ -395,8 +467,8 @@ public partial class WindowManager : SingleThreadedProcess
                 iconSize = 16,
                 iconTextGap = 4,
                 Padding = new Thickness(3),
-                Margin = new Thickness(2, 2, 0, 0),
-                useBorders = true,
+                Margin = new Thickness(2, 1, 2, 1),
+                useBorders = !Palette.FlatControls,
                 image = window.Icon,
 
                 leftClickAction = () =>

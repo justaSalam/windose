@@ -1,5 +1,6 @@
 using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Graphics;
+using System.Drawing;
 using Windose.Programs;
 using Windose.System.Kernel;
 using Windose.System.Kernel.Subsystem;
@@ -20,6 +21,11 @@ public class StartMenu : Window
         canResize = false;
         canMove = false;
         showInTaskbar = false;
+        if (Palette.GlassEnabled)
+        {
+            useGlass = true;
+            glassStyle = GlassStyle.AeroStartMenu();
+        }
 
         panel = new StackPanel(Palette.MenuBackground, 0, 0, width, height)
         {
@@ -52,7 +58,7 @@ public class StartMenu : Window
             verticalAlignment = VerticalAlignment.Top,
             clampSize = false,
             Margin = new Thickness(0, 0, 0, 4),
-            PlaceholderText = "Search programs",
+            PlaceholderText = "Search programs and files",
         };
         searchField.TextChanged += delegate (string text)
         {
@@ -228,9 +234,20 @@ public class StartMenu : Window
 
     public override void DrawLocal()
     {
-
-        DrawRaisedRectangle(0, 0, Width, Height);
-
+        if (useGlass)
+        {
+            int r = 6;
+            // Windows 7 Start Menu Aero glass backdrop with rounded corners
+            FillRaw(Color.FromArgb(0, 0, 0, 0), 0, 0, Width, Height);
+            DrawOverGradientVerticalRounded(Color.FromArgb(220, 24, 40, 60), Color.FromArgb(245, 14, 24, 36), 0, 0, Width, Height, r);
+            DrawRoundedRectangle(Color.FromArgb(180, 50, 75, 105), 0, 0, Width, Height, r);
+            if (Width > 4 && Height > 2)
+                DrawHorizontalSpan(Color.FromArgb(80, 255, 255, 255), 2, 1, Width - 4);
+        }
+        else
+        {
+            DrawRaisedRectangle(0, 0, Width, Height);
+        }
 
         foreach (Component child in children)
         {
