@@ -1511,8 +1511,8 @@ public sealed class CssSheet
             }
         }
 
-        // width and height attributes (tables, cells, images, hr)
-        if (tag == "table" || tag == "td" || tag == "th" || tag == "hr" || tag == "img" || tag == "iframe")
+        // width and height attributes (tables, cells, images, hr, svg)
+        if (tag == "table" || tag == "td" || tag == "th" || tag == "hr" || tag == "img" || tag == "iframe" || tag == "svg")
         {
             string wAttr = el.GetAttr("width");
             if (!string.IsNullOrEmpty(wAttr))
@@ -1638,7 +1638,10 @@ public sealed class CssSheet
                 c.BorderRR = CssBorder.Solid; c.BorderRW = 1; c.BorderRC = 0xFF888888;
                 c.PadT = 2; c.PadB = 2; c.PadL = 6; c.PadR = 6;
                 break;
-            case "svg": case "canvas": case "video": case "audio": case "iframe": case "embed":
+            case "svg":
+                c.Display = CssDisplay.InlineBlock;
+                break;
+            case "canvas": case "video": case "audio": case "iframe": case "embed":
             case "object": case "map": case "area":
                 c.Display = CssDisplay.None; break;
             default:

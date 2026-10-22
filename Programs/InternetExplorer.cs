@@ -1892,7 +1892,7 @@ a:hover { text-decoration: underline; }
             CollectCssUrls(page.CssText, srcs);
 
             int fetched = 0;
-            for (int i = 0; i < srcs.Count && fetched < 32; i++)
+            for (int i = 0; i < srcs.Count && fetched < 512; i++)
             {
                 if (cancelPendingFetch) break;
                 string src = srcs[i];
@@ -1907,18 +1907,27 @@ a:hover { text-decoration: underline; }
                         if (comma > 0)
                         {
                             string meta = src.Substring(5, comma - 5);
+                            byte[] data = null;
                             if (meta.IndexOf("base64", StringComparison.OrdinalIgnoreCase) >= 0)
                             {
                                 string b64 = src.Substring(comma + 1).Trim();
-                                byte[] data = Convert.FromBase64String(b64);
-                                if (data != null && data.Length > 0)
+                                data = Convert.FromBase64String(b64);
+                            }
+                            else
+                            {
+                                string content = src.Substring(comma + 1);
+                                string decoded = WebUrl.UrlDecode(content);
+                                data = Encoding.UTF8.GetBytes(decoded);
+                            }
+
+                            if (data != null && data.Length > 0)
+                            {
+                                string hint = meta.IndexOf("svg", StringComparison.OrdinalIgnoreCase) >= 0 ? "image.svg" : null;
+                                Image img = ImageLoader.FromBytes(data, hint);
+                                if (img != null && img.Width > 0 && img.Height > 0)
                                 {
-                                    Image img = ImageLoader.FromBytes(data);
-                                    if (img != null && img.Width > 0 && img.Height > 0)
-                                    {
-                                        images[src] = img;
-                                        fetched++;
-                                    }
+                                    images[src] = img;
+                                    fetched++;
                                 }
                             }
                         }

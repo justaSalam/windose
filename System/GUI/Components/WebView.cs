@@ -1302,7 +1302,30 @@ public class WebView : Component
         for (int i = 0; i < line.Spans.Count; i++)
         {
             RenderSpan s = line.Spans[i];
-            if (s.Hidden || string.IsNullOrEmpty(s.Text)) continue;
+            if (s.Hidden) continue;
+
+            if (s.IsImage)
+            {
+                int iy = ly + s.YOff;
+                if (s.Image != null)
+                {
+                    DrawImageStretch(s.Image, new Rectangle(s.X, iy, s.Width, s.Height));
+                }
+                else
+                {
+                    DrawSunkenRectangle(s.X, iy, s.Width, s.Height);
+                    DrawFilledRectangle(Color.FromArgb(235, 238, 242), s.X + 1, iy + 1, Math.Max(0, s.Width - 2), Math.Max(0, s.Height - 2));
+                    if (!string.IsNullOrEmpty(s.ImageAlt) && s.Width >= 24 && s.Height >= 14)
+                    {
+                        int tw = MeasureTextWidth(s.ImageAlt, 11);
+                        if (s.Width >= tw)
+                            DrawString(s.ImageAlt, Color.FromArgb(90, 90, 100), s.X + (s.Width - tw) / 2, iy + s.Height / 2 - 6, 11);
+                    }
+                }
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(s.Text)) continue;
 
             int size = s.Size > 0 ? s.Size : fontSize;
             int ty = ly + 2 + s.YOff;

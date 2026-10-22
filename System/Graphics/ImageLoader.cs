@@ -15,7 +15,8 @@ namespace Cosmos.Kernel.System.Graphics
         Qoi,
         Ico,
         Tga,
-        Ppm
+        Ppm,
+        Svg
     }
 
     /// <summary>
@@ -162,6 +163,33 @@ namespace Cosmos.Kernel.System.Graphics
                 return KnownImageFormat.Ppm;
             }
 
+            // 9. SVG: text/xml starting with "<svg" or "<?xml" containing "<svg"
+            if (data.Length >= 4)
+            {
+                int start = 0;
+                // Skip UTF-8 BOM if present
+                if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
+                    start = 3;
+                while (start < data.Length && (data[start] == ' ' || data[start] == '\t' || data[start] == '\r' || data[start] == '\n'))
+                    start++;
+
+                if (start + 4 <= data.Length && data[start] == '<')
+                {
+                    if ((char)data[start + 1] == 's' && (char)data[start + 2] == 'v' && (char)data[start + 3] == 'g')
+                    {
+                        return KnownImageFormat.Svg;
+                    }
+                    int scanLimit = Math.Min(data.Length - 4, 512);
+                    for (int si = start; si < scanLimit; si++)
+                    {
+                        if (data[si] == '<' && (char)data[si + 1] == 's' && (char)data[si + 2] == 'v' && (char)data[si + 3] == 'g')
+                        {
+                            return KnownImageFormat.Svg;
+                        }
+                    }
+                }
+            }
+
             // Fallback by extension hint
             if (!string.IsNullOrEmpty(hintPathOrExtension))
             {
@@ -177,6 +205,7 @@ namespace Cosmos.Kernel.System.Graphics
                     ".ico" => KnownImageFormat.Ico,
                     ".tga" => KnownImageFormat.Tga,
                     ".ppm" or ".pnm" => KnownImageFormat.Ppm,
+                    ".svg" => KnownImageFormat.Svg,
                     _ => KnownImageFormat.Unknown
                 };
             }
@@ -206,11 +235,14 @@ namespace Cosmos.Kernel.System.Graphics
                     return new Tga(data);
                 case KnownImageFormat.Ppm:
                     return new Ppm(data);
+                case KnownImageFormat.Svg:
+                    return new Svg(data);
                 default:
-                    // If unknown, try WebP, then Png, then Jpeg, then Bitmap
+                    // If unknown, try WebP, then Png, then Jpeg, then Svg, then Bitmap
                     try { return new WebP(data); } catch { }
                     try { return new Png(data); } catch { }
                     try { return new Jpeg(data); } catch { }
+                    try { return new Svg(data); } catch { }
                     try { return new Bitmap(data, ColorOrder.BGR); } catch { }
                     throw new NotSupportedException($"Image format could not be identified or is unsupported.");
             }

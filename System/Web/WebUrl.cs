@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 
 /// <summary>Minimal URL normalisation / relative-resolution for the browser.</summary>
 public static class WebUrl
@@ -209,5 +210,40 @@ public static class WebUrl
         if (h >= 0) rest = rest.Substring(0, h);
         if (rest.Length == 0) return "/";
         return rest[0] == '/' ? rest : "/" + rest;
+    }
+
+    /// <summary>Decodes standard percent-encoded URL octets (%XX) and '+' to space.</summary>
+    public static string UrlDecode(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return s;
+        if (s.IndexOf('%') < 0 && s.IndexOf('+') < 0) return s;
+
+        StringBuilder sb = new StringBuilder(s.Length);
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (c == '+')
+            {
+                sb.Append(' ');
+            }
+            else if (c == '%' && i + 2 < s.Length)
+            {
+                string hex = s.Substring(i + 1, 2);
+                if (byte.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out byte b))
+                {
+                    sb.Append((char)b);
+                    i += 2;
+                }
+                else
+                {
+                    sb.Append(c);
+                }
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+        return sb.ToString();
     }
 }
