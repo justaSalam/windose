@@ -1,4 +1,6 @@
 using Cosmos.Kernel.System.Input;
+using Windose.System.Kernel.Subsystem;
+using Windose.System.System_Calls;
 
 public enum FileDialogMode
 {
@@ -64,6 +66,8 @@ public sealed class FileDialog : Window
             viewMode = ListViewMode.Details,
             useBackground = true,
             backgroundColor = Palette.ControlWhite,
+            headers = ["Name", "Size", "Type", "Modified"],
+            headerWidths = [240, 80, 140, 140],
         };
         fileScroll = new ScrollView(0, 0, Width, Height)
         {
@@ -166,7 +170,7 @@ public sealed class FileDialog : Window
     private void NavigateUp()
     {
         string parent = FileSystemManager.GetParent(currentDirectory);
-        if (parent == null || parent == "") return;
+        if (string.IsNullOrEmpty(parent)) return;
         NavigateTo(parent);
     }
 
@@ -175,7 +179,7 @@ public sealed class FileDialog : Window
     private void NavigateTo(string path)
     {
         path = FileSystemManager.NormalizePath(path);
-        if (!Directory.Exists(path))
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
         {
             SetStatus("Folder not found");
             return;
@@ -185,21 +189,50 @@ public sealed class FileDialog : Window
         addressBar.Address = path;
         files.ClearItems();
 
-        string[] directories = Directory.GetDirectories(path);
-        for (int i = 0; i < directories.Length; i++)
+        try
         {
-            string directory = directories[i];
-            FileListViewItem item = files.AddFolder(directory, tag: directory);
-            item.type = "File Folder";
-        }
+            string[] directories = Directory.GetDirectories(path);
+            for (int i = 0; i < directories.Length; i++)
+            {
+                string directory = directories[i];
+                string dirName = Path.GetFileName(directory);
+                if (string.IsNullOrEmpty(dirName)) dirName = directory;
+                if (dirName == ".trash") continue;
 
-        string[] paths = Directory.GetFiles(path);
-        for (int i = 0; i < paths.Length; i++)
+                FileListViewItem item = files.AddFolder(dirName, tag: directory);
+                item.type = "File Folder";
+                item.size = "";
+                item.modified = "";
+            }
+
+            string[] paths = Directory.GetFiles(path);
+            for (int i = 0; i < paths.Length; i++)
+            {
+                string file = paths[i];
+                if (!MatchesFilter(file)) continue;
+                string fName = Path.GetFileName(file);
+                if (fName.EndsWith(".origpath", StringComparison.OrdinalIgnoreCase)) continue;
+
+                FileListViewItem item = files.AddItem(fName, tag: file);
+                item.isFolder = false;
+                item.type = FileAssociations.GetFileTypeDescription(file);
+                try
+                {
+                    FileInfo fi = new FileInfo(file);
+                    item.size = ByteSize.Format(fi.Length);
+                    item.modified = fi.CreationTime.ToString("g");
+                }
+                catch
+                {
+                    item.size = "";
+                    item.modified = "";
+                }
+            }
+        }
+        catch (Exception ex)
         {
-            string file = paths[i];
-            if (!MatchesFilter(file)) continue;
-            FileListViewItem item = files.AddItem(Path.GetFileName(file), tag: file);
-            item.type = options.FilterDescription;
+            SetStatus("Error reading folder: " + ex.Message);
+            SystemLogger.WriteLine("FileDialog", $"Error reading directory {path}: {ex.Message}", ConsoleMessageType.Error);
         }
 
         SetStatus(files.items.Count + " item(s)");
@@ -208,7 +241,7 @@ public sealed class FileDialog : Window
 
     private void Accept()
     {
-        if (currentDirectory == null || currentDirectory == "")
+        if (string.IsNullOrEmpty(currentDirectory))
         {
             SetStatus("Choose an available folder");
             return;
@@ -237,7 +270,14 @@ public sealed class FileDialog : Window
         }
 
         SelectedPath = path;
-        accepted?.Invoke(path);
+        try
+        {
+            accepted?.Invoke(path);
+        }
+        catch (Exception ex)
+        {
+            SystemLogger.WriteLine("FileDialog", $"Error in dialog callback: {ex.Message}", ConsoleMessageType.Error);
+        }
         WindowManager.PostClose(this);
     }
 
@@ -256,10 +296,11 @@ public sealed class FileDialog : Window
 
     private static string GetInitialDirectory(string path)
     {
-        if (path != null && path != "" && Directory.Exists(path)) return FileSystemManager.NormalizePath(path);
+        if (!string.IsNullOrEmpty(path) && Directory.Exists(path)) return FileSystemManager.NormalizePath(path);
         string directory = FileSystemManager.GetParent(path ?? "");
-        if (directory != null && directory != "" && Directory.Exists(directory)) return directory;
-        return "/mnt";
+        if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory)) return directory;
+        if (Directory.Exists("/mnt")) return "/mnt";
+        return "/";
     }
 
     private static string GetInitialFileName(string path, string defaultName)
@@ -271,26 +312,36 @@ public sealed class FileDialog : Window
 
     private bool MatchesFilter(string path)
     {
-        string extension = NormalizeExtension(options.FilterExtension);
-        return extension == "" || path.EndsWith(extension, StringComparison.OrdinalIgnoreCase);
+        if (options == null || string.IsNullOrEmpty(options.FilterExtension)) return true;
+        string[] exts = options.FilterExtension.Split(new[] { ';', ',', '|' }, StringSplitOptions.RemoveEmptyEntries);
+        if (exts.Length == 0) return true;
+        for (int i = 0; i < exts.Length; i++)
+        {
+            string ext = NormalizeExtension(exts[i]);
+            if (ext == "" || ext == ".*" || path.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     private static string NormalizeExtension(string extension)
     {
-        if (extension == null || extension == "") return "";
-        return extension[0] == '.' ? extension : "." + extension;
+        if (string.IsNullOrEmpty(extension)) return "";
+        extension = extension.Trim().TrimStart('*');
+        if (string.IsNullOrEmpty(extension)) return "";
+        return extension.StartsWith('.') ? extension : "." + extension;
     }
 
     private static string GetDialogTitle(FileDialogOptions options)
     {
-        if (options != null && options.Title != null && options.Title != "") return options.Title;
-        return options != null && options.Mode == FileDialogMode.Save ? "Save File" : "Open File";
+        if (options != null && !string.IsNullOrEmpty(options.Title)) return options.Title;
+        return (options != null && options.Mode == FileDialogMode.Save) ? "Save File" : "Open File";
     }
 
     private static string GetAcceptButtonText(FileDialogOptions options)
     {
-        if (options.AcceptButtonText != null && options.AcceptButtonText != "") return options.AcceptButtonText;
-        return options.Mode == FileDialogMode.Save ? "Save" : "Open";
+        if (options != null && !string.IsNullOrEmpty(options.AcceptButtonText)) return options.AcceptButtonText;
+        return (options != null && options.Mode == FileDialogMode.Save) ? "Save" : "Open";
     }
 
     public override string GetComponentName() => "FileDialog";

@@ -1,4 +1,6 @@
-﻿namespace Windose.System.Kernel.Attributes
+using System;
+
+namespace Windose.System.Kernel.Attributes
 {
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
     public sealed class FileAssociationAttribute : Attribute

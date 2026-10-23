@@ -34,10 +34,12 @@ public sealed class JsRealm
     public JsFunction SymbolCtor, ErrorCtor, TypeErrorCtor, RangeErrorCtor, SyntaxErrorCtor;
     public JsFunction ReferenceErrorCtor, EvalErrorCtor, URICtor, RegExpCtor, DateCtor;
     public JsFunction MapCtor, SetCtor, PromiseCtor, ReflectObjCtor, ProxyCtor;
+    public JsFunction FunctionCallMethod, FunctionApplyMethod;
 
     public JsInterpreter Interp;
 
     public JsObject NewObject() { return new JsObject(ObjectPrototype); }
+    public JsObject NewObject(JsObject proto) { return new JsObject(proto != null ? proto : ObjectPrototype); }
     public JsArray NewArray() { return new JsArray(ArrayPrototype); }
 
     public JsArray NewArray(List<object> items)
@@ -108,6 +110,7 @@ public class JsInterpreter
 {
     public JsRealm Realm;
     public JsScope GlobalScope;
+    public JsDom Dom;
 
     // execution context (saved/restored around calls)
     private object _this;
@@ -117,6 +120,7 @@ public class JsInterpreter
     // step budget to stop runaway scripts from hanging the OS
     private int _steps;
     public int StepLimit = 20000000;
+    public void ResetSteps() { _steps = 0; }
 
     // completion value of the last expression statement (eval/repl semantics)
     private object _lastValue = JsUndefined.Instance;
@@ -174,6 +178,7 @@ public class JsInterpreter
 
     public object RunProgram(JsProgram prog)
     {
+        _steps = 0;
         _lastValue = JsUndefined.Instance;
         HoistTop(prog.Body, GlobalScope);
         Completion c = ExecStatements(prog.Body, GlobalScope, null);
@@ -226,7 +231,56 @@ public class JsInterpreter
                 return r;
             }
 
+            if (fn.IsAsync)
+            {
+                if (construct) throw JsErr.Type(fn.Name + " is not a constructor");
+                JsEventLoop loop = EnsureLoop();
+                JsPromise retPromise = new JsPromise(Realm.PromisePrototype);
+
+                try
+                {
+                    JsScope asyncScope = fn.Closure != null ? fn.Closure.PushFunction() : new JsScope { IsFunction = true };
+                    if (!fn.IsArrow)
+                    {
+                        JsArray argsObj = Realm.NewArray(args != null ? new List<object>(args) : new List<object>());
+                        argsObj.SetProperty("callee", fn);
+                        asyncScope.DeclareVar("arguments", argsObj, true);
+                    }
+                    BindParams(asyncScope, fn, args);
+                    if (fn.Body != null) HoistDeclarations(asyncScope, fn.Body);
+
+                    Completion ac;
+                    if (fn.IsExpressionBody)
+                    {
+                        ac = Completion.Ret(EvalExpr(fn.Body, asyncScope));
+                    }
+                    else
+                    {
+                        JsBlock blk = fn.Body as JsBlock;
+                        ac = ExecStatements(blk != null ? blk.Body : new List<JsNode>(), asyncScope, null);
+                    }
+                    object aResult = ac.Type == CompType.Return ? ac.Value : JsUndefined.Instance;
+                    JsBrowser.FulfillPromise(loop, retPromise, aResult);
+                }
+                catch (JsThrown jt)
+                {
+                    JsBrowser.RejectPromise(loop, retPromise, jt.Value);
+                }
+                catch (Exception ex)
+                {
+                    JsBrowser.RejectPromise(loop, retPromise, JsBuiltins.CreateErrorObject(Realm, "Error", ex.Message));
+                }
+
+                return retPromise;
+            }
+
             JsScope scope = fn.Closure != null ? fn.Closure.PushFunction() : new JsScope { IsFunction = true };
+            if (!fn.IsArrow)
+            {
+                JsArray argsObj = Realm.NewArray(args != null ? new List<object>(args) : new List<object>());
+                argsObj.SetProperty("callee", fn);
+                scope.DeclareVar("arguments", argsObj, true);
+            }
             BindParams(scope, fn, args);
             if (fn.Body != null) HoistDeclarations(scope, fn.Body);
 
@@ -381,7 +435,8 @@ public class JsInterpreter
         f.IsArrow = node.Kind == JsKind.Arrow;
         f.IsMethod = node.IsMethod;
         f.IsGenerator = node.IsGenerator;
-        f.Constructable = !f.IsArrow;
+        f.IsAsync = node.IsAsync;
+        f.Constructable = !f.IsArrow && !f.IsAsync;
         if (!f.IsArrow)
         {
             // give normal functions a .prototype object
@@ -1214,7 +1269,12 @@ public class JsInterpreter
             case "-": return -JsValueOps.ToNumber(val);
             case "+": return JsValueOps.ToNumber(val);
             case "~": return ~(long)JsValueOps.ToInt32(val);
-            case "await": return val; // async unsupported: pass through
+            case "await":
+            {
+                JsEventLoop loop = EnsureLoop();
+                JsPromise p = JsBrowser.CoerceToPromise(Realm, loop, val);
+                return loop.AwaitPromise(p);
+            }
         }
         throw JsErr.Syntax("Unknown unary operator " + op);
     }
@@ -1328,6 +1388,40 @@ public class JsInterpreter
     {
         string op = n.Op;
 
+        if (n.Target.Kind == JsKind.Member)
+        {
+            JsMember m = (JsMember)n.Target;
+            object baseVal = EvalExpr(m.Object, scope);
+            object key = m.Computed ? EvalExpr(m.Property, scope) : (object)((JsIdentifier)m.Property).Name;
+
+            if (op == "=")
+            {
+                object v = EvalExpr(n.Value, scope);
+                SetMember(baseVal, key, v);
+                return v;
+            }
+
+            // compound assignment on member
+            object mCur;
+            GetMember(baseVal, key, out mCur);
+            object mRes;
+            switch (op)
+            {
+                case "??=": mRes = JsValueOps.IsNullish(mCur) ? EvalExpr(n.Value, scope) : mCur; break;
+                case "&&=": mRes = JsValueOps.ToBoolean(mCur) ? EvalExpr(n.Value, scope) : mCur; break;
+                case "||=": mRes = JsValueOps.ToBoolean(mCur) ? mCur : EvalExpr(n.Value, scope); break;
+                default:
+                    {
+                        string binop = op.Substring(0, op.Length - 1);
+                        object rhs = EvalExpr(n.Value, scope);
+                        mRes = ApplyBinary(binop, mCur, rhs);
+                        break;
+                    }
+            }
+            SetMember(baseVal, key, mRes);
+            return mRes;
+        }
+
         // destructuring assignment (target is a pattern)
         if (op == "=" && (n.Target.Kind == JsKind.ObjectPat || n.Target.Kind == JsKind.ArrayPat))
         {
@@ -1339,6 +1433,8 @@ public class JsInterpreter
         if (op == "=")
         {
             object v = EvalExpr(n.Value, scope);
+            if (n.Target.Kind == JsKind.Identifier && v is JsFunction fn && string.IsNullOrEmpty(fn.Name))
+                fn.Name = ((JsIdentifier)n.Target).Name;
             BindPattern(scope, n.Target, v, BindMode.Assign);
             return v;
         }
@@ -1444,7 +1540,7 @@ public class JsInterpreter
 
             if (c.Optional && JsValueOps.IsNullish(callee)) { shortCircuit = true; return JsUndefined.Instance; }
 
-            return Invoke(callee, thisArg, args.ToArray());
+            return Invoke(callee, thisArg, args.ToArray(), c.Callee);
         }
 
         // spine root
@@ -1456,10 +1552,44 @@ public class JsInterpreter
         return n.Kind == JsKind.Member || n.Kind == JsKind.Call;
     }
 
-    private object Invoke(object callee, object thisArg, object[] args)
+    private static string DescribeCallee(JsNode n)
+    {
+        if (n == null) return "callee";
+        if (n is JsIdentifier id) return id.Name;
+        if (n is JsMember m)
+        {
+            string prop = m.Property is JsIdentifier pid ? pid.Name : (m.Property is JsLiteral lit ? lit.Value?.ToString() : "?");
+            return DescribeCallee(m.Object) + "." + prop;
+        }
+        return n.Kind.ToString();
+    }
+
+    private object Invoke(object callee, object thisArg, object[] args, JsNode calleeNode = null)
     {
         JsFunction fn = callee as JsFunction;
-        if (fn == null) throw JsErr.Type(JsValueOps.TypeNameOf(callee) + " is not a function");
+        if (fn == null)
+        {
+            throw JsErr.Type(DescribeCallee(calleeNode) + " is not a function (was " + JsValueOps.TypeNameOf(callee) + ")");
+        }
+        if (fn == Realm.FunctionCallMethod && thisArg is JsFunction targetFn)
+        {
+            object realThis = (args != null && args.Length > 0) ? args[0] : Realm.Global;
+            object[] realArgs = null;
+            if (args != null && args.Length > 1)
+            {
+                realArgs = new object[args.Length - 1];
+                for (int i = 1; i < args.Length; i++) realArgs[i - 1] = args[i];
+            }
+            if (JsValueOps.IsNullish(realThis)) realThis = Realm.Global;
+            return Call(targetFn, realThis, realArgs, false);
+        }
+        if (fn == Realm.FunctionApplyMethod && thisArg is JsFunction applyTargetFn)
+        {
+            object realThis = (args != null && args.Length > 0) ? args[0] : Realm.Global;
+            List<object> list = (args != null && args.Length > 1) ? ToList(args[1]) : new List<object>();
+            if (JsValueOps.IsNullish(realThis)) realThis = Realm.Global;
+            return Call(applyTargetFn, realThis, list.ToArray(), false);
+        }
         if (JsValueOps.IsNullish(thisArg)) thisArg = Realm.Global;
         return Call(fn, thisArg, args, false);
     }
@@ -1518,12 +1648,27 @@ public class JsInterpreter
         if (JsValueOps.IsNullish(baseVal))
             throw JsErr.Type("Cannot read properties of " + (baseVal is JsNull ? "null" : "undefined") + " (reading '" + KeyText(keyObj) + "')");
 
-        string keyStr = keyObj as string;
+        if (keyObj is JsSymbol sym)
+        {
+            if (baseVal is JsSymbol)
+            {
+                value = JsUndefined.Instance;
+                return;
+            }
+            JsObject symProto = PrototypeOfValue(baseVal);
+            if (symProto == null) { value = JsUndefined.Instance; return; }
+            symProto.GetProperty(sym, out value);
+            return;
+        }
+
+        string keyStr = keyObj as string ?? JsValueOps.ToStringValue(keyObj);
+        if (keyStr == null) keyStr = "undefined";
 
         if (baseVal is JsSymbol)
         {
             if (keyStr == "description") { value = ((JsSymbol)baseVal).Desc; }
             else if (keyStr == "toString") { value = Realm.MakeMethod("toString", SymbolToString, 0); }
+            else { value = JsUndefined.Instance; }
             return;
         }
 
@@ -1532,34 +1677,23 @@ public class JsInterpreter
             string s = (string)baseVal;
             if (keyStr == "length") { value = (double)s.Length; return; }
             long idx;
-            if (keyStr != null && IsArrayIndexKey(keyStr, out idx) && idx >= 0 && idx < s.Length)
+            if (IsArrayIndexKey(keyStr, out idx) && idx >= 0 && idx < s.Length)
             { value = s[(int)idx].ToString(); return; }
         }
         if (baseVal is JsArray)
         {
             JsArray a = (JsArray)baseVal;
             if (keyStr == "length") { value = (double)a.Length; return; }
+            long idx;
+            if (IsArrayIndexKey(keyStr, out idx))
+            {
+                value = a.GetIndex((int)idx);
+                return;
+            }
         }
 
         JsObject proto = PrototypeOfValue(baseVal);
         if (proto == null) { value = JsUndefined.Instance; return; }
-
-        if (keyObj is JsSymbol)
-        {
-            proto.GetProperty((JsSymbol)keyObj, out value);
-            return;
-        }
-
-        // array / string index fast path
-        if (baseVal is JsArray && keyStr != null)
-        {
-            long idx;
-            if (IsArrayIndexKey(keyStr, out idx))
-            {
-                value = ((JsArray)baseVal).GetIndex((int)idx);
-                return;
-            }
-        }
 
         proto.GetProperty(keyStr, out value);
     }
@@ -1578,16 +1712,18 @@ public class JsInterpreter
         if (!(baseVal is JsObject)) return; // sloppy: writing to a primitive is a no-op
 
         JsObject o = (JsObject)baseVal;
-        string keyStr = keyObj as string;
-        if (keyObj is JsSymbol) { o.SetProperty((JsSymbol)keyObj, value); return; }
+        if (keyObj is JsSymbol sym) { o.SetProperty(sym, value); return; }
 
-        if (o is JsArray && keyStr != null && keyStr == "length")
+        string keyStr = keyObj as string ?? JsValueOps.ToStringValue(keyObj);
+        if (keyStr == null) keyStr = "undefined";
+
+        if (o is JsArray)
         {
-            ((JsArray)o).SetLength((int)JsValueOps.ToNumber(value));
-            return;
-        }
-        if (o is JsArray && keyStr != null)
-        {
+            if (keyStr == "length")
+            {
+                ((JsArray)o).SetLength((int)JsValueOps.ToNumber(value));
+                return;
+            }
             long idx;
             if (IsArrayIndexKey(keyStr, out idx) && idx >= 0)
             {
@@ -1625,12 +1761,24 @@ public class JsInterpreter
     public bool HasProperty(object baseVal, object key)
     {
         if (JsValueOps.IsNullish(baseVal)) return false;
+        if (key is JsSymbol sym)
+        {
+            JsObject protoSym = PrototypeOfValue(baseVal);
+            return protoSym != null && protoSym.HasProperty(sym);
+        }
+        string keyStr = key as string ?? JsValueOps.ToStringValue(key);
+        if (keyStr == null) keyStr = "undefined";
+
+        if (baseVal is string && keyStr == "length") return true;
+        if (baseVal is JsArray)
+        {
+            if (keyStr == "length") return true;
+            long idx;
+            if (IsArrayIndexKey(keyStr, out idx) && idx >= 0 && idx < ((JsArray)baseVal).Length) return true;
+        }
+
         JsObject proto = PrototypeOfValue(baseVal);
         if (proto == null) return false;
-        string keyStr = key as string;
-        if (baseVal is string && keyStr == "length") return true;
-        if (baseVal is JsArray && keyStr == "length") return true;
-        if (key is JsSymbol) return proto.HasProperty((JsSymbol)key);
         return proto.HasProperty(keyStr);
     }
 

@@ -140,6 +140,7 @@ public class WebView : Component
         loop.ViewportHeight = Height;
         loop.CookieGetter = OnJsGetCookies;
         loop.CookieSetter = OnJsSetCookie;
+        loop.PumpHook = PumpJs;
 
         dom = new JsDom(js, document.Root);
         dom.OnDomChanged = OnDomMutated;
@@ -180,12 +181,17 @@ public class WebView : Component
             if (string.IsNullOrEmpty(s.Code)) continue; // external script failed to fetch
             try
             {
+                dom.CurrentExecutingScriptNode = s.Node;
                 JsProgram prog = JsParser.ParseProgram(s.Code);
                 js.RunProgram(prog);
                 js.DrainJobs();   // microtask checkpoint after each script
             }
             catch (JsThrown) { /* a syntax/runtime error in one script must not stop the rest */ }
             catch (Exception) { }
+            finally
+            {
+                dom.CurrentExecutingScriptNode = null;
+            }
         }
     }
 
@@ -202,7 +208,9 @@ public class WebView : Component
         if (dom == null) return false;
         DomNode node = plan.HitTestNode(contentX, contentY);
         if (node == null) return false;
-        bool defaultPrevented = !dom.Dispatch(node, "click"); // Dispatch returns !defaultPrevented
+        int clientX = contentX;
+        int clientY = contentY - scrollY;
+        bool defaultPrevented = !dom.DispatchMouse(node, "click", clientX, clientY, 0); // Dispatch returns !defaultPrevented
         js.DrainJobs();   // handler may have queued Promise reactions
         return defaultPrevented;
     }
@@ -238,6 +246,7 @@ public class WebView : Component
     public static byte WidgetKindOfNode(DomNode node)
     {
         if (node == null || !node.IsElement) return WidgetKind.NotAWidget;
+        if (node.GetAttr("hidden") != null) return WidgetKind.NotAWidget;
         string tag = node.Tag;
         if (tag == "input")
         {
@@ -959,7 +968,14 @@ public class WebView : Component
             if (box.Hidden) continue;
             int by = box.Y - scrollY + viewTop;
             if (by + box.H < viewTop || by > viewTop + viewHeight) continue;
-            DrawBox(box, by, viewportWidth);
+            bool pushed = false;
+            if (box.HasClip && buffer != null)
+            {
+                int cy = box.ClipY - scrollY + viewTop;
+                pushed = buffer.PushContext(0, 0, Width, Height, new Rectangle(box.ClipX, cy, box.ClipW, box.ClipH));
+            }
+            DrawBox(box, by, viewportWidth, viewTop);
+            if (pushed) buffer.PopContext();
         }
 
         // Clip manually by culling lines outside the viewport.
@@ -968,17 +984,31 @@ public class WebView : Component
             RenderLine line = plan.Lines[i];
             int ly = line.Y - scrollY + viewTop;
             if (ly + line.Height < viewTop || ly > viewTop + viewHeight) continue;
+            bool pushed = false;
+            if (line.HasClip && buffer != null)
+            {
+                int cy = line.ClipY - scrollY + viewTop;
+                pushed = buffer.PushContext(0, 0, Width, Height, new Rectangle(line.ClipX, cy, line.ClipW, line.ClipH));
+            }
             DrawLineContent(line, ly, viewportWidth);
+            if (pushed) buffer.PopContext();
         }
 
         // Form controls painted above the text runs.
         for (int i = 0; i < plan.Widgets.Count; i++)
         {
             RenderWidget w = plan.Widgets[i];
-            if (w.Hidden) continue;
+            if (w.Hidden || w.X >= viewportWidth || w.X + w.W <= 0) continue;
             int wy = w.Y - scrollY + viewTop;
             if (wy + w.H < viewTop || wy > viewTop + viewHeight) continue;
+            bool pushed = false;
+            if (w.HasClip && buffer != null)
+            {
+                int cy = w.ClipY - scrollY + viewTop;
+                pushed = buffer.PushContext(0, 0, Width, Height, new Rectangle(w.ClipX, cy, w.ClipW, w.ClipH));
+            }
             DrawWidget(w, wy);
+            if (pushed) buffer.PopContext();
         }
         if (openSelect != null) DrawSelectPopup(viewTop, viewHeight);
 
@@ -1192,30 +1222,167 @@ public class WebView : Component
         return s.Substring(0, end);
     }
 
-    private void DrawBox(RenderBox box, int by, int viewportWidth)
+    private void DrawBox(RenderBox box, int by, int viewportWidth, int viewTop)
     {
+        if (box.IsSticky)
+        {
+            int stickyY = viewTop + box.StickyTop;
+            if (by < stickyY) by = stickyY;
+            if (box.ParentBottom < int.MaxValue)
+            {
+                int maxBy = box.ParentBottom - scrollY + viewTop - box.H;
+                if (by > maxBy) by = maxBy;
+            }
+        }
+
+        int bx = box.X;
+        if (!string.IsNullOrEmpty(box.Transform))
+        {
+            ApplyBoxTransform(ref bx, ref by, box.Transform, box.W, box.H);
+        }
+
+        if (bx >= viewportWidth || bx + box.W <= 0) return;
+
+        if (!string.IsNullOrEmpty(box.BoxShadow))
+        {
+            DrawBoxShadow(bx, by, box.W, box.H, box.BorderRadius, box.BoxShadow);
+        }
+
         int r = box.BorderRadius > 0 ? Math.Min(box.BorderRadius, Math.Min(box.W, box.H) / 2) : 0;
         if (box.HasBg)
         {
-            if (r > 0) DrawFilledRoundedRectangle(box.Bg, box.X, by, box.W, box.H, r);
-            else DrawFilledRectangle(box.Bg, box.X, by, box.W, box.H);
+            if (r > 0) DrawFilledRoundedRectangle(box.Bg, bx, by, box.W, box.H, r);
+            else DrawFilledRectangle(box.Bg, bx, by, box.W, box.H);
         }
 
         if (box.BgImage != null && box.W > 0 && box.H > 0)
         {
-            DrawImageStretch(box.BgImage, new Rectangle(box.X, by, box.W, box.H));
+            DrawImageStretch(box.BgImage, new Rectangle(bx, by, box.W, box.H));
         }
 
         if (r > 0 && box.BorderT > 0)
         {
-            DrawRoundedRectangle(box.BorderCT, box.X, by, box.W, box.H, r);
+            DrawRoundedRectangle(box.BorderCT, bx, by, box.W, box.H, r);
         }
         else
         {
-            if (box.BorderT > 0) DrawBorderSide(box.StyleT, box.BorderCT, box.X, by, box.W, box.BorderT, 0);
-            if (box.BorderB > 0) DrawBorderSide(box.StyleB, box.BorderCB, box.X, by + box.H - box.BorderB, box.W, box.BorderB, 2);
-            if (box.BorderL > 0) DrawBorderSide(box.StyleL, box.BorderCL, box.X, by, box.BorderL, box.H, 3);
-            if (box.BorderR > 0) DrawBorderSide(box.StyleR, box.BorderCR, box.X + box.W - box.BorderR, by, box.BorderR, box.H, 1);
+            if (box.BorderT > 0) DrawBorderSide(box.StyleT, box.BorderCT, bx, by, box.W, box.BorderT, 0);
+            if (box.BorderB > 0) DrawBorderSide(box.StyleB, box.BorderCB, bx, by + box.H - box.BorderB, box.W, box.BorderB, 2);
+            if (box.BorderL > 0) DrawBorderSide(box.StyleL, box.BorderCL, bx, by, box.BorderL, box.H, 3);
+            if (box.BorderR > 0) DrawBorderSide(box.StyleR, box.BorderCR, bx + box.W - box.BorderR, by, box.BorderR, box.H, 1);
+        }
+    }
+
+    private void ApplyBoxTransform(ref int x, ref int y, string transform, int boxW = 0, int boxH = 0)
+    {
+        if (string.IsNullOrEmpty(transform)) return;
+        string t = transform.Trim();
+        int idx = 0;
+        while (idx < t.Length)
+        {
+            int pOpen = t.IndexOf('(', idx);
+            if (pOpen < 0) break;
+            int pClose = t.IndexOf(')', pOpen);
+            if (pClose < 0) break;
+
+            int fnStart = pOpen - 1;
+            while (fnStart >= idx && (char.IsLetterOrDigit(t[fnStart]) || t[fnStart] == '-')) fnStart--;
+            string fn = t.Substring(fnStart + 1, pOpen - fnStart - 1).Trim().ToLowerInvariant();
+            string args = t.Substring(pOpen + 1, pClose - pOpen - 1).Trim();
+
+            if (fn == "translatex")
+            {
+                x += ParseTransformOffset(args, boxW, Width);
+            }
+            else if (fn == "translatey")
+            {
+                y += ParseTransformOffset(args, boxH, Height);
+            }
+            else if (fn == "translate" || fn == "translate3d")
+            {
+                string[] parts = args.Split(',');
+                if (parts.Length > 0) x += ParseTransformOffset(parts[0], boxW, Width);
+                if (parts.Length > 1) y += ParseTransformOffset(parts[1], boxH, Height);
+            }
+
+            idx = pClose + 1;
+        }
+    }
+
+    private static int ParseTransformOffset(string s, int boxSize, int viewSize)
+    {
+        if (string.IsNullOrEmpty(s)) return 0;
+        s = s.Trim();
+        if (s.EndsWith("%"))
+        {
+            string num = s.Substring(0, s.Length - 1).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double pct))
+                return (int)(boxSize * pct / 100.0);
+        }
+        else if (s.EndsWith("vw", StringComparison.OrdinalIgnoreCase))
+        {
+            string num = s.Substring(0, s.Length - 2).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v))
+                return (int)(viewSize * v / 100.0);
+        }
+        else if (s.EndsWith("vh", StringComparison.OrdinalIgnoreCase))
+        {
+            string num = s.Substring(0, s.Length - 2).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v))
+                return (int)(viewSize * v / 100.0);
+        }
+        else if (s.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+        {
+            string num = s.Substring(0, s.Length - 2).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double px))
+                return (int)px;
+        }
+        else
+        {
+            if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v))
+                return (int)v;
+        }
+        return 0;
+    }
+
+    private void DrawBoxShadow(int x, int y, int w, int h, int radius, string shadowStr)
+    {
+        if (string.IsNullOrEmpty(shadowStr)) return;
+        string[] parts = shadowStr.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        int ox = 0, oy = 2, blur = 4;
+        Color shadowCol = Color.FromArgb(40, 0, 0, 0);
+
+        for (int i = 0; i < parts.Length; i++)
+        {
+            string p = parts[i].Trim();
+            if (p.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                if (int.TryParse(p.Substring(0, p.Length - 2), out int val))
+                {
+                    if (i == 0) ox = val;
+                    else if (i == 1) oy = val;
+                    else if (i == 2) blur = val;
+                }
+            }
+            else if (p.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) || p.StartsWith("#"))
+            {
+                shadowCol = Color.FromArgb(50, 0, 0, 0);
+            }
+        }
+
+        int passes = Math.Min(4, Math.Max(1, blur / 2));
+        for (int s = passes; s >= 1; s--)
+        {
+            int sx = x + ox - s;
+            int sy = y + oy - s;
+            int sw = w + s * 2;
+            int sh = h + s * 2;
+            int alpha = Math.Max(5, 50 / (s + 1));
+            Color c = Color.FromArgb(alpha, shadowCol.R, shadowCol.G, shadowCol.B);
+            if (radius > 0)
+                DrawFilledRoundedRectangle(c, sx, sy, sw, sh, radius + s);
+            else
+                DrawFilledRectangle(c, sx, sy, sw, sh);
         }
     }
 
@@ -1279,6 +1446,7 @@ public class WebView : Component
 
         if (line.IsImage)
         {
+            if (line.TextX >= viewportWidth || line.TextX + line.ImageW <= 0) return;
             if (line.Image != null)
             {
                 DrawImageStretch(line.Image, new Rectangle(line.TextX, ly, line.ImageW, line.ImageH));
@@ -1302,7 +1470,7 @@ public class WebView : Component
         for (int i = 0; i < line.Spans.Count; i++)
         {
             RenderSpan s = line.Spans[i];
-            if (s.Hidden) continue;
+            if (s.Hidden || s.X >= viewportWidth || s.X + s.Width <= 0) continue;
 
             if (s.IsImage)
             {
@@ -1570,7 +1738,8 @@ public class WebView : Component
                 }
                 return;
             case Key.Enter:
-                if (multiline)
+                bool isSingleLineTextarea = kind == WidgetKind.Textarea && (focusWidget.GetAttr("rows") == "1" || AncestorForm(focusWidget) != null);
+                if (multiline && !isSingleLineTextarea)
                 {
                     SetWidgetValue(focusWidget, value.Substring(0, ci) + "\n" + value.Substring(ci));
                     caret = ci + 1;

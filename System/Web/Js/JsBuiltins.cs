@@ -64,7 +64,11 @@ public static class JsBuiltins
         BuildSymbol(realm);
         BuildRegExp(realm);
         BuildDate(realm);
+        BuildIntl(realm);
         BuildMapSet(realm);
+        BuildWeakMapSet(realm);
+        BuildTypedArrays(realm);
+        BuildProxyReflect(realm);
         BuildGlobalFunctions(realm);
         // browser globals: Promise, timers, fetch, XHR, location, navigator...
         // (needs realm.Interp so it can attach the event loop)
@@ -237,6 +241,19 @@ public static class JsBuiltins
         realm.ObjectCtor = realm.MakeCtor("Object", ObjectCtorFn, 1, op);
         realm.Global.Define("Object", JsProperty.Data(realm.ObjectCtor));
 
+        realm.ObjectCtor.Define("hasOwn", JsProperty.Data(realm.MakeMethod("hasOwn", delegate (JsCallArgs a)
+        {
+            object target = a.Get(0);
+            if (target == null || target is JsUndefined || target is JsNull)
+                throw JsErr.Type("Cannot convert undefined or null to object");
+            string prop = JsValueOps.ToStringValue(a.Get(1));
+            if (target is JsObject o)
+            {
+                return o.HasOwnProperty(prop);
+            }
+            return false;
+        }, 2)));
+
         realm.ObjectCtor.Define("keys", JsProperty.Data(realm.MakeMethod("keys", delegate (JsCallArgs a)
         {
             object v = a.Get(0);
@@ -396,6 +413,101 @@ public static class JsBuiltins
             }
             return o;
         }, 1)));
+
+        realm.ObjectCtor.Define("getOwnPropertyDescriptor", JsProperty.Data(realm.MakeMethod("getOwnPropertyDescriptor", delegate (JsCallArgs a)
+        {
+            object v = a.Get(0);
+            if (!(v is JsObject)) return JsUndefined.Instance;
+            JsObject o = (JsObject)v;
+            string key = a.ArgCount > 1 ? JsValueOps.ToStringValue(a.Get(1)) : "undefined";
+
+            if (o is JsArray && JsArray.IsArrayIndex(key))
+            {
+                bool ok;
+                long idx = JsArray.KeyToIndex(key, out ok);
+                JsArray arr = (JsArray)o;
+                if (ok && idx >= 0 && idx < arr.Length)
+                {
+                    JsObject desc = realm.NewObject();
+                    desc.SetProperty("value", arr.GetIndex((int)idx));
+                    desc.SetProperty("writable", true);
+                    desc.SetProperty("enumerable", true);
+                    desc.SetProperty("configurable", true);
+                    return desc;
+                }
+            }
+
+            JsProperty p;
+            if (o.TryGetRaw(key, out p))
+            {
+                JsObject desc = realm.NewObject();
+                if (p.IsAccessor)
+                {
+                    desc.SetProperty("get", p.Getter != null ? (object)p.Getter : JsUndefined.Instance);
+                    desc.SetProperty("set", p.Setter != null ? (object)p.Setter : JsUndefined.Instance);
+                }
+                else
+                {
+                    desc.SetProperty("value", p.Value);
+                    desc.SetProperty("writable", p.Writable);
+                }
+                desc.SetProperty("enumerable", p.Enumerable);
+                desc.SetProperty("configurable", p.Configurable);
+                return desc;
+            }
+            return JsUndefined.Instance;
+        }, 2)));
+
+        realm.ObjectCtor.Define("getOwnPropertyDescriptors", JsProperty.Data(realm.MakeMethod("getOwnPropertyDescriptors", delegate (JsCallArgs a)
+        {
+            JsObject result = realm.NewObject();
+            object v = a.Get(0);
+            if (!(v is JsObject)) return result;
+            JsObject o = (JsObject)v;
+            List<string> keys = o.OwnKeys(false);
+            if (o is JsArray)
+            {
+                for (int i = 0; i < ((JsArray)o).Length; i++)
+                {
+                    string ks = i.ToString();
+                    JsObject d = realm.NewObject();
+                    d.SetProperty("value", ((JsArray)o).GetIndex(i));
+                    d.SetProperty("writable", true);
+                    d.SetProperty("enumerable", true);
+                    d.SetProperty("configurable", true);
+                    result.SetProperty(ks, d);
+                }
+            }
+            for (int i = 0; i < keys.Count; i++)
+            {
+                string k = keys[i];
+                if (o is JsArray && JsArray.IsArrayIndex(k)) continue;
+                JsProperty p;
+                if (o.TryGetRaw(k, out p))
+                {
+                    JsObject desc = realm.NewObject();
+                    if (p.IsAccessor)
+                    {
+                        desc.SetProperty("get", p.Getter != null ? (object)p.Getter : JsUndefined.Instance);
+                        desc.SetProperty("set", p.Setter != null ? (object)p.Setter : JsUndefined.Instance);
+                    }
+                    else
+                    {
+                        desc.SetProperty("value", p.Value);
+                        desc.SetProperty("writable", p.Writable);
+                    }
+                    desc.SetProperty("enumerable", p.Enumerable);
+                    desc.SetProperty("configurable", p.Configurable);
+                    result.SetProperty(k, desc);
+                }
+            }
+            return result;
+        }, 1)));
+
+        realm.ObjectCtor.Define("getOwnPropertySymbols", JsProperty.Data(realm.MakeMethod("getOwnPropertySymbols", delegate (JsCallArgs a)
+        {
+            return realm.NewArray();
+        }, 1)));
     }
 
     private static List<string> GetKeysList(object v)
@@ -473,22 +585,24 @@ public static class JsBuiltins
     private static void BuildFunction(JsRealm realm)
     {
         JsObject fp = realm.FunctionPrototype;
-        fp.Define("call", JsProperty.Data(realm.MakeMethod("call", delegate (JsCallArgs a)
+        realm.FunctionCallMethod = realm.MakeMethod("call", delegate (JsCallArgs a)
         {
             object fn = a.ThisValue;
             object thisArg = a.Get(0);
             List<object> args = new List<object>();
             for (int i = 1; i < a.ArgCount; i++) args.Add(a.Get(i));
             return realm.Interp.Call(fn, thisArg, args.ToArray(), false);
-        }, 1)));
+        }, 1);
+        fp.Define("call", JsProperty.Data(realm.FunctionCallMethod));
 
-        fp.Define("apply", JsProperty.Data(realm.MakeMethod("apply", delegate (JsCallArgs a)
+        realm.FunctionApplyMethod = realm.MakeMethod("apply", delegate (JsCallArgs a)
         {
             object fn = a.ThisValue;
             object thisArg = a.Get(0);
             List<object> list = a.ArgCount > 1 ? realm.Interp.ToList(a.Get(1)) : new List<object>();
             return realm.Interp.Call(fn, thisArg, list.ToArray(), false);
-        }, 2)));
+        }, 2);
+        fp.Define("apply", JsProperty.Data(realm.FunctionApplyMethod));
 
         fp.Define("bind", JsProperty.Data(realm.MakeMethod("bind", delegate (JsCallArgs a)
         {
@@ -947,6 +1061,108 @@ public static class JsBuiltins
             return result;
         }, 1)));
 
+        ap.Define("at", JsProperty.Data(realm.MakeMethod("at", delegate (JsCallArgs a)
+        {
+            JsArray arr = ThisArray(a);
+            if (arr == null) return JsUndefined.Instance;
+            int idx = ToInteger(a.Get(0));
+            int len = arr.Length;
+            if (idx < 0) idx += len;
+            if (idx < 0 || idx >= len) return JsUndefined.Instance;
+            return arr.GetIndex(idx);
+        }, 1)));
+
+        ap.Define("findLast", JsProperty.Data(realm.MakeMethod("findLast", delegate (JsCallArgs a)
+        {
+            JsArray arr = ThisArray(a);
+            JsFunction fn = a.Get(0) as JsFunction;
+            if (arr == null || fn == null) return JsUndefined.Instance;
+            object thisArg = a.Get(1);
+            for (int i = arr.Length - 1; i >= 0; i--)
+            {
+                object v = arr.GetIndex(i);
+                if (JsValueOps.ToBoolean(realm.Interp.Call(fn, thisArg, new object[] { v, (double)i, arr }, false)))
+                    return v;
+            }
+            return JsUndefined.Instance;
+        }, 1)));
+
+        ap.Define("findLastIndex", JsProperty.Data(realm.MakeMethod("findLastIndex", delegate (JsCallArgs a)
+        {
+            JsArray arr = ThisArray(a);
+            JsFunction fn = a.Get(0) as JsFunction;
+            if (arr == null || fn == null) return -1.0;
+            object thisArg = a.Get(1);
+            for (int i = arr.Length - 1; i >= 0; i--)
+            {
+                object v = arr.GetIndex(i);
+                if (JsValueOps.ToBoolean(realm.Interp.Call(fn, thisArg, new object[] { v, (double)i, arr }, false)))
+                    return (double)i;
+            }
+            return -1.0;
+        }, 1)));
+
+        ap.Define("toReversed", JsProperty.Data(realm.MakeMethod("toReversed", delegate (JsCallArgs a)
+        {
+            JsArray arr = ThisArray(a);
+            JsArray res = realm.NewArray();
+            if (arr == null) return res;
+            for (int i = arr.Length - 1; i >= 0; i--) res.Push(arr.GetIndex(i));
+            return res;
+        }, 0)));
+
+        ap.Define("toSorted", JsProperty.Data(realm.MakeMethod("toSorted", delegate (JsCallArgs a)
+        {
+            JsArray arr = ThisArray(a);
+            JsArray copy = realm.NewArray();
+            if (arr == null) return copy;
+            for (int i = 0; i < arr.Length; i++) copy.Push(arr.GetIndex(i));
+            JsFunction cmp = a.ArgCount > 0 && a.Get(0) is JsFunction ? (JsFunction)a.Get(0) : null;
+            for (int i = 1; i < copy.Length; i++)
+            {
+                object key = copy.Items[i];
+                int j = i - 1;
+                while (j >= 0 && SortLess(a, cmp, key, copy.Items[j]))
+                {
+                    copy.Items[j + 1] = copy.Items[j];
+                    j--;
+                }
+                copy.Items[j + 1] = key;
+            }
+            return copy;
+        }, 1)));
+
+        ap.Define("toSpliced", JsProperty.Data(realm.MakeMethod("toSpliced", delegate (JsCallArgs a)
+        {
+            JsArray arr = ThisArray(a);
+            JsArray copy = realm.NewArray();
+            if (arr == null) return copy;
+            for (int i = 0; i < arr.Length; i++) copy.Push(arr.GetIndex(i));
+            int len = copy.Length;
+            int start = ToInteger(a.Get(0));
+            if (start < 0) start = System.Math.Max(len + start, 0);
+            else if (start > len) start = len;
+            int deleteCount = a.ArgCount <= 1 ? len - start
+                : a.ArgCount == 2 ? ToInteger(a.Get(1))
+                : System.Math.Max(0, System.Math.Min(ToInteger(a.Get(1)), len - start));
+            copy.Items.RemoveRange(start, deleteCount);
+            for (int i = a.ArgCount - 1; i >= 2; i--) copy.Items.Insert(start, a.Get(i));
+            return copy;
+        }, 2)));
+
+        ap.Define("with", JsProperty.Data(realm.MakeMethod("with", delegate (JsCallArgs a)
+        {
+            JsArray arr = ThisArray(a);
+            JsArray copy = realm.NewArray();
+            if (arr == null) return copy;
+            int len = arr.Length;
+            int idx = ToInteger(a.Get(0));
+            if (idx < 0) idx += len;
+            if (idx < 0 || idx >= len) throw JsErr.Range("Invalid index: " + idx);
+            for (int i = 0; i < len; i++) copy.Push(i == idx ? a.Get(1) : arr.GetIndex(i));
+            return copy;
+        }, 2)));
+
         // ---- Array constructor ----
         realm.ArrayCtor = realm.MakeCtor("Array", delegate (JsCallArgs a)
         {
@@ -1095,6 +1311,14 @@ public static class JsBuiltins
         sp.Define("length", JsProperty.DataNonEnum(0.0));
 
         JsNativeFn strMethod = null; // placeholder to keep pattern clear
+
+        DefineStr(realm, "at", 1, delegate (JsRealm r, string s, JsCallArgs a)
+        {
+            int idx = ToInteger(a.Get(0));
+            if (idx < 0) idx += s.Length;
+            if (idx < 0 || idx >= s.Length) return JsUndefined.Instance;
+            return s[idx].ToString();
+        });
 
         DefineStr(realm, "charAt", 1, delegate (JsRealm r, string s, JsCallArgs a)
         {
@@ -1472,7 +1696,21 @@ public static class JsBuiltins
 
         np.Define("toLocaleString", JsProperty.Data(realm.MakeMethod("toLocaleString", delegate (JsCallArgs a)
         {
-            return JsValueOps.NumberToString(JsValueOps.ToNumber(a.ThisValue));
+            double num = JsValueOps.ToNumber(a.ThisValue);
+            string style = "decimal";
+            string currency = "USD";
+            bool grouping = true;
+            int minFrac = 0;
+            int maxFrac = 3;
+            if (a.ArgCount > 1 && a.Get(1) is JsObject opts)
+            {
+                if (opts.GetProperty("style", out object s)) style = JsValueOps.ToStringValue(s);
+                if (opts.GetProperty("currency", out object c)) currency = JsValueOps.ToStringValue(c);
+                if (opts.GetProperty("useGrouping", out object g)) grouping = JsValueOps.ToBoolean(g);
+                if (opts.GetProperty("minimumFractionDigits", out object mn)) minFrac = (int)JsValueOps.ToNumber(mn);
+                if (opts.GetProperty("maximumFractionDigits", out object mx)) maxFrac = (int)JsValueOps.ToNumber(mx);
+            }
+            return FormatNumber(num, style, currency, grouping, minFrac, maxFrac);
         }, 0)));
 
         realm.NumberCtor = realm.MakeCtor("Number", delegate (JsCallArgs a)
@@ -1785,6 +2023,20 @@ public static class JsBuiltins
             if (_rng == null) _rng = new Random(12345);
             return _rng.NextDouble();
         }, 0)));
+        m.Define("clz32", JsProperty.Data(realm.MakeMethod("clz32", delegate (JsCallArgs a)
+        {
+            uint u = (uint)JsValueOps.ToNumber(a.Get(0));
+            if (u == 0) return 32.0;
+            int count = 0;
+            while ((u & 0x80000000U) == 0) { count++; u <<= 1; }
+            return (double)count;
+        }, 1)));
+        m.Define("imul", JsProperty.Data(realm.MakeMethod("imul", delegate (JsCallArgs a)
+        {
+            int a32 = (int)(uint)JsValueOps.ToNumber(a.Get(0));
+            int b32 = (int)(uint)JsValueOps.ToNumber(a.Get(1));
+            return (double)(a32 * b32);
+        }, 2)));
 
         realm.Global.Define("Math", JsProperty.Data(m));
     }
@@ -2015,6 +2267,9 @@ public static class JsBuiltins
 
     // ---- Date --------------------------------------------------------------
 
+    private static readonly string[] DateDayNames = new string[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+    private static readonly string[] DateMonthNames = new string[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+
     public static void BuildDate(JsRealm realm)
     {
         JsObject dp = realm.DatePrototype;
@@ -2034,17 +2289,375 @@ public static class JsBuiltins
             return double.NaN;
         }, 0)));
 
+        // Getters
+        dp.Define("getFullYear", JsProperty.Data(realm.MakeMethod("getFullYear", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Year;
+        }, 0)));
+
+        dp.Define("getUTCFullYear", JsProperty.Data(realm.MakeMethod("getUTCFullYear", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Year;
+        }, 0)));
+
+        dp.Define("getYear", JsProperty.Data(realm.MakeMethod("getYear", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)(TicksToDt(time).Year - 1900);
+        }, 0)));
+
+        dp.Define("getMonth", JsProperty.Data(realm.MakeMethod("getMonth", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)(TicksToDt(time).Month - 1);
+        }, 0)));
+
+        dp.Define("getUTCMonth", JsProperty.Data(realm.MakeMethod("getUTCMonth", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)(TicksToDt(time).Month - 1);
+        }, 0)));
+
+        dp.Define("getDate", JsProperty.Data(realm.MakeMethod("getDate", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Day;
+        }, 0)));
+
+        dp.Define("getUTCDate", JsProperty.Data(realm.MakeMethod("getUTCDate", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Day;
+        }, 0)));
+
+        dp.Define("getDay", JsProperty.Data(realm.MakeMethod("getDay", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)((int)TicksToDt(time).DayOfWeek);
+        }, 0)));
+
+        dp.Define("getUTCDay", JsProperty.Data(realm.MakeMethod("getUTCDay", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)((int)TicksToDt(time).DayOfWeek);
+        }, 0)));
+
+        dp.Define("getHours", JsProperty.Data(realm.MakeMethod("getHours", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Hour;
+        }, 0)));
+
+        dp.Define("getUTCHours", JsProperty.Data(realm.MakeMethod("getUTCHours", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Hour;
+        }, 0)));
+
+        dp.Define("getMinutes", JsProperty.Data(realm.MakeMethod("getMinutes", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Minute;
+        }, 0)));
+
+        dp.Define("getUTCMinutes", JsProperty.Data(realm.MakeMethod("getUTCMinutes", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Minute;
+        }, 0)));
+
+        dp.Define("getSeconds", JsProperty.Data(realm.MakeMethod("getSeconds", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Second;
+        }, 0)));
+
+        dp.Define("getUTCSeconds", JsProperty.Data(realm.MakeMethod("getUTCSeconds", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Second;
+        }, 0)));
+
+        dp.Define("getMilliseconds", JsProperty.Data(realm.MakeMethod("getMilliseconds", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Millisecond;
+        }, 0)));
+
+        dp.Define("getUTCMilliseconds", JsProperty.Data(realm.MakeMethod("getUTCMilliseconds", delegate (JsCallArgs a)
+        {
+            double time = a.ThisValue is JsDate jd ? jd.Time : JsValueOps.ToNumber(a.ThisValue);
+            return double.IsNaN(time) ? double.NaN : (double)TicksToDt(time).Millisecond;
+        }, 0)));
+
+        dp.Define("getTimezoneOffset", JsProperty.Data(realm.MakeMethod("getTimezoneOffset", delegate (JsCallArgs a)
+        {
+            return 0.0;
+        }, 0)));
+
+        // Setters
+        dp.Define("setTime", JsProperty.Data(realm.MakeMethod("setTime", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            double ms = a.ArgCount > 0 ? JsValueOps.ToNumber(a.Get(0)) : double.NaN;
+            if (jd != null) jd.Time = ms;
+            return ms;
+        }, 1)));
+
+        dp.Define("setFullYear", JsProperty.Data(realm.MakeMethod("setFullYear", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int y = (int)JsValueOps.ToNumber(a.Get(0));
+            int m = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : (dt.Month - 1);
+            int d = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : dt.Day;
+            jd.Time = MakeUtcMs(y, m, d, dt.Hour, dt.Minute, dt.Second, dt.Millisecond);
+            return jd.Time;
+        }, 3)));
+
+        dp.Define("setUTCFullYear", JsProperty.Data(realm.MakeMethod("setUTCFullYear", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int y = (int)JsValueOps.ToNumber(a.Get(0));
+            int m = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : (dt.Month - 1);
+            int d = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : dt.Day;
+            jd.Time = MakeUtcMs(y, m, d, dt.Hour, dt.Minute, dt.Second, dt.Millisecond);
+            return jd.Time;
+        }, 3)));
+
+        dp.Define("setMonth", JsProperty.Data(realm.MakeMethod("setMonth", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int m = (int)JsValueOps.ToNumber(a.Get(0));
+            int d = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Day;
+            jd.Time = MakeUtcMs(dt.Year, m, d, dt.Hour, dt.Minute, dt.Second, dt.Millisecond);
+            return jd.Time;
+        }, 2)));
+
+        dp.Define("setUTCMonth", JsProperty.Data(realm.MakeMethod("setUTCMonth", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int m = (int)JsValueOps.ToNumber(a.Get(0));
+            int d = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Day;
+            jd.Time = MakeUtcMs(dt.Year, m, d, dt.Hour, dt.Minute, dt.Second, dt.Millisecond);
+            return jd.Time;
+        }, 2)));
+
+        dp.Define("setDate", JsProperty.Data(realm.MakeMethod("setDate", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int d = (int)JsValueOps.ToNumber(a.Get(0));
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, d, dt.Hour, dt.Minute, dt.Second, dt.Millisecond);
+            return jd.Time;
+        }, 1)));
+
+        dp.Define("setUTCDate", JsProperty.Data(realm.MakeMethod("setUTCDate", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int d = (int)JsValueOps.ToNumber(a.Get(0));
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, d, dt.Hour, dt.Minute, dt.Second, dt.Millisecond);
+            return jd.Time;
+        }, 1)));
+
+        dp.Define("setHours", JsProperty.Data(realm.MakeMethod("setHours", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int h = (int)JsValueOps.ToNumber(a.Get(0));
+            int min = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Minute;
+            int s = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : dt.Second;
+            int ms = a.ArgCount > 3 ? (int)JsValueOps.ToNumber(a.Get(3)) : dt.Millisecond;
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, h, min, s, ms);
+            return jd.Time;
+        }, 4)));
+
+        dp.Define("setUTCHours", JsProperty.Data(realm.MakeMethod("setUTCHours", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int h = (int)JsValueOps.ToNumber(a.Get(0));
+            int min = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Minute;
+            int s = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : dt.Second;
+            int ms = a.ArgCount > 3 ? (int)JsValueOps.ToNumber(a.Get(3)) : dt.Millisecond;
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, h, min, s, ms);
+            return jd.Time;
+        }, 4)));
+
+        dp.Define("setMinutes", JsProperty.Data(realm.MakeMethod("setMinutes", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int min = (int)JsValueOps.ToNumber(a.Get(0));
+            int s = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Second;
+            int ms = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : dt.Millisecond;
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, dt.Hour, min, s, ms);
+            return jd.Time;
+        }, 3)));
+
+        dp.Define("setUTCMinutes", JsProperty.Data(realm.MakeMethod("setUTCMinutes", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int min = (int)JsValueOps.ToNumber(a.Get(0));
+            int s = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Second;
+            int ms = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : dt.Millisecond;
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, dt.Hour, min, s, ms);
+            return jd.Time;
+        }, 3)));
+
+        dp.Define("setSeconds", JsProperty.Data(realm.MakeMethod("setSeconds", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int s = (int)JsValueOps.ToNumber(a.Get(0));
+            int ms = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Millisecond;
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, dt.Hour, dt.Minute, s, ms);
+            return jd.Time;
+        }, 2)));
+
+        dp.Define("setUTCSeconds", JsProperty.Data(realm.MakeMethod("setUTCSeconds", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int s = (int)JsValueOps.ToNumber(a.Get(0));
+            int ms = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : dt.Millisecond;
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, dt.Hour, dt.Minute, s, ms);
+            return jd.Time;
+        }, 2)));
+
+        dp.Define("setMilliseconds", JsProperty.Data(realm.MakeMethod("setMilliseconds", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int ms = (int)JsValueOps.ToNumber(a.Get(0));
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, dt.Hour, dt.Minute, dt.Second, ms);
+            return jd.Time;
+        }, 1)));
+
+        dp.Define("setUTCMilliseconds", JsProperty.Data(realm.MakeMethod("setUTCMilliseconds", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            int ms = (int)JsValueOps.ToNumber(a.Get(0));
+            jd.Time = MakeUtcMs(dt.Year, dt.Month - 1, dt.Day, dt.Hour, dt.Minute, dt.Second, ms);
+            return jd.Time;
+        }, 1)));
+
+        dp.Define("setYear", JsProperty.Data(realm.MakeMethod("setYear", delegate (JsCallArgs a)
+        {
+            JsDate jd = a.ThisValue as JsDate;
+            if (jd == null) return double.NaN;
+            int y = (int)JsValueOps.ToNumber(a.Get(0));
+            if (y >= 0 && y <= 99) y += 1900;
+            DateTime dt = double.IsNaN(jd.Time) ? System.DateTime.UtcNow : TicksToDt(jd.Time);
+            jd.Time = MakeUtcMs(y, dt.Month - 1, dt.Day, dt.Hour, dt.Minute, dt.Second, dt.Millisecond);
+            return jd.Time;
+        }, 1)));
+
+        // Formatters
         dp.Define("toString", JsProperty.Data(realm.MakeMethod("toString", delegate (JsCallArgs a)
         {
             object t = a.ThisValue;
-            double time = t is JsDate ? ((JsDate)t).Time : JsValueOps.ToNumber(t);
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
             return FormatJsDate(time);
         }, 0)));
 
         dp.Define("toISOString", JsProperty.Data(realm.MakeMethod("toISOString", delegate (JsCallArgs a)
         {
             object t = a.ThisValue;
-            double time = t is JsDate ? ((JsDate)t).Time : JsValueOps.ToNumber(t);
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            return FormatIsoDate(time);
+        }, 0)));
+
+        dp.Define("toUTCString", JsProperty.Data(realm.MakeMethod("toUTCString", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            return FormatUtcDate(time);
+        }, 0)));
+
+        dp.Define("toGMTString", JsProperty.Data(realm.MakeMethod("toGMTString", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            return FormatUtcDate(time);
+        }, 0)));
+
+        dp.Define("toDateString", JsProperty.Data(realm.MakeMethod("toDateString", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            if (double.IsNaN(time)) return "Invalid Date";
+            DateTime dt = TicksToDt(time);
+            return DateDayNames[(int)dt.DayOfWeek] + " " + DateMonthNames[dt.Month - 1] + " " + Pad2(dt.Day) + " " + dt.Year;
+        }, 0)));
+
+        dp.Define("toTimeString", JsProperty.Data(realm.MakeMethod("toTimeString", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            if (double.IsNaN(time)) return "Invalid Date";
+            DateTime dt = TicksToDt(time);
+            return Pad2(dt.Hour) + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + " GMT";
+        }, 0)));
+
+        dp.Define("toLocaleString", JsProperty.Data(realm.MakeMethod("toLocaleString", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            if (double.IsNaN(time)) return "Invalid Date";
+            DateTime dt = TicksToDt(time);
+            int h = dt.Hour % 12; if (h == 0) h = 12;
+            string ampm = dt.Hour >= 12 ? "PM" : "AM";
+            return dt.Month + "/" + dt.Day + "/" + dt.Year + ", " + h + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + " " + ampm;
+        }, 0)));
+
+        dp.Define("toLocaleDateString", JsProperty.Data(realm.MakeMethod("toLocaleDateString", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            if (double.IsNaN(time)) return "Invalid Date";
+            DateTime dt = TicksToDt(time);
+            return dt.Month + "/" + dt.Day + "/" + dt.Year;
+        }, 0)));
+
+        dp.Define("toLocaleTimeString", JsProperty.Data(realm.MakeMethod("toLocaleTimeString", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            if (double.IsNaN(time)) return "Invalid Date";
+            DateTime dt = TicksToDt(time);
+            int h = dt.Hour % 12; if (h == 0) h = 12;
+            string ampm = dt.Hour >= 12 ? "PM" : "AM";
+            return h + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + " " + ampm;
+        }, 0)));
+
+        dp.Define("toJSON", JsProperty.Data(realm.MakeMethod("toJSON", delegate (JsCallArgs a)
+        {
+            object t = a.ThisValue;
+            double time = t is JsDate jd ? jd.Time : JsValueOps.ToNumber(t);
+            if (double.IsNaN(time)) return JsNull.Instance;
             return FormatIsoDate(time);
         }, 0)));
 
@@ -2053,9 +2666,40 @@ public static class JsBuiltins
             if (a.IsConstruct)
             {
                 double time;
-                if (a.ArgCount == 0) time = NowMs();
-                else if (a.ArgCount == 1) time = JsValueOps.ToNumber(a.Get(0));
-                else time = NowMs();
+                if (a.ArgCount == 0)
+                {
+                    time = NowMs();
+                }
+                else if (a.ArgCount == 1)
+                {
+                    object arg = a.Get(0);
+                    if (arg is string s)
+                    {
+                        double parsed;
+                        if (TryParseWebDate(s, out parsed)) time = parsed;
+                        else time = double.NaN;
+                    }
+                    else if (arg is JsDate jd)
+                    {
+                        time = jd.Time;
+                    }
+                    else
+                    {
+                        time = JsValueOps.ToNumber(arg);
+                    }
+                }
+                else
+                {
+                    int y = (int)JsValueOps.ToNumber(a.Get(0));
+                    if (y >= 0 && y <= 99) y += 1900;
+                    int m = (int)JsValueOps.ToNumber(a.Get(1));
+                    int d = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : 1;
+                    int h = a.ArgCount > 3 ? (int)JsValueOps.ToNumber(a.Get(3)) : 0;
+                    int min = a.ArgCount > 4 ? (int)JsValueOps.ToNumber(a.Get(4)) : 0;
+                    int sec = a.ArgCount > 5 ? (int)JsValueOps.ToNumber(a.Get(5)) : 0;
+                    int ms = a.ArgCount > 6 ? (int)JsValueOps.ToNumber(a.Get(6)) : 0;
+                    time = MakeUtcMs(y, m, d, h, min, sec, ms);
+                }
                 return new JsDate(realm.DatePrototype, time);
             }
             return FormatJsDate(NowMs());
@@ -2071,9 +2715,23 @@ public static class JsBuiltins
         {
             string s = JsValueOps.ToStringValue(a.Get(0));
             double t;
-            if (TryParseIsoDate(s, out t)) return t;
+            if (TryParseWebDate(s, out t)) return t;
             return double.NaN;
         }, 1)));
+
+        realm.DateCtor.Define("UTC", JsProperty.Data(realm.MakeMethod("UTC", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount == 0) return double.NaN;
+            int y = (int)JsValueOps.ToNumber(a.Get(0));
+            if (y >= 0 && y <= 99) y += 1900;
+            int m = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : 0;
+            int d = a.ArgCount > 2 ? (int)JsValueOps.ToNumber(a.Get(2)) : 1;
+            int h = a.ArgCount > 3 ? (int)JsValueOps.ToNumber(a.Get(3)) : 0;
+            int min = a.ArgCount > 4 ? (int)JsValueOps.ToNumber(a.Get(4)) : 0;
+            int sec = a.ArgCount > 5 ? (int)JsValueOps.ToNumber(a.Get(5)) : 0;
+            int ms = a.ArgCount > 6 ? (int)JsValueOps.ToNumber(a.Get(6)) : 0;
+            return MakeUtcMs(y, m, d, h, min, sec, ms);
+        }, 7)));
     }
 
     private static double NowMs()
@@ -2087,8 +2745,8 @@ public static class JsBuiltins
     {
         if (double.IsNaN(time)) return "Invalid Date";
         System.DateTime dt = TicksToDt(time);
-        return dt.Year.ToString() + "-" + Pad2(dt.Month) + "-" + Pad2(dt.Day) +
-            " " + Pad2(dt.Hour) + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + " GMT";
+        return DateDayNames[(int)dt.DayOfWeek] + " " + DateMonthNames[dt.Month - 1] + " " + Pad2(dt.Day) +
+            " " + dt.Year + " " + Pad2(dt.Hour) + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + " GMT";
     }
 
     private static string FormatIsoDate(double time)
@@ -2099,11 +2757,63 @@ public static class JsBuiltins
             "T" + Pad2(dt.Hour) + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + ".000Z";
     }
 
+    private static string FormatUtcDate(double time)
+    {
+        if (double.IsNaN(time)) return "Invalid Date";
+        System.DateTime dt = TicksToDt(time);
+        return DateDayNames[(int)dt.DayOfWeek] + ", " + Pad2(dt.Day) + " " + DateMonthNames[dt.Month - 1] +
+            " " + dt.Year + " " + Pad2(dt.Hour) + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + " GMT";
+    }
+
+    private static double MakeUtcMs(int y, int m, int d, int h, int min, int s, int ms)
+    {
+        try
+        {
+            while (m < 0) { y--; m += 12; }
+            while (m > 11) { y++; m -= 12; }
+            if (y < 1) y = 1;
+            if (y > 9999) y = 9999;
+            System.DateTime dt = new System.DateTime(y, m + 1, 1, 0, 0, 0, System.DateTimeKind.Utc);
+            dt = dt.AddDays(d - 1).AddHours(h).AddMinutes(min).AddSeconds(s).AddMilliseconds(ms);
+            return (double)(dt.Ticks - 621355968000000000L) / 10000.0;
+        }
+        catch
+        {
+            return double.NaN;
+        }
+    }
+
     private static System.DateTime TicksToDt(double time)
     {
         long ticks = (long)(time * 10000.0) + 621355968000000000L;
         if (ticks < 0) ticks = 0;
+        if (ticks > 3155378975999999999L) ticks = 3155378975999999999L;
         return new System.DateTime(ticks, System.DateTimeKind.Utc);
+    }
+
+    private static bool TryParseWebDate(string s, out double time)
+    {
+        time = double.NaN;
+        if (string.IsNullOrEmpty(s)) return false;
+        string trimmed = s.Trim();
+        try
+        {
+            System.DateTime dt;
+            if (System.DateTime.TryParse(trimmed, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out dt))
+            {
+                time = (double)(dt.Ticks - 621355968000000000L) / 10000.0;
+                return true;
+            }
+            if (System.DateTime.TryParseExact(trimmed, "r", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out dt))
+            {
+                time = (double)(dt.Ticks - 621355968000000000L) / 10000.0;
+                return true;
+            }
+        }
+        catch { }
+        return TryParseIsoDate(trimmed, out time);
     }
 
     private static bool TryParseIsoDate(string s, out double time)
@@ -2136,6 +2846,341 @@ public static class JsBuiltins
             val = val * 10 + (c - '0');
         }
         return true;
+    }
+
+    // ---- Intl --------------------------------------------------------------
+
+    private static void DefineMethod(JsRealm realm, JsObject o, string name, JsNativeFn fn, int len)
+    {
+        o.Define(name, JsProperty.DataNonEnum(realm.MakeMethod(name, fn, len)));
+    }
+
+    public static void BuildIntl(JsRealm realm)
+    {
+        JsObject intl = realm.NewObject();
+        intl.SetWellKnown(JsWellKnown.ToStringTag, "Intl");
+
+        // Intl.NumberFormat
+        JsObject nfProto = realm.NewObject();
+        nfProto.SetWellKnown(JsWellKnown.ToStringTag, "Intl.NumberFormat");
+        DefineMethod(realm, nfProto, "format", delegate (JsCallArgs a)
+        {
+            JsObject self = a.ThisValue as JsObject;
+            string style = "decimal";
+            string currency = "USD";
+            bool grouping = true;
+            int minFrac = 0;
+            int maxFrac = 3;
+            if (self != null)
+            {
+                if (self.GetProperty("_style", out object st)) style = JsValueOps.ToStringValue(st);
+                if (self.GetProperty("_currency", out object cur)) currency = JsValueOps.ToStringValue(cur);
+                if (self.GetProperty("_grouping", out object gp)) grouping = JsValueOps.ToBoolean(gp);
+                if (self.GetProperty("_minFrac", out object mn)) minFrac = (int)JsValueOps.ToNumber(mn);
+                if (self.GetProperty("_maxFrac", out object mx)) maxFrac = (int)JsValueOps.ToNumber(mx);
+            }
+            double n = a.ArgCount > 0 ? JsValueOps.ToNumber(a.Get(0)) : 0.0;
+            return FormatNumber(n, style, currency, grouping, minFrac, maxFrac);
+        }, 1);
+
+        DefineMethod(realm, nfProto, "formatToParts", delegate (JsCallArgs a)
+        {
+            JsArray arr = realm.NewArray();
+            JsObject part = realm.NewObject();
+            part.Define("type", JsProperty.Data("integer"));
+            part.Define("value", JsProperty.Data(FormatNumber(a.ArgCount > 0 ? JsValueOps.ToNumber(a.Get(0)) : 0.0, "decimal", "USD", true, 0, 3)));
+            arr.Items.Add(part);
+            return arr;
+        }, 1);
+
+        DefineMethod(realm, nfProto, "resolvedOptions", delegate (JsCallArgs a)
+        {
+            JsObject self = a.ThisValue as JsObject;
+            JsObject ro = realm.NewObject();
+            ro.Define("locale", JsProperty.Data("en-US"));
+            ro.Define("numberingSystem", JsProperty.Data("latn"));
+            ro.Define("style", JsProperty.Data(self != null && self.GetProperty("_style", out object st) ? st : "decimal"));
+            ro.Define("currency", JsProperty.Data(self != null && self.GetProperty("_currency", out object c) ? c : "USD"));
+            ro.Define("minimumFractionDigits", JsProperty.Data(self != null && self.GetProperty("_minFrac", out object mn) ? mn : 0.0));
+            ro.Define("maximumFractionDigits", JsProperty.Data(self != null && self.GetProperty("_maxFrac", out object mx) ? mx : 3.0));
+            ro.Define("useGrouping", JsProperty.Data(self != null && self.GetProperty("_grouping", out object gp) ? gp : true));
+            return ro;
+        }, 0);
+
+        JsFunction nfCtor = realm.MakeCtor("NumberFormat", delegate (JsCallArgs a)
+        {
+            JsObject nf = new JsObject(nfProto);
+            string style = "decimal";
+            string currency = "USD";
+            bool grouping = true;
+            int minFrac = 0;
+            int maxFrac = 3;
+            if (a.ArgCount > 1 && a.Get(1) is JsObject opts)
+            {
+                if (opts.GetProperty("style", out object s)) style = JsValueOps.ToStringValue(s);
+                if (opts.GetProperty("currency", out object c)) currency = JsValueOps.ToStringValue(c);
+                if (opts.GetProperty("useGrouping", out object g)) grouping = JsValueOps.ToBoolean(g);
+                if (opts.GetProperty("minimumFractionDigits", out object mn)) minFrac = (int)JsValueOps.ToNumber(mn);
+                if (opts.GetProperty("maximumFractionDigits", out object mx)) maxFrac = (int)JsValueOps.ToNumber(mx);
+            }
+            if (style == "currency") { minFrac = 2; maxFrac = 2; }
+            else if (style == "percent") { minFrac = 0; maxFrac = 0; }
+            nf.Define("_style", JsProperty.DataNonEnum(style));
+            nf.Define("_currency", JsProperty.DataNonEnum(currency));
+            nf.Define("_grouping", JsProperty.DataNonEnum(grouping));
+            nf.Define("_minFrac", JsProperty.DataNonEnum((double)minFrac));
+            nf.Define("_maxFrac", JsProperty.DataNonEnum((double)maxFrac));
+            return nf;
+        }, 0, nfProto);
+        intl.Define("NumberFormat", JsProperty.Data(nfCtor));
+
+        // Intl.DateTimeFormat
+        JsObject dtfProto = realm.NewObject();
+        dtfProto.SetWellKnown(JsWellKnown.ToStringTag, "Intl.DateTimeFormat");
+        DefineMethod(realm, dtfProto, "format", delegate (JsCallArgs a)
+        {
+            double time = NowMs();
+            if (a.ArgCount > 0)
+            {
+                object arg = a.Get(0);
+                if (arg is JsDate jd) time = jd.Time;
+                else time = JsValueOps.ToNumber(arg);
+            }
+            if (double.IsNaN(time)) return "Invalid Date";
+            DateTime dt = TicksToDt(time);
+            int h = dt.Hour % 12; if (h == 0) h = 12;
+            string ampm = dt.Hour >= 12 ? "PM" : "AM";
+            return dt.Month + "/" + dt.Day + "/" + dt.Year + ", " + h + ":" + Pad2(dt.Minute) + ":" + Pad2(dt.Second) + " " + ampm;
+        }, 1);
+
+        DefineMethod(realm, dtfProto, "formatToParts", delegate (JsCallArgs a)
+        {
+            JsArray arr = realm.NewArray();
+            JsObject p = realm.NewObject();
+            p.Define("type", JsProperty.Data("literal"));
+            p.Define("value", JsProperty.Data(""));
+            arr.Items.Add(p);
+            return arr;
+        }, 1);
+
+        DefineMethod(realm, dtfProto, "resolvedOptions", delegate (JsCallArgs a)
+        {
+            JsObject ro = realm.NewObject();
+            ro.Define("locale", JsProperty.Data("en-US"));
+            ro.Define("calendar", JsProperty.Data("gregory"));
+            ro.Define("numberingSystem", JsProperty.Data("latn"));
+            ro.Define("timeZone", JsProperty.Data("UTC"));
+            return ro;
+        }, 0);
+
+        JsFunction dtfCtor = realm.MakeCtor("DateTimeFormat", delegate (JsCallArgs a)
+        {
+            return new JsObject(dtfProto);
+        }, 0, dtfProto);
+        intl.Define("DateTimeFormat", JsProperty.Data(dtfCtor));
+
+        // Intl.RelativeTimeFormat
+        JsObject rtfProto = realm.NewObject();
+        rtfProto.SetWellKnown(JsWellKnown.ToStringTag, "Intl.RelativeTimeFormat");
+        DefineMethod(realm, rtfProto, "format", delegate (JsCallArgs a)
+        {
+            double val = a.ArgCount > 0 ? JsValueOps.ToNumber(a.Get(0)) : 0.0;
+            string unit = a.ArgCount > 1 ? JsValueOps.ToStringValue(a.Get(1)).ToLowerInvariant() : "day";
+            if (unit.EndsWith("s")) unit = unit.Substring(0, unit.Length - 1);
+            if (val == 0) return "now";
+            if (val < 0)
+            {
+                double pos = -val;
+                return (pos == 1 ? "1 " + unit + " ago" : pos.ToString() + " " + unit + "s ago");
+            }
+            return (val == 1 ? "in 1 " + unit : "in " + val.ToString() + " " + unit + "s");
+        }, 2);
+
+        DefineMethod(realm, rtfProto, "formatToParts", delegate (JsCallArgs a)
+        {
+            JsArray arr = realm.NewArray();
+            JsObject p = realm.NewObject();
+            p.Define("type", JsProperty.Data("literal"));
+            p.Define("value", JsProperty.Data(""));
+            arr.Items.Add(p);
+            return arr;
+        }, 2);
+
+        DefineMethod(realm, rtfProto, "resolvedOptions", delegate (JsCallArgs a)
+        {
+            JsObject ro = realm.NewObject();
+            ro.Define("locale", JsProperty.Data("en-US"));
+            ro.Define("numeric", JsProperty.Data("always"));
+            return ro;
+        }, 0);
+
+        JsFunction rtfCtor = realm.MakeCtor("RelativeTimeFormat", delegate (JsCallArgs a)
+        {
+            return new JsObject(rtfProto);
+        }, 0, rtfProto);
+        intl.Define("RelativeTimeFormat", JsProperty.Data(rtfCtor));
+
+        // Intl.PluralRules
+        JsObject prProto = realm.NewObject();
+        DefineMethod(realm, prProto, "select", delegate (JsCallArgs a)
+        {
+            double n = a.ArgCount > 0 ? Math.Abs(JsValueOps.ToNumber(a.Get(0))) : 0.0;
+            return n == 1.0 ? "one" : "other";
+        }, 1);
+        DefineMethod(realm, prProto, "resolvedOptions", delegate (JsCallArgs a)
+        {
+            JsObject ro = realm.NewObject();
+            ro.Define("locale", JsProperty.Data("en-US"));
+            ro.Define("type", JsProperty.Data("cardinal"));
+            return ro;
+        }, 0);
+        JsFunction prCtor = realm.MakeCtor("PluralRules", delegate (JsCallArgs a) { return new JsObject(prProto); }, 0, prProto);
+        intl.Define("PluralRules", JsProperty.Data(prCtor));
+
+        // Intl.Collator
+        JsObject colProto = realm.NewObject();
+        DefineMethod(realm, colProto, "compare", delegate (JsCallArgs a)
+        {
+            string s1 = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+            string s2 = a.ArgCount > 1 ? JsValueOps.ToStringValue(a.Get(1)) : "";
+            int c = string.Compare(s1, s2, StringComparison.OrdinalIgnoreCase);
+            return (double)(c < 0 ? -1 : (c > 0 ? 1 : 0));
+        }, 2);
+        DefineMethod(realm, colProto, "resolvedOptions", delegate (JsCallArgs a)
+        {
+            JsObject ro = realm.NewObject();
+            ro.Define("locale", JsProperty.Data("en-US"));
+            ro.Define("sensitivity", JsProperty.Data("variant"));
+            return ro;
+        }, 0);
+        JsFunction colCtor = realm.MakeCtor("Collator", delegate (JsCallArgs a) { return new JsObject(colProto); }, 0, colProto);
+        intl.Define("Collator", JsProperty.Data(colCtor));
+
+        // Intl.ListFormat
+        JsObject lfProto = realm.NewObject();
+        DefineMethod(realm, lfProto, "format", delegate (JsCallArgs a)
+        {
+            object arg = a.Get(0);
+            if (arg is JsArray ja && ja.Items.Count > 0)
+            {
+                if (ja.Items.Count == 1) return JsValueOps.ToStringValue(ja.Items[0]);
+                if (ja.Items.Count == 2) return JsValueOps.ToStringValue(ja.Items[0]) + " and " + JsValueOps.ToStringValue(ja.Items[1]);
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < ja.Items.Count; i++)
+                {
+                    if (i > 0) sb.Append(", ");
+                    if (i == ja.Items.Count - 1) sb.Append("and ");
+                    sb.Append(JsValueOps.ToStringValue(ja.Items[i]));
+                }
+                return sb.ToString();
+            }
+            return "";
+        }, 1);
+        JsFunction lfCtor = realm.MakeCtor("ListFormat", delegate (JsCallArgs a) { return new JsObject(lfProto); }, 0, lfProto);
+        intl.Define("ListFormat", JsProperty.Data(lfCtor));
+
+        // Intl.DisplayNames
+        JsObject dnProto = realm.NewObject();
+        DefineMethod(realm, dnProto, "of", delegate (JsCallArgs a)
+        {
+            return a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+        }, 1);
+        JsFunction dnCtor = realm.MakeCtor("DisplayNames", delegate (JsCallArgs a) { return new JsObject(dnProto); }, 2, dnProto);
+        intl.Define("DisplayNames", JsProperty.Data(dnCtor));
+
+        // Intl.Locale
+        JsObject locProto = realm.NewObject();
+        JsFunction locCtor = realm.MakeCtor("Locale", delegate (JsCallArgs a)
+        {
+            string tag = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "en-US";
+            JsObject loc = new JsObject(locProto);
+            loc.Define("baseName", JsProperty.Data(tag));
+            int hyphen = tag.IndexOf('-');
+            string lang = hyphen > 0 ? tag.Substring(0, hyphen) : tag;
+            string region = hyphen > 0 && hyphen + 1 < tag.Length ? tag.Substring(hyphen + 1) : "";
+            loc.Define("language", JsProperty.Data(lang));
+            loc.Define("region", JsProperty.Data(region));
+            return loc;
+        }, 1, locProto);
+        intl.Define("Locale", JsProperty.Data(locCtor));
+
+        // Intl.getCanonicalLocales
+        DefineMethod(realm, intl, "getCanonicalLocales", delegate (JsCallArgs a)
+        {
+            JsArray arr = realm.NewArray();
+            if (a.ArgCount > 0)
+            {
+                object arg = a.Get(0);
+                if (arg is JsArray ja)
+                {
+                    for (int i = 0; i < ja.Items.Count; i++)
+                        arr.Items.Add(JsValueOps.ToStringValue(ja.Items[i]));
+                }
+                else
+                {
+                    arr.Items.Add(JsValueOps.ToStringValue(arg));
+                }
+            }
+            return arr;
+        }, 1);
+
+        realm.Global.Define("Intl", JsProperty.Data(intl));
+    }
+
+    private static string FormatNumber(double d, string style, string currency, bool useGrouping, int minFrac, int maxFrac)
+    {
+        if (double.IsNaN(d)) return "NaN";
+        if (double.IsPositiveInfinity(d)) return "Infinity";
+        if (double.IsNegativeInfinity(d)) return "-Infinity";
+
+        bool isNeg = d < 0;
+        double abs = Math.Abs(d);
+        if (style == "percent") abs *= 100.0;
+
+        double factor = Math.Pow(10, Math.Min(maxFrac, 10));
+        abs = Math.Round(abs * factor) / factor;
+
+        long intPart = (long)Math.Floor(abs);
+        double fracPart = abs - intPart;
+
+        string intStr = intPart.ToString();
+        if (useGrouping && intStr.Length > 3)
+        {
+            StringBuilder sb = new StringBuilder();
+            int rem = intStr.Length % 3;
+            if (rem > 0)
+            {
+                sb.Append(intStr.Substring(0, rem));
+                if (intStr.Length > rem) sb.Append(',');
+            }
+            for (int i = rem; i < intStr.Length; i += 3)
+            {
+                sb.Append(intStr.Substring(i, 3));
+                if (i + 3 < intStr.Length) sb.Append(',');
+            }
+            intStr = sb.ToString();
+        }
+
+        string fracStr = "";
+        if (maxFrac > 0)
+        {
+            long fracNum = (long)Math.Round(fracPart * factor);
+            fracStr = fracNum.ToString().PadLeft(maxFrac, '0');
+            int trimLen = fracStr.Length;
+            while (trimLen > minFrac && fracStr[trimLen - 1] == '0') trimLen--;
+            fracStr = fracStr.Substring(0, trimLen);
+        }
+
+        string numStr = (isNeg ? "-" : "") + intStr + (fracStr.Length > 0 ? "." + fracStr : "");
+        if (style == "percent") return numStr + "%";
+        if (style == "currency")
+        {
+            if (currency == "USD") return (isNeg ? "-$" : "$") + intStr + (fracStr.Length > 0 ? "." + fracStr : "");
+            if (currency == "EUR") return (isNeg ? "-€" : "€") + intStr + (fracStr.Length > 0 ? "." + fracStr : "");
+            if (currency == "GBP") return (isNeg ? "-£" : "£") + intStr + (fracStr.Length > 0 ? "." + fracStr : "");
+            return (isNeg ? "-" : "") + currency + " " + intStr + (fracStr.Length > 0 ? "." + fracStr : "");
+        }
+        return numStr;
     }
 
     // ---- Map / Set ---------------------------------------------------------
@@ -2273,10 +3318,549 @@ public static class JsBuiltins
             }, 0), null));
     }
 
+    // ---- WeakMap / WeakSet -------------------------------------------------
+
+    public static void BuildWeakMapSet(JsRealm realm)
+    {
+        // WeakMap
+        JsObject wmp = realm.NewObject();
+        SetTag(realm, wmp, "WeakMap");
+        wmp.Define("get", JsProperty.Data(realm.MakeMethod("get", delegate (JsCallArgs a)
+        {
+            JsMapObject map = a.ThisValue as JsMapObject;
+            if (map == null) return JsUndefined.Instance;
+            object key = a.Get(0);
+            if (!(key is JsObject)) return JsUndefined.Instance;
+            int idx = map.IndexOfKey(key);
+            return idx >= 0 ? map.Values[idx] : JsUndefined.Instance;
+        }, 1)));
+        wmp.Define("set", JsProperty.Data(realm.MakeMethod("set", delegate (JsCallArgs a)
+        {
+            JsMapObject map = a.ThisValue as JsMapObject;
+            if (map == null) return a.ThisValue;
+            object key = a.Get(0);
+            if (!(key is JsObject)) throw JsErr.Type("Invalid value used as weak map key");
+            map.SetKey(key, a.Get(1));
+            return map;
+        }, 2)));
+        wmp.Define("has", JsProperty.Data(realm.MakeMethod("has", delegate (JsCallArgs a)
+        {
+            JsMapObject map = a.ThisValue as JsMapObject;
+            if (map == null) return false;
+            object key = a.Get(0);
+            if (!(key is JsObject)) return false;
+            return map.IndexOfKey(key) >= 0;
+        }, 1)));
+        wmp.Define("delete", JsProperty.Data(realm.MakeMethod("delete", delegate (JsCallArgs a)
+        {
+            JsMapObject map = a.ThisValue as JsMapObject;
+            if (map == null) return false;
+            object key = a.Get(0);
+            if (!(key is JsObject)) return false;
+            return map.RemoveKey(key);
+        }, 1)));
+
+        realm.Global.Define("WeakMap", JsProperty.Data(realm.MakeCtor("WeakMap", delegate (JsCallArgs a)
+        {
+            JsMapObject map = new JsMapObject(wmp);
+            if (a.ArgCount > 0)
+            {
+                List<object> items = realm.Interp.ToList(a.Get(0));
+                for (int i = 0; i < items.Count; i++)
+                {
+                    List<object> pair = realm.Interp.ToList(items[i]);
+                    if (pair.Count >= 2 && pair[0] is JsObject) map.SetKey(pair[0], pair[1]);
+                }
+            }
+            return map;
+        }, 0, wmp)));
+
+        // WeakSet
+        JsObject wsp = realm.NewObject();
+        SetTag(realm, wsp, "WeakSet");
+        wsp.Define("add", JsProperty.Data(realm.MakeMethod("add", delegate (JsCallArgs a)
+        {
+            JsSetObject set = a.ThisValue as JsSetObject;
+            if (set == null) return a.ThisValue;
+            object v = a.Get(0);
+            if (!(v is JsObject)) throw JsErr.Type("Invalid value used in weak set");
+            set.AddValue(v);
+            return set;
+        }, 1)));
+        wsp.Define("has", JsProperty.Data(realm.MakeMethod("has", delegate (JsCallArgs a)
+        {
+            JsSetObject set = a.ThisValue as JsSetObject;
+            if (set == null) return false;
+            object v = a.Get(0);
+            if (!(v is JsObject)) return false;
+            return set.IndexOf(v) >= 0;
+        }, 1)));
+        wsp.Define("delete", JsProperty.Data(realm.MakeMethod("delete", delegate (JsCallArgs a)
+        {
+            JsSetObject set = a.ThisValue as JsSetObject;
+            if (set == null) return false;
+            object v = a.Get(0);
+            if (!(v is JsObject)) return false;
+            return set.RemoveValue(v);
+        }, 1)));
+
+        realm.Global.Define("WeakSet", JsProperty.Data(realm.MakeCtor("WeakSet", delegate (JsCallArgs a)
+        {
+            JsSetObject set = new JsSetObject(wsp);
+            if (a.ArgCount > 0)
+            {
+                List<object> items = realm.Interp.ToList(a.Get(0));
+                for (int i = 0; i < items.Count; i++)
+                {
+                    if (items[i] is JsObject) set.AddValue(items[i]);
+                }
+            }
+            return set;
+        }, 0, wsp)));
+    }
+
+    // ---- TypedArrays -------------------------------------------------------
+
+    public static void BuildTypedArrays(JsRealm realm)
+    {
+        JsObject abProto = realm.NewObject();
+        SetTag(realm, abProto, "ArrayBuffer");
+        abProto.Define("byteLength", JsProperty.Accessor(
+            realm.MakeMethod("get byteLength", delegate (JsCallArgs a)
+            {
+                JsArrayBuffer ab = a.ThisValue as JsArrayBuffer;
+                return ab != null ? (object)(double)ab.ByteLength : (object)0.0;
+            }, 0), null));
+        abProto.Define("slice", JsProperty.Data(realm.MakeMethod("slice", delegate (JsCallArgs a)
+        {
+            JsArrayBuffer ab = a.ThisValue as JsArrayBuffer;
+            if (ab == null) return realm.NewObject();
+            int len = ab.ByteLength;
+            int begin = a.ArgCount > 0 ? ToInteger(a.Get(0)) : 0;
+            int end = a.ArgCount > 1 ? ToInteger(a.Get(1)) : len;
+            if (begin < 0) begin = System.Math.Max(0, len + begin); else if (begin > len) begin = len;
+            if (end < 0) end = System.Math.Max(0, len + end); else if (end > len) end = len;
+            int span = System.Math.Max(0, end - begin);
+            byte[] sliced = new byte[span];
+            if (span > 0 && ab.Data != null) Array.Copy(ab.Data, begin, sliced, 0, span);
+            return new JsArrayBuffer(abProto, sliced);
+        }, 2)));
+
+        realm.Global.Define("ArrayBuffer", JsProperty.Data(realm.MakeCtor("ArrayBuffer", delegate (JsCallArgs a)
+        {
+            int len = a.ArgCount > 0 ? (int)System.Math.Max(0, JsValueOps.ToNumber(a.Get(0))) : 0;
+            return new JsArrayBuffer(abProto, len);
+        }, 1, abProto)));
+
+        string[] kinds = { "Uint8Array", "Int8Array", "Uint8ClampedArray", "Int16Array", "Uint16Array", "Int32Array", "Uint32Array", "Float32Array", "Float64Array" };
+        int[] bpes = { 1, 1, 1, 2, 2, 4, 4, 4, 8 };
+
+        for (int k = 0; k < kinds.Length; k++)
+        {
+            string kind = kinds[k];
+            int bpe = bpes[k];
+
+            JsObject proto = realm.NewObject();
+            SetTag(realm, proto, kind);
+            proto.Define("BYTES_PER_ELEMENT", JsProperty.DataNonEnum((double)bpe));
+
+            proto.Define("set", JsProperty.Data(realm.MakeMethod("set", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return JsUndefined.Instance;
+                object src = a.Get(0);
+                int offset = a.ArgCount > 1 ? ToInteger(a.Get(1)) : 0;
+                if (src is JsTypedArray srcTa)
+                {
+                    for (int i = 0; i < srcTa.Length && (offset + i) < target.Length; i++)
+                        target.SetElement(offset + i, srcTa.GetElement(i));
+                }
+                else if (src is JsArray srcArr)
+                {
+                    for (int i = 0; i < srcArr.Length && (offset + i) < target.Length; i++)
+                        target.SetElement(offset + i, JsValueOps.ToNumber(srcArr.GetIndex(i)));
+                }
+                return JsUndefined.Instance;
+            }, 2)));
+
+            proto.Define("subarray", JsProperty.Data(realm.MakeMethod("subarray", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return a.ThisValue;
+                int begin = a.ArgCount > 0 ? ToInteger(a.Get(0)) : 0;
+                int end = a.ArgCount > 1 ? ToInteger(a.Get(1)) : target.Length;
+                if (begin < 0) begin = System.Math.Max(0, target.Length + begin); else if (begin > target.Length) begin = target.Length;
+                if (end < 0) end = System.Math.Max(0, target.Length + end); else if (end > target.Length) end = target.Length;
+                int span = System.Math.Max(0, end - begin);
+                return new JsTypedArray(target.Prototype, target.Buffer, target.ByteOffset + begin * target.BytesPerElement, span, target.BytesPerElement, target.ArrayKind);
+            }, 2)));
+
+            proto.Define("slice", JsProperty.Data(realm.MakeMethod("slice", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return a.ThisValue;
+                int begin = a.ArgCount > 0 ? ToInteger(a.Get(0)) : 0;
+                int end = a.ArgCount > 1 ? ToInteger(a.Get(1)) : target.Length;
+                if (begin < 0) begin = System.Math.Max(0, target.Length + begin); else if (begin > target.Length) begin = target.Length;
+                if (end < 0) end = System.Math.Max(0, target.Length + end); else if (end > target.Length) end = target.Length;
+                int span = System.Math.Max(0, end - begin);
+                JsArrayBuffer newBuf = new JsArrayBuffer(abProto, span * target.BytesPerElement);
+                JsTypedArray res = new JsTypedArray(target.Prototype, newBuf, 0, span, target.BytesPerElement, target.ArrayKind);
+                for (int i = 0; i < span; i++) res.SetElement(i, target.GetElement(begin + i));
+                return res;
+            }, 2)));
+
+            proto.Define("forEach", JsProperty.Data(realm.MakeMethod("forEach", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                JsFunction fn = a.Get(0) as JsFunction;
+                if (target == null || fn == null) return JsUndefined.Instance;
+                object thisArg = a.Get(1);
+                for (int i = 0; i < target.Length; i++)
+                    realm.Interp.Call(fn, thisArg, new object[] { target.GetElement(i), (double)i, target }, false);
+                return JsUndefined.Instance;
+            }, 1)));
+
+            proto.Define("join", JsProperty.Data(realm.MakeMethod("join", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return "";
+                string sep = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : ",";
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < target.Length; i++)
+                {
+                    if (i > 0) sb.Append(sep);
+                    sb.Append(target.GetElement(i));
+                }
+                return sb.ToString();
+            }, 1)));
+
+            proto.Define("toString", JsProperty.Data(realm.MakeMethod("toString", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return "";
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < target.Length; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append(target.GetElement(i));
+                }
+                return sb.ToString();
+            }, 0)));
+
+            proto.Define("indexOf", JsProperty.Data(realm.MakeMethod("indexOf", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return -1.0;
+                double search = JsValueOps.ToNumber(a.Get(0));
+                int from = a.ArgCount > 1 ? ToInteger(a.Get(1)) : 0;
+                if (from < 0) from = System.Math.Max(0, target.Length + from);
+                for (int i = from; i < target.Length; i++)
+                {
+                    if (target.GetElement(i) == search) return (double)i;
+                }
+                return -1.0;
+            }, 2)));
+
+            proto.Define("includes", JsProperty.Data(realm.MakeMethod("includes", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return false;
+                double search = JsValueOps.ToNumber(a.Get(0));
+                for (int i = 0; i < target.Length; i++)
+                {
+                    if (target.GetElement(i) == search) return true;
+                }
+                return false;
+            }, 1)));
+
+            proto.Define("fill", JsProperty.Data(realm.MakeMethod("fill", delegate (JsCallArgs a)
+            {
+                JsTypedArray target = a.ThisValue as JsTypedArray;
+                if (target == null) return a.ThisValue;
+                double val = JsValueOps.ToNumber(a.Get(0));
+                int start = a.ArgCount > 1 ? ToInteger(a.Get(1)) : 0;
+                int end = a.ArgCount > 2 ? ToInteger(a.Get(2)) : target.Length;
+                if (start < 0) start = System.Math.Max(0, target.Length + start);
+                if (end < 0) end = System.Math.Max(0, target.Length + end);
+                if (end > target.Length) end = target.Length;
+                for (int i = start; i < end; i++) target.SetElement(i, val);
+                return target;
+            }, 3)));
+
+            string curKind = kind;
+            int curBpe = bpe;
+            JsObject curProto = proto;
+
+            JsFunction ctor = realm.MakeCtor(curKind, delegate (JsCallArgs a)
+            {
+                object arg0 = a.Get(0);
+                if (arg0 is JsArrayBuffer ab)
+                {
+                    int byteOffset = a.ArgCount > 1 ? ToInteger(a.Get(1)) : 0;
+                    int length;
+                    if (a.ArgCount > 2)
+                    {
+                        length = ToInteger(a.Get(2));
+                    }
+                    else
+                    {
+                        length = System.Math.Max(0, (ab.ByteLength - byteOffset) / curBpe);
+                    }
+                    return new JsTypedArray(curProto, ab, byteOffset, length, curBpe, curKind);
+                }
+                else if (arg0 is JsTypedArray srcTa)
+                {
+                    JsArrayBuffer newBuf = new JsArrayBuffer(abProto, srcTa.Length * curBpe);
+                    JsTypedArray res = new JsTypedArray(curProto, newBuf, 0, srcTa.Length, curBpe, curKind);
+                    for (int i = 0; i < srcTa.Length; i++) res.SetElement(i, srcTa.GetElement(i));
+                    return res;
+                }
+                else if (arg0 is JsArray srcArr)
+                {
+                    JsArrayBuffer newBuf = new JsArrayBuffer(abProto, srcArr.Length * curBpe);
+                    JsTypedArray res = new JsTypedArray(curProto, newBuf, 0, srcArr.Length, curBpe, curKind);
+                    for (int i = 0; i < srcArr.Length; i++) res.SetElement(i, JsValueOps.ToNumber(srcArr.GetIndex(i)));
+                    return res;
+                }
+                else
+                {
+                    int length = (int)System.Math.Max(0, JsValueOps.ToNumber(arg0));
+                    JsArrayBuffer newBuf = new JsArrayBuffer(abProto, length * curBpe);
+                    return new JsTypedArray(curProto, newBuf, 0, length, curBpe, curKind);
+                }
+            }, 1, curProto);
+
+            ctor.Define("BYTES_PER_ELEMENT", JsProperty.DataNonEnum((double)curBpe));
+            realm.Global.Define(curKind, JsProperty.Data(ctor));
+        }
+
+        JsObject dvProto = realm.NewObject();
+        SetTag(realm, dvProto, "DataView");
+        dvProto.Define("getInt8", JsProperty.Data(realm.MakeMethod("getInt8", delegate (JsCallArgs a)
+        {
+            JsDataView dv = a.ThisValue as JsDataView;
+            if (dv == null || dv.Buffer == null || dv.Buffer.Data == null) return 0.0;
+            int offset = dv.ByteOffset + ToInteger(a.Get(0));
+            if (offset < 0 || offset >= dv.Buffer.Data.Length) return 0.0;
+            return (double)(sbyte)dv.Buffer.Data[offset];
+        }, 1)));
+        dvProto.Define("getUint8", JsProperty.Data(realm.MakeMethod("getUint8", delegate (JsCallArgs a)
+        {
+            JsDataView dv = a.ThisValue as JsDataView;
+            if (dv == null || dv.Buffer == null || dv.Buffer.Data == null) return 0.0;
+            int offset = dv.ByteOffset + ToInteger(a.Get(0));
+            if (offset < 0 || offset >= dv.Buffer.Data.Length) return 0.0;
+            return (double)dv.Buffer.Data[offset];
+        }, 1)));
+        dvProto.Define("setInt8", JsProperty.Data(realm.MakeMethod("setInt8", delegate (JsCallArgs a)
+        {
+            JsDataView dv = a.ThisValue as JsDataView;
+            if (dv != null && dv.Buffer != null && dv.Buffer.Data != null)
+            {
+                int offset = dv.ByteOffset + ToInteger(a.Get(0));
+                if (offset >= 0 && offset < dv.Buffer.Data.Length)
+                    dv.Buffer.Data[offset] = (byte)(sbyte)JsValueOps.ToNumber(a.Get(1));
+            }
+            return JsUndefined.Instance;
+        }, 2)));
+        dvProto.Define("setUint8", JsProperty.Data(realm.MakeMethod("setUint8", delegate (JsCallArgs a)
+        {
+            JsDataView dv = a.ThisValue as JsDataView;
+            if (dv != null && dv.Buffer != null && dv.Buffer.Data != null)
+            {
+                int offset = dv.ByteOffset + ToInteger(a.Get(0));
+                if (offset >= 0 && offset < dv.Buffer.Data.Length)
+                    dv.Buffer.Data[offset] = (byte)JsValueOps.ToNumber(a.Get(1));
+            }
+            return JsUndefined.Instance;
+        }, 2)));
+
+        realm.Global.Define("DataView", JsProperty.Data(realm.MakeCtor("DataView", delegate (JsCallArgs a)
+        {
+            JsArrayBuffer ab = a.Get(0) as JsArrayBuffer;
+            if (ab == null) throw JsErr.Type("First argument to DataView constructor must be an ArrayBuffer");
+            int byteOffset = a.ArgCount > 1 ? ToInteger(a.Get(1)) : 0;
+            int byteLength = a.ArgCount > 2 ? ToInteger(a.Get(2)) : (ab.ByteLength - byteOffset);
+            return new JsDataView(dvProto, ab, byteOffset, byteLength);
+        }, 1, dvProto)));
+    }
+
+    private static void BuildProxyReflect(JsRealm realm)
+    {
+        realm.ProxyCtor = realm.MakeCtor("Proxy", delegate (JsCallArgs a)
+        {
+            JsObject target = a.Get(0) as JsObject;
+            JsObject handler = a.Get(1) as JsObject;
+            if (target == null || handler == null)
+                throw JsErr.Type("Cannot create proxy with a non-object as target or handler");
+            return new JsProxyObject(target, handler);
+        }, 2, realm.NewObject());
+        realm.Global.Define("Proxy", JsProperty.Data(realm.ProxyCtor));
+
+        realm.ReflectObj = realm.NewObject();
+        realm.ReflectObj.SetWellKnown(JsWellKnown.ToStringTag, "Reflect");
+
+        realm.ReflectObj.Define("get", JsProperty.Data(realm.MakeMethod("get", delegate (JsCallArgs a)
+        {
+            JsObject o = a.Get(0) as JsObject;
+            if (o == null) throw JsErr.Type("Reflect.get called on non-object");
+            string key = JsValueOps.ToStringValue(a.Get(1));
+            o.GetProperty(key, out object val);
+            return val;
+        }, 2)));
+
+        realm.ReflectObj.Define("set", JsProperty.Data(realm.MakeMethod("set", delegate (JsCallArgs a)
+        {
+            JsObject o = a.Get(0) as JsObject;
+            if (o == null) throw JsErr.Type("Reflect.set called on non-object");
+            string key = JsValueOps.ToStringValue(a.Get(1));
+            o.SetProperty(key, a.Get(2));
+            return true;
+        }, 3)));
+
+        realm.ReflectObj.Define("has", JsProperty.Data(realm.MakeMethod("has", delegate (JsCallArgs a)
+        {
+            JsObject o = a.Get(0) as JsObject;
+            if (o == null) throw JsErr.Type("Reflect.has called on non-object");
+            string key = JsValueOps.ToStringValue(a.Get(1));
+            return o.HasProperty(key);
+        }, 2)));
+
+        realm.ReflectObj.Define("deleteProperty", JsProperty.Data(realm.MakeMethod("deleteProperty", delegate (JsCallArgs a)
+        {
+            JsObject o = a.Get(0) as JsObject;
+            if (o == null) throw JsErr.Type("Reflect.deleteProperty called on non-object");
+            string key = JsValueOps.ToStringValue(a.Get(1));
+            return o.DeleteProperty(key);
+        }, 2)));
+
+        realm.ReflectObj.Define("apply", JsProperty.Data(realm.MakeMethod("apply", delegate (JsCallArgs a)
+        {
+            JsFunction fn = a.Get(0) as JsFunction;
+            if (fn == null) throw JsErr.Type("Reflect.apply target is not a function");
+            object thisArg = a.Get(1);
+            object[] args = new object[0];
+            if (a.Get(2) is JsArray arr) args = arr.Items.ToArray();
+            return realm.Interp.Call(fn, thisArg, args, false);
+        }, 3)));
+
+        realm.ReflectObj.Define("construct", JsProperty.Data(realm.MakeMethod("construct", delegate (JsCallArgs a)
+        {
+            JsFunction fn = a.Get(0) as JsFunction;
+            if (fn == null) throw JsErr.Type("Reflect.construct target is not a constructor");
+            object[] args = new object[0];
+            if (a.Get(1) is JsArray arr) args = arr.Items.ToArray();
+            return realm.Interp.Call(fn, JsUndefined.Instance, args, true);
+        }, 2)));
+
+        realm.ReflectObj.Define("ownKeys", JsProperty.Data(realm.MakeMethod("ownKeys", delegate (JsCallArgs a)
+        {
+            JsObject o = a.Get(0) as JsObject;
+            if (o == null) throw JsErr.Type("Reflect.ownKeys called on non-object");
+            List<string> keys = o.OwnKeys(false);
+            List<object> objs = new List<object>(keys.Count);
+            for (int i = 0; i < keys.Count; i++) objs.Add(keys[i]);
+            return realm.NewArray(objs);
+        }, 1)));
+
+        realm.ReflectObj.Define("getPrototypeOf", JsProperty.Data(realm.MakeMethod("getPrototypeOf", delegate (JsCallArgs a)
+        {
+            JsObject o = a.Get(0) as JsObject;
+            if (o == null) throw JsErr.Type("Reflect.getPrototypeOf called on non-object");
+            return o.Prototype != null ? (object)o.Prototype : JsNull.Instance;
+        }, 1)));
+
+        realm.ReflectObj.Define("setPrototypeOf", JsProperty.Data(realm.MakeMethod("setPrototypeOf", delegate (JsCallArgs a)
+        {
+            JsObject o = a.Get(0) as JsObject;
+            if (o == null) throw JsErr.Type("Reflect.setPrototypeOf called on non-object");
+            JsObject proto = a.Get(1) as JsObject;
+            o.SetPrototype(proto);
+            return true;
+        }, 2)));
+
+        realm.Global.Define("Reflect", JsProperty.Data(realm.ReflectObj));
+    }
+
+    private static object CloneStructured(JsRealm realm, object v, Dictionary<object, object> seen)
+    {
+        if (v == null || v is JsUndefined || v is JsNull || v is bool || v is double || v is string || v is JsSymbol)
+            return v;
+
+        if (seen.ContainsKey(v)) return seen[v];
+
+        if (v is JsArray arr)
+        {
+            JsArray copy = realm.NewArray();
+            seen[v] = copy;
+            for (int i = 0; i < arr.Items.Count; i++)
+            {
+                copy.Push(CloneStructured(realm, arr.Items[i], seen));
+            }
+            return copy;
+        }
+
+        if (v is JsDate date)
+        {
+            JsDate copy = new JsDate(realm.DatePrototype, date.TimeValue);
+            seen[v] = copy;
+            return copy;
+        }
+
+        if (v is JsRegExpObject re)
+        {
+            JsRegExpObject copy = new JsRegExpObject(realm.RegExpPrototype, re.Value);
+            seen[v] = copy;
+            return copy;
+        }
+
+        if (v is JsArrayBuffer buf)
+        {
+            byte[] copyData = new byte[buf.ByteLength];
+            if (buf.Data != null) Array.Copy(buf.Data, copyData, buf.ByteLength);
+            JsArrayBuffer copyBuf = new JsArrayBuffer(realm.ObjectPrototype, copyData);
+            seen[v] = copyBuf;
+            return copyBuf;
+        }
+
+        if (v is JsTypedArray ta)
+        {
+            JsArrayBuffer clonedBuf = (JsArrayBuffer)CloneStructured(realm, ta.Buffer, seen);
+            JsTypedArray copyTa = new JsTypedArray(ta.Prototype, clonedBuf, ta.ByteOffset, ta.Length, ta.BytesPerElement, ta.ArrayKind);
+            seen[v] = copyTa;
+            return copyTa;
+        }
+
+        if (v is JsObject obj)
+        {
+            JsObject copy = realm.NewObject();
+            seen[v] = copy;
+            List<string> keys = obj.OwnKeys(true);
+            for (int i = 0; i < keys.Count; i++)
+            {
+                string k = keys[i];
+                if (obj.GetProperty(k, out object propVal))
+                {
+                    copy.SetProperty(k, CloneStructured(realm, propVal, seen));
+                }
+            }
+            return copy;
+        }
+
+        return v;
+    }
+
     // ---- global functions --------------------------------------------------
 
     public static void BuildGlobalFunctions(JsRealm realm)
     {
+        realm.Global.Define("structuredClone", JsProperty.Data(realm.MakeMethod("structuredClone", delegate (JsCallArgs a)
+        {
+            object v = a.Get(0);
+            return CloneStructured(realm, v, new Dictionary<object, object>());
+        }, 1)));
+
         realm.Global.Define("isNaN", JsProperty.Data(realm.MakeMethod("isNaN", delegate (JsCallArgs a)
         {
             return double.IsNaN(JsValueOps.ToNumber(a.Get(0)));

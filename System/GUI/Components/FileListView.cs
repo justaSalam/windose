@@ -36,15 +36,21 @@ public class FileListView : Component
 
     private Png folderIcon;
 
-
-
-
-
     public FileListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
-        itemIcon = new Png("/mnt/System/Icons/file_lines.png");
-        folderIcon = new Png("/mnt/System/Icons/directory_closed.png");
+        headers = ["Name", "Size", "Type", "Modified"];
+        headerWidths = [180, 80, 80, 120];
+        try
+        {
+            if (File.Exists("/mnt/System/Icons/file_lines.png"))
+                itemIcon = new Png("/mnt/System/Icons/file_lines.png");
+            if (File.Exists("/mnt/System/Icons/directory_closed.png"))
+                folderIcon = new Png("/mnt/System/Icons/directory_closed.png");
+        }
+        catch
+        {
+        }
     }
 
     public FileListViewItem AddItem(string text, Image icon = null, object tag = null)
@@ -63,7 +69,7 @@ public class FileListView : Component
         return item;
     }
 
-    public FileListViewItem AddFolder(string text, Bitmap icon = null, object tag = null)
+    public FileListViewItem AddFolder(string text, Image icon = null, object tag = null)
     {
         FileListViewItem item = AddItem(text, icon, tag);
         item.isFolder = true;
@@ -85,7 +91,6 @@ public class FileListView : Component
         viewMode = mode;
         MarkDirty();
     }
-
 
     public override void DrawLocal()
     {
@@ -190,22 +195,24 @@ public class FileListView : Component
 
     private void DrawDetailsHeader()
     {
+        if (headers == null || headerWidths == null) return;
+
         DrawFilledRectangle(Palette.ControlFace, 0, 0, Width, headerHeight);
 
         int currentX = 0;
-        for (int i = 0; i < headerWidths.Length; i++)
+        int count = Math.Min(headers.Length, headerWidths.Length);
+        for (int i = 0; i < count; i++)
         {
-
             DrawSunkenRectangle(currentX, 0, headerWidths[i], headerHeight);
             DrawString(headers[i], Palette.ControlBlack, currentX + 4, 2, fontSize);
             currentX += headerWidths[i];
         }
     }
 
-
-
     private void DrawDetailsRow(FileListViewItem item, int y)
     {
+        if (item == null) return;
+
         bool selected = item == selectedItem || item.selected;
 
         if (selected)
@@ -215,13 +222,44 @@ public class FileListView : Component
 
         DrawItemIcon(item, 4, y + 2, smallIconSize);
 
-        DrawString($"{TextFeatures.Fill(item.text, 20)}    {ByteSize.Format(item.fileEntry.SizeBytes)}     {item.fileEntry.FileType}   {item.modified}", color, 24, y + 2, fontSize);
-
-        int currentX = 0;
-        for (int i = 0; i < headerWidths.Length; i++)
+        if (headerWidths != null && headerWidths.Length > 0)
         {
-            DrawString(headers[i], Palette.ControlBlack, currentX + 4, 2, fontSize);
-            currentX += headerWidths[i];
+            int currentX = 0;
+
+            // Column 0: Name (item.text)
+            int col0Width = headerWidths[0];
+            DrawString(item.text ?? "", color, 24, y + 2, fontSize);
+            currentX += col0Width;
+
+            // Column 1: Size
+            if (headerWidths.Length > 1)
+            {
+                string sizeText = item.size ?? (item.hasFileEntry && !item.isFolder ? ByteSize.Format(item.fileEntry.SizeBytes) : "");
+                DrawString(sizeText, color, currentX + 4, y + 2, fontSize);
+                currentX += headerWidths[1];
+            }
+
+            // Column 2: Type
+            if (headerWidths.Length > 2)
+            {
+                string typeText = item.type ?? (item.hasFileEntry ? (item.isFolder ? "File Folder" : item.fileEntry.FileType.ToString()) : "");
+                DrawString(typeText, color, currentX + 4, y + 2, fontSize);
+                currentX += headerWidths[2];
+            }
+
+            // Column 3: Modified
+            if (headerWidths.Length > 3)
+            {
+                string modifiedText = item.modified ?? (item.hasFileEntry ? item.fileEntry.CreatedAt : "");
+                DrawString(modifiedText, color, currentX + 4, y + 2, fontSize);
+            }
+        }
+        else
+        {
+            string sizeStr = item.size ?? (item.hasFileEntry && !item.isFolder ? ByteSize.Format(item.fileEntry.SizeBytes) : "");
+            string typeStr = item.type ?? (item.hasFileEntry ? (item.isFolder ? "File Folder" : item.fileEntry.FileType.ToString()) : "");
+            string modStr = item.modified ?? (item.hasFileEntry ? item.fileEntry.CreatedAt : "");
+            DrawString($"{TextFeatures.Fill(item.text ?? "", 20)}    {sizeStr}     {typeStr}   {modStr}", color, 24, y + 2, fontSize);
         }
     }
 
@@ -248,12 +286,6 @@ public class FileListView : Component
             return;
         }
 
-        if(!item.hasFileEntry)
-        {
-            return;
-        }
-        
-
         if (item.isFolder)
             DrawFolderIcon(x, y, size);
         else
@@ -262,6 +294,8 @@ public class FileListView : Component
 
     private void DrawFolderIcon(int x, int y, int size)
     {
+        if (folderIcon == null) return;
+
         switch (viewMode)
         {
             case ListViewMode.List:
@@ -282,8 +316,10 @@ public class FileListView : Component
 
     private void DrawFileIcon(FileListViewItem item, int x, int y)
     {
-        string ext = Path.GetExtension(item.fileEntry.FileName);
-        Png icon = GetCachedIcon(ext);
+        string name = item.hasFileEntry ? item.fileEntry.FileName : (item.text ?? "");
+        string ext = !string.IsNullOrEmpty(name) ? Path.GetExtension(name) : "";
+        Png icon = GetCachedIcon(ext) ?? itemIcon;
+        if (icon == null) return;
 
         switch (viewMode)
         {
@@ -303,12 +339,23 @@ public class FileListView : Component
 
     private static Png GetCachedIcon(string extension)
     {
+        if (string.IsNullOrEmpty(extension)) return null;
         if (iconCache.TryGetValue(extension, out Png cached)) return cached;
 
-        string iconPath = Registry.GetString($"{StaticRegistry.FileAssociation}/{extension}", "/mnt/System/Icons/file_question.png");
-        Png icon = new Png(iconPath);
-        iconCache[extension] = icon;
-        return icon;
+        try
+        {
+            string iconPath = Registry.GetString($"{StaticRegistry.FileAssociation}/{extension}", "/mnt/System/Icons/file_question.png");
+            if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
+            {
+                Png icon = new Png(iconPath);
+                iconCache[extension] = icon;
+                return icon;
+            }
+        }
+        catch
+        {
+        }
+        return null;
     }
 
     private void DrawCenteredText(string text, Color color, int x, int y, int width, int size)
@@ -336,7 +383,6 @@ public class FileListView : Component
 
             viewportRightClick?.Invoke(mouseX, mouseY);
             return true;
-
         }
 
         switch (mouse.left)

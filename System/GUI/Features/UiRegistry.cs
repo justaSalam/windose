@@ -1,4 +1,6 @@
-﻿public class PropertyDescriptor
+using System.Drawing;
+
+public class PropertyDescriptor
 {
     public string Name = "";
     public Func<Component, string> Get = _ => "";
@@ -88,6 +90,46 @@ public static class UiRegistry
         Register("Label", () => new Label(0, 0, 80, 20) { text = "Label", useBackground = false }, false);
         Register("ListView", () => new ListView(0, 0, 200, 120), false);
         Register("ComboBox", () => new ComboBox(0, 0, 160), false);
-        // Register("TextBox", () => new TextBox(0, 0, 140, 22), false);   // enable once the constructor matches
+
+        Register("TextField", () => new TextField(0, 0, 140, 22), false)
+            .Prop("placeholder", c => ((TextField)c).PlaceholderText, (c, v) => { ((TextField)c).PlaceholderText = v; c.MarkDirty(); })
+            .Prop("readOnly", c => ((TextField)c).readOnly.ToString(), (c, v) => { ((TextField)c).readOnly = v == "True"; c.MarkDirty(); })
+            .Prop("multiline", c => ((TextField)c).Multiline.ToString(), (c, v) => { ((TextField)c).Multiline = v == "True"; c.MarkDirty(); });
+
+        Register("Checkbox", () => new Checkbox(0, 0) { text = "Checkbox" }, false)
+            .Prop("checked", c => ((Checkbox)c).Checked.ToString(), (c, v) => { ((Checkbox)c).Checked = v == "True"; c.MarkDirty(); });
+
+        Register("RadioButton", () => new RadioButton(0, 0) { text = "RadioButton", Group = "group1" }, false)
+            .Prop("checked", c => ((RadioButton)c).Checked.ToString(), (c, v) => { ((RadioButton)c).Checked = v == "True"; c.MarkDirty(); })
+            .Prop("group", c => ((RadioButton)c).Group, (c, v) => { ((RadioButton)c).Group = v; c.MarkDirty(); });
+
+        Register("ProgressBar", () => new ProgressBar(0, 0, 140, 20), false)
+            .Prop("value", c => ((ProgressBar)c).Value.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((ProgressBar)c).Value = n; })
+            .Prop("min", c => ((ProgressBar)c).Minimum.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((ProgressBar)c).Minimum = n; })
+            .Prop("max", c => ((ProgressBar)c).Maximum.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((ProgressBar)c).Maximum = n; });
+
+        Register("Slider", () => new Slider(0, 0, 140), false)
+            .Prop("value", c => ((Slider)c).Value.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((Slider)c).Value = n; })
+            .Prop("min", c => ((Slider)c).Minimum.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((Slider)c).Minimum = n; })
+            .Prop("max", c => ((Slider)c).Maximum.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((Slider)c).Maximum = n; });
+
+        Register("NumericUpDown", () => new NumericUpDown(0, 0, 100, 24), false)
+            .Prop("value", c => ((NumericUpDown)c).Value.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((NumericUpDown)c).Value = n; })
+            .Prop("min", c => ((NumericUpDown)c).Minimum.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((NumericUpDown)c).Minimum = n; })
+            .Prop("max", c => ((NumericUpDown)c).Maximum.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((NumericUpDown)c).Maximum = n; })
+            .Prop("increment", c => ((NumericUpDown)c).Increment.ToString(), (c, v) => { if (float.TryParse(v, out float n)) ((NumericUpDown)c).Increment = n; });
+
+        Register("Panel", () => new Panel(Color.FromArgb(255, 230, 230, 230), 0, 0, 160, 100) { useBackground = true }, true)
+            .Prop("useBackground", c => ((Panel)c).useBackground.ToString(), (c, v) => { ((Panel)c).useBackground = v == "True"; c.MarkDirty(); })
+            .Prop("useBorders", c => ((Panel)c).useBorders.ToString(), (c, v) => { ((Panel)c).useBorders = v == "True"; c.MarkDirty(); });
+
+        Register("GroupBox", () => new GroupBox(0, 0, 200, 140) { text = "Group Box" }, true)
+            .Prop("useBackground", c => ((GroupBox)c).useBackground.ToString(), (c, v) => { ((GroupBox)c).useBackground = v == "True"; c.MarkDirty(); });
+
+        Register("Separator", () => new Separator(0, 0, 140, 6) { orientation = LayoutOrientation.Horizontal }, false)
+            .Prop("orientation", c => ((Separator)c).orientation.ToString(), (c, v) => { ((Separator)c).orientation = v == "Vertical" ? LayoutOrientation.Vertical : LayoutOrientation.Horizontal; c.MarkDirty(); });
+
+        Register("LinkLabel", () => new LinkLabel("Link", 0, 0, 80, 20), false)
+            .Prop("underline", c => ((LinkLabel)c).underline.ToString(), (c, v) => { ((LinkLabel)c).underline = v == "True"; c.MarkDirty(); });
     }
 }

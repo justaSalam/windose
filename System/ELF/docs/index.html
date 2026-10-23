@@ -52,7 +52,7 @@ footer{color:var(--muted);font-size:13px;margin-top:60px}
 <div class="layout">
 <nav class="sidebar">
 <h2>ELF Developer Docs</h2>
-<span class="ver">KAPI v10</span>
+<span class="ver">KAPI v11</span>
 <a href="#overview">Overview</a>
 <a href="#quickstart">Quickstart</a>
 <a href="#anatomy">Program anatomy</a>
@@ -250,7 +250,7 @@ The queue holds 64 events and <strong>drops the newest when full</strong> — dr
 <tr><td><code>libctest</code></td><td>libc correctness suite</td></tr>
 </table>
 
-<footer>Windose ELF docs · KAPI v10 · generated from <code>programs/include/kernel.h</code> — if this page disagrees with that header, the header wins.</footer>
+<footer>Windose ELF docs · KAPI v11 · generated from <code>programs/include/kernel.h</code> — if this page disagrees with that header, the header wins.</footer>
 </main>
 </div>
 <script>
@@ -265,7 +265,12 @@ const API = [
 ["k_alloc — internal","void*","Raw kernel alloc backing libc malloc. Use malloc/free instead."]]},
 {g:"Processes", id:"api-proc", calls:[
 ["k_spawn(const char *path, const char *argbuf, int arglen)","int pid","Start a program file. Args are NUL-separated (like get_args format). Negative on failure."],
-["k_kill(int target)","int","Cooperative kill: windows close at once, thread stops at next kernel call. 0 ok."]]},
+["k_kill(int target)","int","Cooperative kill: windows close at once, thread stops at next kernel call. 0 ok."],
+["k_wait_pid(int target, int *exit_code, int timeout_ms)","int","Wait for process to exit and get its exit code. 0 ok, -1 not found, -2 timeout."],
+["k_clipboard_get(char *buf, int max)","int","Read text from system clipboard into buf. Returns length."],
+["k_clipboard_set(const char *text, int len)","int","Write text to system clipboard. 0 ok."],
+["k_get_env(const char *name, char *buf, int max)","int","Get environment variable. Returns length, -1 if missing."],
+["k_set_env(const char *name, const char *val)","int","Set environment variable (NULL val to unset). 0 ok."]]},
 {g:"Windows & text", id:"api-window", calls:[
 ["k_create_window(int w, int h, const char *title)","handle","Client area w×h (32–4096); frame + title added. 0 = failed."],
 ["k_close(handle_t h)","int","Close window/object. Safe to call twice."],
@@ -396,7 +401,7 @@ const API = [
     });
     t.appendChild(tb); host.appendChild(t);
   });
-  document.getElementById('apiCount').textContent = total + ' calls · KAPI v10';
+  document.getElementById('apiCount').textContent = total + ' calls · KAPI v11';
   const box = document.getElementById('apiSearch');
   box.addEventListener('input', function(){
     const q = box.value.toLowerCase().trim();

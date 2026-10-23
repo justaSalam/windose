@@ -18,14 +18,31 @@ namespace Windose.System.Elf
         public const uint PF_X = 1, PF_W = 2, PF_R = 4;
         // sh_type
         public const uint SHT_NULL = 0, SHT_PROGBITS = 1, SHT_SYMTAB = 2, SHT_STRTAB = 3,
-                          SHT_RELA = 4, SHT_NOBITS = 8, SHT_REL = 9, SHT_DYNSYM = 11;
+                          SHT_RELA = 4, SHT_NOBITS = 8, SHT_REL = 9, SHT_DYNSYM = 11,
+                          SHT_INIT_ARRAY = 14, SHT_FINI_ARRAY = 15, SHT_PREINIT_ARRAY = 16;
         // sh_flags
         public const ulong SHF_WRITE = 1, SHF_ALLOC = 2, SHF_EXECINSTR = 4;
         // dynamic tags
-        public const long DT_NULL = 0, DT_PLTRELSZ = 2, DT_STRTAB = 5, DT_SYMTAB = 6, DT_RELA = 7, DT_RELASZ = 8,
-                          DT_RELAENT = 9, DT_SYMENT = 11, DT_JMPREL = 23, DT_RELRSZ = 35, DT_RELR = 36, DT_RELRENT = 37;
+        public const long DT_NULL = 0, DT_NEEDED = 1, DT_PLTRELSZ = 2, DT_STRTAB = 5, DT_SYMTAB = 6,
+                          DT_RELA = 7, DT_RELASZ = 8, DT_RELAENT = 9, DT_SYMENT = 11,
+                          DT_INIT = 12, DT_FINI = 13, DT_RPATH = 15,
+                          DT_REL = 17, DT_RELSZ = 18, DT_RELENT = 19,
+                          DT_JMPREL = 23, DT_INIT_ARRAY = 25, DT_FINI_ARRAY = 26,
+                          DT_INIT_ARRAYSZ = 27, DT_FINI_ARRAYSZ = 28, DT_RUNPATH = 29,
+                          DT_PREINIT_ARRAY = 32, DT_PREINIT_ARRAYSZ = 33,
+                          DT_RELRSZ = 35, DT_RELR = 36, DT_RELRENT = 37;
         // x86-64 relocation types
-        public const uint R_X86_64_NONE = 0, R_X86_64_64 = 1, R_X86_64_GLOB_DAT = 6, R_X86_64_JUMP_SLOT = 7, R_X86_64_RELATIVE = 8;
+        public const uint R_X86_64_NONE = 0,
+                          R_X86_64_64 = 1,
+                          R_X86_64_PC32 = 2,
+                          R_X86_64_PLT32 = 4,
+                          R_X86_64_COPY = 5,
+                          R_X86_64_GLOB_DAT = 6,
+                          R_X86_64_JUMP_SLOT = 7,
+                          R_X86_64_RELATIVE = 8,
+                          R_X86_64_32 = 10,
+                          R_X86_64_32S = 11,
+                          R_X86_64_IRELATIVE = 37;
     }
 
     public sealed class ElfSegment
@@ -88,6 +105,16 @@ namespace Windose.System.Elf
         public uint Flags;
         public ElfSegment[] Segments;
         public ElfSection[] Sections;
+
+        public ulong InitFunc;
+        public ulong FiniFunc;
+        public ulong InitArray;
+        public ulong InitArraySize;
+        public ulong FiniArray;
+        public ulong FiniArraySize;
+        public ulong PreinitArray;
+        public ulong PreinitArraySize;
+        public string[] NeededLibraries;
 
         private ElfFile() { }
 
@@ -359,10 +386,11 @@ namespace Windose.System.Elf
         }
 
         /// <summary>
-        /// Applies the dynamic relocations of a loaded image (RELA + JMPREL tables, plus RELR when present).
+        /// Applies the dynamic relocations of a loaded image (RELA + JMPREL tables, plus RELR and REL when present).
         /// 'mem[memOffset]' holds the byte for vaddr 'low'; 'bias' is (runtime address of that byte) - low.
-        /// Supports RELATIVE, 64, GLOB_DAT, JUMP_SLOT against symbols defined inside the program itself.
-        /// Undefined symbols and TLS are rejected. A file without PT_DYNAMIC has nothing to relocate and succeeds.
+        /// Supports RELATIVE, 64, GLOB_DAT, JUMP_SLOT, 32, 32S, PC32, PLT32, IRELATIVE against symbols defined inside the program.
+        /// Extracts init/fini arrays and DT_NEEDED libraries.
+        /// Undefined symbols and TLS are rejected. A file without PT_DYNAMIC checks section relocations or succeeds.
         /// </summary>
         public bool ApplyRelocations(byte[] mem, int memOffset, ulong low, ulong size, ulong bias, out string error)
         {
@@ -370,10 +398,44 @@ namespace Windose.System.Elf
             ElfSegment dyn = null;
             for (int i = 0; i < Segments.Length; i++)
                 if (Segments[i].Type == ElfConst.PT_DYNAMIC) { dyn = Segments[i]; break; }
-            if (dyn == null) return true;
+
+            if (dyn == null)
+            {
+                // Section-based relocations for static ELFs
+                if (Sections != null && Sections.Length > 0)
+                {
+                    ElfSection symtabSec = null, strtabSec = null;
+                    for (int i = 0; i < Sections.Length; i++)
+                    {
+                        if (Sections[i].Type == ElfConst.SHT_SYMTAB || Sections[i].Type == ElfConst.SHT_DYNSYM)
+                        {
+                            symtabSec = Sections[i];
+                            if (symtabSec.Link < (uint)Sections.Length)
+                                strtabSec = Sections[symtabSec.Link];
+                            break;
+                        }
+                    }
+                    ulong sVaddr = symtabSec != null ? symtabSec.Addr : 0;
+                    ulong strVaddr = strtabSec != null ? strtabSec.Addr : 0;
+
+                    for (int i = 0; i < Sections.Length; i++)
+                    {
+                        ElfSection sec = Sections[i];
+                        if (sec.Type == ElfConst.SHT_RELA && sec.Size > 0)
+                        {
+                            ulong tblVaddr = sec.Addr != 0 ? sec.Addr : (low + sec.Offset);
+                            if (!ApplyTable(mem, memOffset, low, size, bias, tblVaddr, sec.Size, sVaddr, strVaddr, out error))
+                                return false;
+                        }
+                    }
+                }
+                FindSectionInitFini();
+                return true;
+            }
 
             ulong rela = 0, relasz = 0, relaent = 24, jmprel = 0, pltrelsz = 0, symtab = 0, strtab = 0;
             ulong syment = 24, relr = 0, relrsz = 0, relent = 8;
+            ulong rel = 0, relsz = 0, relent_rel = 16;
             if (dyn.VAddr < low || dyn.VAddr - low + dyn.MemSize > size) { error = "PT_DYNAMIC outside image"; return false; }
             int dp = memOffset + (int)(dyn.VAddr - low);
             for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
@@ -394,16 +456,121 @@ namespace Windose.System.Elf
                     case ElfConst.DT_RELR: relr = val; break;
                     case ElfConst.DT_RELRSZ: relrsz = val; break;
                     case ElfConst.DT_RELRENT: relent = val; break;
+                    case ElfConst.DT_INIT: InitFunc = val; break;
+                    case ElfConst.DT_FINI: FiniFunc = val; break;
+                    case ElfConst.DT_INIT_ARRAY: InitArray = val; break;
+                    case ElfConst.DT_INIT_ARRAYSZ: InitArraySize = val; break;
+                    case ElfConst.DT_FINI_ARRAY: FiniArray = val; break;
+                    case ElfConst.DT_FINI_ARRAYSZ: FiniArraySize = val; break;
+                    case ElfConst.DT_PREINIT_ARRAY: PreinitArray = val; break;
+                    case ElfConst.DT_PREINIT_ARRAYSZ: PreinitArraySize = val; break;
+                    case ElfConst.DT_REL: rel = val; break;
+                    case ElfConst.DT_RELSZ: relsz = val; break;
+                    case ElfConst.DT_RELENT: relent_rel = val; break;
                 }
             }
-            if (relaent != 24) { error = "bad DT_RELAENT"; return false; }
-            if (syment != 24) { error = "bad DT_SYMENT"; return false; }
-            if (relent != 8) { error = "bad DT_RELRENT"; return false; }
+            if (relaent != 24 && rela != 0) { error = "bad DT_RELAENT"; return false; }
+            if (syment != 24 && symtab != 0) { error = "bad DT_SYMENT"; return false; }
+            if (relent != 8 && relr != 0) { error = "bad DT_RELRENT"; return false; }
+
+            // Extract needed libraries
+            if (strtab != 0)
+            {
+                int neededCount = 0;
+                for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
+                {
+                    long tag = (long)Rd64(mem, dp + (int)o);
+                    if (tag == ElfConst.DT_NULL) break;
+                    if (tag == ElfConst.DT_NEEDED) neededCount++;
+                }
+                NeededLibraries = new string[neededCount];
+                int idx = 0;
+                for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
+                {
+                    long tag = (long)Rd64(mem, dp + (int)o);
+                    ulong val = Rd64(mem, dp + (int)o + 8);
+                    if (tag == ElfConst.DT_NULL) break;
+                    if (tag == ElfConst.DT_NEEDED)
+                    {
+                        NeededLibraries[idx++] = CStrAt(mem, memOffset, low, size, strtab, (uint)val);
+                    }
+                }
+            }
+            else
+            {
+                NeededLibraries = new string[0];
+            }
+
+            FindSectionInitFini();
 
             if (rela != 0 && relasz != 0 && !ApplyTable(mem, memOffset, low, size, bias, rela, relasz, symtab, strtab, out error)) return false;
             if (jmprel != 0 && pltrelsz != 0 && !ApplyTable(mem, memOffset, low, size, bias, jmprel, pltrelsz, symtab, strtab, out error)) return false;
+            if (rel != 0 && relsz != 0 && !ApplyRelTable(mem, memOffset, low, size, bias, rel, relsz, relent_rel, symtab, strtab, out error)) return false;
             if (relr != 0 && relrsz != 0 && !ApplyRelr(mem, memOffset, low, size, bias, relr, relrsz, out error)) return false;
             return true;
+        }
+
+        private void FindSectionInitFini()
+        {
+            if (Sections == null) return;
+            if (InitArray == 0)
+            {
+                for (int i = 0; i < Sections.Length; i++)
+                {
+                    if (Sections[i].Type == ElfConst.SHT_INIT_ARRAY || Sections[i].Name == ".init_array")
+                    {
+                        InitArray = Sections[i].Addr;
+                        InitArraySize = Sections[i].Size;
+                        break;
+                    }
+                }
+            }
+            if (FiniArray == 0)
+            {
+                for (int i = 0; i < Sections.Length; i++)
+                {
+                    if (Sections[i].Type == ElfConst.SHT_FINI_ARRAY || Sections[i].Name == ".fini_array")
+                    {
+                        FiniArray = Sections[i].Addr;
+                        FiniArraySize = Sections[i].Size;
+                        break;
+                    }
+                }
+            }
+            if (PreinitArray == 0)
+            {
+                for (int i = 0; i < Sections.Length; i++)
+                {
+                    if (Sections[i].Type == ElfConst.SHT_PREINIT_ARRAY || Sections[i].Name == ".preinit_array")
+                    {
+                        PreinitArray = Sections[i].Addr;
+                        PreinitArraySize = Sections[i].Size;
+                        break;
+                    }
+                }
+            }
+            if (InitFunc == 0)
+            {
+                for (int i = 0; i < Sections.Length; i++)
+                {
+                    if (Sections[i].Name == ".init" && Sections[i].Size > 0)
+                    {
+                        InitFunc = Sections[i].Addr;
+                        break;
+                    }
+                }
+            }
+            if (FiniFunc == 0)
+            {
+                for (int i = 0; i < Sections.Length; i++)
+                {
+                    if (Sections[i].Name == ".fini" && Sections[i].Size > 0)
+                    {
+                        FiniFunc = Sections[i].Addr;
+                        break;
+                    }
+                }
+            }
         }
 
         private static bool ApplyTable(byte[] mem, int memOffset, ulong low, ulong size, ulong bias,
@@ -422,39 +589,182 @@ namespace Windose.System.Elf
                 uint type = (uint)(info & 0xFFFFFFFF);
                 uint sym = (uint)(info >> 32);
                 if (type == ElfConst.R_X86_64_NONE) continue;
-                if (rOff < low || rOff - low + 8 > size) { error = "relocation target outside image"; return false; }
 
-                ulong value;
+                ulong reqSize = (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S || type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32) ? 4UL : 8UL;
+                if (rOff < low || rOff - low + reqSize > size) { error = "relocation target outside image"; return false; }
+
                 if (type == ElfConst.R_X86_64_RELATIVE)
                 {
-                    value = unchecked(bias + (ulong)addend);
+                    ulong value = unchecked(bias + (ulong)addend);
+                    Wr64(mem, memOffset + (int)(rOff - low), value);
+                    continue;
                 }
-                else if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
-                {
-                    ulong s = 0;
-                    if (sym != 0)
-                    {
-                        if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
-                        ulong so = symtab - low + (ulong)sym * 24;
-                        if (so + 24 > size) { error = "symbol index out of range"; return false; }
-                        int sp = memOffset + (int)so;
-                        uint nameOff = Rd32(mem, sp);
-                        byte stInfo = mem[sp + 4];
-                        ushort shndx = (ushort)(mem[sp + 6] | (mem[sp + 7] << 8));
-                        ulong stValue = Rd64(mem, sp + 8);
-                        if (shndx == 0)
-                        {
-                            if ((stInfo >> 4) == 2) s = 0;   // weak undefined resolves to 0
-                            else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
-                        }
-                        else if (shndx == 0xFFF1) s = stValue;                 // SHN_ABS
-                        else s = unchecked(bias + stValue);
-                    }
-                    value = type == ElfConst.R_X86_64_64 ? unchecked(s + (ulong)addend) : s;
-                }
-                else { error = "unsupported relocation type " + type; return false; }
 
-                Wr64(mem, memOffset + (int)(rOff - low), value);
+                if (type == ElfConst.R_X86_64_IRELATIVE)
+                {
+                    ulong resolverAddr = unchecked(bias + (ulong)addend);
+                    ulong value;
+                    unsafe
+                    {
+                        try
+                        {
+                            var resolver = (delegate* unmanaged<ulong>)(byte*)resolverAddr;
+                            value = resolver();
+                        }
+                        catch (global::System.Exception ex)
+                        {
+                            error = "IRELATIVE resolver failed: " + ex.Message;
+                            return false;
+                        }
+                    }
+                    Wr64(mem, memOffset + (int)(rOff - low), value);
+                    continue;
+                }
+
+                ulong s = 0;
+                if (sym != 0)
+                {
+                    if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
+                    ulong so = symtab - low + (ulong)sym * 24;
+                    if (so + 24 > size) { error = "symbol index out of range"; return false; }
+                    int sp = memOffset + (int)so;
+                    uint nameOff = Rd32(mem, sp);
+                    byte stInfo = mem[sp + 4];
+                    ushort shndx = (ushort)(mem[sp + 6] | (mem[sp + 7] << 8));
+                    ulong stValue = Rd64(mem, sp + 8);
+                    if (shndx == 0)
+                    {
+                        if ((stInfo >> 4) == 2) s = 0;   // weak undefined resolves to 0
+                        else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
+                    }
+                    else if (shndx == 0xFFF1) s = stValue;                 // SHN_ABS
+                    else s = unchecked(bias + stValue);
+                }
+
+                if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
+                {
+                    ulong value = unchecked(s + (ulong)addend);
+                    Wr64(mem, memOffset + (int)(rOff - low), value);
+                }
+                else if (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S)
+                {
+                    ulong value = unchecked(s + (ulong)addend);
+                    Wr32(mem, memOffset + (int)(rOff - low), (uint)value);
+                }
+                else if (type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32)
+                {
+                    ulong pAddr = unchecked(bias + rOff);
+                    ulong pcVal = unchecked(s + (ulong)addend - pAddr);
+                    Wr32(mem, memOffset + (int)(rOff - low), (uint)pcVal);
+                }
+                else if (type == ElfConst.R_X86_64_COPY)
+                {
+                    // Copy relocation in static/PIE is a no-op
+                }
+                else
+                {
+                    error = "unsupported relocation type " + type;
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static bool ApplyRelTable(byte[] mem, int memOffset, ulong low, ulong size, ulong bias,
+                                          ulong tableVaddr, ulong tableSize, ulong relent, ulong symtab, ulong strtab, out string error)
+        {
+            error = null;
+            if (relent == 0) relent = 16;
+            if (tableVaddr < low || tableVaddr - low + tableSize > size) { error = "REL table outside image"; return false; }
+            int tp = memOffset + (int)(tableVaddr - low);
+            ulong count = tableSize / relent;
+            for (ulong i = 0; i < count; i++)
+            {
+                int e = tp + (int)(i * relent);
+                ulong rOff = Rd64(mem, e);
+                ulong info = Rd64(mem, e + 8);
+                uint type = (uint)(info & 0xFFFFFFFF);
+                uint sym = (uint)(info >> 32);
+                if (type == ElfConst.R_X86_64_NONE) continue;
+
+                ulong reqSize = (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S || type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32) ? 4UL : 8UL;
+                if (rOff < low || rOff - low + reqSize > size) { error = "relocation target outside image"; return false; }
+
+                long addend = (reqSize == 4) ? (long)(int)Rd32(mem, memOffset + (int)(rOff - low))
+                                             : (long)Rd64(mem, memOffset + (int)(rOff - low));
+
+                if (type == ElfConst.R_X86_64_RELATIVE)
+                {
+                    ulong value = unchecked(bias + (ulong)addend);
+                    Wr64(mem, memOffset + (int)(rOff - low), value);
+                    continue;
+                }
+
+                if (type == ElfConst.R_X86_64_IRELATIVE)
+                {
+                    ulong resolverAddr = unchecked(bias + (ulong)addend);
+                    ulong value;
+                    unsafe
+                    {
+                        try
+                        {
+                            var resolver = (delegate* unmanaged<ulong>)(byte*)resolverAddr;
+                            value = resolver();
+                        }
+                        catch (global::System.Exception ex)
+                        {
+                            error = "IRELATIVE resolver failed: " + ex.Message;
+                            return false;
+                        }
+                    }
+                    Wr64(mem, memOffset + (int)(rOff - low), value);
+                    continue;
+                }
+
+                ulong s = 0;
+                if (sym != 0)
+                {
+                    if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
+                    ulong so = symtab - low + (ulong)sym * 24;
+                    if (so + 24 > size) { error = "symbol index out of range"; return false; }
+                    int sp = memOffset + (int)so;
+                    uint nameOff = Rd32(mem, sp);
+                    byte stInfo = mem[sp + 4];
+                    ushort shndx = (ushort)(mem[sp + 6] | (mem[sp + 7] << 8));
+                    ulong stValue = Rd64(mem, sp + 8);
+                    if (shndx == 0)
+                    {
+                        if ((stInfo >> 4) == 2) s = 0;
+                        else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
+                    }
+                    else if (shndx == 0xFFF1) s = stValue;
+                    else s = unchecked(bias + stValue);
+                }
+
+                if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
+                {
+                    ulong value = unchecked(s + (ulong)addend);
+                    Wr64(mem, memOffset + (int)(rOff - low), value);
+                }
+                else if (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S)
+                {
+                    ulong value = unchecked(s + (ulong)addend);
+                    Wr32(mem, memOffset + (int)(rOff - low), (uint)value);
+                }
+                else if (type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32)
+                {
+                    ulong pAddr = unchecked(bias + rOff);
+                    ulong pcVal = unchecked(s + (ulong)addend - pAddr);
+                    Wr32(mem, memOffset + (int)(rOff - low), (uint)pcVal);
+                }
+                else if (type == ElfConst.R_X86_64_COPY)
+                {
+                }
+                else
+                {
+                    error = "unsupported relocation type " + type;
+                    return false;
+                }
             }
             return true;
         }
@@ -515,6 +825,14 @@ namespace Windose.System.Elf
 
         private static uint Rd32(byte[] m, int o) { return (uint)(m[o] | (m[o + 1] << 8) | (m[o + 2] << 16) | (m[o + 3] << 24)); }
         private static ulong Rd64(byte[] m, int o) { return Rd32(m, o) | ((ulong)Rd32(m, o + 4) << 32); }
+        private static void Wr32(byte[] m, int o, uint v)
+        {
+            m[o] = (byte)v;
+            m[o + 1] = (byte)(v >> 8);
+            m[o + 2] = (byte)(v >> 16);
+            m[o + 3] = (byte)(v >> 24);
+        }
+
         private static void Wr64(byte[] m, int o, ulong v)
         {
             for (int i = 0; i < 8; i++) m[o + i] = (byte)(v >> (8 * i));

@@ -22,6 +22,8 @@ public sealed class JsElementObject : JsObject
     public Dictionary<string, List<JsFunction>> Listeners;
     public JsStyleObject StyleCache;   // lazily created `el.style`
     public JsObject ClassListCache;    // lazily created `el.classList`
+    public JsDatasetObject DatasetCache;// lazily created `el.dataset`
+    public JsObject AttributesCache;   // lazily created `el.attributes`
 
     public JsElementObject(DomNode node, JsObject prototype, JsDom dom)
         : base(prototype)
@@ -37,6 +39,62 @@ public sealed class JsElementObject : JsObject
     }
 }
 
+/// <summary>`el.dataset` — maps camelCase properties to data-* attributes.</summary>
+public sealed class JsDatasetObject : JsObject
+{
+    public JsElementObject Owner;
+
+    public JsDatasetObject(JsObject prototype, JsElementObject owner) : base(prototype)
+    {
+        Owner = owner;
+    }
+
+    public override string ClassTag { get { return "DOMStringMap"; } }
+
+    public override bool GetProperty(string key, out object value)
+    {
+        string attr = "data-" + CamelToKebab(key);
+        string v = Owner.Node.GetAttr(attr);
+        if (v != null)
+        {
+            value = v;
+            return true;
+        }
+        return base.GetProperty(key, out value);
+    }
+
+    public override void SetProperty(string key, object value)
+    {
+        string attr = "data-" + CamelToKebab(key);
+        string v = JsValueOps.ToStringValue(value);
+        JsDom.SetAttribute(Owner.Node, attr, v);
+        Owner.Dom.MarkChanged();
+    }
+
+    public override bool DeleteProperty(string key)
+    {
+        string attr = "data-" + CamelToKebab(key);
+        if (Owner.Node.Attrs != null && Owner.Node.Attrs.Remove(attr))
+        {
+            Owner.Dom.MarkChanged();
+            return true;
+        }
+        return base.DeleteProperty(key);
+    }
+
+    public static string CamelToKebab(string s)
+    {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if (c >= 'A' && c <= 'Z') { sb.Append('-'); sb.Append((char)(c + 32)); }
+            else sb.Append(c);
+        }
+        return sb.ToString();
+    }
+}
+
 /// <summary>A DOM Event passed to listeners.</summary>
 public sealed class JsEventObject : JsObject
 {
@@ -47,6 +105,15 @@ public sealed class JsEventObject : JsObject
     public bool DefaultPrevented;
     public bool PropagationStopped;
     public bool StopImmediate;
+
+    public object Detail = JsUndefined.Instance;
+    public double TimeStamp = 0;
+    public double ClientX = 0, ClientY = 0, PageX = 0, PageY = 0, ScreenX = 0, ScreenY = 0;
+    public int Button = 0, Buttons = 0;
+    public bool AltKey = false, CtrlKey = false, ShiftKey = false, MetaKey = false;
+    public string Key = "";
+    public string Code = "";
+    public int KeyCode = 0, Which = 0, CharCode = 0;
 
     public JsEventObject(JsObject prototype) : base(prototype) { }
 
@@ -62,6 +129,37 @@ public sealed class JsStyleObject : JsObject
         Owner = owner;
     }
     public override string ClassTag { get { return "CSSStyleDeclaration"; } }
+
+    public override bool GetProperty(string key, out object value)
+    {
+        if (base.GetProperty(key, out value)) return true;
+        if (Owner != null && Owner.Node != null && !string.IsNullOrEmpty(key))
+        {
+            string cssName = JsDom.CamelToKebab(key);
+            string v = StyleAttr.Get(Owner.Node.StyleAttr, cssName);
+            value = v != null ? v : "";
+            return true;
+        }
+        value = JsUndefined.Instance;
+        return false;
+    }
+
+    public override void SetProperty(string key, object value)
+    {
+        if (base.HasProperty(key))
+        {
+            base.SetProperty(key, value);
+            return;
+        }
+        if (Owner != null && Owner.Node != null && !string.IsNullOrEmpty(key))
+        {
+            string cssName = JsDom.CamelToKebab(key);
+            string sVal = JsValueOps.ToStringValue(value);
+            Owner.Dom.SetStyleAttrDirect(Owner.Node, cssName, sVal);
+            return;
+        }
+        base.SetProperty(key, value);
+    }
 }
 
 /// <summary>A snapshot of an element's computed style (window.getComputedStyle).
@@ -413,6 +511,7 @@ public sealed class JsDom
     // document stylesheet + viewport via SetStylesheet; the sheet is parsed
     // lazily and only re-parsed when that changes.
     public JsObject ComputedPrototype;
+    public JsObject CanvasContextPrototype;
     private CssSheet styleSheet;
     private string styleCss = "";
     private int styleVw = 1024, styleVh = 768;
@@ -431,9 +530,19 @@ public sealed class JsDom
         "float", "clear", "verticalAlign",
     };
 
+    public string LocationHref
+    {
+        get
+        {
+            JsEventLoop loop = Interp != null ? Interp.Loop : null;
+            return loop != null && loop.LocationHref != null ? loop.LocationHref : "";
+        }
+    }
+
     public JsDom(JsInterpreter interp, DomNode root)
     {
         Interp = interp;
+        if (interp != null) interp.Dom = this;
         Realm = interp.Realm;
         Root = root;
         cache = new Dictionary<DomNode, JsElementObject>();
@@ -467,15 +576,82 @@ public sealed class JsDom
         DefineOn(Realm.Global, "removeEventListener", WindowRemoveListener, 2);
         DefineOn(Realm.Global, "getComputedStyle", WindowGetComputedStyle, 2);
 
-        // `new Event(type)` constructor
+        // event constructors
         Realm.Global.Define("Event", JsProperty.Data(
             Realm.MakeCtor("Event", EventCtor, 1, EventPrototype)));
+        Realm.Global.Define("CustomEvent", JsProperty.Data(
+            Realm.MakeCtor("CustomEvent", CustomEventCtor, 1, Realm.NewObject(EventPrototype))));
+        Realm.Global.Define("MouseEvent", JsProperty.Data(
+            Realm.MakeCtor("MouseEvent", MouseEventCtor, 1, Realm.NewObject(EventPrototype))));
+        Realm.Global.Define("KeyboardEvent", JsProperty.Data(
+            Realm.MakeCtor("KeyboardEvent", KeyboardEventCtor, 1, Realm.NewObject(EventPrototype))));
+        Realm.Global.Define("FocusEvent", JsProperty.Data(
+            Realm.MakeCtor("FocusEvent", EventCtor, 1, Realm.NewObject(EventPrototype))));
+        Realm.Global.Define("UIEvent", JsProperty.Data(
+            Realm.MakeCtor("UIEvent", EventCtor, 1, Realm.NewObject(EventPrototype))));
+
+        BuildDomConstructors();
     }
 
     private object EventCtor(JsCallArgs a)
     {
         JsEventObject ev = new JsEventObject(EventPrototype);
         ev.Type = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+        ev.TimeStamp = (double)DateTime.UtcNow.Ticks / 10000.0;
+        if (a.ArgCount > 1 && a.Get(1) is JsObject opts)
+        {
+            if (opts.GetProperty("bubbles", out object b)) ev.Bubbles = JsValueOps.ToBoolean(b);
+            if (opts.GetProperty("cancelable", out object c)) ev.DefaultPrevented = false;
+        }
+        return ev;
+    }
+
+    private object CustomEventCtor(JsCallArgs a)
+    {
+        JsEventObject ev = new JsEventObject(EventPrototype);
+        ev.Type = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+        ev.TimeStamp = (double)DateTime.UtcNow.Ticks / 10000.0;
+        if (a.ArgCount > 1 && a.Get(1) is JsObject opts)
+        {
+            if (opts.GetProperty("bubbles", out object b)) ev.Bubbles = JsValueOps.ToBoolean(b);
+            if (opts.GetProperty("detail", out object d)) ev.Detail = d;
+        }
+        return ev;
+    }
+
+    private object MouseEventCtor(JsCallArgs a)
+    {
+        JsEventObject ev = (JsEventObject)EventCtor(a);
+        if (a.ArgCount > 1 && a.Get(1) is JsObject opts)
+        {
+            if (opts.GetProperty("clientX", out object cx)) ev.ClientX = JsValueOps.ToNumber(cx);
+            if (opts.GetProperty("clientY", out object cy)) ev.ClientY = JsValueOps.ToNumber(cy);
+            if (opts.GetProperty("pageX", out object px)) ev.PageX = JsValueOps.ToNumber(px);
+            if (opts.GetProperty("pageY", out object py)) ev.PageY = JsValueOps.ToNumber(py);
+            if (opts.GetProperty("button", out object btn)) ev.Button = (int)JsValueOps.ToNumber(btn);
+            if (opts.GetProperty("buttons", out object btns)) ev.Buttons = (int)JsValueOps.ToNumber(btns);
+            if (opts.GetProperty("altKey", out object ak)) ev.AltKey = JsValueOps.ToBoolean(ak);
+            if (opts.GetProperty("ctrlKey", out object ck)) ev.CtrlKey = JsValueOps.ToBoolean(ck);
+            if (opts.GetProperty("shiftKey", out object sk)) ev.ShiftKey = JsValueOps.ToBoolean(sk);
+            if (opts.GetProperty("metaKey", out object mk)) ev.MetaKey = JsValueOps.ToBoolean(mk);
+        }
+        return ev;
+    }
+
+    private object KeyboardEventCtor(JsCallArgs a)
+    {
+        JsEventObject ev = (JsEventObject)EventCtor(a);
+        if (a.ArgCount > 1 && a.Get(1) is JsObject opts)
+        {
+            if (opts.GetProperty("key", out object k)) ev.Key = JsValueOps.ToStringValue(k);
+            if (opts.GetProperty("code", out object c)) ev.Code = JsValueOps.ToStringValue(c);
+            if (opts.GetProperty("keyCode", out object kc)) ev.KeyCode = (int)JsValueOps.ToNumber(kc);
+            if (opts.GetProperty("which", out object wh)) ev.Which = (int)JsValueOps.ToNumber(wh);
+            if (opts.GetProperty("altKey", out object ak)) ev.AltKey = JsValueOps.ToBoolean(ak);
+            if (opts.GetProperty("ctrlKey", out object ck)) ev.CtrlKey = JsValueOps.ToBoolean(ck);
+            if (opts.GetProperty("shiftKey", out object sk)) ev.ShiftKey = JsValueOps.ToBoolean(sk);
+            if (opts.GetProperty("metaKey", out object mk)) ev.MetaKey = JsValueOps.ToBoolean(mk);
+        }
         return ev;
     }
 
@@ -493,7 +669,7 @@ public sealed class JsDom
         o.Define(name, JsProperty.Accessor(g, s));
     }
 
-    private void MarkChanged()
+    public void MarkChanged()
     {
         if (OnDomChanged != null) OnDomChanged();
     }
@@ -690,11 +866,19 @@ public sealed class JsDom
         DefineAccessor(ElementPrototype, "id", ElIdGet, ElIdSet);
         DefineAccessor(ElementPrototype, "className", ElClassGet, ElClassSet);
         DefineAccessor(ElementPrototype, "value", ElValueGet, ElValueSet);
+        DefineAccessor(ElementPrototype, "ownerDocument", ElOwnerDocument, null);
+        DefineAccessor(ElementPrototype, "dataset", ElDataset, null);
+        DefineAccessor(ElementPrototype, "attributes", ElAttributes, null);
+        DefineAccessor(ElementPrototype, "innerText", ElInnerTextGet, ElInnerTextSet);
+        DefineAccessor(ElementPrototype, "childElementCount", ElChildElementCount, null);
 
         // content
         DefineAccessor(ElementPrototype, "innerHTML", ElInnerGet, ElInnerSet);
         DefineAccessor(ElementPrototype, "outerHTML", ElOuterGet, null);
         DefineAccessor(ElementPrototype, "textContent", ElTextGet, ElTextSet);
+        DefineAccessor(ElementPrototype, "documentElement", ElDocumentElement, null);
+        DefineAccessor(ElementPrototype, "body", ElBody, null);
+        DefineAccessor(ElementPrototype, "head", ElHead, null);
 
         // tree
         DefineAccessor(ElementPrototype, "children", ElChildren, null);
@@ -714,11 +898,28 @@ public sealed class JsDom
         DefineAccessor(ElementPrototype, "style", ElStyle, null);
         DefineAccessor(ElementPrototype, "classList", ElClassList, null);
 
+        // geometry & layout
+        DefineAccessor(ElementPrototype, "offsetWidth", ElOffsetWidth, null);
+        DefineAccessor(ElementPrototype, "offsetHeight", ElOffsetHeight, null);
+        DefineAccessor(ElementPrototype, "offsetLeft", ElOffsetLeft, null);
+        DefineAccessor(ElementPrototype, "offsetTop", ElOffsetTop, null);
+        DefineAccessor(ElementPrototype, "offsetParent", ElOffsetParent, null);
+        DefineAccessor(ElementPrototype, "clientWidth", ElClientWidth, null);
+        DefineAccessor(ElementPrototype, "clientHeight", ElClientHeight, null);
+        DefineAccessor(ElementPrototype, "clientLeft", ElClientLeft, null);
+        DefineAccessor(ElementPrototype, "clientTop", ElClientTop, null);
+        DefineAccessor(ElementPrototype, "scrollWidth", ElScrollWidth, null);
+        DefineAccessor(ElementPrototype, "scrollHeight", ElScrollHeight, null);
+        DefineAccessor(ElementPrototype, "scrollLeft", ElScrollLeft, ElScrollLeftSet);
+        DefineAccessor(ElementPrototype, "scrollTop", ElScrollTop, ElScrollTopSet);
+
         // attributes
         DefineOn(ElementPrototype, "getAttribute", ElGetAttribute, 1);
         DefineOn(ElementPrototype, "setAttribute", ElSetAttribute, 2);
         DefineOn(ElementPrototype, "removeAttribute", ElRemoveAttribute, 1);
         DefineOn(ElementPrototype, "hasAttribute", ElHasAttribute, 1);
+        DefineOn(ElementPrototype, "getAttributeNames", ElGetAttributeNames, 0);
+        DefineOn(ElementPrototype, "toggleAttribute", ElToggleAttribute, 1);
 
         // mutation
         DefineOn(ElementPrototype, "appendChild", ElAppendChild, 1);
@@ -726,11 +927,25 @@ public sealed class JsDom
         DefineOn(ElementPrototype, "insertBefore", ElInsertBefore, 2);
         DefineOn(ElementPrototype, "remove", ElRemove, 0);
         DefineOn(ElementPrototype, "cloneNode", ElCloneNode, 1);
+        DefineOn(ElementPrototype, "replaceChild", ElReplaceChild, 2);
+        DefineOn(ElementPrototype, "hasChildNodes", ElHasChildNodes, 0);
+        DefineOn(ElementPrototype, "append", ElAppend, 1);
+        DefineOn(ElementPrototype, "prepend", ElPrepend, 1);
+        DefineOn(ElementPrototype, "before", ElBefore, 1);
+        DefineOn(ElementPrototype, "after", ElAfter, 1);
+        DefineOn(ElementPrototype, "replaceWith", ElReplaceWith, 1);
 
         // queries
         DefineOn(ElementPrototype, "querySelector", ElQuerySelector, 1);
         DefineOn(ElementPrototype, "querySelectorAll", ElQuerySelectorAll, 1);
         DefineOn(ElementPrototype, "getElementById", ElGetElementById, 1);
+        DefineOn(ElementPrototype, "getElementsByClassName", ElGetElementsByClassName, 1);
+        DefineOn(ElementPrototype, "getElementsByTagName", ElGetElementsByTagName, 1);
+        DefineOn(ElementPrototype, "matches", ElMatches, 1);
+        DefineOn(ElementPrototype, "closest", ElClosest, 1);
+        DefineOn(ElementPrototype, "contains", ElContains, 1);
+        DefineOn(ElementPrototype, "getBoundingClientRect", ElGetBoundingClientRect, 0);
+        DefineOn(ElementPrototype, "scrollIntoView", ElScrollIntoView, 0);
 
         // events
         DefineOn(ElementPrototype, "addEventListener", ElAddEventListener, 2);
@@ -761,6 +976,57 @@ public sealed class JsDom
         DefineOn(ElementPrototype, "submit", ElSubmit, 0);
         DefineOn(ElementPrototype, "reset", ElReset, 0);
         DefineOn(ElementPrototype, "clickSubmit", ElClickSubmit, 0);
+
+        // HTML attributes
+        DefineAccessor(ElementPrototype, "src", ElSrcGet, ElSrcSet);
+        DefineAccessor(ElementPrototype, "href", ElHrefGet, ElHrefSet);
+        DefineAccessor(ElementPrototype, "title", ElTitleGet, ElTitleSet);
+        DefineAccessor(ElementPrototype, "alt", ElAltGet, ElAltSet);
+        DefineAccessor(ElementPrototype, "target", ElTargetGet, ElTargetSet);
+        DefineAccessor(ElementPrototype, "rel", ElRelGet, ElRelSet);
+        DefineAccessor(ElementPrototype, "hidden", ElHiddenGet, ElHiddenSet);
+        DefineAccessor(ElementPrototype, "tabIndex", ElTabIndexGet, ElTabIndexSet);
+        DefineAccessor(ElementPrototype, "action", ElActionGet, ElActionSet);
+        DefineAccessor(ElementPrototype, "method", ElMethodGet, ElMethodSet);
+        DefineAccessor(ElementPrototype, "autocomplete", ElAutocompleteGet, ElAutocompleteSet);
+        DefineAccessor(ElementPrototype, "required", ElRequiredGet, ElRequiredSet);
+        DefineAccessor(ElementPrototype, "pattern", ElPatternGet, ElPatternSet);
+        DefineAccessor(ElementPrototype, "min", ElMinGet, ElMinSet);
+        DefineAccessor(ElementPrototype, "max", ElMaxGet, ElMaxSet);
+        DefineAccessor(ElementPrototype, "step", ElStepGet, ElStepSet);
+        DefineAccessor(ElementPrototype, "accept", ElAcceptGet, ElAcceptSet);
+        DefineAccessor(ElementPrototype, "rows", ElRowsGet, ElRowsSet);
+        DefineAccessor(ElementPrototype, "cols", ElColsGet, ElColsSet);
+        DefineAccessor(ElementPrototype, "width", ElWidthGet, ElWidthSet);
+        DefineAccessor(ElementPrototype, "height", ElHeightGet, ElHeightSet);
+        DefineAccessor(ElementPrototype, "contentEditable", ElContentEditableGet, ElContentEditableSet);
+        DefineAccessor(ElementPrototype, "isContentEditable", ElIsContentEditableGet, null);
+        DefineAccessor(ElementPrototype, "autofocus", ElAutofocusGet, ElAutofocusSet);
+        DefineAccessor(ElementPrototype, "multiple", ElMultipleGet, ElMultipleSet);
+        DefineAccessor(ElementPrototype, "lang", ElLangGet, ElLangSet);
+        DefineAccessor(ElementPrototype, "dir", ElDirGet, ElDirSet);
+
+        // mutation & insertion
+        DefineOn(ElementPrototype, "insertAdjacentHTML", ElInsertAdjacentHTML, 2);
+        DefineOn(ElementPrototype, "insertAdjacentElement", ElInsertAdjacentElement, 2);
+        DefineOn(ElementPrototype, "insertAdjacentText", ElInsertAdjacentText, 2);
+        DefineOn(ElementPrototype, "compareDocumentPosition", ElCompareDocumentPosition, 1);
+        DefineOn(ElementPrototype, "isSameNode", ElIsSameNode, 1);
+        DefineOn(ElementPrototype, "isEqualNode", ElIsEqualNode, 1);
+        DefineOn(ElementPrototype, "normalize", ElNormalize, 0);
+
+        // canvas methods
+        DefineOn(ElementPrototype, "getContext", ElGetContext, 1);
+        DefineOn(ElementPrototype, "toDataURL", ElToDataURL, 0);
+        DefineOn(ElementPrototype, "toBlob", ElToBlob, 1);
+
+        // shadow DOM & web components & animations
+        DefineOn(ElementPrototype, "attachShadow", ElAttachShadow, 1);
+        DefineAccessor(ElementPrototype, "shadowRoot", ElShadowRoot, null);
+        DefineAccessor(ElementPrototype, "slot", ElSlotGet, ElSlotSet);
+        DefineOn(ElementPrototype, "getRootNode", ElGetRootNode, 0);
+        DefineOn(ElementPrototype, "animate", ElAnimate, 2);
+        DefineAccessor(ElementPrototype, "content", ElTemplateContentGet, null);
     }
 
     // ---- form-control accessors (stage 3) ---------------------------------
@@ -1137,6 +1403,35 @@ public sealed class JsDom
     private object ElNextSib(JsCallArgs a) { JsElementObject e = A(a); return WrapOrJsNull(e.Node.Next); }
     private object ElPrevSib(JsCallArgs a) { JsElementObject e = A(a); return WrapOrJsNull(e.Node.Prev); }
 
+    private object ElDocumentElement(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node == null) return JsNull.Instance;
+        if (e.Node.Tag != "#document" && e.Node.Tag != "html") return JsUndefined.Instance;
+        DomNode html = FindByTag(e.Node, "html");
+        if (html != null) return Wrap(html);
+        DomNode first = e.Node.FirstElementChild();
+        return first != null ? (object)Wrap(first) : JsNull.Instance;
+    }
+
+    private object ElBody(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node == null) return JsNull.Instance;
+        if (e.Node.Tag != "#document" && e.Node.Tag != "html") return JsUndefined.Instance;
+        DomNode b = FindByTag(e.Node, "body");
+        return b != null ? (object)Wrap(b) : JsNull.Instance;
+    }
+
+    private object ElHead(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node == null) return JsNull.Instance;
+        if (e.Node.Tag != "#document" && e.Node.Tag != "html") return JsUndefined.Instance;
+        DomNode h = FindByTag(e.Node, "head");
+        return h != null ? (object)Wrap(h) : JsNull.Instance;
+    }
+
     // style / classList (lazily built per element)
     private object ElStyle(JsCallArgs a)
     {
@@ -1221,6 +1516,7 @@ public sealed class JsDom
         MarkChanged();
         return JsUndefined.Instance;
     }
+
     private object ElCloneNode(JsCallArgs a)
     {
         JsElementObject e = A(a);
@@ -1253,6 +1549,732 @@ public sealed class JsDom
         JsElementObject e = A(a);
         string id = JsValueOps.ToStringValue(a.Get(0));
         return WrapOrJsNull(FindById(e.Node, id));
+    }
+
+    private object ElOwnerDocument(JsCallArgs a) { return Document; }
+
+    private object ElDataset(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.DatasetCache == null) e.DatasetCache = new JsDatasetObject(Realm.NewObject(), e);
+        return e.DatasetCache;
+    }
+
+    private object ElAttributes(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsArray arr = Realm.NewArray();
+        if (e.Node.Attrs != null)
+        {
+            foreach (KeyValuePair<string, string> kv in e.Node.Attrs)
+            {
+                JsObject attrObj = Realm.NewObject();
+                attrObj.Define("name", JsProperty.Data(kv.Key));
+                attrObj.Define("value", JsProperty.Data(kv.Value));
+                attrObj.Define("specified", JsProperty.Data(true));
+                arr.Items.Add(attrObj);
+            }
+        }
+        return arr;
+    }
+
+    private object ElInnerTextGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.TextContent; }
+    private object ElInnerTextSet(JsCallArgs a) { return ElTextSet(a); }
+
+    private object ElChildElementCount(JsCallArgs a) { JsElementObject e = A(a); return (double)e.Node.ChildElementCount; }
+
+    private object ElOffsetWidth(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null && (e.Node.Tag == "body" || e.Node.Tag == "html" || e.Node.Tag == "#document"))
+        {
+            return Interp != null && Interp.Loop != null && Interp.Loop.ViewportWidth > 0
+                ? (double)Interp.Loop.ViewportWidth : 800.0;
+        }
+        CssComputed cs = e.Node.Style ?? ComputeStyleChain(e.Node);
+        return (double)(cs != null && cs.HasW ? cs.W : (cs != null && cs.Display == CssDisplay.None ? 0 : 100));
+    }
+    private object ElOffsetHeight(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null && (e.Node.Tag == "body" || e.Node.Tag == "html" || e.Node.Tag == "#document"))
+        {
+            return Interp != null && Interp.Loop != null && Interp.Loop.ViewportHeight > 0
+                ? (double)Interp.Loop.ViewportHeight : 600.0;
+        }
+        CssComputed cs = e.Node.Style ?? ComputeStyleChain(e.Node);
+        return (double)(cs != null && cs.HasH ? cs.H : (cs != null && cs.Display == CssDisplay.None ? 0 : 30));
+    }
+    private object ElOffsetLeft(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        CssComputed cs = e.Node.Style ?? ComputeStyleChain(e.Node);
+        return (double)(cs != null && cs.PosL != CssComputed.Auto ? cs.PosL : 0);
+    }
+    private object ElOffsetTop(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        CssComputed cs = e.Node.Style ?? ComputeStyleChain(e.Node);
+        return (double)(cs != null && cs.PosT != CssComputed.Auto ? cs.PosT : 0);
+    }
+    private object ElOffsetParent(JsCallArgs a) { JsElementObject e = A(a); return WrapOrJsNull(e.Node.Parent); }
+
+    private object ElClientWidth(JsCallArgs a) { return ElOffsetWidth(a); }
+    private object ElClientHeight(JsCallArgs a) { return ElOffsetHeight(a); }
+    private object ElClientLeft(JsCallArgs a) { JsElementObject e = A(a); CssComputed cs = e.Node.Style ?? ComputeStyleChain(e.Node); return (double)(cs != null ? cs.BorderLW : 0); }
+    private object ElClientTop(JsCallArgs a) { JsElementObject e = A(a); CssComputed cs = e.Node.Style ?? ComputeStyleChain(e.Node); return (double)(cs != null ? cs.BorderTW : 0); }
+
+    private object ElScrollWidth(JsCallArgs a) { return ElOffsetWidth(a); }
+    private object ElScrollHeight(JsCallArgs a) { return ElOffsetHeight(a); }
+    private object ElScrollLeft(JsCallArgs a) { return 0.0; }
+    private object ElScrollLeftSet(JsCallArgs a) { return JsUndefined.Instance; }
+    private object ElScrollTop(JsCallArgs a) { return 0.0; }
+    private object ElScrollTopSet(JsCallArgs a) { return JsUndefined.Instance; }
+    private object ElScrollIntoView(JsCallArgs a) { return JsUndefined.Instance; }
+
+    private object ElGetBoundingClientRect(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        CssComputed cs = e.Node.Style ?? ComputeStyleChain(e.Node);
+        double w = cs != null && cs.HasW ? cs.W : (cs != null && cs.Display == CssDisplay.None ? 0 : 100);
+        double h = cs != null && cs.HasH ? cs.H : (cs != null && cs.Display == CssDisplay.None ? 0 : 30);
+        double top = cs != null && cs.PosT != CssComputed.Auto ? cs.PosT : 0;
+        double left = cs != null && cs.PosL != CssComputed.Auto ? cs.PosL : 0;
+        JsObject rect = Realm.NewObject();
+        rect.Define("x", JsProperty.Data(left));
+        rect.Define("y", JsProperty.Data(top));
+        rect.Define("width", JsProperty.Data(w));
+        rect.Define("height", JsProperty.Data(h));
+        rect.Define("top", JsProperty.Data(top));
+        rect.Define("bottom", JsProperty.Data(top + h));
+        rect.Define("left", JsProperty.Data(left));
+        rect.Define("right", JsProperty.Data(left + w));
+        return rect;
+    }
+
+    private object ElMatches(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string selStr = JsValueOps.ToStringValue(a.Get(0));
+        List<CssSelector> sels = CssSheet.ParseSelectors(selStr);
+        if (sels != null)
+        {
+            for (int i = 0; i < sels.Count; i++)
+                if (CssSheet.Matches(sels[i], e.Node)) return true;
+        }
+        return false;
+    }
+
+    private object ElClosest(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string selStr = JsValueOps.ToStringValue(a.Get(0));
+        List<CssSelector> sels = CssSheet.ParseSelectors(selStr);
+        DomNode cur = e.Node;
+        while (cur != null && cur.IsElement)
+        {
+            if (sels != null)
+            {
+                for (int i = 0; i < sels.Count; i++)
+                    if (CssSheet.Matches(sels[i], cur)) return Wrap(cur);
+            }
+            cur = cur.Parent;
+        }
+        return JsNull.Instance;
+    }
+
+    private object ElContains(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsElementObject other = a.Get(0) as JsElementObject;
+        if (other == null || other.Node == null) return false;
+        return e.Node.Contains(other.Node);
+    }
+
+    private object ElReplaceChild(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsElementObject newC = RequireNode(a.Get(0));
+        JsElementObject oldC = RequireNode(a.Get(1));
+        e.Node.ReplaceChild(newC.Node, oldC.Node);
+        MarkChanged();
+        return oldC;
+    }
+
+    private object ElHasChildNodes(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node.HasChildNodes();
+    }
+
+    private object ElGetElementsByClassName(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string cls = JsValueOps.ToStringValue(a.Get(0));
+        List<DomNode> hits = e.Node.GetElementsByClassName(cls);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < hits.Count; i++) arr.Items.Add(Wrap(hits[i]));
+        return arr;
+    }
+
+    private object ElGetElementsByTagName(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string tag = JsValueOps.ToStringValue(a.Get(0)).ToLowerInvariant();
+        List<DomNode> hits = e.Node.GetElementsByTagName(tag);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < hits.Count; i++) arr.Items.Add(Wrap(hits[i]));
+        return arr;
+    }
+
+    private object ElGetAttributeNames(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsArray arr = Realm.NewArray();
+        if (e.Node.Attrs != null)
+            foreach (string k in e.Node.Attrs.Keys) arr.Items.Add(k);
+        return arr;
+    }
+
+    private object ElToggleAttribute(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string name = JsValueOps.ToStringValue(a.Get(0)).ToLowerInvariant();
+        bool has = e.Node.GetAttr(name) != null;
+        bool next = a.ArgCount > 1 ? JsValueOps.ToBoolean(a.Get(1)) : !has;
+        if (next) SetAttribute(e.Node, name, "");
+        else if (e.Node.Attrs != null) e.Node.Attrs.Remove(name);
+        MarkChanged();
+        return next;
+    }
+
+    private object ElAppend(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        for (int i = 0; i < a.ArgCount; i++)
+        {
+            object v = a.Get(i);
+            if (v is JsElementObject elObj) e.Node.Append(elObj.Node);
+            else e.Node.AddText(JsValueOps.ToStringValue(v));
+        }
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElPrepend(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        for (int i = a.ArgCount - 1; i >= 0; i--)
+        {
+            object v = a.Get(i);
+            DomNode n = v is JsElementObject elObj ? elObj.Node : new DomNode { NodeType = DomNode.TextNode, Text = JsValueOps.ToStringValue(v) };
+            e.Node.InsertBefore(n, e.Node.FirstChild);
+        }
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElBefore(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node.Parent == null) return JsUndefined.Instance;
+        for (int i = 0; i < a.ArgCount; i++)
+        {
+            object v = a.Get(i);
+            DomNode n = v is JsElementObject elObj ? elObj.Node : new DomNode { NodeType = DomNode.TextNode, Text = JsValueOps.ToStringValue(v) };
+            e.Node.Parent.InsertBefore(n, e.Node);
+        }
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElAfter(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node.Parent == null) return JsUndefined.Instance;
+        DomNode refNode = e.Node.Next;
+        for (int i = 0; i < a.ArgCount; i++)
+        {
+            object v = a.Get(i);
+            DomNode n = v is JsElementObject elObj ? elObj.Node : new DomNode { NodeType = DomNode.TextNode, Text = JsValueOps.ToStringValue(v) };
+            e.Node.Parent.InsertBefore(n, refNode);
+        }
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElReplaceWith(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node.Parent == null) return JsUndefined.Instance;
+        for (int i = 0; i < a.ArgCount; i++)
+        {
+            object v = a.Get(i);
+            DomNode n = v is JsElementObject elObj ? elObj.Node : new DomNode { NodeType = DomNode.TextNode, Text = JsValueOps.ToStringValue(v) };
+            e.Node.Parent.InsertBefore(n, e.Node);
+        }
+        e.Node.Unlink();
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElSrcGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string src = e.Node.GetAttr("src");
+        if (src == null) return "";
+        return WebUrl.Resolve(LocationHref, src);
+    }
+    private object ElSrcSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        SetAttribute(e.Node, "src", JsValueOps.ToStringValue(a.Get(0)));
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElHrefGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string href = e.Node.GetAttr("href");
+        if (href == null) return "";
+        return WebUrl.Resolve(LocationHref, href);
+    }
+    private object ElHrefSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        SetAttribute(e.Node, "href", JsValueOps.ToStringValue(a.Get(0)));
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElTitleGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("title") != null ? e.Node.GetAttr("title") : ""; }
+    private object ElTitleSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "title", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElAltGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("alt") != null ? e.Node.GetAttr("alt") : ""; }
+    private object ElAltSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "alt", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElTargetGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("target") != null ? e.Node.GetAttr("target") : ""; }
+    private object ElTargetSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "target", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElRelGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("rel") != null ? e.Node.GetAttr("rel") : ""; }
+    private object ElRelSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "rel", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElHiddenGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("hidden") != null; }
+    private object ElHiddenSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (JsValueOps.ToBoolean(a.Get(0))) SetAttribute(e.Node, "hidden", "");
+        else if (e.Node.Attrs != null) e.Node.Attrs.Remove("hidden");
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElTabIndexGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string ti = e.Node.GetAttr("tabindex");
+        if (int.TryParse(ti, out int v)) return (double)v;
+        return 0.0;
+    }
+    private object ElTabIndexSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        SetAttribute(e.Node, "tabindex", ((int)JsValueOps.ToNumber(a.Get(0))).ToString());
+        return JsUndefined.Instance;
+    }
+
+    private object ElActionGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("action") != null ? e.Node.GetAttr("action") : ""; }
+    private object ElActionSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "action", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElMethodGet(JsCallArgs a) { JsElementObject e = A(a); return (e.Node.GetAttr("method") != null ? e.Node.GetAttr("method") : "get").ToLowerInvariant(); }
+    private object ElMethodSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "method", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElAutocompleteGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("autocomplete") != null ? e.Node.GetAttr("autocomplete") : ""; }
+    private object ElAutocompleteSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "autocomplete", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElRequiredGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("required") != null; }
+    private object ElRequiredSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (JsValueOps.ToBoolean(a.Get(0))) SetAttribute(e.Node, "required", "");
+        else if (e.Node.Attrs != null) e.Node.Attrs.Remove("required");
+        return JsUndefined.Instance;
+    }
+
+    private object ElPatternGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("pattern") != null ? e.Node.GetAttr("pattern") : ""; }
+    private object ElPatternSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "pattern", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElMinGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("min") != null ? e.Node.GetAttr("min") : ""; }
+    private object ElMinSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "min", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElMaxGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("max") != null ? e.Node.GetAttr("max") : ""; }
+    private object ElMaxSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "max", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElStepGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("step") != null ? e.Node.GetAttr("step") : ""; }
+    private object ElStepSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "step", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElAcceptGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("accept") != null ? e.Node.GetAttr("accept") : ""; }
+    private object ElAcceptSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "accept", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElRowsGet(JsCallArgs a) { JsElementObject e = A(a); return int.TryParse(e.Node.GetAttr("rows"), out int r) ? (double)r : 2.0; }
+    private object ElRowsSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "rows", ((int)JsValueOps.ToNumber(a.Get(0))).ToString()); return JsUndefined.Instance; }
+
+    private object ElColsGet(JsCallArgs a) { JsElementObject e = A(a); return int.TryParse(e.Node.GetAttr("cols"), out int c) ? (double)c : 20.0; }
+    private object ElColsSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "cols", ((int)JsValueOps.ToNumber(a.Get(0))).ToString()); return JsUndefined.Instance; }
+
+    private object ElWidthGet(JsCallArgs a) { JsElementObject e = A(a); return int.TryParse(e.Node.GetAttr("width"), out int w) ? (double)w : 0.0; }
+    private object ElWidthSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "width", ((int)JsValueOps.ToNumber(a.Get(0))).ToString()); MarkChanged(); return JsUndefined.Instance; }
+
+    private object ElHeightGet(JsCallArgs a) { JsElementObject e = A(a); return int.TryParse(e.Node.GetAttr("height"), out int h) ? (double)h : 0.0; }
+    private object ElHeightSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "height", ((int)JsValueOps.ToNumber(a.Get(0))).ToString()); MarkChanged(); return JsUndefined.Instance; }
+
+    private object ElContentEditableGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("contenteditable") != null ? e.Node.GetAttr("contenteditable") : "inherit"; }
+    private object ElContentEditableSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "contenteditable", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElIsContentEditableGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string ce = e.Node.GetAttr("contenteditable");
+        return ce == "true" || ce == "";
+    }
+
+    private object ElAutofocusGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("autofocus") != null; }
+    private object ElAutofocusSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (JsValueOps.ToBoolean(a.Get(0))) SetAttribute(e.Node, "autofocus", "");
+        else if (e.Node.Attrs != null) e.Node.Attrs.Remove("autofocus");
+        return JsUndefined.Instance;
+    }
+
+    private object ElMultipleGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("multiple") != null; }
+    private object ElMultipleSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (JsValueOps.ToBoolean(a.Get(0))) SetAttribute(e.Node, "multiple", "");
+        else if (e.Node.Attrs != null) e.Node.Attrs.Remove("multiple");
+        return JsUndefined.Instance;
+    }
+
+    private object ElLangGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("lang") != null ? e.Node.GetAttr("lang") : ""; }
+    private object ElLangSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "lang", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElDirGet(JsCallArgs a) { JsElementObject e = A(a); return e.Node.GetAttr("dir") != null ? e.Node.GetAttr("dir") : ""; }
+    private object ElDirSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "dir", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+
+    private object ElPlaceholderSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "placeholder", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+    private object ElTypeSet(JsCallArgs a) { JsElementObject e = A(a); SetAttribute(e.Node, "type", JsValueOps.ToStringValue(a.Get(0))); return JsUndefined.Instance; }
+    private object ElReadonlySet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (JsValueOps.ToBoolean(a.Get(0))) SetAttribute(e.Node, "readonly", "");
+        else if (e.Node.Attrs != null) e.Node.Attrs.Remove("readonly");
+        return JsUndefined.Instance;
+    }
+
+    private object ElInsertAdjacentHTML(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string pos = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)).ToLowerInvariant() : "";
+        string html = a.ArgCount > 1 ? JsValueOps.ToStringValue(a.Get(1)) : "";
+        List<DomNode> nodes = HtmlDom.ParseFragment(html);
+        if (nodes.Count == 0) return JsUndefined.Instance;
+
+        if (pos == "beforebegin")
+        {
+            if (e.Node.Parent != null)
+            {
+                for (int i = 0; i < nodes.Count; i++) e.Node.Parent.InsertBefore(nodes[i], e.Node);
+                MarkChanged();
+            }
+        }
+        else if (pos == "afterbegin")
+        {
+            DomNode first = e.Node.FirstChild;
+            for (int i = 0; i < nodes.Count; i++) e.Node.InsertBefore(nodes[i], first);
+            MarkChanged();
+        }
+        else if (pos == "beforeend")
+        {
+            for (int i = 0; i < nodes.Count; i++) e.Node.AppendChild(nodes[i]);
+            MarkChanged();
+        }
+        else if (pos == "afterend")
+        {
+            if (e.Node.Parent != null)
+            {
+                DomNode next = e.Node.Next;
+                for (int i = 0; i < nodes.Count; i++) e.Node.Parent.InsertBefore(nodes[i], next);
+                MarkChanged();
+            }
+        }
+        return JsUndefined.Instance;
+    }
+
+    private object ElInsertAdjacentElement(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string pos = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)).ToLowerInvariant() : "";
+        JsElementObject child = a.ArgCount > 1 ? a.Get(1) as JsElementObject : null;
+        if (child == null || child.Node == null) return JsNull.Instance;
+
+        if (pos == "beforebegin")
+        {
+            if (e.Node.Parent != null) { e.Node.Parent.InsertBefore(child.Node, e.Node); MarkChanged(); return child; }
+        }
+        else if (pos == "afterbegin")
+        {
+            e.Node.InsertBefore(child.Node, e.Node.FirstChild); MarkChanged(); return child;
+        }
+        else if (pos == "beforeend")
+        {
+            e.Node.AppendChild(child.Node); MarkChanged(); return child;
+        }
+        else if (pos == "afterend")
+        {
+            if (e.Node.Parent != null) { e.Node.Parent.InsertBefore(child.Node, e.Node.Next); MarkChanged(); return child; }
+        }
+        return JsNull.Instance;
+    }
+
+    private object ElInsertAdjacentText(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        string pos = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)).ToLowerInvariant() : "";
+        string text = a.ArgCount > 1 ? JsValueOps.ToStringValue(a.Get(1)) : "";
+        DomNode textNode = new DomNode { NodeType = DomNode.TextNode, Text = text };
+
+        if (pos == "beforebegin")
+        {
+            if (e.Node.Parent != null) { e.Node.Parent.InsertBefore(textNode, e.Node); MarkChanged(); }
+        }
+        else if (pos == "afterbegin")
+        {
+            e.Node.InsertBefore(textNode, e.Node.FirstChild); MarkChanged();
+        }
+        else if (pos == "beforeend")
+        {
+            e.Node.AppendChild(textNode); MarkChanged();
+        }
+        else if (pos == "afterend")
+        {
+            if (e.Node.Parent != null) { e.Node.Parent.InsertBefore(textNode, e.Node.Next); MarkChanged(); }
+        }
+        return JsUndefined.Instance;
+    }
+
+    private object ElCompareDocumentPosition(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsElementObject other = a.ArgCount > 0 ? a.Get(0) as JsElementObject : null;
+        if (other == null || other.Node == null) return (double)1;
+        return (double)e.Node.CompareDocumentPosition(other.Node);
+    }
+
+    private object ElIsSameNode(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsElementObject other = a.ArgCount > 0 ? a.Get(0) as JsElementObject : null;
+        return other != null && object.ReferenceEquals(e.Node, other.Node);
+    }
+
+    private object ElIsEqualNode(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        JsElementObject other = a.ArgCount > 0 ? a.Get(0) as JsElementObject : null;
+        return other != null && e.Node.IsEqualNode(other.Node);
+    }
+
+    private object ElNormalize(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        e.Node.Normalize();
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object ElGetContext(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node == null || e.Node.Tag != "canvas") return JsNull.Instance;
+        string ctxType = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)).ToLowerInvariant() : "";
+        if (ctxType == "2d")
+        {
+            if (e.GetProperty("_canvas2d", out object ctx)) return ctx;
+            int w = 300, h = 150;
+            string sw = e.Node.GetAttr("width");
+            string sh = e.Node.GetAttr("height");
+            if (!string.IsNullOrEmpty(sw) && int.TryParse(sw, out int pw) && pw > 0) w = pw;
+            if (!string.IsNullOrEmpty(sh) && int.TryParse(sh, out int ph) && ph > 0) h = ph;
+            if (w > 2048) w = 2048; if (h > 2048) h = 2048;
+            if (e.Node.CanvasSurface == null)
+            {
+                e.Node.CanvasSurface = new Cosmos.Kernel.System.Graphics.Bitmap(w, h, Cosmos.Kernel.System.Graphics.ColorDepth.ColorDepth32);
+            }
+
+            JsObject newCtx = Realm.NewObject(CanvasContextPrototype);
+            newCtx.Define("canvas", JsProperty.DataNonEnum(e));
+            e.SetProperty("_canvas2d", newCtx);
+            return newCtx;
+        }
+        return JsNull.Instance;
+    }
+
+    private object ElToDataURL(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null && e.Node.CanvasSurface is Cosmos.Kernel.System.Graphics.Bitmap bmp && bmp.RawData != null)
+        {
+            byte[] bmpBytes = CanvasEncodeBmp(bmp.RawData, (int)bmp.Width, (int)bmp.Height);
+            if (bmpBytes != null && bmpBytes.Length > 0)
+                return "data:image/bmp;base64," + Convert.ToBase64String(bmpBytes);
+        }
+        return "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    }
+
+    private static byte[] CanvasEncodeBmp(int[] pixels, int w, int h)
+    {
+        int rowBytes = ((w * 3 + 3) / 4) * 4;
+        int imageSize = rowBytes * h;
+        byte[] bmp = new byte[54 + imageSize];
+
+        // BMP header
+        bmp[0] = 0x42; bmp[1] = 0x4D; // BM
+        int fileSize = 54 + imageSize;
+        bmp[2] = (byte)(fileSize & 0xFF); bmp[3] = (byte)((fileSize >> 8) & 0xFF);
+        bmp[4] = (byte)((fileSize >> 16) & 0xFF); bmp[5] = (byte)((fileSize >> 24) & 0xFF);
+        bmp[10] = 54; // offset
+
+        // DIB header
+        bmp[14] = 40; // header size
+        bmp[18] = (byte)(w & 0xFF); bmp[19] = (byte)((w >> 8) & 0xFF);
+        bmp[20] = (byte)((w >> 16) & 0xFF); bmp[21] = (byte)((w >> 24) & 0xFF);
+        bmp[22] = (byte)(h & 0xFF); bmp[23] = (byte)((h >> 8) & 0xFF);
+        bmp[24] = (byte)((h >> 16) & 0xFF); bmp[25] = (byte)((h >> 24) & 0xFF);
+        bmp[26] = 1; // planes
+        bmp[28] = 24; // bpp
+        bmp[34] = (byte)(imageSize & 0xFF); bmp[35] = (byte)((imageSize >> 8) & 0xFF);
+
+        // Pixels (bottom-up, BGR)
+        for (int y = 0; y < h; y++)
+        {
+            int srcRow = (h - 1 - y) * w;
+            int dstRow = 54 + y * rowBytes;
+            for (int x = 0; x < w; x++)
+            {
+                int c = pixels[srcRow + x];
+                int dst = dstRow + x * 3;
+                bmp[dst] = (byte)(c & 0xFF);         // B
+                bmp[dst + 1] = (byte)((c >> 8) & 0xFF);  // G
+                bmp[dst + 2] = (byte)((c >> 16) & 0xFF); // R
+            }
+        }
+        return bmp;
+    }
+
+    private object ElToBlob(JsCallArgs a)
+    {
+        JsFunction cb = a.Get(0) as JsFunction;
+        if (cb != null)
+        {
+            JsBlobObject b = new JsBlobObject(Realm.ObjectPrototype, new byte[0], "image/png");
+            Realm.Interp.Call(cb, JsUndefined.Instance, new object[] { b }, false);
+        }
+        return JsUndefined.Instance;
+    }
+
+    private object ElAttachShadow(JsCallArgs a)
+    {
+        JsElementObject el = a.ThisValue as JsElementObject;
+        if (el == null) return JsUndefined.Instance;
+        DomNode frag = new DomNode { NodeType = DomNode.Element, Tag = "#document-fragment" };
+        JsElementObject sr = Wrap(frag);
+        if (sr != null)
+        {
+            sr.Define("host", JsProperty.Data(el));
+            sr.Define("mode", JsProperty.Data("open"));
+            el.Define("_shadowRoot", JsProperty.DataNonEnum(sr));
+            return sr;
+        }
+        return JsUndefined.Instance;
+    }
+
+    private object ElShadowRoot(JsCallArgs a)
+    {
+        JsElementObject el = a.ThisValue as JsElementObject;
+        if (el == null) return JsNull.Instance;
+        JsProperty p;
+        if (el.TryGetRaw("_shadowRoot", out p) || el.TryGetRaw("shadowRoot", out p))
+            return p.Value;
+        return JsNull.Instance;
+    }
+
+    private object ElSlotGet(JsCallArgs a)
+    {
+        JsElementObject e = a.ThisValue as JsElementObject;
+        return (e != null && e.Node != null) ? (e.Node.GetAttr("slot") ?? "") : "";
+    }
+
+    private object ElSlotSet(JsCallArgs a)
+    {
+        JsElementObject e = a.ThisValue as JsElementObject;
+        if (e != null && e.Node != null)
+        {
+            SetAttribute(e.Node, "slot", JsValueOps.ToStringValue(a.Get(0)));
+            MarkChanged();
+        }
+        return JsUndefined.Instance;
+    }
+
+    private object ElGetRootNode(JsCallArgs a)
+    {
+        JsElementObject e = a.ThisValue as JsElementObject;
+        if (e == null || e.Node == null) return a.ThisValue != null ? a.ThisValue : JsNull.Instance;
+        DomNode cur = e.Node;
+        while (cur.Parent != null)
+        {
+            cur = cur.Parent;
+        }
+        return Wrap(cur);
+    }
+
+    private object ElAnimate(JsCallArgs a)
+    {
+        JsObject anim = Realm.NewObject();
+        JsPromise finished = new JsPromise(Realm.PromisePrototype);
+        if (Interp != null && Interp.Loop != null)
+            JsBrowser.FulfillPromise(Interp.Loop, finished, anim);
+        anim.Define("finished", JsProperty.Data(finished));
+        anim.Define("playState", JsProperty.Data("finished"));
+        anim.Define("currentTime", JsProperty.Data(0.0));
+        DefineOn(anim, "play", delegate { return JsUndefined.Instance; }, 0);
+        DefineOn(anim, "pause", delegate { return JsUndefined.Instance; }, 0);
+        DefineOn(anim, "finish", delegate { return JsUndefined.Instance; }, 0);
+        DefineOn(anim, "cancel", delegate { return JsUndefined.Instance; }, 0);
+        DefineOn(anim, "reverse", delegate { return JsUndefined.Instance; }, 0);
+        DefineOn(anim, "addEventListener", delegate { return JsUndefined.Instance; }, 2);
+        DefineOn(anim, "removeEventListener", delegate { return JsUndefined.Instance; }, 2);
+        return anim;
+    }
+
+    private object ElTemplateContentGet(JsCallArgs a)
+    {
+        JsElementObject thisObj = a.ThisValue as JsElementObject;
+        if (thisObj == null || thisObj.Node == null || thisObj.Node.Tag != "template") return JsUndefined.Instance;
+        JsProperty p;
+        if (thisObj.TryGetRaw("_templateContent", out p))
+            return p.Value;
+        DomNode frag = new DomNode { NodeType = DomNode.Element, Tag = "#document-fragment" };
+        DomNode c = thisObj.Node.FirstChild;
+        while (c != null)
+        {
+            frag.Append(c.CloneNode(true));
+            c = c.Next;
+        }
+        JsElementObject wrapped = Wrap(frag);
+        thisObj.Define("_templateContent", JsProperty.DataNonEnum(wrapped));
+        return wrapped;
     }
 
     // events
@@ -1317,9 +2339,41 @@ public sealed class JsDom
         DefineAccessor(EventPrototype, "currentTarget", EvCurrentTarget, null);
         DefineAccessor(EventPrototype, "bubbles", EvBubbles, null);
         DefineAccessor(EventPrototype, "defaultPrevented", EvDefaultPrevented, null);
+        DefineAccessor(EventPrototype, "detail", EvDetail, null);
+        DefineAccessor(EventPrototype, "timeStamp", EvTimeStamp, null);
+        DefineAccessor(EventPrototype, "clientX", EvClientX, null);
+        DefineAccessor(EventPrototype, "clientY", EvClientY, null);
+        DefineAccessor(EventPrototype, "pageX", EvPageX, null);
+        DefineAccessor(EventPrototype, "pageY", EvPageY, null);
+        DefineAccessor(EventPrototype, "screenX", EvScreenX, null);
+        DefineAccessor(EventPrototype, "screenY", EvScreenY, null);
+        DefineAccessor(EventPrototype, "button", EvButton, null);
+        DefineAccessor(EventPrototype, "buttons", EvButtons, null);
+        DefineAccessor(EventPrototype, "altKey", EvAltKey, null);
+        DefineAccessor(EventPrototype, "ctrlKey", EvCtrlKey, null);
+        DefineAccessor(EventPrototype, "shiftKey", EvShiftKey, null);
+        DefineAccessor(EventPrototype, "metaKey", EvMetaKey, null);
+        DefineAccessor(EventPrototype, "key", EvKey, null);
+        DefineAccessor(EventPrototype, "code", EvCode, null);
+        DefineAccessor(EventPrototype, "keyCode", EvKeyCode, null);
+        DefineAccessor(EventPrototype, "which", EvWhich, null);
+        DefineAccessor(EventPrototype, "charCode", EvCharCode, null);
+
         DefineOn(EventPrototype, "preventDefault", EvPreventDefault, 0);
         DefineOn(EventPrototype, "stopPropagation", EvStopPropagation, 0);
         DefineOn(EventPrototype, "stopImmediatePropagation", EvStopImmediate, 0);
+        DefineOn(EventPrototype, "composedPath", EvComposedPath, 0);
+        DefineOn(EventPrototype, "initEvent", delegate (JsCallArgs a)
+        {
+            JsEventObject ev = a.ThisValue as JsEventObject;
+            if (ev != null)
+            {
+                ev.Type = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+                ev.Bubbles = a.ArgCount > 1 ? JsValueOps.ToBoolean(a.Get(1)) : false;
+                ev.DefaultPrevented = false;
+            }
+            return JsUndefined.Instance;
+        }, 3);
     }
 
     private static JsEventObject EV(JsCallArgs a)
@@ -1337,6 +2391,37 @@ public sealed class JsDom
     private object EvStopPropagation(JsCallArgs a) { EV(a).PropagationStopped = true; return JsUndefined.Instance; }
     private object EvStopImmediate(JsCallArgs a) { JsEventObject ev = EV(a); ev.StopImmediate = true; ev.PropagationStopped = true; return JsUndefined.Instance; }
 
+    private object EvDetail(JsCallArgs a) { return EV(a).Detail; }
+    private object EvTimeStamp(JsCallArgs a) { return EV(a).TimeStamp; }
+    private object EvClientX(JsCallArgs a) { return EV(a).ClientX; }
+    private object EvClientY(JsCallArgs a) { return EV(a).ClientY; }
+    private object EvPageX(JsCallArgs a) { return EV(a).PageX; }
+    private object EvPageY(JsCallArgs a) { return EV(a).PageY; }
+    private object EvScreenX(JsCallArgs a) { return EV(a).ScreenX; }
+    private object EvScreenY(JsCallArgs a) { return EV(a).ScreenY; }
+    private object EvButton(JsCallArgs a) { return (double)EV(a).Button; }
+    private object EvButtons(JsCallArgs a) { return (double)EV(a).Buttons; }
+    private object EvAltKey(JsCallArgs a) { return EV(a).AltKey; }
+    private object EvCtrlKey(JsCallArgs a) { return EV(a).CtrlKey; }
+    private object EvShiftKey(JsCallArgs a) { return EV(a).ShiftKey; }
+    private object EvMetaKey(JsCallArgs a) { return EV(a).MetaKey; }
+    private object EvKey(JsCallArgs a) { return EV(a).Key; }
+    private object EvCode(JsCallArgs a) { return EV(a).Code; }
+    private object EvKeyCode(JsCallArgs a) { return (double)EV(a).KeyCode; }
+    private object EvWhich(JsCallArgs a) { return (double)EV(a).Which; }
+    private object EvCharCode(JsCallArgs a) { return (double)EV(a).CharCode; }
+
+    private object EvComposedPath(JsCallArgs a)
+    {
+        JsEventObject ev = EV(a);
+        JsArray arr = Realm.NewArray();
+        if (ev.Target != null) arr.Items.Add(ev.Target);
+        if (ev.CurrentTarget != null && ev.CurrentTarget != ev.Target) arr.Items.Add(ev.CurrentTarget);
+        arr.Items.Add(Document);
+        arr.Items.Add(Realm.Global);
+        return arr;
+    }
+
     // ---- document ---------------------------------------------------------
 
     private void BuildDocument(JsObject doc)
@@ -1352,15 +2437,49 @@ public sealed class JsDom
         DefineAccessor(doc, "cookie", DocCookieGet, DocCookieSet);
         DefineAccessor(doc, "activeElement", DocActiveElement, null);
 
+        DefineAccessor(doc, "defaultView", DocDefaultView, null);
+        DefineAccessor(doc, "scrollingElement", DocScrollingElement, null);
+        DefineAccessor(doc, "compatMode", DocCompatMode, null);
+        DefineAccessor(doc, "characterSet", DocCharset, null);
+        DefineAccessor(doc, "charset", DocCharset, null);
+        DefineAccessor(doc, "inputEncoding", DocCharset, null);
+        DefineAccessor(doc, "visibilityState", DocVisibilityState, null);
+        DefineAccessor(doc, "hidden", DocHidden, null);
+        DefineAccessor(doc, "forms", DocForms, null);
+        DefineAccessor(doc, "images", DocImages, null);
+        DefineAccessor(doc, "links", DocLinks, null);
+        DefineAccessor(doc, "scripts", DocScripts, null);
+
         DefineOn(doc, "querySelector", DocQuerySelector, 1);
         DefineOn(doc, "querySelectorAll", DocQuerySelectorAll, 1);
         DefineOn(doc, "getElementById", DocGetElementById, 1);
         DefineOn(doc, "getElementsByTagName", DocGetElementsByTagName, 1);
+        DefineOn(doc, "getElementsByClassName", DocGetElementsByClassName, 1);
         DefineOn(doc, "createElement", DocCreateElement, 1);
+        DefineOn(doc, "createElementNS", DocCreateElementNS, 2);
+        DefineOn(doc, "createDocumentFragment", DocCreateDocumentFragment, 0);
+        DefineOn(doc, "createComment", DocCreateComment, 1);
         DefineOn(doc, "createTextNode", DocCreateTextNode, 1);
+        DefineOn(doc, "importNode", DocImportNode, 2);
+        DefineOn(doc, "adoptNode", DocAdoptNode, 1);
+        DefineOn(doc, "hasFocus", DocHasFocus, 0);
         DefineOn(doc, "addEventListener", DocAddEventListener, 2);
         DefineOn(doc, "removeEventListener", DocRemoveEventListener, 2);
         DefineOn(doc, "dispatchEvent", DocDispatchEvent, 1);
+        DefineOn(doc, "createRange", DocCreateRange, 0);
+        DefineOn(doc, "createEvent", DocCreateEvent, 1);
+        DefineOn(doc, "getElementsByName", DocGetElementsByName, 1);
+        DefineOn(doc, "write", DocWrite, 1);
+        DefineOn(doc, "writeln", DocWriteln, 1);
+        DefineOn(doc, "open", DocOpen, 0);
+        DefineOn(doc, "close", DocClose, 0);
+        DefineAccessor(doc, "referrer", DocReferrer, null);
+        DefineAccessor(doc, "domain", DocDomainGet, null);
+        DefineOn(doc, "elementFromPoint", DocElementFromPoint, 2);
+        DefineAccessor(doc, "currentScript", DocCurrentScript, null);
+        DefineAccessor(doc, "styleSheets", DocStyleSheets, null);
+        DefineOn(doc, "createTreeWalker", DocCreateTreeWalker, 1);
+        DefineOn(doc, "createNodeIterator", DocCreateNodeIterator, 1);
     }
 
     // a document is not a JsElementObject; it dispatches against Root
@@ -1448,6 +2567,95 @@ public sealed class JsDom
         DomNode n = new DomNode { NodeType = DomNode.TextNode, Text = t };
         return Wrap(n);
     }
+
+    private object DocDefaultView(JsCallArgs a) { return Realm.Global; }
+    private object DocScrollingElement(JsCallArgs a) { return DocDocumentElement(a); }
+    private object DocCompatMode(JsCallArgs a) { return "CSS1Compat"; }
+    private object DocCharset(JsCallArgs a) { return "UTF-8"; }
+    private object DocVisibilityState(JsCallArgs a) { return "visible"; }
+    private object DocHidden(JsCallArgs a) { return false; }
+    private object DocHasFocus(JsCallArgs a) { return true; }
+
+    private object DocForms(JsCallArgs a)
+    {
+        List<DomNode> hits = new List<DomNode>();
+        CollectByTag(Root, "form", hits);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < hits.Count; i++) arr.Items.Add(Wrap(hits[i]));
+        return arr;
+    }
+    private object DocImages(JsCallArgs a)
+    {
+        List<DomNode> hits = new List<DomNode>();
+        CollectByTag(Root, "img", hits);
+        CollectByTag(Root, "svg", hits);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < hits.Count; i++) arr.Items.Add(Wrap(hits[i]));
+        return arr;
+    }
+    private object DocLinks(JsCallArgs a)
+    {
+        List<DomNode> hits = new List<DomNode>();
+        CollectByTag(Root, "a", hits);
+        CollectByTag(Root, "area", hits);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < hits.Count; i++)
+            if (hits[i].GetAttr("href") != null) arr.Items.Add(Wrap(hits[i]));
+        return arr;
+    }
+    private object DocScripts(JsCallArgs a)
+    {
+        List<DomNode> hits = new List<DomNode>();
+        CollectByTag(Root, "script", hits);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < hits.Count; i++) arr.Items.Add(Wrap(hits[i]));
+        return arr;
+    }
+
+    private object DocGetElementsByClassName(JsCallArgs a)
+    {
+        string cls = JsValueOps.ToStringValue(a.Get(0));
+        List<DomNode> hits = Root.GetElementsByClassName(cls);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < hits.Count; i++) arr.Items.Add(Wrap(hits[i]));
+        return arr;
+    }
+
+    private object DocCreateDocumentFragment(JsCallArgs a)
+    {
+        DomNode frag = new DomNode { NodeType = DomNode.Element, Tag = "#document-fragment" };
+        return Wrap(frag);
+    }
+
+    private object DocCreateComment(JsCallArgs a)
+    {
+        string t = JsValueOps.ToStringValue(a.Get(0));
+        DomNode c = new DomNode { NodeType = DomNode.TextNode, Text = "<!--" + t + "-->" };
+        return Wrap(c);
+    }
+
+    private object DocCreateElementNS(JsCallArgs a)
+    {
+        string tag = JsValueOps.ToStringValue(a.Get(1)).ToLowerInvariant();
+        DomNode n = new DomNode { NodeType = DomNode.Element, Tag = tag };
+        return Wrap(n);
+    }
+
+    private object DocImportNode(JsCallArgs a)
+    {
+        JsElementObject e = a.Get(0) as JsElementObject;
+        if (e == null || e.Node == null) return JsNull.Instance;
+        bool deep = a.ArgCount > 1 && JsValueOps.ToBoolean(a.Get(1));
+        return Wrap(e.Node.CloneNode(deep));
+    }
+
+    private object DocAdoptNode(JsCallArgs a)
+    {
+        JsElementObject e = a.Get(0) as JsElementObject;
+        if (e == null || e.Node == null) return JsNull.Instance;
+        e.Node.Unlink();
+        return e;
+    }
     private object DocAddEventListener(JsCallArgs a) { AddListener(documentListeners, a); return JsUndefined.Instance; }
     private object DocRemoveEventListener(JsCallArgs a) { RemoveListener(documentListeners, a); return JsUndefined.Instance; }
     private object DocDispatchEvent(JsCallArgs a)
@@ -1456,6 +2664,987 @@ public sealed class JsDom
         if (ev == null) throw JsErr.Type("dispatchEvent expects an Event");
         DispatchExisting(Root, ev);
         return !ev.DefaultPrevented;
+    }
+
+    private object DocCreateRange(JsCallArgs a)
+    {
+        if (Realm.Global.GetProperty("Range", out object rCtor) && rCtor is JsFunction)
+        {
+            return Realm.Interp.Call((JsFunction)rCtor, Realm.Global, new object[0], true);
+        }
+        return Realm.NewObject();
+    }
+
+    private object DocCreateEvent(JsCallArgs a)
+    {
+        JsEventObject ev = new JsEventObject(EventPrototype);
+        ev.Type = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+        ev.TimeStamp = (double)DateTime.UtcNow.Ticks / 10000.0;
+        return ev;
+    }
+
+    private object DocGetElementsByName(JsCallArgs a)
+    {
+        string name = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+        List<DomNode> matched = new List<DomNode>();
+        CollectByName(Root, name, matched);
+        JsArray arr = Realm.NewArray();
+        for (int i = 0; i < matched.Count; i++) arr.Push(Wrap(matched[i]));
+        return arr;
+    }
+
+    private static void CollectByName(DomNode node, string name, List<DomNode> matched)
+    {
+        for (DomNode c = node.FirstChild; c != null; c = c.Next)
+        {
+            if (c.IsElement)
+            {
+                if (c.GetAttr("name") == name) matched.Add(c);
+                CollectByName(c, name, matched);
+            }
+        }
+    }
+
+    private object DocWrite(JsCallArgs a)
+    {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < a.ArgCount; i++) sb.Append(JsValueOps.ToStringValue(a.Get(i)));
+        string html = sb.ToString();
+        List<DomNode> nodes = HtmlDom.ParseFragment(html);
+        DomNode body = FindByTag(Root, "body");
+        if (body == null) body = Root;
+        for (int i = 0; i < nodes.Count; i++) body.AppendChild(nodes[i]);
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object DocWriteln(JsCallArgs a)
+    {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < a.ArgCount; i++) sb.Append(JsValueOps.ToStringValue(a.Get(i)));
+        sb.Append('\n');
+        string html = sb.ToString();
+        List<DomNode> nodes = HtmlDom.ParseFragment(html);
+        DomNode body = FindByTag(Root, "body");
+        if (body == null) body = Root;
+        for (int i = 0; i < nodes.Count; i++) body.AppendChild(nodes[i]);
+        MarkChanged();
+        return JsUndefined.Instance;
+    }
+
+    private object DocOpen(JsCallArgs a) { return Document; }
+    private object DocClose(JsCallArgs a) { return Document; }
+    private object DocReferrer(JsCallArgs a) { return ""; }
+
+    private object DocDomainGet(JsCallArgs a)
+    {
+        string h = LocationHref;
+        if (string.IsNullOrEmpty(h)) return "";
+        try
+        {
+            int p = h.IndexOf("://");
+            if (p >= 0)
+            {
+                int start = p + 3;
+                int end = h.IndexOfAny(new char[] { '/', ':', '?', '#' }, start);
+                return end >= 0 ? h.Substring(start, end - start) : h.Substring(start);
+            }
+        }
+        catch { }
+        return "";
+    }
+
+    private object DocElementFromPoint(JsCallArgs a)
+    {
+        DomNode body = FindByTag(Root, "body");
+        DomNode res = body != null ? body : Root.FirstElementChild();
+        return res != null ? (object)Wrap(res) : JsNull.Instance;
+    }
+
+    public DomNode CurrentExecutingScriptNode;
+    private object DocCurrentScript(JsCallArgs a)
+    {
+        return CurrentExecutingScriptNode != null ? Wrap(CurrentExecutingScriptNode) : JsNull.Instance;
+    }
+
+    private object DocStyleSheets(JsCallArgs a)
+    {
+        JsArray arr = Realm.NewArray();
+        List<DomNode> styleNodes = new List<DomNode>();
+        CollectByTag(Root, "style", styleNodes);
+        CollectByTag(Root, "link", styleNodes);
+        for (int i = 0; i < styleNodes.Count; i++)
+        {
+            DomNode n = styleNodes[i];
+            if (n.Tag == "link" && (n.GetAttr("rel") ?? "").IndexOf("stylesheet", StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            JsObject sheet = Realm.NewObject();
+            sheet.Define("type", JsProperty.Data("text/css"));
+            sheet.Define("href", JsProperty.Data(n.Tag == "link" ? (n.GetAttr("href") ?? "") : ""));
+            sheet.Define("ownerNode", JsProperty.Data(Wrap(n)));
+            sheet.Define("cssRules", JsProperty.Data(Realm.NewArray()));
+            sheet.Define("rules", JsProperty.Data(Realm.NewArray()));
+            DefineOn(sheet, "insertRule", delegate (JsCallArgs args) { return 0.0; }, 1);
+            DefineOn(sheet, "deleteRule", delegate (JsCallArgs args) { return JsUndefined.Instance; }, 1);
+            arr.Items.Add(sheet);
+        }
+        return arr;
+    }
+
+    private object DocCreateTreeWalker(JsCallArgs a)
+    {
+        object rootVal = a.Get(0);
+        JsObject tw = Realm.NewObject();
+        tw.Define("root", JsProperty.Data(rootVal));
+        tw.Define("currentNode", JsProperty.Data(rootVal));
+        DefineOn(tw, "nextNode", delegate (JsCallArgs args)
+        {
+            object curVal = tw.GetPropertyOrUndefined("currentNode");
+            JsElementObject curObj = curVal as JsElementObject;
+            DomNode n = curObj != null ? curObj.Node : null;
+            if (n != null)
+            {
+                DomNode next = n.FirstChild ?? n.Next ?? (n.Parent != null ? n.Parent.Next : null);
+                if (next != null)
+                {
+                    object wrapped = Wrap(next);
+                    tw.Define("currentNode", JsProperty.Data(wrapped));
+                    return wrapped;
+                }
+            }
+            return JsNull.Instance;
+        }, 0);
+        DefineOn(tw, "previousNode", delegate { return JsNull.Instance; }, 0);
+        DefineOn(tw, "parentNode", delegate { return JsNull.Instance; }, 0);
+        DefineOn(tw, "firstChild", delegate { return JsNull.Instance; }, 0);
+        DefineOn(tw, "lastChild", delegate { return JsNull.Instance; }, 0);
+        DefineOn(tw, "nextSibling", delegate { return JsNull.Instance; }, 0);
+        DefineOn(tw, "previousSibling", delegate { return JsNull.Instance; }, 0);
+        return tw;
+    }
+
+    private object DocCreateNodeIterator(JsCallArgs a)
+    {
+        return DocCreateTreeWalker(a);
+    }
+
+    private void BuildDomConstructors()
+    {
+        JsObject nodeProto = Realm.NewObject();
+        JsFunction nodeCtor = Realm.MakeCtor("Node", delegate (JsCallArgs a)
+        {
+            throw JsErr.Type("Illegal constructor");
+        }, 0, nodeProto);
+        nodeCtor.Define("ELEMENT_NODE", JsProperty.DataNonEnum(1.0));
+        nodeCtor.Define("ATTRIBUTE_NODE", JsProperty.DataNonEnum(2.0));
+        nodeCtor.Define("TEXT_NODE", JsProperty.DataNonEnum(3.0));
+        nodeCtor.Define("CDATA_SECTION_NODE", JsProperty.DataNonEnum(4.0));
+        nodeCtor.Define("ENTITY_REFERENCE_NODE", JsProperty.DataNonEnum(5.0));
+        nodeCtor.Define("ENTITY_NODE", JsProperty.DataNonEnum(6.0));
+        nodeCtor.Define("PROCESSING_INSTRUCTION_NODE", JsProperty.DataNonEnum(7.0));
+        nodeCtor.Define("COMMENT_NODE", JsProperty.DataNonEnum(8.0));
+        nodeCtor.Define("DOCUMENT_NODE", JsProperty.DataNonEnum(9.0));
+        nodeCtor.Define("DOCUMENT_TYPE_NODE", JsProperty.DataNonEnum(10.0));
+        nodeCtor.Define("DOCUMENT_FRAGMENT_NODE", JsProperty.DataNonEnum(11.0));
+        nodeCtor.Define("NOTATION_NODE", JsProperty.DataNonEnum(12.0));
+        nodeCtor.Define("DOCUMENT_POSITION_DISCONNECTED", JsProperty.DataNonEnum(1.0));
+        nodeCtor.Define("DOCUMENT_POSITION_PRECEDING", JsProperty.DataNonEnum(2.0));
+        nodeCtor.Define("DOCUMENT_POSITION_FOLLOWING", JsProperty.DataNonEnum(4.0));
+        nodeCtor.Define("DOCUMENT_POSITION_CONTAINS", JsProperty.DataNonEnum(8.0));
+        nodeCtor.Define("DOCUMENT_POSITION_CONTAINED_BY", JsProperty.DataNonEnum(16.0));
+        nodeCtor.Define("DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC", JsProperty.DataNonEnum(32.0));
+
+        Realm.Global.Define("Node", JsProperty.Data(nodeCtor));
+
+        ElementPrototype.Prototype = nodeProto;
+
+        JsFunction elCtor = Realm.MakeCtor("Element", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, ElementPrototype);
+        JsObject htmlElProto = Realm.NewObject(ElementPrototype);
+        JsFunction htmlElCtor = Realm.MakeCtor("HTMLElement", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, htmlElProto);
+        Realm.Global.Define("Element", JsProperty.Data(elCtor));
+        Realm.Global.Define("HTMLElement", JsProperty.Data(htmlElCtor));
+
+        string[] elementClasses = {
+            "HTMLHtmlElement", "HTMLHeadElement", "HTMLBodyElement", "HTMLDivElement", "HTMLSpanElement",
+            "HTMLParagraphElement", "HTMLAnchorElement", "HTMLImageElement", "HTMLButtonElement", "HTMLInputElement",
+            "HTMLTextAreaElement", "HTMLSelectElement", "HTMLOptionElement", "HTMLFormElement", "HTMLTableElement",
+            "HTMLTableRowElement", "HTMLTableCellElement", "HTMLUListElement", "HTMLOListElement", "HTMLLIElement",
+            "HTMLScriptElement", "HTMLStyleElement", "HTMLLinkElement", "HTMLMetaElement", "HTMLIFrameElement",
+            "HTMLCanvasElement", "HTMLAudioElement", "HTMLVideoElement", "HTMLUnknownElement"
+        };
+        for (int i = 0; i < elementClasses.Length; i++)
+        {
+            string name = elementClasses[i];
+            JsObject subProto = Realm.NewObject(htmlElProto);
+            JsFunction c = Realm.MakeCtor(name, delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, subProto);
+            Realm.Global.Define(name, JsProperty.Data(c));
+        }
+
+        JsObject imgProto = Realm.NewObject(htmlElProto);
+        Realm.Global.Define("Image", JsProperty.Data(Realm.MakeCtor("Image", delegate (JsCallArgs a)
+        {
+            DomNode img = new DomNode { NodeType = DomNode.Element, Tag = "img" };
+            if (a.ArgCount > 0) SetAttribute(img, "width", JsValueOps.ToStringValue(a.Get(0)));
+            if (a.ArgCount > 1) SetAttribute(img, "height", JsValueOps.ToStringValue(a.Get(1)));
+            return Wrap(img);
+        }, 0, imgProto)));
+
+        JsObject audProto = Realm.NewObject(htmlElProto);
+        Realm.Global.Define("Audio", JsProperty.Data(Realm.MakeCtor("Audio", delegate (JsCallArgs a)
+        {
+            DomNode aud = new DomNode { NodeType = DomNode.Element, Tag = "audio" };
+            if (a.ArgCount > 0) SetAttribute(aud, "src", JsValueOps.ToStringValue(a.Get(0)));
+            return Wrap(aud);
+        }, 0, audProto)));
+
+        JsObject docProto = Realm.NewObject(nodeProto);
+        JsObject htmlDocProto = Realm.NewObject(docProto);
+        Document.Prototype = htmlDocProto;
+        Realm.Global.Define("Document", JsProperty.Data(Realm.MakeCtor("Document", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, docProto)));
+        Realm.Global.Define("HTMLDocument", JsProperty.Data(Realm.MakeCtor("HTMLDocument", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, htmlDocProto)));
+        JsObject docFragProto = Realm.NewObject(nodeProto);
+        Realm.Global.Define("DocumentFragment", JsProperty.Data(Realm.MakeCtor("DocumentFragment", delegate (JsCallArgs a)
+        {
+            DomNode frag = new DomNode { NodeType = DomNode.Element, Tag = "#document-fragment" };
+            return Wrap(frag);
+        }, 0, docFragProto)));
+        TextPrototype.Prototype = nodeProto;
+        Realm.Global.Define("Text", JsProperty.Data(Realm.MakeCtor("Text", delegate (JsCallArgs a)
+        {
+            string t = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+            DomNode n = new DomNode { NodeType = DomNode.TextNode, Text = t };
+            return Wrap(n);
+        }, 0, TextPrototype)));
+        JsObject commentProto = Realm.NewObject(TextPrototype);
+        Realm.Global.Define("Comment", JsProperty.Data(Realm.MakeCtor("Comment", delegate (JsCallArgs a)
+        {
+            string t = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+            DomNode n = new DomNode { NodeType = DomNode.TextNode, Text = "<!--" + t + "-->" };
+            return Wrap(n);
+        }, 0, commentProto)));
+        JsObject charDataProto = Realm.NewObject(TextPrototype);
+        Realm.Global.Define("CharacterData", JsProperty.Data(Realm.MakeCtor("CharacterData", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, charDataProto)));
+
+        JsObject collProto = Realm.NewObject();
+        collProto.Define("length", JsProperty.DataNonEnum(0.0));
+        collProto.Define("item", JsProperty.Data(Realm.MakeMethod("item", delegate (JsCallArgs a) { return JsNull.Instance; }, 1)));
+        Realm.Global.Define("NodeList", JsProperty.Data(Realm.MakeCtor("NodeList", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, Realm.NewObject(collProto))));
+        Realm.Global.Define("HTMLCollection", JsProperty.Data(Realm.MakeCtor("HTMLCollection", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, Realm.NewObject(collProto))));
+        Realm.Global.Define("DOMTokenList", JsProperty.Data(Realm.MakeCtor("DOMTokenList", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, Realm.NewObject(collProto))));
+        Realm.Global.Define("NamedNodeMap", JsProperty.Data(Realm.MakeCtor("NamedNodeMap", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, Realm.NewObject(collProto))));
+
+        BuildRange(Realm);
+        BuildCanvas2D(Realm);
+    }
+
+    private void BuildRange(JsRealm realm)
+    {
+        JsObject rangeProto = realm.NewObject();
+        rangeProto.SetWellKnown(JsWellKnown.ToStringTag, "Range");
+
+        rangeProto.Define("startOffset", JsProperty.DataNonEnum(0.0));
+        rangeProto.Define("endOffset", JsProperty.DataNonEnum(0.0));
+        rangeProto.Define("collapsed", JsProperty.DataNonEnum(true));
+        rangeProto.Define("commonAncestorContainer", JsProperty.DataNonEnum(Document));
+        rangeProto.Define("startContainer", JsProperty.DataNonEnum(Document));
+        rangeProto.Define("endContainer", JsProperty.DataNonEnum(Document));
+
+        JsNativeFn noop = delegate (JsCallArgs a) { return JsUndefined.Instance; };
+        DefineOn(rangeProto, "setStart", noop, 2);
+        DefineOn(rangeProto, "setEnd", noop, 2);
+        DefineOn(rangeProto, "collapse", noop, 1);
+        DefineOn(rangeProto, "selectNode", noop, 1);
+        DefineOn(rangeProto, "selectNodeContents", noop, 1);
+        DefineOn(rangeProto, "cloneRange", delegate (JsCallArgs a) { return a.ThisValue; }, 0);
+        DefineOn(rangeProto, "detach", noop, 0);
+        DefineOn(rangeProto, "deleteContents", noop, 0);
+
+        DefineOn(rangeProto, "getBoundingClientRect", delegate (JsCallArgs a)
+        {
+            JsObject rect = realm.NewObject();
+            rect.Define("x", JsProperty.DataNonEnum(0.0));
+            rect.Define("y", JsProperty.DataNonEnum(0.0));
+            rect.Define("width", JsProperty.DataNonEnum(0.0));
+            rect.Define("height", JsProperty.DataNonEnum(0.0));
+            rect.Define("top", JsProperty.DataNonEnum(0.0));
+            rect.Define("left", JsProperty.DataNonEnum(0.0));
+            rect.Define("right", JsProperty.DataNonEnum(0.0));
+            rect.Define("bottom", JsProperty.DataNonEnum(0.0));
+            return rect;
+        }, 0);
+
+        DefineOn(rangeProto, "getClientRects", delegate (JsCallArgs a)
+        {
+            return realm.NewArray();
+        }, 0);
+
+        DefineOn(rangeProto, "createContextualFragment", delegate (JsCallArgs a)
+        {
+            string html = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+            DomNode frag = new DomNode { NodeType = DomNode.Element, Tag = "#document-fragment" };
+            List<DomNode> nodes = HtmlDom.ParseFragment(html);
+            for (int i = 0; i < nodes.Count; i++) frag.AppendChild(nodes[i]);
+            return Wrap(frag);
+        }, 1);
+
+        realm.Global.Define("Range", JsProperty.Data(realm.MakeCtor("Range", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(rangeProto);
+        }, 0, rangeProto)));
+    }
+
+    private void BuildCanvas2D(JsRealm realm)
+    {
+        JsObject ctxProto = realm.NewObject();
+        ctxProto.SetWellKnown(JsWellKnown.ToStringTag, "CanvasRenderingContext2D");
+
+        ctxProto.Define("fillStyle", JsProperty.DataNonEnum("#000000"));
+        ctxProto.Define("strokeStyle", JsProperty.DataNonEnum("#000000"));
+        ctxProto.Define("lineWidth", JsProperty.DataNonEnum(1.0));
+        ctxProto.Define("lineCap", JsProperty.DataNonEnum("butt"));
+        ctxProto.Define("lineJoin", JsProperty.DataNonEnum("miter"));
+        ctxProto.Define("miterLimit", JsProperty.DataNonEnum(10.0));
+        ctxProto.Define("font", JsProperty.DataNonEnum("10px sans-serif"));
+        ctxProto.Define("textAlign", JsProperty.DataNonEnum("start"));
+        ctxProto.Define("textBaseline", JsProperty.DataNonEnum("alphabetic"));
+        ctxProto.Define("globalAlpha", JsProperty.DataNonEnum(1.0));
+        ctxProto.Define("globalCompositeOperation", JsProperty.DataNonEnum("source-over"));
+        ctxProto.Define("shadowColor", JsProperty.DataNonEnum("rgba(0, 0, 0, 0)"));
+        ctxProto.Define("shadowBlur", JsProperty.DataNonEnum(0.0));
+        ctxProto.Define("shadowOffsetX", JsProperty.DataNonEnum(0.0));
+        ctxProto.Define("shadowOffsetY", JsProperty.DataNonEnum(0.0));
+        ctxProto.Define("imageSmoothingEnabled", JsProperty.DataNonEnum(true));
+
+        JsNativeFn noop = delegate (JsCallArgs a) { return JsUndefined.Instance; };
+
+        DefineOn(ctxProto, "fillRect", delegate (JsCallArgs a)
+        {
+            if (CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int w, out int h))
+            {
+                JsObject ctx = a.ThisValue as JsObject;
+                string fs = ctx != null && ctx.GetProperty("fillStyle", out object fv) ? JsValueOps.ToStringValue(fv) : "#000000";
+                double ga = ctx != null && ctx.GetProperty("globalAlpha", out object av) ? JsValueOps.ToNumber(av) : 1.0;
+                uint c = CanvasParseColor(fs, ga);
+
+                int rx = (int)JsValueOps.ToNumber(a.Get(0));
+                int ry = (int)JsValueOps.ToNumber(a.Get(1));
+                int rw = (int)JsValueOps.ToNumber(a.Get(2));
+                int rh = (int)JsValueOps.ToNumber(a.Get(3));
+
+                CanvasFillRect(bmp.RawData, w, h, rx, ry, rw, rh, c);
+                MarkChanged();
+            }
+            return JsUndefined.Instance;
+        }, 4);
+
+        DefineOn(ctxProto, "strokeRect", delegate (JsCallArgs a)
+        {
+            if (CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int w, out int h))
+            {
+                JsObject ctx = a.ThisValue as JsObject;
+                string ss = ctx != null && ctx.GetProperty("strokeStyle", out object sv) ? JsValueOps.ToStringValue(sv) : "#000000";
+                double ga = ctx != null && ctx.GetProperty("globalAlpha", out object av) ? JsValueOps.ToNumber(av) : 1.0;
+                double lw = ctx != null && ctx.GetProperty("lineWidth", out object lwv) ? JsValueOps.ToNumber(lwv) : 1.0;
+                uint c = CanvasParseColor(ss, ga);
+
+                int rx = (int)JsValueOps.ToNumber(a.Get(0));
+                int ry = (int)JsValueOps.ToNumber(a.Get(1));
+                int rw = (int)JsValueOps.ToNumber(a.Get(2));
+                int rh = (int)JsValueOps.ToNumber(a.Get(3));
+                int lineW = Math.Max(1, (int)lw);
+
+                CanvasDrawLine(bmp.RawData, w, h, rx, ry, rx + rw, ry, c, lineW);
+                CanvasDrawLine(bmp.RawData, w, h, rx + rw, ry, rx + rw, ry + rh, c, lineW);
+                CanvasDrawLine(bmp.RawData, w, h, rx + rw, ry + rh, rx, ry + rh, c, lineW);
+                CanvasDrawLine(bmp.RawData, w, h, rx, ry + rh, rx, ry, c, lineW);
+                MarkChanged();
+            }
+            return JsUndefined.Instance;
+        }, 4);
+
+        DefineOn(ctxProto, "clearRect", delegate (JsCallArgs a)
+        {
+            if (CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int w, out int h))
+            {
+                int rx = (int)JsValueOps.ToNumber(a.Get(0));
+                int ry = (int)JsValueOps.ToNumber(a.Get(1));
+                int rw = (int)JsValueOps.ToNumber(a.Get(2));
+                int rh = (int)JsValueOps.ToNumber(a.Get(3));
+
+                CanvasClearRect(bmp.RawData, w, h, rx, ry, rw, rh);
+                MarkChanged();
+            }
+            return JsUndefined.Instance;
+        }, 4);
+
+        DefineOn(ctxProto, "beginPath", delegate (JsCallArgs a)
+        {
+            canvasSubpaths.Clear();
+            canvasSubpaths.Add(new List<CanvasPt>());
+            return JsUndefined.Instance;
+        }, 0);
+
+        DefineOn(ctxProto, "closePath", delegate (JsCallArgs a)
+        {
+            if (canvasSubpaths.Count > 0 && canvasSubpaths[canvasSubpaths.Count - 1].Count > 1)
+            {
+                List<CanvasPt> pts = canvasSubpaths[canvasSubpaths.Count - 1];
+                pts.Add(pts[0]);
+            }
+            return JsUndefined.Instance;
+        }, 0);
+
+        DefineOn(ctxProto, "moveTo", delegate (JsCallArgs a)
+        {
+            int x = (int)JsValueOps.ToNumber(a.Get(0));
+            int y = (int)JsValueOps.ToNumber(a.Get(1));
+            List<CanvasPt> pts = new List<CanvasPt>();
+            pts.Add(new CanvasPt { X = x, Y = y });
+            canvasSubpaths.Add(pts);
+            return JsUndefined.Instance;
+        }, 2);
+
+        DefineOn(ctxProto, "lineTo", delegate (JsCallArgs a)
+        {
+            int x = (int)JsValueOps.ToNumber(a.Get(0));
+            int y = (int)JsValueOps.ToNumber(a.Get(1));
+            if (canvasSubpaths.Count == 0) canvasSubpaths.Add(new List<CanvasPt>());
+            canvasSubpaths[canvasSubpaths.Count - 1].Add(new CanvasPt { X = x, Y = y });
+            return JsUndefined.Instance;
+        }, 2);
+
+        DefineOn(ctxProto, "rect", delegate (JsCallArgs a)
+        {
+            int rx = (int)JsValueOps.ToNumber(a.Get(0));
+            int ry = (int)JsValueOps.ToNumber(a.Get(1));
+            int rw = (int)JsValueOps.ToNumber(a.Get(2));
+            int rh = (int)JsValueOps.ToNumber(a.Get(3));
+            List<CanvasPt> pts = new List<CanvasPt>
+            {
+                new CanvasPt { X = rx, Y = ry },
+                new CanvasPt { X = rx + rw, Y = ry },
+                new CanvasPt { X = rx + rw, Y = ry + rh },
+                new CanvasPt { X = rx, Y = ry + rh },
+                new CanvasPt { X = rx, Y = ry }
+            };
+            canvasSubpaths.Add(pts);
+            return JsUndefined.Instance;
+        }, 4);
+
+        DefineOn(ctxProto, "arc", delegate (JsCallArgs a)
+        {
+            int cx = (int)JsValueOps.ToNumber(a.Get(0));
+            int cy = (int)JsValueOps.ToNumber(a.Get(1));
+            int radius = (int)JsValueOps.ToNumber(a.Get(2));
+            double sa = a.ArgCount > 3 ? JsValueOps.ToNumber(a.Get(3)) : 0;
+            double ea = a.ArgCount > 4 ? JsValueOps.ToNumber(a.Get(4)) : Math.PI * 2;
+            bool ccw = a.ArgCount > 5 && JsValueOps.ToBoolean(a.Get(5));
+            CanvasAddArc(cx, cy, radius, sa, ea, ccw);
+            return JsUndefined.Instance;
+        }, 6);
+
+        DefineOn(ctxProto, "arcTo", noop, 5);
+        DefineOn(ctxProto, "bezierCurveTo", noop, 6);
+        DefineOn(ctxProto, "quadraticCurveTo", noop, 4);
+
+        DefineOn(ctxProto, "fill", delegate (JsCallArgs a)
+        {
+            if (CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int w, out int h))
+            {
+                JsObject ctx = a.ThisValue as JsObject;
+                string fs = ctx != null && ctx.GetProperty("fillStyle", out object fv) ? JsValueOps.ToStringValue(fv) : "#000000";
+                double ga = ctx != null && ctx.GetProperty("globalAlpha", out object av) ? JsValueOps.ToNumber(av) : 1.0;
+                uint c = CanvasParseColor(fs, ga);
+
+                CanvasFillPath(bmp.RawData, w, h, c);
+                MarkChanged();
+            }
+            return JsUndefined.Instance;
+        }, 0);
+
+        DefineOn(ctxProto, "stroke", delegate (JsCallArgs a)
+        {
+            if (CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int w, out int h))
+            {
+                JsObject ctx = a.ThisValue as JsObject;
+                string ss = ctx != null && ctx.GetProperty("strokeStyle", out object sv) ? JsValueOps.ToStringValue(sv) : "#000000";
+                double ga = ctx != null && ctx.GetProperty("globalAlpha", out object av) ? JsValueOps.ToNumber(av) : 1.0;
+                double lw = ctx != null && ctx.GetProperty("lineWidth", out object lwv) ? JsValueOps.ToNumber(lwv) : 1.0;
+                uint c = CanvasParseColor(ss, ga);
+
+                CanvasStrokePath(bmp.RawData, w, h, c, Math.Max(1, (int)lw));
+                MarkChanged();
+            }
+            return JsUndefined.Instance;
+        }, 0);
+
+        DefineOn(ctxProto, "clip", noop, 0);
+        DefineOn(ctxProto, "isPointInPath", delegate (JsCallArgs a) { return false; }, 2);
+        DefineOn(ctxProto, "isPointInStroke", delegate (JsCallArgs a) { return false; }, 2);
+
+        DefineOn(ctxProto, "fillText", delegate (JsCallArgs a)
+        {
+            if (CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int w, out int h))
+            {
+                string text = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+                int tx = (int)JsValueOps.ToNumber(a.Get(1));
+                int ty = (int)JsValueOps.ToNumber(a.Get(2));
+                JsObject ctx = a.ThisValue as JsObject;
+                string fs = ctx != null && ctx.GetProperty("fillStyle", out object fv) ? JsValueOps.ToStringValue(fv) : "#000000";
+                double ga = ctx != null && ctx.GetProperty("globalAlpha", out object av) ? JsValueOps.ToNumber(av) : 1.0;
+                uint c = CanvasParseColor(fs, ga);
+
+                CanvasDrawText(bmp.RawData, w, h, text, tx, ty, c);
+                MarkChanged();
+            }
+            return JsUndefined.Instance;
+        }, 3);
+
+        DefineOn(ctxProto, "strokeText", noop, 3);
+
+        DefineOn(ctxProto, "measureText", delegate (JsCallArgs a)
+        {
+            string t = a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "";
+            double w = t.Length * 8.0;
+            JsObject metrics = realm.NewObject();
+            metrics.Define("width", JsProperty.DataNonEnum(w));
+            metrics.Define("actualBoundingBoxAscent", JsProperty.DataNonEnum(8.0));
+            metrics.Define("actualBoundingBoxDescent", JsProperty.DataNonEnum(2.0));
+            metrics.Define("actualBoundingBoxLeft", JsProperty.DataNonEnum(0.0));
+            metrics.Define("actualBoundingBoxRight", JsProperty.DataNonEnum(w));
+            return metrics;
+        }, 1);
+
+        DefineOn(ctxProto, "drawImage", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount >= 3 && CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int cw, out int ch))
+            {
+                object imgArg = a.Get(0);
+                JsElementObject el = imgArg as JsElementObject;
+                Cosmos.Kernel.System.Graphics.Image srcImg = null;
+                if (el != null && el.Node != null)
+                {
+                    srcImg = el.Node.CanvasSurface;
+                }
+                if (srcImg != null && srcImg.RawData != null)
+                {
+                    int dx = (int)JsValueOps.ToNumber(a.Get(1));
+                    int dy = (int)JsValueOps.ToNumber(a.Get(2));
+                    int dw = a.ArgCount > 3 ? (int)JsValueOps.ToNumber(a.Get(3)) : (int)srcImg.Width;
+                    int dh = a.ArgCount > 4 ? (int)JsValueOps.ToNumber(a.Get(4)) : (int)srcImg.Height;
+                    int sw = (int)srcImg.Width;
+                    int sh = (int)srcImg.Height;
+
+                    for (int y = 0; y < dh; y++)
+                    {
+                        int py = dy + y;
+                        if (py < 0 || py >= ch) continue;
+                        int sy = (y * sh) / dh;
+                        for (int x = 0; x < dw; x++)
+                        {
+                            int px = dx + x;
+                            if (px < 0 || px >= cw) continue;
+                            int sx = (x * sw) / dw;
+                            uint col = unchecked((uint)srcImg.RawData[sy * sw + sx]);
+                            CanvasSetPixel(bmp.RawData, cw, ch, px, py, col);
+                        }
+                    }
+                    MarkChanged();
+                }
+            }
+            return JsUndefined.Instance;
+        }, 3);
+
+        DefineOn(ctxProto, "save", noop, 0);
+        DefineOn(ctxProto, "restore", noop, 0);
+        DefineOn(ctxProto, "scale", noop, 2);
+        DefineOn(ctxProto, "rotate", noop, 1);
+        DefineOn(ctxProto, "translate", noop, 2);
+        DefineOn(ctxProto, "transform", noop, 6);
+        DefineOn(ctxProto, "setTransform", noop, 6);
+        DefineOn(ctxProto, "resetTransform", noop, 0);
+
+        DefineOn(ctxProto, "createLinearGradient", delegate (JsCallArgs a)
+        {
+            JsObject grad = realm.NewObject();
+            DefineOn(grad, "addColorStop", noop, 2);
+            return grad;
+        }, 4);
+        DefineOn(ctxProto, "createRadialGradient", delegate (JsCallArgs a)
+        {
+            JsObject grad = realm.NewObject();
+            DefineOn(grad, "addColorStop", noop, 2);
+            return grad;
+        }, 6);
+        DefineOn(ctxProto, "createPattern", delegate (JsCallArgs a)
+        {
+            return realm.NewObject();
+        }, 2);
+
+        DefineOn(ctxProto, "createImageData", delegate (JsCallArgs a)
+        {
+            int w = (int)System.Math.Max(1, JsValueOps.ToNumber(a.Get(0)));
+            int h = (int)System.Math.Max(1, a.ArgCount > 1 ? JsValueOps.ToNumber(a.Get(1)) : 1);
+            JsObject imgData = realm.NewObject();
+            imgData.Define("width", JsProperty.DataNonEnum((double)w));
+            imgData.Define("height", JsProperty.DataNonEnum((double)h));
+            byte[] bytes = new byte[w * h * 4];
+            JsArrayBuffer buf = new JsArrayBuffer(realm.ObjectPrototype, bytes);
+            JsTypedArray data = new JsTypedArray(realm.ObjectPrototype, buf, 0, bytes.Length, 1, "Uint8ClampedArray");
+            imgData.Define("data", JsProperty.DataNonEnum(data));
+            return imgData;
+        }, 2);
+
+        DefineOn(ctxProto, "getImageData", delegate (JsCallArgs a)
+        {
+            int sx = (int)JsValueOps.ToNumber(a.Get(0));
+            int sy = (int)JsValueOps.ToNumber(a.Get(1));
+            int sw = (int)System.Math.Max(1, JsValueOps.ToNumber(a.Get(2)));
+            int sh = (int)System.Math.Max(1, a.ArgCount > 3 ? JsValueOps.ToNumber(a.Get(3)) : 1);
+            JsObject imgData = realm.NewObject();
+            imgData.Define("width", JsProperty.DataNonEnum((double)sw));
+            imgData.Define("height", JsProperty.DataNonEnum((double)sh));
+            byte[] bytes = new byte[sw * sh * 4];
+            if (CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int cw, out int ch))
+            {
+                for (int y = 0; y < sh; y++)
+                {
+                    int py = sy + y;
+                    if (py < 0 || py >= ch) continue;
+                    for (int x = 0; x < sw; x++)
+                    {
+                        int px = sx + x;
+                        if (px < 0 || px >= cw) continue;
+                        int c = bmp.RawData[py * cw + px];
+                        int dst = (y * sw + x) * 4;
+                        bytes[dst] = (byte)((c >> 16) & 0xFF);     // R
+                        bytes[dst + 1] = (byte)((c >> 8) & 0xFF);  // G
+                        bytes[dst + 2] = (byte)(c & 0xFF);         // B
+                        bytes[dst + 3] = (byte)((c >> 24) & 0xFF); // A
+                    }
+                }
+            }
+            JsArrayBuffer buf = new JsArrayBuffer(realm.ObjectPrototype, bytes);
+            JsTypedArray data = new JsTypedArray(realm.ObjectPrototype, buf, 0, bytes.Length, 1, "Uint8ClampedArray");
+            imgData.Define("data", JsProperty.DataNonEnum(data));
+            return imgData;
+        }, 4);
+
+        DefineOn(ctxProto, "putImageData", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount >= 3 && a.Get(0) is JsObject imgData && CanvasGetSurface(a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int cw, out int ch))
+            {
+                int dx = (int)JsValueOps.ToNumber(a.Get(1));
+                int dy = (int)JsValueOps.ToNumber(a.Get(2));
+                int sw = (int)JsValueOps.ToNumber(imgData.GetPropertyOrUndefined("width"));
+                int sh = (int)JsValueOps.ToNumber(imgData.GetPropertyOrUndefined("height"));
+                if (imgData.GetProperty("data", out object dataObj) && dataObj is JsTypedArray ta && ta.Buffer != null && ta.Buffer.Data != null)
+                {
+                    byte[] bytes = ta.Buffer.Data;
+                    for (int y = 0; y < sh; y++)
+                    {
+                        int py = dy + y;
+                        if (py < 0 || py >= ch) continue;
+                        for (int x = 0; x < sw; x++)
+                        {
+                            int px = dx + x;
+                            if (px < 0 || px >= cw) continue;
+                            int src = (y * sw + x) * 4;
+                            if (src + 3 < bytes.Length)
+                            {
+                                int r = bytes[src];
+                                int g = bytes[src + 1];
+                                int b = bytes[src + 2];
+                                int alpha = bytes[src + 3];
+                                bmp.RawData[py * cw + px] = (alpha << 24) | (r << 16) | (g << 8) | b;
+                            }
+                        }
+                    }
+                    MarkChanged();
+                }
+            }
+            return JsUndefined.Instance;
+        }, 3);
+
+        CanvasContextPrototype = ctxProto;
+        realm.Global.Define("CanvasRenderingContext2D", JsProperty.Data(realm.MakeCtor("CanvasRenderingContext2D", delegate (JsCallArgs a)
+        {
+            throw JsErr.Type("Illegal constructor");
+        }, 0, ctxProto)));
+    }
+
+    private struct CanvasPt { public int X, Y; }
+    private readonly List<List<CanvasPt>> canvasSubpaths = new List<List<CanvasPt>>();
+
+    private static bool CanvasGetSurface(JsCallArgs a, out Cosmos.Kernel.System.Graphics.Bitmap bmp, out int w, out int h)
+    {
+        bmp = null; w = 300; h = 150;
+        JsObject ctx = a.ThisValue as JsObject;
+        if (ctx == null) return false;
+        if (!ctx.GetProperty("canvas", out object cvs)) return false;
+        JsElementObject el = cvs as JsElementObject;
+        if (el == null || el.Node == null) return false;
+
+        string sw = el.Node.GetAttr("width");
+        string sh = el.Node.GetAttr("height");
+        if (!string.IsNullOrEmpty(sw) && int.TryParse(sw, out int pw) && pw > 0) w = pw;
+        if (!string.IsNullOrEmpty(sh) && int.TryParse(sh, out int ph) && ph > 0) h = ph;
+        if (w > 2048) w = 2048; if (h > 2048) h = 2048;
+
+        if (el.Node.CanvasSurface == null)
+        {
+            el.Node.CanvasSurface = new Cosmos.Kernel.System.Graphics.Bitmap(w, h, Cosmos.Kernel.System.Graphics.ColorDepth.ColorDepth32);
+        }
+
+        bmp = el.Node.CanvasSurface as Cosmos.Kernel.System.Graphics.Bitmap;
+        return bmp != null && bmp.RawData != null;
+    }
+
+    private static int ConvertHexDigit(char ch)
+    {
+        if (ch >= '0' && ch <= '9') return ch - '0';
+        if (ch >= 'a' && ch <= 'f') return ch - 'a' + 10;
+        if (ch >= 'A' && ch <= 'F') return ch - 'A' + 10;
+        return 0;
+    }
+
+    private static uint CanvasParseColor(string s, double globalAlpha)
+    {
+        uint c = 0xFF000000;
+        if (string.IsNullOrEmpty(s)) return c;
+        s = s.Trim().ToLowerInvariant();
+        if (s.StartsWith("#"))
+        {
+            if (s.Length == 4)
+            {
+                int r = ConvertHexDigit(s[1]);
+                int g = ConvertHexDigit(s[2]);
+                int b = ConvertHexDigit(s[3]);
+                c = 0xFF000000 | (uint)((r * 17) << 16) | (uint)((g * 17) << 8) | (uint)(b * 17);
+            }
+            else if (s.Length >= 7)
+            {
+                int r = (ConvertHexDigit(s[1]) << 4) | ConvertHexDigit(s[2]);
+                int g = (ConvertHexDigit(s[3]) << 4) | ConvertHexDigit(s[4]);
+                int b = (ConvertHexDigit(s[5]) << 4) | ConvertHexDigit(s[6]);
+                c = 0xFF000000 | (uint)(r << 16) | (uint)(g << 8) | (uint)b;
+            }
+        }
+        else if (s.StartsWith("rgb"))
+        {
+            int p1 = s.IndexOf('(');
+            int p2 = s.IndexOf(')');
+            if (p1 >= 0 && p2 > p1)
+            {
+                string[] parts = s.Substring(p1 + 1, p2 - p1 - 1).Split(',');
+                if (parts.Length >= 3)
+                {
+                    int r = int.TryParse(parts[0].Trim(), out int pr) ? Math.Max(0, Math.Min(255, pr)) : 0;
+                    int g = int.TryParse(parts[1].Trim(), out int pg) ? Math.Max(0, Math.Min(255, pg)) : 0;
+                    int b = int.TryParse(parts[2].Trim(), out int pb) ? Math.Max(0, Math.Min(255, pb)) : 0;
+                    int a = 255;
+                    if (parts.Length >= 4 && float.TryParse(parts[3].Trim(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float pa))
+                        a = (int)(Math.Max(0f, Math.Min(1f, pa)) * 255);
+                    c = ((uint)a << 24) | ((uint)r << 16) | ((uint)g << 8) | (uint)b;
+                }
+            }
+        }
+        else
+        {
+            switch (s)
+            {
+                case "red": c = 0xFFFF0000; break;
+                case "green": c = 0xFF008000; break;
+                case "blue": c = 0xFF0000FF; break;
+                case "white": c = 0xFFFFFFFF; break;
+                case "black": c = 0xFF000000; break;
+                case "yellow": c = 0xFFFFFF00; break;
+                case "cyan": c = 0xFF00FFFF; break;
+                case "magenta": c = 0xFFFF00FF; break;
+                case "gray": case "grey": c = 0xFF808080; break;
+                case "orange": c = 0xFFFFA500; break;
+                case "transparent": c = 0x00000000; break;
+            }
+        }
+
+        if (globalAlpha < 1.0)
+        {
+            uint a = (c >> 24) & 0xFF;
+            a = (uint)(a * Math.Max(0.0, Math.Min(1.0, globalAlpha)));
+            c = (a << 24) | (c & 0x00FFFFFF);
+        }
+        return c;
+    }
+
+    private static void CanvasSetPixel(int[] raw, int w, int h, int x, int y, uint color)
+    {
+        if (x < 0 || x >= w || y < 0 || y >= h) return;
+        uint sa = (color >> 24) & 0xFF;
+        if (sa == 0) return;
+        int idx = y * w + x;
+        if (sa == 255) { raw[idx] = unchecked((int)color); return; }
+
+        uint dst = unchecked((uint)raw[idx]);
+        uint da = (dst >> 24) & 0xFF;
+        uint inv = 255 - sa;
+        uint r = ((color >> 16 & 0xFF) * sa + (dst >> 16 & 0xFF) * inv) / 255;
+        uint g = ((color >> 8 & 0xFF) * sa + (dst >> 8 & 0xFF) * inv) / 255;
+        uint b = ((color & 0xFF) * sa + (dst & 0xFF) * inv) / 255;
+        uint a = sa + da * inv / 255;
+        raw[idx] = unchecked((int)((a << 24) | (r << 16) | (g << 8) | b));
+    }
+
+    private static void CanvasDrawLine(int[] raw, int w, int h, int x0, int y0, int x1, int y1, uint color, int width)
+    {
+        int dx = Math.Abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = -Math.Abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int err = dx + dy, e2;
+        int rad = Math.Max(1, width / 2);
+
+        while (true)
+        {
+            if (width <= 1) CanvasSetPixel(raw, w, h, x0, y0, color);
+            else
+            {
+                for (int ny = -rad; ny <= rad; ny++)
+                    for (int nx = -rad; nx <= rad; nx++)
+                        CanvasSetPixel(raw, w, h, x0 + nx, y0 + ny, color);
+            }
+            if (x0 == x1 && y0 == y1) break;
+            e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+    }
+
+    private void CanvasFillPath(int[] raw, int w, int h, uint color)
+    {
+        int minY = h, maxY = 0;
+        for (int p = 0; p < canvasSubpaths.Count; p++)
+        {
+            List<CanvasPt> pts = canvasSubpaths[p];
+            for (int i = 0; i < pts.Count; i++)
+            {
+                if (pts[i].Y < minY) minY = pts[i].Y;
+                if (pts[i].Y > maxY) maxY = pts[i].Y;
+            }
+        }
+        if (minY < 0) minY = 0;
+        if (maxY >= h) maxY = h - 1;
+
+        List<int> xIntersects = new List<int>();
+        for (int y = minY; y <= maxY; y++)
+        {
+            xIntersects.Clear();
+            for (int p = 0; p < canvasSubpaths.Count; p++)
+            {
+                List<CanvasPt> pts = canvasSubpaths[p];
+                int count = pts.Count;
+                if (count < 3) continue;
+                for (int i = 0; i < count; i++)
+                {
+                    CanvasPt p0 = pts[i];
+                    CanvasPt p1 = pts[(i + 1) % count];
+                    if ((p0.Y <= y && p1.Y > y) || (p1.Y <= y && p0.Y > y))
+                    {
+                        float t = (float)(y - p0.Y) / (p1.Y - p0.Y);
+                        int x = (int)(p0.X + t * (p1.X - p0.X));
+                        xIntersects.Add(x);
+                    }
+                }
+            }
+            xIntersects.Sort();
+            for (int i = 0; i < xIntersects.Count - 1; i += 2)
+            {
+                int xStart = Math.Max(0, xIntersects[i]);
+                int xEnd = Math.Min(w - 1, xIntersects[i + 1]);
+                for (int x = xStart; x <= xEnd; x++)
+                    CanvasSetPixel(raw, w, h, x, y, color);
+            }
+        }
+    }
+
+    private void CanvasStrokePath(int[] raw, int w, int h, uint color, int lineWidth)
+    {
+        for (int p = 0; p < canvasSubpaths.Count; p++)
+        {
+            List<CanvasPt> pts = canvasSubpaths[p];
+            for (int i = 0; i < pts.Count - 1; i++)
+            {
+                CanvasDrawLine(raw, w, h, pts[i].X, pts[i].Y, pts[i + 1].X, pts[i + 1].Y, color, lineWidth);
+            }
+        }
+    }
+
+    private void CanvasFillRect(int[] raw, int cw, int ch, int rx, int ry, int rw, int rh, uint color)
+    {
+        int x0 = Math.Max(0, rx);
+        int y0 = Math.Max(0, ry);
+        int x1 = Math.Min(cw, rx + rw);
+        int y1 = Math.Min(ch, ry + rh);
+        for (int y = y0; y < y1; y++)
+        {
+            for (int x = x0; x < x1; x++)
+            {
+                CanvasSetPixel(raw, cw, ch, x, y, color);
+            }
+        }
+    }
+
+    private void CanvasClearRect(int[] raw, int cw, int ch, int rx, int ry, int rw, int rh)
+    {
+        int x0 = Math.Max(0, rx);
+        int y0 = Math.Max(0, ry);
+        int x1 = Math.Min(cw, rx + rw);
+        int y1 = Math.Min(ch, ry + rh);
+        for (int y = y0; y < y1; y++)
+        {
+            for (int x = x0; x < x1; x++)
+            {
+                raw[y * cw + x] = 0;
+            }
+        }
+    }
+
+    private void CanvasAddArc(int cx, int cy, int radius, double startAngle, double endAngle, bool counterclockwise)
+    {
+        if (canvasSubpaths.Count == 0) canvasSubpaths.Add(new List<CanvasPt>());
+        List<CanvasPt> pts = canvasSubpaths[canvasSubpaths.Count - 1];
+
+        int steps = Math.Max(12, Math.Min(64, radius * 2));
+        double angleStep = (endAngle - startAngle) / steps;
+        for (int i = 0; i <= steps; i++)
+        {
+            double a = startAngle + i * angleStep;
+            int px = (int)(cx + radius * Math.Cos(a));
+            int py = (int)(cy + radius * Math.Sin(a));
+            pts.Add(new CanvasPt { X = px, Y = py });
+        }
+    }
+
+    private void CanvasDrawText(int[] raw, int w, int h, string text, int tx, int ty, uint color)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        int curX = tx;
+        for (int i = 0; i < text.Length; i++)
+        {
+            char ch = text[i];
+            DrawSimpleChar(raw, w, h, ch, curX, ty, color);
+            curX += 8;
+        }
+    }
+
+    private static void DrawSimpleChar(int[] raw, int w, int h, char c, int cx, int cy, uint color)
+    {
+        // Simple 5x7 block matrix representation for legibility on canvas
+        for (int y = 0; y < 8; y++)
+        {
+            for (int x = 0; x < 6; x++)
+            {
+                if (x == 0 || y == 0 || (x == 5 && c >= 'A' && c <= 'Z') || (y == 4 && (c == 'A' || c == 'H' || c == 'E' || c == 'F')))
+                    CanvasSetPixel(raw, w, h, cx + x, cy + y, color);
+            }
+        }
     }
 
     // window-level listeners
@@ -1473,6 +3662,23 @@ public sealed class JsDom
         JsEventObject ev = new JsEventObject(EventPrototype);
         ev.Type = type;
         ev.Target = Wrap(target);
+        ev.TimeStamp = (double)DateTime.UtcNow.Ticks / 10000.0;
+        return DispatchExisting(target, ev);
+    }
+
+    /// <summary>Create + dispatch a mouse event carrying coordinates.</summary>
+    public bool DispatchMouse(DomNode target, string type, int clientX, int clientY, int button)
+    {
+        JsEventObject ev = new JsEventObject(EventPrototype);
+        ev.Type = type;
+        ev.Target = Wrap(target);
+        ev.ClientX = clientX;
+        ev.ClientY = clientY;
+        ev.PageX = clientX;
+        ev.PageY = clientY;
+        ev.Button = button;
+        ev.Buttons = button == 0 ? 1 : 0;
+        ev.TimeStamp = (double)DateTime.UtcNow.Ticks / 10000.0;
         return DispatchExisting(target, ev);
     }
 
@@ -1615,6 +3821,12 @@ public sealed class JsDom
     }
 
     // keep Node.StyleAttr and Attrs["style"] in sync (they are one value in the DOM)
+    public void SetStyleAttrDirect(DomNode n, string name, string val)
+    {
+        WriteStyleAttr(n, StyleAttr.Set(n.StyleAttr, name, val));
+        MarkChanged();
+    }
+
     private static void WriteStyleAttr(DomNode n, string value)
     {
         n.StyleAttr = value;
@@ -1687,6 +3899,13 @@ public sealed class JsDom
         {
             string c = JsValueOps.ToStringValue(a.Get(0));
             bool had = HasClass(o.Node, c);
+            if (a.ArgCount > 1)
+            {
+                bool force = JsValueOps.ToBoolean(a.Get(1));
+                if (force) AddClass(o.Node, c); else RemoveClass(o.Node, c);
+                MarkChanged();
+                return force;
+            }
             if (had) RemoveClass(o.Node, c); else AddClass(o.Node, c);
             MarkChanged();
             return !had;
@@ -1695,10 +3914,48 @@ public sealed class JsDom
         {
             return HasClass(o.Node, JsValueOps.ToStringValue(a.Get(0)));
         }, 1);
+        DefineOn(cl, "replace", delegate (JsCallArgs a)
+        {
+            string oldC = JsValueOps.ToStringValue(a.Get(0));
+            string newC = a.ArgCount > 1 ? JsValueOps.ToStringValue(a.Get(1)) : "";
+            if (HasClass(o.Node, oldC))
+            {
+                RemoveClass(o.Node, oldC);
+                AddClass(o.Node, newC);
+                MarkChanged();
+                return true;
+            }
+            return false;
+        }, 2);
+        DefineOn(cl, "item", delegate (JsCallArgs a)
+        {
+            int idx = (int)JsValueOps.ToNumber(a.Get(0));
+            if (o.Node.Classes != null && idx >= 0 && idx < o.Node.Classes.Count)
+                return o.Node.Classes[idx];
+            return JsNull.Instance;
+        }, 1);
+        DefineOn(cl, "forEach", delegate (JsCallArgs a)
+        {
+            JsFunction fn = a.Get(0) as JsFunction;
+            if (fn != null && o.Node.Classes != null)
+            {
+                object thisArg = a.Get(1);
+                for (int i = 0; i < o.Node.Classes.Count; i++)
+                    Realm.Interp.Call(fn, thisArg, new object[] { o.Node.Classes[i], (double)i, cl }, false);
+            }
+            return JsUndefined.Instance;
+        }, 1);
+        DefineOn(cl, "toString", delegate (JsCallArgs a)
+        {
+            return o.Node.GetAttr("class") ?? "";
+        }, 0);
         DefineAccessor(cl, "length", delegate (JsCallArgs a)
         {
             return (double)(o.Node.Classes != null ? o.Node.Classes.Count : 0);
         }, null);
+        DefineAccessor(cl, "value",
+            delegate (JsCallArgs a) { return o.Node.GetAttr("class") ?? ""; },
+            delegate (JsCallArgs a) { SetAttribute(o.Node, "class", JsValueOps.ToStringValue(a.Get(0))); MarkChanged(); return JsUndefined.Instance; });
         return cl;
     }
 
@@ -1852,7 +4109,7 @@ public sealed class JsDom
         }
     }
 
-    private static string CamelToKebab(string s)
+    public static string CamelToKebab(string s)
     {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < s.Length; i++)

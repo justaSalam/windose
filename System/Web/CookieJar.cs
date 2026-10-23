@@ -95,8 +95,19 @@ public sealed class CookieJar
                     if (seconds <= 0) c.ExpiresAtTicks = 1;           // delete now
                     else c.ExpiresAtTicks = DateTime.UtcNow.Ticks + seconds * 10000000L;
                 }
-                // "expires" needs full HTTP-date parsing; those cookies are
-                // treated as session cookies (a documented approximation).
+                else if (aname == "expires")
+                {
+                    try
+                    {
+                        DateTime dt;
+                        if (DateTime.TryParse(aval, System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out dt))
+                        {
+                            c.ExpiresAtTicks = dt.Ticks;
+                        }
+                    }
+                    catch { }
+                }
             }
         }
         if (reject) return;

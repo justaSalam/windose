@@ -88,6 +88,21 @@ public static class Registry
             Define($"{StaticRegistry.FileAssociation}/.ico", "/mnt/System/Icons/paint_file.png");
             Define($"{StaticRegistry.FileAssociation}/.ppm", "/mnt/System/Icons/paint_file.png");
             Define($"{StaticRegistry.FileAssociation}/.breeze", "/mnt/System/Icons/script_file_blue.png");
+            Define($"{StaticRegistry.FileAssociation}/.txt", "/mnt/System/Icons/notepad_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.html", "/mnt/System/Icons/html.png");
+            Define($"{StaticRegistry.FileAssociation}/.htm", "/mnt/System/Icons/html.png");
+            Define($"{StaticRegistry.FileAssociation}/.avi", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.mp4", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.webm", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.mkv", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.mov", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.wmv", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.flv", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.wav", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.mp3", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.ogg", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.wma", "/mnt/System/Icons/media_player_file.png");
+            Define($"{StaticRegistry.FileAssociation}/.lua", "/mnt/System/Icons/executable_script.png");
             Define($"{StaticRegistry.FileAssociation}/.db", "/mnt/System/Icons/regedit_file.png");
             Define($"{StaticRegistry.FileAssociation}/.log", "/mnt/System/Icons/event_log.png");
 

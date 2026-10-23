@@ -12,6 +12,7 @@ using HttpRequestHeaders = Cosmos.Network.Http.Headers.HttpRequestHeaders;
 using HttpWebRequest = Cosmos.Network.Http.HttpWebRequest;
 using SslVerification = Cosmos.Network.Http.SslVerification;
 using System.IO;
+using Windose.System.Kernel;
 using Windose.System.Kernel.Attributes;
 using Windose.Web.Tls;
 using System.Text;
@@ -169,17 +170,17 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
 
             toolbar = new Toolbar(0, 0, Width, 28);
 
-            toolbar.AddButton("Back", GoBack);
-            toolbar.AddButton("Forward", GoForward);
-            toolbar.AddButton("Stop", StopLoading);
-            toolbar.AddButton("Refresh", Refresh);
-            toolbar.AddButton("Home", Home);
+            toolbar.AddButton("Back", () => GoBack());
+            toolbar.AddButton("Forward", () => GoForward());
+            toolbar.AddButton("Stop", () => StopLoading());
+            toolbar.AddButton("Refresh", () => Refresh());
+            toolbar.AddButton("Home", () => Home());
             toolbar.AddButton("Go", () => Navigate(addressBar.Address));
-            toolbar.AddButton("Favorites", ShowFavorites);
-            toolbar.AddButton("+ Fav", AddCurrentToFavorites);
-            toolbar.AddButton("History", ShowHistory);
-            toolbar.AddButton("Save", SavePage);
-            toolbar.AddButton("Source", ViewSource);
+            toolbar.AddButton("Favorites", () => ShowFavorites());
+            toolbar.AddButton("+ Fav", () => AddCurrentToFavorites());
+            toolbar.AddButton("History", () => ShowHistory());
+            toolbar.AddButton("Save", () => SavePage());
+            toolbar.AddButton("Source", () => ViewSource());
             toolbar.AddButton("Zoom +", () => webView.ZoomIn());
             toolbar.AddButton("Zoom -", () => webView.ZoomOut());
 
@@ -369,10 +370,29 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
 
         private void Navigate(string rawUrl)
         {
+            if (rawUrl != null && rawUrl.StartsWith("media:", StringComparison.OrdinalIgnoreCase))
+            {
+                string target = rawUrl.Substring(6);
+                LaunchTracker.Start(() => new MediaPlayer(target));
+                return;
+            }
             refreshCountdownSeconds = -1;
             refreshTargetUrl = null;
 
             string url = WebUrl.Normalize(rawUrl);
+            if (url != null)
+            {
+                string checkUrl = url.ToLowerInvariant();
+                int qIdx = checkUrl.IndexOf('?');
+                if (qIdx >= 0) checkUrl = checkUrl.Substring(0, qIdx);
+                if (checkUrl.EndsWith(".avi") || checkUrl.EndsWith(".mp4") || checkUrl.EndsWith(".webm") ||
+                    checkUrl.EndsWith(".mkv") || checkUrl.EndsWith(".mov") || checkUrl.EndsWith(".wmv") ||
+                    checkUrl.EndsWith(".flv") || checkUrl.EndsWith(".wav") || checkUrl.EndsWith(".mp3"))
+                {
+                    LaunchTracker.Start(() => new MediaPlayer(url));
+                    return;
+                }
+            }
             if (url == null)
             {
                 SetStatus("Invalid address");
@@ -396,6 +416,19 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
         private void BeginPostNavigation(string rawUrl, string body)
         {
             string url = WebUrl.Normalize(rawUrl);
+            if (url != null)
+            {
+                string checkUrl = url.ToLowerInvariant();
+                int qIdx = checkUrl.IndexOf('?');
+                if (qIdx >= 0) checkUrl = checkUrl.Substring(0, qIdx);
+                if (checkUrl.EndsWith(".avi") || checkUrl.EndsWith(".mp4") || checkUrl.EndsWith(".webm") ||
+                    checkUrl.EndsWith(".mkv") || checkUrl.EndsWith(".mov") || checkUrl.EndsWith(".wmv") ||
+                    checkUrl.EndsWith(".flv") || checkUrl.EndsWith(".wav") || checkUrl.EndsWith(".mp3"))
+                {
+                    LaunchTracker.Start(() => new MediaPlayer(url));
+                    return;
+                }
+            }
             if (url == null) { SetStatus("Invalid address"); return; }
 
             if (!string.IsNullOrEmpty(currentUrl))
@@ -1143,6 +1176,12 @@ tr:hover { background-color: #f8f9fa; }
 
                 lastRawHtml = html ?? "";
 
+                if (YouTubeHydrator.IsYouTubeUrl(finalUrl))
+                {
+                    PublishProgress(20, "Hydrating YouTube…");
+                    html = YouTubeHydrator.Hydrate(html, finalUrl, u => FetchString(u));
+                }
+
                 int chars = html != null ? html.Length : 0;
                 PublishProgress(25, "Received " + chars + " chars, parsing…");
 
@@ -1168,6 +1207,9 @@ tr:hover { background-color: #f8f9fa; }
                 int cssLoaded = FetchStylesheets(page, finalUrl, out cssErr);
 
                 if (cancelPendingFetch) return;
+
+                // Progressive render: show page structure, text and styles immediately without waiting for images/scripts
+                Publish(page, finalUrl, page.Title, "Loading page…", new Dictionary<string, Image>());
 
                 PublishProgress(65, "Loading scripts…");
                 FetchScripts(page, finalUrl);
@@ -1228,56 +1270,6 @@ a:hover { text-decoration: underline; }
             }
         }
 
-        private HttpClient NewClient()
-        {
-            HttpClient client = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
-            // A hobby OS ships no root-CA store, so skip certificate validation for HTTPS.
-            client.SslVerification = SslVerification.NoVerification;
-            // Browser identity (stage 4): sites gate content on UA + Accept.
-            try
-            {
-                client.DefaultRequestHeaders.Add("User-Agent",
-                    "Mozilla/5.0 (Windose; x86) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36");
-                client.DefaultRequestHeaders.Add("Accept",
-                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
-                client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.9");
-            }
-            catch { /* header rejection must not stop the request */ }
-            return client;
-        }
-
-        // Follow 3xx redirects manually (Get() returns them rather than throwing, and
-        // many real sites issue them). Returns the final 2xx response.
-        private HttpResponseMessage GetFollowingRedirects(string url, out string finalUrl)
-        {
-            string current = url;
-            for (int hop = 0; hop < 6; hop++)
-            {
-                HttpClient client = NewClient();
-                AddCookieHeader(client, current);
-                HttpResponseMessage response = client.Get(current);
-                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
-                StoreCookies(response, current);
-
-                int code = (int)response.StatusCode;
-                if (code >= 300 && code < 400)
-                {
-                    string location = ReadHeader(response, "Location");
-                    if (string.IsNullOrEmpty(location))
-                        throw new Exception("HTTP " + code + " redirect with no Location header.");
-                    current = WebUrl.Resolve(current, location);
-                    continue;
-                }
-
-                if (code < 200 || code >= 300)
-                    throw new Exception("HTTP " + code + " from " + WebUrl.HostOf(current));
-
-                finalUrl = current;
-                return response;
-            }
-            throw new Exception("Too many redirects.");
-        }
-
         private string FetchString(string url)
         {
             string dummy;
@@ -1286,84 +1278,19 @@ a:hover { text-decoration: underline; }
 
         private string FetchString(string url, out string finalUrl)
         {
-            string current = url;
             finalUrl = url;
-
-            for (int hop = 0; hop < 6; hop++)
+            string scheme = WebUrl.SchemeOf(url);
+            if (scheme == "file")
             {
-                if (cancelPendingFetch) throw new Exception("Operation cancelled by user.");
-
-                string scheme = WebUrl.SchemeOf(current);
-                if (scheme == "file")
-                {
-                    finalUrl = current;
-                    string path = FileUrlToLocalPath(current);
-                    return File.Exists(path) ? File.ReadAllText(path) : null;
-                }
-
-                if (scheme == "https")
-                {
-                    string nativeError;
-                    string nativeFinal;
-                    TlsHttpResponse native = TryNativeHttps("GET", current, null, null, out nativeFinal, out nativeError);
-                    if (native != null)
-                    {
-                        if (native.Status >= 300 && native.Status < 400)
-                        {
-                            string location = ExtractHeaderValue(native.HeaderBlock, "location");
-                            if (string.IsNullOrEmpty(location))
-                                throw new Exception("HTTP " + native.Status + " redirect with no Location header.");
-                            current = WebUrl.Resolve(nativeFinal, location);
-                            continue;
-                        }
-
-                        if (native.Status < 200 || native.Status >= 300)
-                            throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
-
-                        finalUrl = nativeFinal;
-                        return DecodeBody(native.Body, ExtractHeaderValue(native.HeaderBlock, "content-type"));
-                    }
-                    return FallbackString(current, nativeError, out finalUrl);
-                }
-
-                // Plain HTTP via Cosmos HttpClient
-                HttpClient client = NewClient();
-                AddCookieHeader(client, current);
-                HttpResponseMessage response = client.Get(current);
-                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
-                StoreCookies(response, current);
-
-                int code = (int)response.StatusCode;
-                if (code >= 300 && code < 400)
-                {
-                    string location = ReadHeader(response, "Location");
-                    if (string.IsNullOrEmpty(location))
-                        throw new Exception("HTTP " + code + " redirect with no Location header.");
-                    current = WebUrl.Resolve(current, location);
-                    continue;
-                }
-
-                if (code < 200 || code >= 300)
-                    throw new Exception("HTTP " + code + " from " + WebUrl.HostOf(current));
-
-                finalUrl = current;
-                return response.Content != null ? response.Content.ReadAsString() : null;
+                string path = FileUrlToLocalPath(url);
+                return File.Exists(path) ? File.ReadAllText(path) : null;
             }
 
-            throw new Exception("Too many redirects.");
-        }
+            TlsHttpResponse response = NativeHttpFetchWithRedirects("GET", url, null, null, out finalUrl);
+            if (response.Status < 200 || response.Status >= 300)
+                throw new Exception("HTTP " + response.Status + (string.IsNullOrEmpty(response.Reason) ? "" : " " + response.Reason) + " from " + WebUrl.HostOf(finalUrl));
 
-        private string FallbackString(string url, string nativeError, out string finalUrl)
-        {
-            try
-            {
-                HttpResponseMessage response = GetFollowingRedirects(url, out finalUrl);
-                return response.Content != null ? response.Content.ReadAsString() : null;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(nativeError + "; HttpClient: " + DeepestMessage(ex));
-            }
+            return DecodeBody(response.Body, ExtractHeaderValue(response.HeaderBlock, "content-type"));
         }
 
         private byte[] FetchBytes(string url)
@@ -1374,83 +1301,19 @@ a:hover { text-decoration: underline; }
 
         private byte[] FetchBytes(string url, out string finalUrl)
         {
-            string current = url;
             finalUrl = url;
-
-            for (int hop = 0; hop < 6; hop++)
+            string scheme = WebUrl.SchemeOf(url);
+            if (scheme == "file")
             {
-                if (cancelPendingFetch) return null;
-
-                string scheme = WebUrl.SchemeOf(current);
-                if (scheme == "file")
-                {
-                    finalUrl = current;
-                    string path = FileUrlToLocalPath(current);
-                    return File.Exists(path) ? File.ReadAllBytes(path) : null;
-                }
-
-                if (scheme == "https")
-                {
-                    string nativeError;
-                    string nativeFinal;
-                    TlsHttpResponse native = TryNativeHttps("GET", current, null, null, out nativeFinal, out nativeError);
-                    if (native != null)
-                    {
-                        if (native.Status >= 300 && native.Status < 400)
-                        {
-                            string location = ExtractHeaderValue(native.HeaderBlock, "location");
-                            if (string.IsNullOrEmpty(location))
-                                throw new Exception("HTTP " + native.Status + " redirect with no Location header.");
-                            current = WebUrl.Resolve(nativeFinal, location);
-                            continue;
-                        }
-
-                        if (native.Status < 200 || native.Status >= 300)
-                            throw new Exception("HTTP " + native.Status + " from " + WebUrl.HostOf(nativeFinal));
-
-                        finalUrl = nativeFinal;
-                        return native.Body;
-                    }
-                    return FallbackBytes(current, nativeError, out finalUrl);
-                }
-
-                HttpClient client = NewClient();
-                AddCookieHeader(client, current);
-                HttpResponseMessage response = client.Get(current);
-                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
-                StoreCookies(response, current);
-
-                int code = (int)response.StatusCode;
-                if (code >= 300 && code < 400)
-                {
-                    string location = ReadHeader(response, "Location");
-                    if (string.IsNullOrEmpty(location))
-                        throw new Exception("HTTP " + code + " redirect with no Location header.");
-                    current = WebUrl.Resolve(current, location);
-                    continue;
-                }
-
-                if (code < 200 || code >= 300)
-                    throw new Exception("HTTP " + code + " from " + WebUrl.HostOf(current));
-
-                finalUrl = current;
-                return response.Content != null ? response.Content.ReadAsByteArray() : null;
+                string path = FileUrlToLocalPath(url);
+                return File.Exists(path) ? File.ReadAllBytes(path) : null;
             }
 
-            throw new Exception("Too many redirects.");
-        }
+            TlsHttpResponse response = NativeHttpFetchWithRedirects("GET", url, null, null, out finalUrl);
+            if (response.Status < 200 || response.Status >= 300)
+                throw new Exception("HTTP " + response.Status + (string.IsNullOrEmpty(response.Reason) ? "" : " " + response.Reason) + " from " + WebUrl.HostOf(finalUrl));
 
-        private byte[] FallbackBytes(string url, string nativeError, out string finalUrl)
-        {
-            try
-            {
-                HttpResponseMessage response = GetFollowingRedirects(url, out finalUrl);
-                return response.Content != null ? response.Content.ReadAsByteArray() : null;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception(nativeError + "; HttpClient: " + DeepestMessage(ex));
-            }
+            return response.Body;
         }
 
         // ---- JS fetch / XHR (runs on the WebView's fetch worker thread) -----
@@ -1463,10 +1326,6 @@ a:hover { text-decoration: underline; }
             JsFetchResult result = new JsFetchResult();
             result.Url = url;
 
-            // Captured when the native TLS stack declines, so a dead Cosmos
-            // fallback can still show the real (native) cause.
-            string nativeError = null;
-
             try
             {
                 string scheme = WebUrl.SchemeOf(url);
@@ -1477,60 +1336,28 @@ a:hover { text-decoration: underline; }
                 }
 
                 string finalUrl;
-                if (scheme == "https")
-                {
-                    TlsHttpResponse native = TryNativeHttps(method, url, headers, body, out finalUrl, out nativeError);
-                    if (native != null)
-                    {
-                        result.Status = native.Status;
-                        result.StatusText = native.Reason != null ? native.Reason : "";
-                        result.Ok = native.Status >= 200 && native.Status < 300;
-                        result.Url = finalUrl;
-                        result.Headers = native.HeaderBlock;
-                        result.Body = DecodeBody(native.Body, ExtractHeaderValue(native.HeaderBlock, "content-type"));
-                        return result;
-                    }
-                    // native could not carry it — fall back to the Cosmos client
-                }
+                TlsHttpResponse response = NativeHttpFetchWithRedirects(method, url, headers, body, out finalUrl);
 
-                HttpResponseMessage response = SendWithRedirects(method, url, headers, body, out finalUrl);
-
-                int code = (int)response.StatusCode;
-                result.Status = code;
-                result.StatusText = response.ReasonPhrase != null ? response.ReasonPhrase : "";
-                result.Ok = code >= 200 && code < 300;
+                result.Status = response.Status;
+                result.StatusText = response.Reason != null ? response.Reason : "";
+                result.Ok = response.Status >= 200 && response.Status < 300;
                 result.Url = finalUrl;
-                result.Headers = CollectResponseHeaders(response);
-                result.Body = response.Content != null ? response.Content.ReadAsString() : "";
+                result.Headers = response.HeaderBlock;
+                result.Body = DecodeBody(response.Body, ExtractHeaderValue(response.HeaderBlock, "content-type"));
             }
             catch (Exception ex)
             {
-                result.Error = nativeError != null
-                    ? nativeError + "; HttpClient: " + DeepestMessage(ex)
-                    : DeepestMessage(ex);
+                result.Error = DeepestMessage(ex);
             }
             return result;
         }
 
-        // ---- native TLS (https://) ----------------------------------------
-        // The OS ships its own TLS 1.2 client (System/Web/Tls) because the
-        // Cosmos networking library offers no working handshake of its own.
-        // TryNativeHttps mirrors SendWithRedirects — same redirect rules, same
-        // cookie jar — but every hop rides a native TLS session.
-
-        /// <summary>Perform an HTTP request through the native TLS stack,
-        /// following up to 6 redirects and updating the cookie jar per hop.
-        /// Returns null (with nativeError set) when even the first connection
-        /// cannot be made — DNS, TCP connect or handshake — so the caller can
-        /// fall back to the Cosmos HttpClient. HTTP status codes are NOT an
-        /// error: any final response (404 included) comes back for the caller
-        /// to judge, exactly like GetFollowingRedirects.</summary>
-        private TlsHttpResponse TryNativeHttps(string method, string url,
-            string requestHeaders, string body, out string finalUrl, out string nativeError)
+        /// <summary>Perform an HTTP/HTTPS request through the hand-rolled transport stack,
+        /// following up to 6 redirects and updating the cookie jar per hop.</summary>
+        private TlsHttpResponse NativeHttpFetchWithRedirects(string method, string url,
+            string requestHeaders, string body, out string finalUrl)
         {
             finalUrl = url;
-            nativeError = null;
-
             string current = url;
             string m = string.IsNullOrEmpty(method) ? "GET" : method.ToUpperInvariant();
             string mediaType = ExtractHeaderValue(requestHeaders, "content-type");
@@ -1539,8 +1366,11 @@ a:hover { text-decoration: underline; }
 
             for (int hop = 0; hop < 6; hop++)
             {
-                if (WebUrl.SchemeOf(current) != "https")
-                    throw new Exception("Refusing to downgrade from https:// to plain http:// after a redirect.");
+                if (cancelPendingFetch) throw new Exception("Operation cancelled by user.");
+
+                string scheme = WebUrl.SchemeOf(current);
+                if (scheme != "http" && scheme != "https")
+                    throw new Exception("Unsupported protocol: " + scheme);
 
                 byte[] bodyBytes = null;
                 if (body != null && body.Length > 0 && (m == "POST" || m == "PUT" || m == "PATCH"))
@@ -1554,8 +1384,6 @@ a:hover { text-decoration: underline; }
                 }
                 catch (Exception ex)
                 {
-                    // Transport-level failure. If a later redirect hop fails, attempt
-                    // one retry in case the server closed the keep-alive connection.
                     if (hop > 0)
                     {
                         try
@@ -1565,19 +1393,17 @@ a:hover { text-decoration: underline; }
                         }
                         catch
                         {
-                            throw new Exception("Native TLS fetch failed during redirect: " + DeepestMessage(ex));
+                            throw new Exception("Network fetch failed during redirect: " + DeepestMessage(ex));
                         }
                     }
                     else
                     {
-                        finalUrl = url;
-                        nativeError = DeepestMessage(ex);
-                        return null;
+                        throw;
                     }
                 }
 
-                for (int i = 0; i < response.SetCookies.Count; i++)
-                    cookies.AddFromSetCookie(response.SetCookies[i], current);
+                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
+                StoreCookies(response, current);
 
                 int code = response.Status;
                 if (code >= 300 && code < 400)
@@ -1587,7 +1413,11 @@ a:hover { text-decoration: underline; }
                         throw new Exception("HTTP " + code + " redirect with no Location header.");
                     if (code == 301 || code == 302 || code == 303)
                     {
-                        if (m == "POST" || m == "PUT" || m == "PATCH") m = "GET";
+                        if (m == "POST" || m == "PUT" || m == "PATCH")
+                        {
+                            m = "GET";
+                            body = null;
+                        }
                     }
                     current = WebUrl.Resolve(current, location);
                     continue;
@@ -1597,6 +1427,15 @@ a:hover { text-decoration: underline; }
                 return response;
             }
             throw new Exception("Too many redirects.");
+        }
+
+        private void StoreCookies(TlsHttpResponse response, string url)
+        {
+            if (response != null && response.SetCookies != null)
+            {
+                for (int i = 0; i < response.SetCookies.Count; i++)
+                    cookies.AddFromSetCookie(response.SetCookies[i], url);
+            }
         }
 
         /// <summary>Response body -> string. The native path always receives the
@@ -1605,91 +1444,26 @@ a:hover { text-decoration: underline; }
         private static string DecodeBody(byte[] bytes, string contentType)
         {
             if (bytes == null || bytes.Length == 0) return "";
+
+            // Check if Gzip compressed (magic bytes: 0x1F, 0x8B)
+            if (bytes.Length >= 2 && bytes[0] == 0x1F && bytes[1] == 0x8B)
+            {
+                try
+                {
+                    using (global::System.IO.MemoryStream ms = new global::System.IO.MemoryStream(bytes))
+                    using (global::System.IO.Compression.GZipStream gz = new global::System.IO.Compression.GZipStream(ms, global::System.IO.Compression.CompressionMode.Decompress))
+                    using (global::System.IO.MemoryStream outMs = new global::System.IO.MemoryStream())
+                    {
+                        gz.CopyTo(outMs);
+                        bytes = outMs.ToArray();
+                    }
+                }
+                catch { }
+            }
+
             int off = 0;
             if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) off = 3;
             return global::System.Text.Encoding.UTF8.GetString(bytes, off, bytes.Length - off);
-        }
-
-        /// <summary>Send a request of any method (with optional body and script
-        /// headers), following up to 6 redirects. 301/302/303 turn POST into
-        /// GET (browser behaviour); 307/308 keep method and body.</summary>
-        private HttpResponseMessage SendWithRedirects(string method, string url,
-            string requestHeaders, string body, out string finalUrl)
-        {
-            string current = url;
-            string m = string.IsNullOrEmpty(method) ? "GET" : method.ToUpperInvariant();
-            string mediaType = ExtractHeaderValue(requestHeaders, "content-type");
-            if (mediaType == null || mediaType.Length == 0)
-                mediaType = "application/x-www-form-urlencoded";
-
-            for (int hop = 0; hop < 6; hop++)
-            {
-                HttpClient client = NewClient();
-                AddCookieHeader(client, current);
-                AddRequestHeaders(client.DefaultRequestHeaders, requestHeaders);
-
-                HttpResponseMessage response;
-                if (m == "POST") response = client.Post(current, MakeContent(body, mediaType));
-                else if (m == "PUT") response = client.Put(current, MakeContent(body, mediaType));
-                else if (m == "PATCH") response = client.Patch(current, MakeContent(body, mediaType));
-                else if (m == "DELETE") response = client.Delete(current);
-                else response = client.Get(current);
-
-                if (response == null) throw new Exception("No response from " + WebUrl.HostOf(current));
-                StoreCookies(response, current);
-
-                int code = (int)response.StatusCode;
-                if (code >= 300 && code < 400)
-                {
-                    string location = ReadHeader(response, "Location");
-                    if (string.IsNullOrEmpty(location))
-                        throw new Exception("HTTP " + code + " redirect with no Location header.");
-                    if (code == 301 || code == 302 || code == 303)
-                    {
-                        if (m == "POST" || m == "PUT" || m == "PATCH") m = "GET";
-                    }
-                    current = WebUrl.Resolve(current, location);
-                    continue;
-                }
-
-                finalUrl = current;
-                return response;
-            }
-            throw new Exception("Too many redirects.");
-        }
-
-        private static HttpContent MakeContent(string body, string mediaType)
-        {
-            if (body == null) body = "";
-            return new StringContent(body, new global::System.Text.UTF8Encoding(false), mediaType);
-        }
-
-        /// <summary>Add the script-supplied "Name: value" lines to the request
-        /// (the browser's own UA/Accept stay unless a script overrides them).</summary>
-        private static void AddRequestHeaders(HttpRequestHeaders headers, string headerLines)
-        {
-            if (headers == null || string.IsNullOrEmpty(headerLines)) return;
-            int start = 0;
-            while (start < headerLines.Length)
-            {
-                int nl = headerLines.IndexOf('\n', start);
-                if (nl < 0) nl = headerLines.Length;
-                string line = headerLines.Substring(start, nl - start);
-                if (line.Length > 0 && line[line.Length - 1] == '\r') line = line.Substring(0, line.Length - 1);
-                start = nl + 1;
-
-                int colon = line.IndexOf(':');
-                if (colon <= 0) continue;
-                string name = line.Substring(0, colon).Trim();
-                string value = line.Substring(colon + 1).Trim();
-                if (name.Length == 0 || value.Length == 0) continue;
-                // Content-Type is carried by the body content, not the header list
-                if (name.ToLowerInvariant() == "content-type") continue;
-                // User-Agent is a forbidden header name (browsers block script spoofing)
-                if (name.ToLowerInvariant() == "user-agent") continue;
-                try { headers.Add(name, value); }
-                catch { /* a bad header must not fail the whole request */ }
-            }
         }
 
         /// <summary>Pull one "Name: value" line out of a script header block.</summary>
@@ -1712,75 +1486,6 @@ a:hover { text-decoration: underline; }
                     return line.Substring(colon + 1).Trim();
             }
             return null;
-        }
-
-        /// <summary>Flatten the (fixed) set of headers we care about into
-        /// "Name: value\r\n" lines for the JS Headers object. HttpHeaders has
-        /// no enumerator, so probe by name in both header stores.</summary>
-        private static string CollectResponseHeaders(HttpResponseMessage response)
-        {
-            string outp = "";
-            string[] names = new string[]
-            {
-                "Content-Type", "Content-Length", "Location", "Set-Cookie",
-                "Content-Encoding", "Content-Language", "Cache-Control", "Expires",
-                "Last-Modified", "ETag", "Server", "Date", "WWW-Authenticate",
-                "Content-Disposition", "Refresh", "X-Frame-Options",
-            };
-            for (int i = 0; i < names.Length; i++)
-            {
-                string v = ReadHeaderBestEffort(response, names[i]);
-                if (v != null && v.Length > 0) outp += names[i] + ": " + v + "\r\n";
-            }
-            return outp;
-        }
-
-        /// <summary>Read a header from the response, falling back to the content
-        /// headers (Content-Type and friends live there) and to the lowercase
-        /// spelling for servers that send lowercase names.</summary>
-        private static string ReadHeaderBestEffort(HttpResponseMessage response, string name)
-        {
-            string v = ReadHeader(response, name);
-            if (v != null) return v;
-            v = ReadHeader(response, name.ToLowerInvariant());
-            if (v != null) return v;
-            if (response.Content != null && response.Content.Headers != null)
-            {
-                v = ReadHeader(response.Content, name);
-                if (v != null) return v;
-                v = ReadHeader(response.Content, name.ToLowerInvariant());
-                if (v != null) return v;
-            }
-            return null;
-        }
-
-        private static string ReadHeader(HttpContent content, string name)
-        {
-            if (content == null || content.Headers == null) return null;
-            if (!content.Headers.Contains(name)) return null;
-            global::System.Collections.Generic.IEnumerable<string> values = content.Headers.GetValues(name);
-            foreach (string s in values) return s;
-            return null;
-        }
-
-        /// <summary>Attach the jar's cookies for this URL to the request.</summary>
-        private void AddCookieHeader(HttpClient client, string url)
-        {
-            string cookie = cookies.HeaderFor(url);
-            if (cookie == null || cookie.Length == 0) return;
-            try { client.DefaultRequestHeaders.Add("Cookie", cookie); }
-            catch { /* a rejected cookie header must not fail the request */ }
-        }
-
-        /// <summary>Capture every Set-Cookie the response carries (a response
-        /// may hold several, so walk all values rather than the first).</summary>
-        private void StoreCookies(HttpResponseMessage response, string url)
-        {
-            if (response.Headers != null && response.Headers.Contains("Set-Cookie"))
-            {
-                global::System.Collections.Generic.IEnumerable<string> values = response.Headers.GetValues("Set-Cookie");
-                foreach (string s in values) cookies.AddFromSetCookie(s, url);
-            }
         }
 
         private int FetchStylesheets(HtmlPage page, string baseUrl, out string lastError)
@@ -1834,7 +1539,7 @@ a:hover { text-decoration: underline; }
 
             if (page.StyleSheetHrefs != null && page.StyleSheetHrefs.Count > 0)
             {
-                int limit = Math.Min(page.StyleSheetHrefs.Count, 16);
+                int limit = Math.Min(page.StyleSheetHrefs.Count, 4);
                 for (int i = 0; i < limit; i++)
                 {
                     if (cancelPendingFetch) break;
@@ -1865,8 +1570,9 @@ a:hover { text-decoration: underline; }
         {
             if (page.Scripts == null || page.Scripts.Count == 0) return;
             string baseForJs = !string.IsNullOrEmpty(page.BaseHref) ? WebUrl.Resolve(baseUrl, page.BaseHref) : baseUrl;
-            int limit = Math.Min(page.Scripts.Count, 8);
-            for (int i = 0; i < limit; i++)
+            int fetched = 0;
+            const int MaxExternalScripts = 16;
+            for (int i = 0; i < page.Scripts.Count && fetched < MaxExternalScripts; i++)
             {
                 if (cancelPendingFetch) break;
                 HtmlScript s = page.Scripts[i];
@@ -1874,8 +1580,17 @@ a:hover { text-decoration: underline; }
                 string abs = WebUrl.Resolve(baseForJs, s.Src);
                 try
                 {
+                    PublishProgress(65 + (fetched * 15 / MaxExternalScripts), "Loading script " + (fetched + 1) + "…");
                     string code = FetchString(abs);
-                    if (!string.IsNullOrEmpty(code)) s.Code = code;
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        // Protect memory from massive multi-megabyte bundles
+                        if (code.Length <= 524288)
+                        {
+                            s.Code = code;
+                            fetched++;
+                        }
+                    }
                 }
                 catch { /* a missing script is not fatal */ }
             }
@@ -1892,7 +1607,9 @@ a:hover { text-decoration: underline; }
             CollectCssUrls(page.CssText, srcs);
 
             int fetched = 0;
-            for (int i = 0; i < srcs.Count && fetched < 512; i++)
+            int networkFetched = 0;
+            const int MaxNetworkImages = 12;
+            for (int i = 0; i < srcs.Count; i++)
             {
                 if (cancelPendingFetch) break;
                 string src = srcs[i];
@@ -1936,6 +1653,8 @@ a:hover { text-decoration: underline; }
                     continue;
                 }
 
+                if (networkFetched >= MaxNetworkImages) continue;
+
                 string abs = WebUrl.Resolve(baseForImages, src);
                 if (images.ContainsKey(abs)) continue;
 
@@ -1949,6 +1668,7 @@ a:hover { text-decoration: underline; }
                         images[abs] = img;
                         images[src] = img;
                         fetched++;
+                        networkFetched++;
                     }
                 }
                 catch { /* broken/unsupported image: fall back to the alt placeholder */ }
@@ -2027,15 +1747,6 @@ a:hover { text-decoration: underline; }
         {
             if (string.IsNullOrEmpty(s)) return "";
             return s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
-        }
-
-        private static string ReadHeader(HttpResponseMessage response, string name)
-        {
-            if (response.Headers == null) return null;
-            if (!response.Headers.Contains(name)) return null;
-            string[] values = response.Headers.GetValues(name).ToArray();
-            if (values == null || values.Length == 0) return null;
-            return values[0];
         }
 
         private static string DeepestMessage(Exception ex)

@@ -32,6 +32,9 @@ public sealed class DomNode
     // Resolved computed style (elements only; set by the style pass)
     public CssComputed Style;
 
+    // Backing graphical surface for <canvas>
+    public Cosmos.Kernel.System.Graphics.Image CanvasSurface;
+
     public bool IsElement { get { return NodeType == Element; } }
 
     public string GetAttr(string name)
@@ -51,11 +54,268 @@ public sealed class DomNode
         return n;
     }
 
+    public DomNode LastElementChild()
+    {
+        DomNode n = LastChild;
+        while (n != null && !n.IsElement) n = n.Prev;
+        return n;
+    }
+
     public DomNode NextElementSibling()
     {
         DomNode n = Next;
         while (n != null && !n.IsElement) n = n.Next;
         return n;
+    }
+
+    public DomNode PreviousElementSibling()
+    {
+        DomNode n = Prev;
+        while (n != null && !n.IsElement) n = n.Prev;
+        return n;
+    }
+
+    public int ChildElementCount
+    {
+        get
+        {
+            int count = 0;
+            DomNode n = FirstChild;
+            while (n != null)
+            {
+                if (n.IsElement) count++;
+                n = n.Next;
+            }
+            return count;
+        }
+    }
+
+    public bool HasChildNodes()
+    {
+        return FirstChild != null;
+    }
+
+    public bool Contains(DomNode other)
+    {
+        DomNode cur = other;
+        while (cur != null)
+        {
+            if (cur == this) return true;
+            cur = cur.Parent;
+        }
+        return false;
+    }
+
+    public DomNode ReplaceChild(DomNode newChild, DomNode oldChild)
+    {
+        if (oldChild == null || oldChild.Parent != this) return null;
+        if (newChild == null) { Remove(oldChild); return oldChild; }
+        InsertBefore(newChild, oldChild);
+        Remove(oldChild);
+        return oldChild;
+    }
+
+    public DomNode CloneNode(bool deep)
+    {
+        DomNode copy = new DomNode();
+        copy.NodeType = NodeType;
+        copy.Tag = Tag;
+        copy.Text = Text;
+        copy.Id = Id;
+        copy.StyleAttr = StyleAttr;
+        if (Classes != null) copy.Classes = new List<string>(Classes);
+        if (Attrs != null)
+        {
+            copy.Attrs = new Dictionary<string, string>();
+            foreach (KeyValuePair<string, string> kv in Attrs) copy.Attrs[kv.Key] = kv.Value;
+        }
+        if (deep)
+        {
+            DomNode c = FirstChild;
+            while (c != null)
+            {
+                copy.Append(c.CloneNode(true));
+                c = c.Next;
+            }
+        }
+        return copy;
+    }
+
+    public bool IsSameNode(DomNode other)
+    {
+        return object.ReferenceEquals(this, other);
+    }
+
+    public bool IsEqualNode(DomNode other)
+    {
+        if (other == null) return false;
+        if (object.ReferenceEquals(this, other)) return true;
+        if (NodeType != other.NodeType) return false;
+        if (NodeType == TextNode) return string.Equals(Text, other.Text);
+        if (!string.Equals(Tag, other.Tag, StringComparison.OrdinalIgnoreCase)) return false;
+        int attrCount1 = Attrs != null ? Attrs.Count : 0;
+        int attrCount2 = other.Attrs != null ? other.Attrs.Count : 0;
+        if (attrCount1 != attrCount2) return false;
+        if (Attrs != null)
+        {
+            foreach (KeyValuePair<string, string> kv in Attrs)
+            {
+                if (other.Attrs == null || !other.Attrs.TryGetValue(kv.Key, out string ov) || ov != kv.Value)
+                    return false;
+            }
+        }
+        DomNode c1 = FirstChild, c2 = other.FirstChild;
+        while (c1 != null && c2 != null)
+        {
+            if (!c1.IsEqualNode(c2)) return false;
+            c1 = c1.Next;
+            c2 = c2.Next;
+        }
+        return c1 == null && c2 == null;
+    }
+
+    public void Normalize()
+    {
+        DomNode c = FirstChild;
+        while (c != null)
+        {
+            DomNode next = c.Next;
+            if (c.NodeType == TextNode)
+            {
+                if (string.IsNullOrEmpty(c.Text))
+                {
+                    Remove(c);
+                }
+                else if (next != null && next.NodeType == TextNode)
+                {
+                    c.Text += next.Text;
+                    Remove(next);
+                    continue;
+                }
+            }
+            else if (c.IsElement)
+            {
+                c.Normalize();
+            }
+            c = next;
+        }
+    }
+
+    public const int DOCUMENT_POSITION_DISCONNECTED = 1;
+    public const int DOCUMENT_POSITION_PRECEDING = 2;
+    public const int DOCUMENT_POSITION_FOLLOWING = 4;
+    public const int DOCUMENT_POSITION_CONTAINS = 8;
+    public const int DOCUMENT_POSITION_CONTAINED_BY = 16;
+    public const int DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 32;
+
+    public int CompareDocumentPosition(DomNode other)
+    {
+        if (other == null || object.ReferenceEquals(this, other)) return 0;
+        DomNode root1 = GetRootNode();
+        DomNode root2 = other.GetRootNode();
+        if (!object.ReferenceEquals(root1, root2))
+            return DOCUMENT_POSITION_DISCONNECTED | DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC | DOCUMENT_POSITION_PRECEDING;
+        if (Contains(other))
+            return DOCUMENT_POSITION_CONTAINED_BY | DOCUMENT_POSITION_FOLLOWING;
+        if (other.Contains(this))
+            return DOCUMENT_POSITION_CONTAINS | DOCUMENT_POSITION_PRECEDING;
+        DomNode n = root1;
+        while (n != null)
+        {
+            if (object.ReferenceEquals(n, other)) return DOCUMENT_POSITION_PRECEDING;
+            if (object.ReferenceEquals(n, this)) return DOCUMENT_POSITION_FOLLOWING;
+            n = PreOrderNext(n);
+        }
+        return DOCUMENT_POSITION_DISCONNECTED;
+    }
+
+    public DomNode GetRootNode()
+    {
+        DomNode n = this;
+        while (n.Parent != null) n = n.Parent;
+        return n;
+    }
+
+    private static DomNode PreOrderNext(DomNode n)
+    {
+        if (n.FirstChild != null) return n.FirstChild;
+        while (n != null)
+        {
+            if (n.Next != null) return n.Next;
+            n = n.Parent;
+        }
+        return null;
+    }
+
+    public List<DomNode> GetElementsByTagName(string tag)
+    {
+        List<DomNode> list = new List<DomNode>();
+        string t = tag != null ? tag.ToLowerInvariant() : "";
+        CollectElementsByTag(this, t, list);
+        return list;
+    }
+
+    private static void CollectElementsByTag(DomNode root, string tag, List<DomNode> list)
+    {
+        DomNode n = root.FirstChild;
+        while (n != null)
+        {
+            if (n.IsElement)
+            {
+                if (tag == "*" || n.Tag == tag) list.Add(n);
+                CollectElementsByTag(n, tag, list);
+            }
+            n = n.Next;
+        }
+    }
+
+    public List<DomNode> GetElementsByClassName(string className)
+    {
+        List<DomNode> list = new List<DomNode>();
+        if (string.IsNullOrEmpty(className)) return list;
+        string[] classes = className.Split(new char[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        CollectElementsByClasses(this, classes, list);
+        return list;
+    }
+
+    private static void CollectElementsByClasses(DomNode root, string[] classes, List<DomNode> list)
+    {
+        DomNode n = root.FirstChild;
+        while (n != null)
+        {
+            if (n.IsElement && n.Classes != null)
+            {
+                bool all = true;
+                for (int i = 0; i < classes.Length; i++)
+                {
+                    if (!n.Classes.Contains(classes[i])) { all = false; break; }
+                }
+                if (all) list.Add(n);
+                CollectElementsByClasses(n, classes, list);
+            }
+            else if (n.IsElement)
+            {
+                CollectElementsByClasses(n, classes, list);
+            }
+            n = n.Next;
+        }
+    }
+
+    public DomNode GetElementById(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return null;
+        DomNode n = FirstChild;
+        while (n != null)
+        {
+            if (n.IsElement)
+            {
+                if (n.Id == id) return n;
+                DomNode hit = n.GetElementById(id);
+                if (hit != null) return hit;
+            }
+            n = n.Next;
+        }
+        return null;
     }
 
     internal void AppendChild(DomNode child)
@@ -181,7 +441,10 @@ public sealed class DomNode
         while (n != null)
         {
             if (n.NodeType == TextNode) { if (n.Text != null) sb.Append(n.Text); }
-            else CollectText(n, sb);
+            else if (n.Tag != "script" && n.Tag != "style" && n.Tag != "noscript" && n.Tag != "template")
+            {
+                CollectText(n, sb);
+            }
             n = n.Next;
         }
     }
@@ -394,6 +657,24 @@ public static class HtmlDom
         return root;
     }
 
+    /// <summary>Parse an HTML fragment into a list of top-level DomNodes.</summary>
+    public static List<DomNode> ParseFragment(string html)
+    {
+        DomNode doc = Parse(html);
+        List<DomNode> list = new List<DomNode>();
+        DomNode c = doc.FirstChild;
+        while (c != null)
+        {
+            DomNode next = c.Next;
+            c.Parent = null;
+            c.Prev = null;
+            c.Next = null;
+            list.Add(c);
+            c = next;
+        }
+        return list;
+    }
+
     // ---- helpers ---------------------------------------------------------
 
     private static void FlushText(DomNode cur, StringBuilder text)
@@ -603,6 +884,7 @@ public sealed class HtmlScript
 {
     public string Src;   // resolved absolute URL of an external script, or null
     public string Code;  // inline code, or fetched source for external scripts
+    public DomNode Node; // DOM element node for document.currentScript
 }
 
 public static class HtmlPageBuilder
@@ -623,6 +905,14 @@ public static class HtmlPageBuilder
         {
             if (n.IsElement)
             {
+                if (n.Tag == "noscript")
+                {
+                    // In browsers with JavaScript enabled, content inside <noscript>
+                    // (such as meta refresh redirects or fallback CSS hiding content)
+                    // must NOT be collected into the page.
+                    n = n.Next;
+                    continue;
+                }
                 switch (n.Tag)
                 {
                     case "title":
@@ -638,17 +928,28 @@ public static class HtmlPageBuilder
                         }
                     case "script":
                         {
-                            string src = n.GetAttr("src");
-                            HtmlScript script = new HtmlScript();
-                            if (src != null && src.Length > 0)
+                            string stype = (n.GetAttr("type") ?? "").ToLowerInvariant().Trim();
+                            bool isJs = string.IsNullOrEmpty(stype) ||
+                                        stype == "text/javascript" ||
+                                        stype == "application/javascript" ||
+                                        stype == "text/ecmascript" ||
+                                        stype == "application/ecmascript" ||
+                                        stype == "module";
+                            if (isJs)
                             {
-                                script.Src = src;
+                                string src = n.GetAttr("src");
+                                HtmlScript script = new HtmlScript();
+                                if (src != null && src.Length > 0)
+                                {
+                                    script.Src = src;
+                                }
+                                else
+                                {
+                                    script.Code = TextOf(n);
+                                }
+                                script.Node = n;
+                                page.Scripts.Add(script);
                             }
-                            else
-                            {
-                                script.Code = TextOf(n);
-                            }
-                            page.Scripts.Add(script);
                             break;
                         }
                     case "link":
@@ -819,6 +1120,13 @@ public static class HtmlText
             case "quot": return "\"";
             case "apos": return "'";
             case "nbsp": return " ";
+            case "ensp": return "\u2002";
+            case "emsp": return "\u2003";
+            case "thinsp": return "\u2009";
+            case "zwnj": return "\u200c";
+            case "zwj": return "\u200d";
+            case "lrm": return "\u200e";
+            case "rlm": return "\u200f";
             case "copy": return "\u00a9";
             case "reg": return "\u00ae";
             case "trade": return "\u2122";
@@ -826,14 +1134,27 @@ public static class HtmlText
             case "plusmn": return "\u00b1";
             case "times": return "\u00d7";
             case "divide": return "\u00f7";
+            case "minus": return "\u2212";
+            case "frac14": return "\u00bc";
             case "frac12": return "\u00bd";
+            case "frac34": return "\u00be";
+            case "sup1": return "\u00b9";
+            case "sup2": return "\u00b2";
+            case "sup3": return "\u00b3";
             case "hellip": return "\u2026";
             case "mdash": return "\u2014";
             case "ndash": return "\u2013";
             case "lsquo": return "\u2018";
             case "rsquo": return "\u2019";
+            case "sbquo": return "\u201a";
             case "ldquo": return "\u201c";
             case "rdquo": return "\u201d";
+            case "bdquo": return "\u201e";
+            case "dagger": return "\u2020";
+            case "Dagger": return "\u2021";
+            case "permil": return "\u2030";
+            case "lsaquo": return "\u2039";
+            case "rsaquo": return "\u203a";
             case "bull": return "\u2022";
             case "laquo": return "\u00ab";
             case "raquo": return "\u00bb";
@@ -841,6 +1162,7 @@ public static class HtmlText
             case "pound": return "\u00a3";
             case "yen": return "\u00a5";
             case "cent": return "\u00a2";
+            case "curren": return "\u00a4";
             case "sect": return "\u00a7";
             case "para": return "\u00b6";
             case "middot": return "\u00b7";
@@ -863,25 +1185,96 @@ public static class HtmlText
             case "diams": return "\u2666";
             case "clubs": return "\u2663";
             case "spades": return "\u2660";
+            case "loz": return "\u25ca";
             case "le": return "\u2264";
             case "ge": return "\u2265";
             case "ne": return "\u2260";
+            case "equiv": return "\u2261";
             case "asymp": return "\u2248";
+            case "cong": return "\u2245";
+            case "sim": return "\u223c";
             case "infin": return "\u221e";
+            case "radic": return "\u221a";
+            case "prop": return "\u221d";
+            case "sum": return "\u2211";
+            case "prod": return "\u220f";
+            case "int": return "\u222b";
+            case "part": return "\u2202";
+            case "nabla": return "\u2207";
+            case "exist": return "\u2203";
+            case "forall": return "\u2200";
+            case "empty": return "\u2205";
+            case "isin": return "\u2208";
+            case "notin": return "\u2209";
+            case "ni": return "\u220b";
+            case "sub": return "\u2282";
+            case "sup": return "\u2283";
+            case "nsub": return "\u2284";
+            case "sube": return "\u2286";
+            case "supe": return "\u2287";
+            case "cap": return "\u2229";
+            case "cup": return "\u222a";
+            case "and": return "\u2227";
+            case "or": return "\u2228";
+            case "ang": return "\u2220";
+            case "perp": return "\u22a5";
             case "prime": return "\u2032";
+            case "Prime": return "\u2033";
+            case "oline": return "\u203e";
+            case "frasl": return "\u2044";
+            case "weierp": return "\u2118";
+            case "image": return "\u2111";
+            case "real": return "\u211c";
+            case "alefsym": return "\u2135";
             case "alpha": return "\u03b1";
             case "beta": return "\u03b2";
             case "gamma": return "\u03b3";
             case "delta": return "\u03b4";
             case "epsilon": return "\u03b5";
+            case "zeta": return "\u03b6";
+            case "eta": return "\u03b7";
             case "theta": return "\u03b8";
+            case "iota": return "\u03b9";
+            case "kappa": return "\u03ba";
             case "lambda": return "\u03bb";
             case "mu": return "\u03bc";
+            case "nu": return "\u03bd";
+            case "xi": return "\u03be";
+            case "omicron": return "\u03bf";
             case "pi": return "\u03c0";
+            case "rho": return "\u03c1";
+            case "sigmaf": return "\u03c2";
             case "sigma": return "\u03c3";
             case "tau": return "\u03c4";
+            case "upsilon": return "\u03c5";
             case "phi": return "\u03c6";
+            case "chi": return "\u03c7";
+            case "psi": return "\u03c8";
             case "omega": return "\u03c9";
+            case "Alpha": return "\u0391";
+            case "Beta": return "\u0392";
+            case "Gamma": return "\u0393";
+            case "Delta": return "\u0394";
+            case "Epsilon": return "\u0395";
+            case "Zeta": return "\u0396";
+            case "Eta": return "\u0397";
+            case "Theta": return "\u0398";
+            case "Iota": return "\u0399";
+            case "Kappa": return "\u039a";
+            case "Lambda": return "\u039b";
+            case "Mu": return "\u039c";
+            case "Nu": return "\u039d";
+            case "Xi": return "\u039e";
+            case "Omicron": return "\u039f";
+            case "Pi": return "\u03a0";
+            case "Rho": return "\u03a1";
+            case "Sigma": return "\u03a3";
+            case "Tau": return "\u03a4";
+            case "Upsilon": return "\u03a5";
+            case "Phi": return "\u03a6";
+            case "Chi": return "\u03a7";
+            case "Psi": return "\u03a8";
+            case "Omega": return "\u03a9";
             default: return null;
         }
     }

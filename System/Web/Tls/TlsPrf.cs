@@ -39,10 +39,73 @@ namespace Windose.Web.Tls
             return result;
         }
 
-        private static byte[] Hmac(byte[] secret, byte[] data, int hashAlgo)
+        public static byte[] Hmac(byte[] secret, byte[] data, int hashAlgo)
         {
             if (hashAlgo == 1) return new HmacSha384(secret).Compute(data);
             return new HmacSha256(secret).Compute(data);
+        }
+
+        public static int HashLenFor(int hashAlgo)
+        {
+            return hashAlgo == 1 ? 48 : 32;
+        }
+
+        public static byte[] HkdfExtract(int hashAlgo, byte[] salt, byte[] ikm)
+        {
+            int hashLen = HashLenFor(hashAlgo);
+            if (salt == null || salt.Length == 0) salt = new byte[hashLen];
+            if (ikm == null) ikm = new byte[0];
+            return Hmac(salt, ikm, hashAlgo);
+        }
+
+        public static byte[] HkdfExpand(int hashAlgo, byte[] prk, byte[] info, int length)
+        {
+            int hashLen = HashLenFor(hashAlgo);
+            int n = (length + hashLen - 1) / hashLen;
+            byte[] okm = new byte[length];
+            byte[] t = new byte[0];
+            int outPos = 0;
+            for (byte i = 1; i <= n; i++)
+            {
+                byte[] input = new byte[t.Length + (info != null ? info.Length : 0) + 1];
+                Array.Copy(t, 0, input, 0, t.Length);
+                if (info != null && info.Length > 0) Array.Copy(info, 0, input, t.Length, info.Length);
+                input[input.Length - 1] = i;
+
+                t = Hmac(prk, input, hashAlgo);
+
+                int copyLen = Math.Min(hashLen, length - outPos);
+                Array.Copy(t, 0, okm, outPos, copyLen);
+                outPos += copyLen;
+            }
+            return okm;
+        }
+
+        public static byte[] HkdfExpandLabel(int hashAlgo, byte[] secret, string label, byte[] context, int length)
+        {
+            byte[] prefix = Ascii("tls13 " + label);
+            if (context == null) context = new byte[0];
+            byte[] hkdfLabel = new byte[2 + 1 + prefix.Length + 1 + context.Length];
+            hkdfLabel[0] = (byte)(length >> 8);
+            hkdfLabel[1] = (byte)length;
+            hkdfLabel[2] = (byte)prefix.Length;
+            Array.Copy(prefix, 0, hkdfLabel, 3, prefix.Length);
+            int pos = 3 + prefix.Length;
+            hkdfLabel[pos++] = (byte)context.Length;
+            if (context.Length > 0) Array.Copy(context, 0, hkdfLabel, pos, context.Length);
+
+            return HkdfExpand(hashAlgo, secret, hkdfLabel, length);
+        }
+
+        public static byte[] BuildTls13Nonce(byte[] iv, ulong seq)
+        {
+            byte[] nonce = new byte[12];
+            Array.Copy(iv, 0, nonce, 0, 12);
+            for (int i = 0; i < 8; i++)
+            {
+                nonce[4 + i] ^= (byte)(seq >> (8 * (7 - i)));
+            }
+            return nonce;
         }
 
         public static byte[] Ascii(string s)

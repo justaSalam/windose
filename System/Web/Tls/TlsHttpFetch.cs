@@ -22,8 +22,15 @@ namespace Windose.Web.Tls
             new global::System.Collections.Generic.List<string>();
     }
 
-    /// <summary>Minimal HTTP/1.1 client that speaks over the hand-rolled TLS 1.2
-    /// engine, so the browser can load https:// pages without any external TLS
+    public interface IHttpDataStream
+    {
+        void Send(byte[] data);
+        int Receive(byte[] buf, int off, int len);
+        void Close();
+    }
+
+    /// <summary>Minimal HTTP/1.1 client that speaks over plain TCP or the hand-rolled TLS 1.2
+    /// engine, so the browser can load http:// and https:// pages without any external HTTP
     /// library. One call performs a single request (no redirect following — the
     /// caller owns that, alongside cookie handling).
     ///
@@ -31,9 +38,26 @@ namespace Windose.Web.Tls
     /// no reflection. Header names are compared via ToLowerInvariant().</summary>
     public static class TlsHttpFetch
     {
-        /// <summary>Connect to <paramref name="url"/>'s host on 443 (or its explicit
-        /// port), complete the TLS handshake, send the request and read one response.
-        /// Throws on any transport or handshake failure; never returns null.</summary>
+        private sealed class TlsDataStream : IHttpDataStream
+        {
+            private readonly TlsSession session;
+            public TlsDataStream(TlsSession s) { session = s; }
+            public void Send(byte[] data) { session.SendApplicationData(data); }
+            public int Receive(byte[] buf, int off, int len) { return session.ReceiveApplicationData(buf, off, len); }
+            public void Close() { session.Close(); }
+        }
+
+        private sealed class PlainDataStream : IHttpDataStream
+        {
+            private readonly ITlsTransport transport;
+            public PlainDataStream(ITlsTransport t) { transport = t; }
+            public void Send(byte[] data) { transport.Write(data, 0, data.Length); }
+            public int Receive(byte[] buf, int off, int len) { return transport.Read(buf, off, len); }
+            public void Close() { transport.Close(); }
+        }
+
+        /// <summary>Connect to <paramref name="url"/>'s host, complete TLS handshake if https,
+        /// send the request and read one response. Throws on any transport failure; never returns null.</summary>
         /// <param name="method">HTTP verb ("GET", "POST", ...). Null/empty means GET.</param>
         /// <param name="requestHeaders">Extra "Name: value\r\n" lines to merge in (may be null).</param>
         /// <param name="body">Request body bytes, or null for none.</param>
@@ -42,29 +66,29 @@ namespace Windose.Web.Tls
         public static TlsHttpResponse Fetch(string method, string url,
             string requestHeaders, byte[] body, string contentType, string cookieHeader)
         {
+            string scheme = SchemeOf(url);
+            bool isHttps = scheme == "https";
             string host = HostOf(url);
-            int port = PortOf(url);
+            int port = PortOf(url, isHttps);
             string target = TargetOf(url);
 
-            TlsSession session = ConnectAndHandshake(host, port);
+            IHttpDataStream stream = Connect(host, port, isHttps);
             try
             {
                 string verb = (method == null || method.Length == 0) ? "GET" : method.ToUpperInvariant();
                 byte[] request = BuildRequest(verb, host, port, target,
-                    requestHeaders, body, contentType, cookieHeader);
-                session.SendApplicationData(request);
-                return ReadResponse(session, url);
+                    requestHeaders, body, contentType, cookieHeader, isHttps);
+                stream.Send(request);
+                return ReadResponse(stream, url);
             }
             finally
             {
-                session.Close();
+                stream.Close();
             }
         }
 
-        /// <summary>Open a TCP connection to host:port and run the TLS handshake.
-        /// Mirrors the Cosmos HTTP client's proven outbound path (resolve, pick
-        /// IPv4, connect, then hand the socket to the record layer).</summary>
-        private static TlsSession ConnectAndHandshake(string host, int port)
+        /// <summary>Open a TCP connection to host:port (and run TLS handshake if https).</summary>
+        private static IHttpDataStream Connect(string host, int port, bool isHttps)
         {
             global::System.Net.IPAddress address = ResolveIPv4(host);
 
@@ -81,7 +105,15 @@ namespace Windose.Web.Tls
 
             Socket socket = tcp.Client;
             ITlsTransport transport = new CosmosSocketTransport(socket);
-            return TlsHandshake.Connect(host, port, transport);
+            if (isHttps)
+            {
+                TlsSession session = TlsHandshake.Connect(host, port, transport);
+                return new TlsDataStream(session);
+            }
+            else
+            {
+                return new PlainDataStream(transport);
+            }
         }
 
         /// <summary>Resolve host to its first IPv4 address, the same way the Cosmos
@@ -107,15 +139,18 @@ namespace Windose.Web.Tls
         }
 
         private static byte[] BuildRequest(string verb, string host, int port, string target,
-            string requestHeaders, byte[] body, string contentType, string cookieHeader)
+            string requestHeaders, byte[] body, string contentType, string cookieHeader, bool isHttps)
         {
             StringBuilder sb = new StringBuilder(256);
             sb.Append(verb).Append(' ').Append(target).Append(" HTTP/1.1\r\n");
-            if (port == 443) sb.Append("Host: ").Append(host).Append("\r\n");
-            else sb.Append("Host: ").Append(host).Append(':').Append(port).Append("\r\n");
+            if ((isHttps && port == 443) || (!isHttps && port == 80))
+                sb.Append("Host: ").Append(host).Append("\r\n");
+            else
+                sb.Append("Host: ").Append(host).Append(':').Append(port).Append("\r\n");
             sb.Append("Connection: close\r\n");
             sb.Append("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36\r\n");
             sb.Append("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,text/css,*/*;q=0.8\r\n");
+            sb.Append("Accept-Encoding: identity\r\n");
             sb.Append("Accept-Language: en-US,en;q=0.9\r\n");
 
             if (cookieHeader != null && cookieHeader.Length > 0)
@@ -173,9 +208,9 @@ namespace Windose.Web.Tls
 
         // ---- response ---------------------------------------------------
 
-        private static TlsHttpResponse ReadResponse(TlsSession session, string url)
+        private static TlsHttpResponse ReadResponse(IHttpDataStream stream, string url)
         {
-            ResponseReader reader = new ResponseReader(session);
+            ResponseReader reader = new ResponseReader(stream);
 
             string statusLine = reader.ReadLine();
             if (statusLine == null || !statusLine.StartsWith("HTTP/"))
@@ -310,15 +345,23 @@ namespace Windose.Web.Tls
             return colon > 0 ? authority.Substring(0, colon) : authority;
         }
 
-        private static int PortOf(string url)
+        private static string SchemeOf(string url)
+        {
+            int idx = url.IndexOf("://");
+            if (idx <= 0) return "http";
+            return url.Substring(0, idx).ToLowerInvariant();
+        }
+
+        private static int PortOf(string url, bool isHttps)
         {
             int idx = url.IndexOf("://");
             int start = idx >= 0 ? idx + 3 : 0;
             int slash = url.IndexOf('/', start);
             string authority = slash < 0 ? url.Substring(start) : url.Substring(start, slash - start);
             int colon = authority.IndexOf(':');
-            if (colon > 0) return ParseInt(authority.Substring(colon + 1), 443);
-            return 443;
+            int defaultPort = isHttps ? 443 : 80;
+            if (colon > 0) return ParseInt(authority.Substring(colon + 1), defaultPort);
+            return defaultPort;
         }
 
         /// <summary>Path + query (always starts with '/'), for the request line.</summary>
@@ -334,21 +377,21 @@ namespace Windose.Web.Tls
             return rest.Length == 0 ? "/" : rest;
         }
 
-        /// <summary>Byte reader over decrypted TLS application data that can back up to
+        /// <summary>Byte reader over the transport stream that can back up to
         /// a line boundary without losing bytes.</summary>
         private sealed class ResponseReader
         {
-            private readonly TlsSession session;
+            private readonly IHttpDataStream stream;
             private byte[] buf = new byte[0];
             private int pos;
 
-            public ResponseReader(TlsSession s) { session = s; }
+            public ResponseReader(IHttpDataStream s) { stream = s; }
 
             private bool Ensure()
             {
                 if (pos < buf.Length) return true;
                 byte[] tmp = new byte[4096];
-                int n = session.ReceiveApplicationData(tmp, 0, tmp.Length);
+                int n = stream.Receive(tmp, 0, tmp.Length);
                 if (n <= 0) return false;
                 byte[] nb = new byte[n];
                 global::System.Array.Copy(tmp, 0, nb, 0, n);

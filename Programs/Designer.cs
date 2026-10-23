@@ -1,4 +1,7 @@
-﻿using System.Drawing;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
 using Windose.System.Kernel;
 
 public sealed class DesignerWindow : Window
@@ -25,20 +28,22 @@ public sealed class DesignerWindow : Window
 
         // toolbar
         var toolbar = new DockPanel(0, 0, Width, 30);
-        AddToolbarButton(toolbar, "New", 60, NewForm);
-        AddToolbarButton(toolbar, "Open", 60, OpenForm);
-        AddToolbarButton(toolbar, "Save", 60, SaveForm);
-        AddToolbarButton(toolbar, "Preview", 80, Preview);
-        AddToolbarButton(toolbar, "Undo", 60, () => surface.Undo());
-        AddToolbarButton(toolbar, "Redo", 60, () => surface.Redo());
-        AddToolbarButton(toolbar, "Copy", 60, () => surface.DuplicateSelected());
-        AddToolbarButton(toolbar, "Delete", 70, () => surface.DeleteSelected());
+        AddToolbarButton(toolbar, "New", 50, NewForm);
+        AddToolbarButton(toolbar, "Open", 50, OpenForm);
+        AddToolbarButton(toolbar, "Save", 50, SaveForm);
+        AddToolbarButton(toolbar, "Preview", 65, Preview);
+        AddToolbarButton(toolbar, "Export C#", 75, ExportCSharp);
+        AddToolbarButton(toolbar, "Export ELF", 80, ExportElfC);
+        AddToolbarButton(toolbar, "Undo", 50, () => surface.Undo());
+        AddToolbarButton(toolbar, "Redo", 50, () => surface.Redo());
+        AddToolbarButton(toolbar, "Copy", 50, () => surface.DuplicateSelected());
+        AddToolbarButton(toolbar, "Delete", 55, () => surface.DeleteSelected());
 
         // toolbox
-        toolbox = new ListView(0, 0, 150, 100)
+        toolbox = new ListView(0, 0, 160, 100)
         {
             Margin = new Thickness(0, 0, 4, 0),
-            columns = new List<ListViewColumn> { new() { Header = "Toolbox", Width = 146 } }
+            columns = new List<ListViewColumn> { new() { Header = "Toolbox", Width = 156 } }
         };
         foreach (var kv in UiRegistry.Types)
             toolbox.AddItem(new[] { kv.Key }, null, kv.Value);
@@ -61,7 +66,7 @@ public sealed class DesignerWindow : Window
         };
 
         var editRow = new DockPanel(0, 0, 280, 26);
-        editBox = new TextField(0, 0, 200, 24);                   // ASSUMPTION: (x, y, w, h)
+        editBox = new TextField(0, 0, 200, 24);
         var applyButton = new Button("Apply", 0, 0, 70, 24);
         applyButton.leftClickAction = ApplyEdit;
         editRow.AddDockChild(applyButton, Dock.Right);
@@ -101,7 +106,7 @@ public sealed class DesignerWindow : Window
         root.AddDockChild(surface, Dock.Fill);
         root.ResolveDockLayout();
 
-        SetStatus(UiRegistry.Types.Count + " control types");
+        SetStatus(UiRegistry.Types.Count + " control types registered");
     }
 
     // keep root in step with the window however it was resized
@@ -218,7 +223,33 @@ public sealed class DesignerWindow : Window
         if (surface.content == null) return;
         string text = UiFile.Save(surface.content);
         var win = new PreviewWindow(text, 120, 80, surface.content.Width + 8, surface.content.Height + TitleBar + 8);
-        LaunchTracker.Start(() => win);                                 // ASSUMPTION: use whatever opens DiskManagement
+        LaunchTracker.Start(() => win);
+    }
+
+    private void ExportCSharp()
+    {
+        if (surface.content == null) return;
+        try
+        {
+            string cs = UiFile.ExportCSharp(surface.content, "MyDesignedForm");
+            string path = "/mnt/Apps/form.cs";
+            File.WriteAllText(path, cs);
+            SetStatus("Exported C# to " + path);
+        }
+        catch (Exception e) { SetStatus("Export failed: " + e.Message); }
+    }
+
+    private void ExportElfC()
+    {
+        if (surface.content == null) return;
+        try
+        {
+            string c = UiFile.ExportElfC(surface.content, "my_elf_app");
+            string path = "/mnt/Apps/app.c";
+            File.WriteAllText(path, c);
+            SetStatus("Exported ELF C to " + path);
+        }
+        catch (Exception e) { SetStatus("Export failed: " + e.Message); }
     }
 }
 

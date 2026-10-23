@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "kernel.h"
 
 int abs(int v) { return v < 0 ? -v : v; }
 long labs(long v) { return v < 0 ? -v : v; }
@@ -85,3 +86,29 @@ void *bsearch(const void *key, const void *b, size_t n, size_t size, int (*cmp)(
 static unsigned long next = 1;
 int rand(void) { next = next * 1103515245UL + 12345UL; return (int)((next >> 16) & 0x7fff); }
 void srand(unsigned seed) { next = seed; }
+
+static char getenv_buf[512];
+
+char *getenv(const char *name)
+{
+    if (!name || !__k || !__k->get_env) return NULL;
+    int len = __k->get_env(__k->pid, name, getenv_buf, (int)sizeof getenv_buf);
+    if (len < 0) return NULL;
+    return getenv_buf;
+}
+
+int setenv(const char *name, const char *value, int overwrite)
+{
+    if (!name || !__k || !__k->set_env) return -1;
+    if (!overwrite) {
+        char tmp[2];
+        if (__k->get_env && __k->get_env(__k->pid, name, tmp, sizeof tmp) >= 0) return 0;
+    }
+    return __k->set_env(__k->pid, name, value);
+}
+
+int unsetenv(const char *name)
+{
+    if (!name || !__k || !__k->set_env) return -1;
+    return __k->set_env(__k->pid, name, NULL);
+}

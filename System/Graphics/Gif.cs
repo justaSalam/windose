@@ -5,10 +5,22 @@ using System.Text;
 namespace Cosmos.Kernel.System.Graphics
 {
     /// <summary>
+    /// Represents a single decoded frame in an animated GIF.
+    /// </summary>
+    public class GifFrame
+    {
+        public Bitmap Image { get; set; }
+        public int DelayMs { get; set; }
+        public int DisposalMethod { get; set; }
+    }
+
+    /// <summary>
     /// Represents a GIF format image (GIF87a / GIF89a) inheriting from Cosmos Image.
     /// </summary>
     public class Gif : Image
     {
+        public global::System.Collections.Generic.List<GifFrame> Frames { get; } = new global::System.Collections.Generic.List<GifFrame>();
+
         public Gif(string path) : base(0, 0, ColorDepth.ColorDepth32)
         {
             if (string.IsNullOrEmpty(path))
@@ -75,6 +87,8 @@ namespace Cosmos.Kernel.System.Graphics
 
             int[] result = new int[screenW * screenH];
             int transparentColor = -1;
+            int currentDelay = 100;
+            int currentDisposal = 0;
 
             while (ms.Position < ms.Length)
             {
@@ -92,6 +106,8 @@ namespace Cosmos.Kernel.System.Graphics
                         byte transIdx = br.ReadByte();
                         br.ReadByte(); // Block terminator
                         if ((gceFlags & 1) != 0) transparentColor = transIdx;
+                        currentDisposal = (gceFlags >> 2) & 7;
+                        currentDelay = delay > 0 ? (delay * 10) : 100;
                     }
                     else
                     {
@@ -172,11 +188,42 @@ namespace Cosmos.Kernel.System.Graphics
                         }
                     }
 
-                    break; // Use primary frame
+                    Bitmap frameBmp = new Bitmap(screenW, screenH, ColorDepth.ColorDepth32);
+                    if (frameBmp.RawData != null && frameBmp.RawData.Length == result.Length)
+                    {
+                        Array.Copy(result, frameBmp.RawData, result.Length);
+                    }
+                    Frames.Add(new GifFrame
+                    {
+                        Image = frameBmp,
+                        DelayMs = currentDelay > 0 ? currentDelay : 100,
+                        DisposalMethod = currentDisposal
+                    });
+
+                    if (Frames.Count >= 500) break; // safety guard
+
+                    if (currentDisposal == 2)
+                    {
+                        Array.Clear(result, 0, result.Length);
+                    }
+                    transparentColor = -1;
+                    currentDelay = 100;
+                    currentDisposal = 0;
                 }
             }
 
-            ImageAccessor.Initialize(this, screenW, screenH, result, ColorDepth.ColorDepth32);
+            if (Frames.Count == 0)
+            {
+                Bitmap singleFrame = new Bitmap(screenW, screenH, ColorDepth.ColorDepth32);
+                if (singleFrame.RawData != null && singleFrame.RawData.Length == result.Length)
+                {
+                    Array.Copy(result, singleFrame.RawData, result.Length);
+                }
+                Frames.Add(new GifFrame { Image = singleFrame, DelayMs = 100, DisposalMethod = 0 });
+            }
+
+            int[] initialPixels = (Frames.Count > 0 && Frames[0].Image.RawData != null) ? Frames[0].Image.RawData : result;
+            ImageAccessor.Initialize(this, screenW, screenH, initialPixels, ColorDepth.ColorDepth32);
         }
 
         private static byte[] LzwDecode(byte[] input, int minCodeSize, int expectedCount)

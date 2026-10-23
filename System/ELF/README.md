@@ -1,4 +1,4 @@
-# Windose ELF loader (v10)
+# Windose ELF loader (v11)
 
 Runs x86-64 ELF programs written in C inside your Cosmos kernel: several at once, each with its own
 handles, events, memory quota and process-list entry, with a small libc and normal `main(argc, argv)`.
@@ -17,11 +17,12 @@ if (p == null) Terminal.WriteLine("exec failed: " + err);
 
 ## What it does now
 
-* **PIE + relocations**: normal compiler output works, including tables of pointers (R_X86_64_RELATIVE/64/GLOB_DAT/JUMP_SLOT
-  against symbols in the program itself, plus RELR packed relocations). Images are page-aligned. Unresolved symbols and TLS
+* **PIE + relocations**: normal compiler output works, including tables of pointers (R_X86_64_RELATIVE/64/GLOB_DAT/JUMP_SLOT/32/32S/PC32/PLT32/IRELATIVE
+  against symbols in the program itself, plus RELR packed relocations and REL tables). Global constructors (.init_array, DT_INIT)
+  are executed before the entry point; destructors (.fini_array, DT_FINI) run on exit. Images are page-aligned. Unresolved symbols and TLS
   are rejected with a message. Extended section numbering (PN_XNUM) and header-count sanity caps included.
 * **libc** (`programs/libc`, headers in `programs/include`): string.h, stdlib.h (malloc/free/calloc/realloc, strtol, qsort,
-  bsearch, rand), stdio.h (printf family without floats, puts, `file_read`), ctype.h, `exit()` from any depth, `abort()`.
+  bsearch, rand, getenv, setenv, unsetenv), stdio.h (printf family without floats, puts, `file_read`), ctype.h, `exit()` from any depth, `abort()`.
   `crt0` builds argc/argv and turns the return value / `exit()` into the program's exit code.
 * **Processes**: `ElfRunner.Spawn` gives every program its own thread, pid, handle table, event queue and memory quota
   (`ElfRunner.MemoryQuota`, default 64 MB). Windows and memory are released when it exits. `ElfRunner.Kill(pid)` closes its windows
@@ -36,7 +37,8 @@ if (p == null) Terminal.WriteLine("exec failed: " + err);
   grid (+ columns/rows/cells/sort), drop_accept, dnd_get_text, widget_set/get_enabled, widget_focus,
   spawn, kill, yield, poll_event, read_file, write_file, ticks, pid,
   launch_app, open_file, notify_send, desktop_count, desktop_current, desktop_switch, window_set_desktop,
-  trash_delete, trash_list, trash_restore, trash_empty.
+  trash_delete, trash_list, trash_restore, trash_empty,
+  wait_pid, clipboard_get, clipboard_set, get_env, set_env.
   Memory comes from malloc (kernel `alloc` underneath). Program output goes to the system log (`elf:<name>`).
 * **Events**: click, close, key (code + cooked char), mouse move/down/up, focus in/out, drop with text payload.
   Widget changes (checkbox, combo, list, tabs, menus, dialogs, color, numeric, calendar, grid) arrive as

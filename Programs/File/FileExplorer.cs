@@ -375,39 +375,29 @@ public class FileExplorer : Window
         if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
 
         string ext = Path.GetExtension(path).ToLowerInvariant();
-        switch(ext)
+        if (ext == ".elf")
         {
-            case ".png":
-            case ".jpg":
-            case ".jpeg":
-            case ".bmp":
-            case ".gif":
-                LaunchTracker.Start(() => new ImageViewer(path, 120, 120, 640, 480));
-                return;
-
-
-        }
-        if (!FileAssociations.TryGetApplication(ext, out Type program)) return;
-
-        if (program == typeof(BreezeEditor))
-        {
-            LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, path));
+            try
+            {
+                byte[] data = File.ReadAllBytes(path);
+                if (Windose.System.Elf.ElfRunner.Spawn(data, Path.GetFileName(path), new string[] { path }, out string error) == null)
+                {
+                    SystemLogger.WriteLine("ELF", $" Failed to launch {path}: {error}", ConsoleMessageType.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                SystemLogger.WriteLine("ELF", $" Error launching {path}: {ex.Message}", ConsoleMessageType.Error);
+            }
             return;
         }
 
-        if (program == typeof(ImageViewer))
+        if (FileAssociations.Launch(path))
         {
-            LaunchTracker.Start(() => new ImageViewer(path, 120, 120, 640, 480));
             return;
         }
 
-        if (program == typeof(InternetExplorer))
-        {
-            LaunchTracker.Start(() => new InternetExplorer(path, 80, 60));
-            return;
-        }
-
-        LaunchTracker.Start(() => (Window)Activator.CreateInstance(program)!);
+        SystemLogger.WriteLine("FileExplorer", $"No associated application for {ext}", ConsoleMessageType.Warning);
     }
 
     private void ShowFileContextMenu(FileListViewItem item, int mouseX, int mouseY)
@@ -599,10 +589,7 @@ public class FileExplorer : Window
                 }
                 FileListViewItem item = files.AddItem(entry);
 
-                //TODO: Replace with system registry association instead
-                item.type = string.Equals(FileSystemManager.GetExtension(file.FullName), ".breeze", StringComparison.OrdinalIgnoreCase)
-                    ? "Breeze Script"
-                    : "File";
+                item.type = FileAssociations.GetFileTypeDescription(file.FullName);
             }
         }
         catch (UnauthorizedAccessException ex)

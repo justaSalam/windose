@@ -168,20 +168,9 @@ public class Kernel : Sys.Kernel
         ResourceLoader.WriteStorage("/mnt/Programs/libctest.elf", "Windose.System.ELF.programs.bin.libctest.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/memhog.elf", "Windose.System.ELF.programs.bin.memhog.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/spin.elf", "Windose.System.ELF.programs.bin.spin.elf", true);
-
-        ResourceLoader.WriteStorage("/mnt/Programs/ctype.h", "Windose.System.ELF.programs.include.ctype.h", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/kernel.h", "Windose.System.ELF.programs.include.kernel.h", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/stdio.h", "Windose.System.ELF.programs.include.stdio.h", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/stdlib.h", "Windose.System.ELF.programs.include.stdlib.h", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/string.h", "Windose.System.ELF.programs.include.string.h", true);
-
-        ResourceLoader.WriteStorage("/mnt/Programs/crt0.c", "Windose.System.ELF.programs.libc.crt0.c", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/format.c", "Windose.System.ELF.programs.libc.format.c", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/malloc.c", "Windose.System.ELF.programs.libc.malloc.c", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/stdio.c", "Windose.System.ELF.programs.libc.stdio.c", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/stdlib.c", "Windose.System.ELF.programs.libc.stdlib.c", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/string.c", "Windose.System.ELF.programs.libc.string.c", true);
-
+        ResourceLoader.WriteStorage("/mnt/Programs/cosmoslogindialog.elf", "Windose.System.ELF.programs.bin.cosmoslogindialog.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/newelfapp.elf", "Windose.System.ELF.programs.bin.newelfapp.elf", true);
+        ResourceLoader.WriteStorage("/mnt/Programs/aeroeditor.elf", "Windose.System.ELF.programs.bin.aeroeditor.elf", true);
 
     }
 

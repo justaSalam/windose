@@ -9,7 +9,7 @@
 // If a program crashes on its first kernel call, switch to ms_abi (must match the C# side's calling
 // convention) and rebuild libc + programs.
 #define KABI __attribute__((sysv_abi))
-#define KAPI_VERSION 10
+#define KAPI_VERSION 11
 #define K_KILLED (-100)          // returned by every call after the program was killed; the wrappers exit(137)
 
 typedef int handle_t;            // opaque; 0 = none/failed; never do arithmetic on it
@@ -148,6 +148,11 @@ typedef struct KernelApi {
     int      (KABI *trash_list)(int pid, char *buf, int max);
     int      (KABI *trash_restore)(int pid, const char *name);
     int      (KABI *trash_empty)(int pid);
+    int      (KABI *wait_pid)(int pid, int target, int *exit_code, int timeout_ms);
+    int      (KABI *clipboard_get)(int pid, char *buf, int max);
+    int      (KABI *clipboard_set)(int pid, const char *text, int len);
+    int      (KABI *get_env)(int pid, const char *name, char *buf, int max);
+    int      (KABI *set_env)(int pid, const char *name, const char *val);
 } KernelApi;
 
 extern KernelApi *__k;
@@ -269,6 +274,11 @@ static inline int      k_trash_delete(const char *path) { return __kchk(__k->tra
 static inline int      k_trash_list(char *buf, int max) { return __kchk(__k->trash_list(__k->pid, buf, max)); }
 static inline int      k_trash_restore(const char *name) { return __kchk(__k->trash_restore(__k->pid, name)); }
 static inline int      k_trash_empty(void) { return __kchk(__k->trash_empty(__k->pid)); }
+static inline int      k_wait_pid(int target, int *exit_code, int timeout_ms) { return __kchk(__k->wait_pid(__k->pid, target, exit_code, timeout_ms)); }
+static inline int      k_clipboard_get(char *buf, int max) { return __kchk(__k->clipboard_get(__k->pid, buf, max)); }
+static inline int      k_clipboard_set(const char *text, int len) { return __kchk(__k->clipboard_set(__k->pid, text, len)); }
+static inline int      k_get_env(const char *name, char *buf, int max) { return __kchk(__k->get_env(__k->pid, name, buf, max)); }
+static inline int      k_set_env(const char *name, const char *val) { return __kchk(__k->set_env(__k->pid, name, val)); }
 static inline int      k_pid(void)                                  { return __k->pid; }
 
 #endif

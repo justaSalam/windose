@@ -23,6 +23,7 @@ namespace Windose.System.Elf
 
         internal readonly HandleTable Objs = new HandleTable();
         internal readonly ElfEventQueue Events = new ElfEventQueue();
+        internal readonly Dictionary<string, string> Env = new Dictionary<string, string>(StringComparer.Ordinal);
 
         // image: byte[] pinned for the whole life of the program; ImageAddress is 4 KB aligned inside it
         internal byte[] Image;
@@ -30,6 +31,19 @@ namespace Windose.System.Elf
         internal ulong ImageAddress;
         internal ulong ImageSize;
         internal ulong EntryAddress;
+        internal ElfFile Elf;
+        internal ulong Low;
+
+        // initializers / finalizers / dependencies
+        internal ulong InitFunc;
+        internal ulong FiniFunc;
+        internal ulong InitArray;
+        internal ulong InitArraySize;
+        internal ulong FiniArray;
+        internal ulong FiniArraySize;
+        internal ulong PreinitArray;
+        internal ulong PreinitArraySize;
+        internal string[] NeededLibraries;
 
         // memory handed out through the alloc API (pinned arrays), freed after the thread has ended
         private readonly List<GCHandle> _pins = new List<GCHandle>();
@@ -107,6 +121,15 @@ namespace Windose.System.Elf
             CloseAllObjects();
         }
 
+        /// <summary>Finds runtime address of an exported symbol in the program image, or 0 if not found.</summary>
+        public ulong FindSymbolAddress(string name)
+        {
+            if (Elf == null) return 0;
+            ElfSymbol sym = Elf.FindSymbol(name);
+            if (sym == null || sym.SectionIndex == 0) return 0;
+            return sym.SectionIndex == 0xFFF1 ? sym.Value : unchecked(ImageAddress + (sym.Value - Low));
+        }
+
         /// <summary>Thread entry. Runs the program, then releases everything it owned.</summary>
         internal void ThreadMain()
         {
@@ -115,12 +138,68 @@ namespace Windose.System.Elf
                 State = ElfState.Running;
                 KernelApi api = default(KernelApi);
                 ElfRunner.FillApi(ref api, Pid);
+
+                // Run pre-initializers
+                RunFuncArray(PreinitArray, PreinitArraySize, false);
+
+                // Run DT_INIT
+                if (InitFunc != 0)
+                {
+                    try { ((delegate* unmanaged<void>)(byte*)InitFunc)(); }
+                    catch { }
+                }
+
+                // Run DT_INIT_ARRAY constructors
+                RunFuncArray(InitArray, InitArraySize, false);
+
                 var entry = (delegate* unmanaged<KernelApi*, int>)(byte*)EntryAddress;
                 ExitCode = entry(&api);
             }
             finally
             {
+                // Run DT_FINI_ARRAY destructors in reverse order
+                RunFuncArray(FiniArray, FiniArraySize, true);
+
+                // Run DT_FINI
+                if (FiniFunc != 0)
+                {
+                    try { ((delegate* unmanaged<void>)(byte*)FiniFunc)(); }
+                    catch { }
+                }
+
                 Cleanup();
+            }
+        }
+
+        private static void RunFuncArray(ulong arrayAddr, ulong sizeInBytes, bool reverse)
+        {
+            if (arrayAddr == 0 || sizeInBytes == 0) return;
+            ulong count = sizeInBytes / 8;
+            if (count > 4096) count = 4096;
+            var ptrs = (ulong*)(byte*)arrayAddr;
+            if (!reverse)
+            {
+                for (ulong i = 0; i < count; i++)
+                {
+                    ulong fn = ptrs[i];
+                    if (fn != 0 && fn != ulong.MaxValue)
+                    {
+                        try { ((delegate* unmanaged<void>)(byte*)fn)(); }
+                        catch { }
+                    }
+                }
+            }
+            else
+            {
+                for (long i = (long)count - 1; i >= 0; i--)
+                {
+                    ulong fn = ptrs[i];
+                    if (fn != 0 && fn != ulong.MaxValue)
+                    {
+                        try { ((delegate* unmanaged<void>)(byte*)fn)(); }
+                        catch { }
+                    }
+                }
             }
         }
 
@@ -129,6 +208,7 @@ namespace Windose.System.Elf
             CloseAllObjects();
             FreeMemory();                       // safe: the program thread is done
             lock (_stateLock) State = ElfState.Exited;
+            ElfRunner.RecordExit(Pid, ExitCode);
             ElfRunner.Unregister(this);
             try { if (ElfRunner.Host != null) ElfRunner.Host.ProgramExited(this); } catch { }
             try { Action<ElfProgram> cb = ElfRunner.Exited; if (cb != null) cb(this); } catch { }
@@ -140,6 +220,7 @@ namespace Windose.System.Elf
             // Called when Spawn failed after the image was pinned but before the thread started.
             FreeMemory();
             State = ElfState.Exited;
+            ElfRunner.RecordExit(Pid, -1);
             _done.Set();
         }
     }

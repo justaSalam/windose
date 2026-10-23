@@ -27,6 +27,7 @@ namespace Windose.Web.Tls
         private byte[] readKey, readIv;
         private ulong writeSeq, readSeq;
         private bool writeProtected, readProtected;
+        public bool IsTls13;
 
         public TlsRecordLayer(ITlsTransport t) { transport = t; }
 
@@ -45,15 +46,31 @@ namespace Windose.Web.Tls
         public void Send(byte contentType, byte[] fragment, bool encrypt)
         {
             byte[] payload;
+            byte recordType = contentType;
             if (encrypt && writeProtected)
             {
-                byte[] aad = BuildAad(writeSeq, contentType, fragment.Length);
-                byte[] nonce = BuildNonce(writeIv, writeSeq);
-                byte[] sealedData = AesGcm.Seal(writeKey, nonce, aad, fragment);
-                payload = new byte[8 + sealedData.Length];
-                for (int i = 0; i < 8; i++) payload[i] = (byte)(writeSeq >> (8 * (7 - i)));
-                Array.Copy(sealedData, 0, payload, 8, sealedData.Length);
-                writeSeq++;
+                if (IsTls13)
+                {
+                    recordType = TlsContent.ApplicationData;
+                    byte[] plain = new byte[fragment.Length + 1];
+                    Array.Copy(fragment, 0, plain, 0, fragment.Length);
+                    plain[fragment.Length] = contentType;
+
+                    int encLen = plain.Length + 16;
+                    byte[] aad = new byte[] { recordType, 3, 3, (byte)(encLen >> 8), (byte)encLen };
+                    byte[] nonce = TlsPrf.BuildTls13Nonce(writeIv, writeSeq++);
+                    payload = AesGcm.Seal(writeKey, nonce, aad, plain);
+                }
+                else
+                {
+                    byte[] aad = BuildAad(writeSeq, contentType, fragment.Length);
+                    byte[] nonce = BuildNonce(writeIv, writeSeq);
+                    byte[] sealedData = AesGcm.Seal(writeKey, nonce, aad, fragment);
+                    payload = new byte[8 + sealedData.Length];
+                    for (int i = 0; i < 8; i++) payload[i] = (byte)(writeSeq >> (8 * (7 - i)));
+                    Array.Copy(sealedData, 0, payload, 8, sealedData.Length);
+                    writeSeq++;
+                }
             }
             else
             {
@@ -61,7 +78,7 @@ namespace Windose.Web.Tls
             }
 
             byte[] header = new byte[5];
-            header[0] = contentType;
+            header[0] = recordType;
             header[1] = 3; header[2] = 3;
             header[3] = (byte)(payload.Length >> 8);
             header[4] = (byte)payload.Length;
@@ -87,41 +104,68 @@ namespace Windose.Web.Tls
         /// transport close.</summary>
         public byte[] ReadRecord(out byte contentType)
         {
-            byte[] header = ReadExact(5);
-            if (header == null) { contentType = 0; return null; }
-            contentType = header[0];
-            int recLen = (header[3] << 8) | header[4];
-            if (recLen > (16384 + 2048)) throw new Exception("TLS: oversized record " + recLen);
-            byte[] payload = ReadExact(recLen);
-            if (payload == null) { contentType = 0; return null; }
-
-            if (readProtected)
+            while (true)
             {
-                if (payload.Length < 8 + 16) throw new Exception("TLS: short protected record");
-                byte[] wireNonce8 = new byte[8];
-                Array.Copy(payload, 0, wireNonce8, 0, 8);
-                int ctLen = payload.Length - 8 - 16;
-                byte[] ctAndTag = new byte[ctLen + 16];
-                Array.Copy(payload, 8, ctAndTag, 0, ctLen + 16);
+                byte[] header = ReadExact(5);
+                if (header == null) { contentType = 0; return null; }
+                byte rawType = header[0];
+                int recLen = (header[3] << 8) | header[4];
+                if (recLen > (16384 + 2048)) throw new Exception("TLS: oversized record " + recLen);
+                byte[] payload = ReadExact(recLen);
+                if (payload == null) { contentType = 0; return null; }
 
-                // RFC 5288: GCM nonce = implicit_iv(4) || explicit_nonce(8). The
-                // explicit nonce is the record's nonce_explicit field taken from the
-                // WIRE — a peer may legitimately choose a random 8-byte value
-                // (OpenSSL does) rather than the sequence number, so we must read it
-                // here instead of assuming it equals our counter. The AAD, by
-                // contrast, always uses our true sequence number (RFC 5116), which is
-                // independent of the nonce choice.
-                byte[] nonce = new byte[12];
-                Array.Copy(readIv, 0, nonce, 0, 4);
-                Array.Copy(wireNonce8, 0, nonce, 4, 8);
-                byte[] aad = BuildAad(readSeq, contentType, ctLen);
-                byte[] plain = AesGcm.Open(readKey, nonce, aad, ctAndTag);
-                if (plain == null)
-                    throw new Exception("TLS: AEAD authentication failed (seq " + readSeq + ", ct " + contentType + ")");
-                readSeq++;
-                return plain;
+                if (IsTls13 && rawType == TlsContent.ChangeCipherSpec)
+                {
+                    // Ignore middlebox compatibility CCS
+                    continue;
+                }
+
+                if (readProtected)
+                {
+                    if (IsTls13)
+                    {
+                        byte[] aad = new byte[] { rawType, 3, 3, (byte)(recLen >> 8), (byte)recLen };
+                        byte[] nonce = TlsPrf.BuildTls13Nonce(readIv, readSeq++);
+                        byte[] plain = AesGcm.Open(readKey, nonce, aad, payload);
+                        if (plain == null)
+                            throw new Exception("TLS 1.3: AEAD auth failed (seq " + (readSeq - 1) + ")");
+
+                        int pEnd = plain.Length - 1;
+                        while (pEnd >= 0 && plain[pEnd] == 0) pEnd--;
+                        if (pEnd < 0) throw new Exception("TLS 1.3: empty record");
+                        contentType = plain[pEnd];
+                        byte[] frag = new byte[pEnd];
+                        Array.Copy(plain, 0, frag, 0, pEnd);
+                        return frag;
+                    }
+                    else
+                    {
+                        if (payload.Length < 8 + 16) throw new Exception("TLS: short protected record");
+                        byte[] wireNonce8 = new byte[8];
+                        Array.Copy(payload, 0, wireNonce8, 0, 8);
+                        int ctLen = payload.Length - 8 - 16;
+                        byte[] ctAndTag = new byte[ctLen + 16];
+                        Array.Copy(payload, 8, ctAndTag, 0, ctLen + 16);
+
+                        // RFC 5288: GCM nonce = implicit_iv(4) || explicit_nonce(8).
+                        byte[] nonce = new byte[12];
+                        Array.Copy(readIv, 0, nonce, 0, 4);
+                        Array.Copy(wireNonce8, 0, nonce, 4, 8);
+                        byte[] aad = BuildAad(readSeq, rawType, ctLen);
+                        byte[] plain = AesGcm.Open(readKey, nonce, aad, ctAndTag);
+                        if (plain == null)
+                            throw new Exception("TLS: AEAD authentication failed (seq " + readSeq + ", ct " + rawType + ")");
+                        readSeq++;
+                        contentType = rawType;
+                        return plain;
+                    }
+                }
+                else
+                {
+                    contentType = rawType;
+                    return payload;
+                }
             }
-            return payload;
         }
 
         private byte[] ReadExact(int n)

@@ -133,6 +133,11 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, byte*, int, int> TrashList;                           // (pid, buf, max) -> count
         public delegate* unmanaged<int, byte*, int> TrashRestore;                             // (pid, name) -> 0
         public delegate* unmanaged<int, int> TrashEmpty;                                      // (pid)
+        public delegate* unmanaged<int, int, int*, int, int> WaitPid;                         // (pid, target, out_exit_code, timeout_ms) -> 0 ok, -1 not found, -2 timeout, -3 killed
+        public delegate* unmanaged<int, byte*, int, int> ClipboardGet;                        // (pid, buf, max) -> len
+        public delegate* unmanaged<int, byte*, int, int> ClipboardSet;                        // (pid, text, len) -> 0
+        public delegate* unmanaged<int, byte*, byte*, int, int> GetEnv;                        // (pid, name, buf, max) -> len
+        public delegate* unmanaged<int, byte*, byte*, int> SetEnv;                            // (pid, name, value) -> 0
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -154,7 +159,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 10;
+        public const int ApiVersion = 11;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -203,6 +208,54 @@ namespace Windose.System.Elf
 
         internal static void Unregister(ElfProgram p) { lock (Programs) Programs.Remove(p.Pid); }
 
+        internal static readonly object ExitedCodesLock = new object();
+        internal static readonly Dictionary<int, int> ExitedExitCodes = new Dictionary<int, int>();
+        internal static readonly Dictionary<int, ManualResetEvent> ProcessWaitEvents = new Dictionary<int, ManualResetEvent>();
+
+        internal static void RecordExit(int pid, int code)
+        {
+            lock (ExitedCodesLock)
+            {
+                ExitedExitCodes[pid] = code;
+                if (ProcessWaitEvents.TryGetValue(pid, out var ev))
+                {
+                    ev.Set();
+                }
+            }
+        }
+
+        /// <summary>Waits for a program to finish. Returns 0 on success, -1 if no such process, -2 on timeout.</summary>
+        public static int WaitPid(int targetPid, out int exitCode, int timeoutMs = -1)
+        {
+            exitCode = -1;
+            ManualResetEvent ev;
+            lock (ExitedCodesLock)
+            {
+                if (ExitedExitCodes.TryGetValue(targetPid, out int code))
+                {
+                    exitCode = code;
+                    return 0;
+                }
+                if (!ProcessWaitEvents.TryGetValue(targetPid, out ev))
+                {
+                    return -1;
+                }
+            }
+
+            bool signaled = timeoutMs < 0 ? ev.WaitOne() : ev.WaitOne(timeoutMs);
+            if (!signaled) return -2;
+
+            lock (ExitedCodesLock)
+            {
+                if (ExitedExitCodes.TryGetValue(targetPid, out int code))
+                {
+                    exitCode = code;
+                    return 0;
+                }
+            }
+            return -1;
+        }
+
         /// <summary>Cooperative kill. Windows close at once; the program stops at its next API call
         /// (sleep and poll_event return within ~10 ms). A program stuck in a pure compute loop cannot be stopped.</summary>
         public static bool Kill(int pid)
@@ -246,6 +299,10 @@ namespace Windose.System.Elf
                 if (Programs.Count >= MaxPrograms) { error = "too many running programs"; return null; }
                 p = new ElfProgram(_nextPid++, name, full);
                 Programs[p.Pid] = p;
+                lock (ExitedCodesLock)
+                {
+                    ProcessWaitEvents[p.Pid] = new ManualResetEvent(false);
+                }
             }
 
             try
@@ -263,9 +320,26 @@ namespace Windose.System.Elf
                 if (!elf.ApplyRelocations(backing, offset, low, size, bias, out error))
                 { Fail(p); return null; }
 
+                p.Elf = elf;
+                p.Low = low;
                 p.ImageAddress = aligned;
                 p.ImageSize = size;
                 p.EntryAddress = unchecked(bias + elf.Entry);
+                p.InitFunc = elf.InitFunc != 0 ? unchecked(bias + elf.InitFunc) : 0;
+                p.FiniFunc = elf.FiniFunc != 0 ? unchecked(bias + elf.FiniFunc) : 0;
+                p.InitArray = elf.InitArray != 0 ? unchecked(bias + elf.InitArray) : 0;
+                p.InitArraySize = elf.InitArraySize;
+                p.FiniArray = elf.FiniArray != 0 ? unchecked(bias + elf.FiniArray) : 0;
+                p.FiniArraySize = elf.FiniArraySize;
+                p.PreinitArray = elf.PreinitArray != 0 ? unchecked(bias + elf.PreinitArray) : 0;
+                p.PreinitArraySize = elf.PreinitArraySize;
+                p.NeededLibraries = elf.NeededLibraries;
+
+                p.Env["PATH"] = "/mnt/Programs;/mnt/System";
+                p.Env["USER"] = "root";
+                p.Env["HOME"] = "/mnt";
+                p.Env["OS"] = "Windose";
+                p.Env["TERM"] = "windose";
 
                 if (MakeExecutable != null) MakeExecutable(aligned, size);
                 if (Host != null) Host.ProgramStarted(p);
@@ -422,6 +496,11 @@ namespace Windose.System.Elf
             api.TrashList = &ApiTrashList;
             api.TrashRestore = &ApiTrashRestore;
             api.TrashEmpty = &ApiTrashEmpty;
+            api.WaitPid = &ApiWaitPid;
+            api.ClipboardGet = &ApiClipboardGet;
+            api.ClipboardSet = &ApiClipboardSet;
+            api.GetEnv = &ApiGetEnv;
+            api.SetEnv = &ApiSetEnv;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -702,6 +781,11 @@ namespace Windose.System.Elf
                 for (int i = 0; i < extra.Length; i++) args[i + 1] = extra[i];
                 ElfProgram child = Spawn(data, file, args, out string error);
                 if (child == null) return -2;
+                lock (p.Env)
+                {
+                    foreach (var kv in p.Env)
+                        child.Env[kv.Key] = kv.Value;
+                }
                 return child.Pid;
             }
             catch { return -2; }
@@ -2219,6 +2303,110 @@ namespace Windose.System.Elf
                 return 0;
             }
             catch { return -2; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWaitPid(int pid, int target, int* outExitCode, int timeoutMs)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                int code;
+                int r = WaitPid(target, out code, timeoutMs);
+                if (r == 0 && outExitCode != null)
+                {
+                    *outExitCode = code;
+                }
+                return r;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiClipboardGet(int pid, byte* buf, int max)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (buf == null || max <= 0) return -1;
+                string text = WindoseClipboard.Text ?? "";
+                int len = text.Length;
+                if (len >= max) len = max - 1;
+                for (int i = 0; i < len; i++) buf[i] = (byte)text[i];
+                buf[len] = 0;
+                return len;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiClipboardSet(int pid, byte* text, int len)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (text == null) { WindoseClipboard.Clear(); return 0; }
+                string s;
+                if (len >= 0)
+                {
+                    char[] c = new char[len];
+                    for (int i = 0; i < len; i++) c[i] = (char)text[i];
+                    s = new string(c);
+                }
+                else
+                {
+                    s = CStr(text);
+                }
+                WindoseClipboard.SetText(s);
+                return 0;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiGetEnv(int pid, byte* name, byte* buf, int max)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (name == null || buf == null || max <= 0) return -1;
+                string key = CStr(name);
+                lock (p.Env)
+                {
+                    if (!p.Env.TryGetValue(key, out string val) || val == null) return -1;
+                    int len = val.Length;
+                    if (len >= max) len = max - 1;
+                    for (int i = 0; i < len; i++) buf[i] = (byte)val[i];
+                    buf[len] = 0;
+                    return len;
+                }
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiSetEnv(int pid, byte* name, byte* val)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (name == null) return -1;
+                string key = CStr(name);
+                if (key.Length == 0) return -1;
+                lock (p.Env)
+                {
+                    if (val == null)
+                    {
+                        p.Env.Remove(key);
+                    }
+                    else
+                    {
+                        p.Env[key] = CStr(val);
+                    }
+                }
+                return 0;
+            }
+            catch { return -1; }
         }
     }
 }

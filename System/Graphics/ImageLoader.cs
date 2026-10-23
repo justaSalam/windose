@@ -190,10 +190,29 @@ namespace Cosmos.Kernel.System.Graphics
                 }
             }
 
-            // Fallback by extension hint
+            // Fallback by extension hint or MIME type
             if (!string.IsNullOrEmpty(hintPathOrExtension))
             {
-                string ext = Path.GetExtension(hintPathOrExtension).ToLowerInvariant();
+                string hint = hintPathOrExtension.Trim();
+                if (hint.IndexOf("webp", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.WebP;
+                if (hint.IndexOf("svg", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Svg;
+                if (hint.IndexOf("png", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Png;
+                if (hint.IndexOf("jpeg", StringComparison.OrdinalIgnoreCase) >= 0 || hint.IndexOf("jpg", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Jpeg;
+                if (hint.IndexOf("gif", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Gif;
+                if (hint.IndexOf("ico", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Ico;
+                if (hint.IndexOf("bmp", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Bitmap;
+                if (hint.IndexOf("qoi", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Qoi;
+                if (hint.IndexOf("tga", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Tga;
+                if (hint.IndexOf("ppm", StringComparison.OrdinalIgnoreCase) >= 0 || hint.IndexOf("pnm", StringComparison.OrdinalIgnoreCase) >= 0) return KnownImageFormat.Ppm;
+
+                string clean = hint;
+                int q = clean.IndexOf('?');
+                if (q >= 0) clean = clean.Substring(0, q);
+                int h = clean.IndexOf('#');
+                if (h >= 0) clean = clean.Substring(0, h);
+
+                string ext = "";
+                try { ext = Path.GetExtension(clean).ToLowerInvariant(); } catch { }
                 return ext switch
                 {
                     ".webp" => KnownImageFormat.WebP,

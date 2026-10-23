@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="System\ELF\programs\bin\cosmoslogindialog.elf" />
     <None Remove="System\ELF\programs\bin\hello.elf" />
     <None Remove="System\ELF\programs\bin\libctest.elf" />
     <None Remove="System\ELF\programs\bin\memhog.elf" />
@@ -33,6 +34,8 @@
     <None Remove="System\ELF\programs\src\spin.c" />
     <None Remove="System\ELF\programs\src\window.c" />
     <None Remove="System\ELF\programs\window.elf" />
+      <None Remove="System\ELF\programs\bin\newelfapp.elf" />
+      <None Remove="System\ELF\programs\bin\aeroeditor.elf" />
   </ItemGroup>
 
   <!-- Core kernel packages -->
@@ -286,6 +289,9 @@
     <EmbeddedResource Include=".\System\ELF\programs\src\memhog.c" />
     <EmbeddedResource Include=".\System\ELF\programs\src\spin.c" />
     <EmbeddedResource Include=".\System\ELF\programs\src\window.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\cosmoslogindialog.elf" />
+      <EmbeddedResource Include=".\System\ELF\programs\bin\newelfapp.elf" />
+      <EmbeddedResource Include=".\System\ELF\programs\bin\aeroeditor.elf" />
   </ItemGroup>
 
     <ItemGroup>

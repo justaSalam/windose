@@ -50,6 +50,14 @@ public sealed class RenderBox
     public CssBorder StyleT, StyleB, StyleL, StyleR;
     public bool Hidden;
     public DomNode Node;   // element this box decorates (for click targeting)
+    public string BoxShadow;
+    public bool IsSticky;
+    public int StickyTop;
+    public int ParentBottom;
+    public string Transform;
+    public bool HasClip;
+    public int ClipX, ClipY, ClipW, ClipH;
+    public int ZIndex;
 }
 
 public sealed class RenderLine
@@ -64,6 +72,9 @@ public sealed class RenderLine
     public bool Hidden;
     public Color RuleColor;
     public DomNode Node;   // img element for image lines (click targeting)
+    public bool HasClip;
+    public int ClipX, ClipY, ClipW, ClipH;
+    public int ZIndex;
 }
 
 /// <summary>Form-control widget kinds (byte constants; no enums so the OS
@@ -95,6 +106,9 @@ public sealed class RenderWidget
     public int TextX, TextY;  // origin of the text inside the control
     public int TextW;         // measured width of Text (caret math)
     public bool Hidden;
+    public bool HasClip;
+    public int ClipX, ClipY, ClipW, ClipH;
+    public int ZIndex;
 }
 
 public sealed class RenderPlan
@@ -199,6 +213,7 @@ public static class HtmlLayout
         public string BaseHref;
         public int Vw, Vh;
         public RenderPlan Plan;
+        public bool IsMeasuring;
 
         // The containing block for absolutely/fixed positioned descendants:
         // the nearest positioned (relative/absolute/fixed) ancestor's padding
@@ -436,14 +451,17 @@ public static class HtmlLayout
                         }
                         break;
                     case "img":
-                        if (IsBlockLevel(cs))
+                        if (cs.Display != CssDisplay.None)
                         {
-                            FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
-                            EmitImage(child, cs, contentX, contentRight, ref y, ctx);
-                        }
-                        else
-                        {
-                            CollectInline(child, cs, runs, ctx, href);
+                            if (IsBlockLevel(cs))
+                            {
+                                FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
+                                EmitImage(child, cs, contentX, contentRight, ref y, ctx);
+                            }
+                            else
+                            {
+                                AddImageRun(child, cs, runs, ctx, href);
+                            }
                         }
                         break;
                     case "svg":
@@ -456,8 +474,43 @@ public static class HtmlLayout
                             }
                             else
                             {
-                                CollectInline(child, cs, runs, ctx, href);
+                                AddSvgRun(child, cs, baseStyle, runs, ctx, href);
                             }
+                        }
+                        break;
+                    case "canvas":
+                        if (cs.Display != CssDisplay.None)
+                        {
+                            if (IsBlockLevel(cs))
+                            {
+                                FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
+                                EmitCanvas(child, cs, contentX, contentRight, ref y, ctx);
+                            }
+                            else
+                            {
+                                AddCanvasRun(child, cs, runs, ctx, href);
+                            }
+                        }
+                        break;
+                    case "video":
+                        if (cs.Display != CssDisplay.None)
+                        {
+                            FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
+                            EmitVideo(child, cs, contentX, contentRight, ref y, ctx);
+                        }
+                        break;
+                    case "audio":
+                        if (cs.Display != CssDisplay.None)
+                        {
+                            FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
+                            EmitAudio(child, cs, contentX, contentRight, ref y, ctx);
+                        }
+                        break;
+                    case "iframe":
+                        if (cs.Display != CssDisplay.None)
+                        {
+                            FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
+                            EmitIframe(child, cs, contentX, contentRight, ref y, ctx);
                         }
                         break;
                     case "hr":
@@ -487,7 +540,7 @@ public static class HtmlLayout
         // absolutely/fixed positioned elements are blockified (CSS 2.1 §9.7)
         if (cs.Position == CssPos.Absolute || cs.Position == CssPos.Fixed) return true;
         return cs.Display == CssDisplay.Block || cs.Display == CssDisplay.ListItem ||
-               cs.Display == CssDisplay.Flex || cs.Display == CssDisplay.Table ||
+               cs.Display == CssDisplay.Flex || cs.Display == CssDisplay.Grid || cs.Display == CssDisplay.Table ||
                cs.Display == CssDisplay.TableRow || cs.Display == CssDisplay.TableCell ||
                cs.Display == CssDisplay.TableCaption;
     }
@@ -516,6 +569,21 @@ public static class HtmlLayout
                 // Block-level form control (display:block): its own line.
                 EmitBlockWidget(node, style, availX, ref y, ctx);
                 return;
+            case "img":
+                EmitImage(node, style, availX, availRight, ref y, ctx);
+                return;
+            case "svg":
+                EmitSvg(node, style, availX, availRight, ref y, ctx);
+                return;
+            case "canvas":
+                EmitCanvas(node, style, availX, availRight, ref y, ctx);
+                return;
+            case "video":
+                EmitVideo(node, style, availX, availRight, ref y, ctx);
+                return;
+            case "audio":
+                EmitAudio(node, style, availX, availRight, ref y, ctx);
+                return;
         }
 
         // --- box model ---
@@ -535,10 +603,27 @@ public static class HtmlLayout
         if (fixedPos) { cbL = 0; cbT = 0; cbR = ctx.Vw; cbB = ctx.Vh; cbBValid = true; }
 
         int availW = Math.Max(60, availRight - availX);
+        if (style.HasW && !style.HasH && style.AspectRatio > 0)
+        {
+            style.H = (int)(style.W / style.AspectRatio);
+            style.HasH = true;
+        }
+        else if (style.HasH && !style.HasW && style.AspectRatio > 0)
+        {
+            style.W = (int)(style.H * style.AspectRatio);
+            style.HasW = true;
+        }
         int boxW;
         if (style.HasW)
         {
-            boxW = style.W + (style.BoxSizing == CssBox.Border ? 0 : pl + pr + bl + br);
+            int baseW = style.W;
+            if (style.IsWPct)
+            {
+                int cbWidth = outOfFlow ? (cbR - cbL) : (availRight - availX - marginLeft - marginRight);
+                if (cbWidth > 0)
+                    baseW = (int)Math.Round(style.WPct * cbWidth / 100.0);
+            }
+            boxW = baseW + (style.BoxSizing == CssBox.Border ? 0 : pl + pr + bl + br);
         }
         else if (style.Display == CssDisplay.InlineBlock || style.Float != CssFloat.None)
         {
@@ -559,8 +644,22 @@ public static class HtmlLayout
             int borders = (style.BoxSizing == CssBox.Border ? 0 : pl + pr + bl + br);
             boxW = (cbR - style.PosR) - (cbL + style.PosL) - borders;
         }
-        if (style.MaxW < int.MaxValue && boxW > style.MaxW) boxW = style.MaxW;
-        if (style.MinW > 0 && boxW < style.MinW) boxW = style.MinW;
+
+        int curMaxW = style.MaxW;
+        if (style.IsMaxWPct)
+        {
+            int cbWidth = outOfFlow ? (cbR - cbL) : (availRight - availX - marginLeft - marginRight);
+            if (cbWidth > 0) curMaxW = (int)Math.Round(style.MaxWPct * cbWidth / 100.0);
+        }
+        int curMinW = style.MinW;
+        if (style.IsMinWPct)
+        {
+            int cbWidth = outOfFlow ? (cbR - cbL) : (availRight - availX - marginLeft - marginRight);
+            if (cbWidth > 0) curMinW = (int)Math.Round(style.MinWPct * cbWidth / 100.0);
+        }
+
+        if (curMaxW < int.MaxValue && boxW > curMaxW) boxW = curMaxW;
+        if (curMinW > 0 && boxW < curMinW) boxW = curMinW;
         if (outOfFlow) { if (boxW < 1) boxW = 1; }
         else { if (boxW < 40) boxW = Math.Min(40, availW); if (boxW < 20) boxW = 20; }
 
@@ -590,15 +689,15 @@ public static class HtmlLayout
             {
                 boxX = availRight - marginRight - boxW + dx;
             }
-            else if (freeSpace > 0 && style.MarginLAuto && style.MarginRAuto)
+            else if (!ctx.IsMeasuring && freeSpace > 0 && style.MarginLAuto && style.MarginRAuto)
             {
                 boxX = availX + freeSpace / 2 + dx;
             }
-            else if (freeSpace > 0 && style.MarginLAuto)
+            else if (!ctx.IsMeasuring && freeSpace > 0 && style.MarginLAuto)
             {
                 boxX = availX + (freeSpace - marginRight) + dx;
             }
-            else if (freeSpace > 0 && (style.TextAlign == CssAlign.Center || (node.Parent != null && ctx.Sheet.Compute(node.Parent, null, ctx.Vw, ctx.Vh).TextAlign == CssAlign.Center)) && (style.HasW || style.MaxW < int.MaxValue || style.Display == CssDisplay.InlineBlock))
+            else if (!ctx.IsMeasuring && freeSpace > 0 && style.TextAlign == CssAlign.Center && (style.HasW || style.MaxW < int.MaxValue || style.Display == CssDisplay.InlineBlock))
             {
                 boxX = availX + freeSpace / 2 + dx;
             }
@@ -643,16 +742,126 @@ public static class HtmlLayout
         // Table rows/cells and captions are handled as containers; lists/tables recursed above.
         if (style.Display == CssDisplay.Flex)
             LayoutFlex(node, style, containerStyle, contentX, contentRight, ref cy, ctx);
+        else if (style.Display == CssDisplay.Grid)
+            LayoutGrid(node, style, containerStyle, contentX, contentRight, ref cy, ctx);
         else
             LayoutContainer(node, style, containerStyle, contentX, contentRight, ref cy, ctx);
 
         int contentBottom = cy;
-        if (style.HasH && style.H > (contentBottom - contentTop)) contentBottom = contentTop + style.H;
-        if (style.MinH > 0 && contentBottom - contentTop < style.MinH) contentBottom = contentTop + style.MinH;
+        int explicitH = style.H;
+        bool hasDefiniteH = style.HasH;
+        if (style.IsHPct)
+        {
+            if (outOfFlow && cbBValid)
+            {
+                int cbHeight = cbB - cbT;
+                if (cbHeight > 0)
+                {
+                    explicitH = (int)Math.Round(style.HPct * cbHeight / 100.0);
+                    if (style.BoxSizing == CssBox.Border)
+                        explicitH = Math.Max(0, explicitH - pt - pb - bt - bb);
+                    hasDefiniteH = true;
+                }
+            }
+            else
+            {
+                hasDefiniteH = false;
+            }
+        }
+
+        int curMaxH = style.MaxH;
+        if (style.IsMaxHPct && outOfFlow && cbBValid)
+        {
+            int cbHeight = cbB - cbT;
+            if (cbHeight > 0) curMaxH = (int)Math.Round(style.MaxHPct * cbHeight / 100.0);
+        }
+        int curMinH = style.MinH;
+        if (style.IsMinHPct && outOfFlow && cbBValid)
+        {
+            int cbHeight = cbB - cbT;
+            if (cbHeight > 0) curMinH = (int)Math.Round(style.MinHPct * cbHeight / 100.0);
+        }
+
+        if (hasDefiniteH && explicitH > (contentBottom - contentTop)) contentBottom = contentTop + explicitH;
+        if (curMinH > 0 && contentBottom - contentTop < curMinH) contentBottom = contentTop + curMinH;
+        if (curMaxH < int.MaxValue && contentBottom - contentTop > curMaxH) contentBottom = contentTop + curMaxH;
 
         int boxBottom = contentBottom + pb + bb;
         int boxHeight = boxBottom - boxTop;
+        if (curMaxH < int.MaxValue && boxHeight > curMaxH)
+        {
+            boxHeight = curMaxH;
+            boxBottom = boxTop + boxHeight;
+        }
         if (boxHeight < 1) boxHeight = 1;
+
+        if (style.OverflowX == CssOverflow.Hidden || style.OverflowY == CssOverflow.Hidden)
+        {
+            int clipL = boxX + bl;
+            int clipT = boxTop + bt;
+            int clipR = boxX + boxW - br;
+            int clipB = boxBottom - bb;
+            int clipW = Math.Max(0, clipR - clipL);
+            int clipH = Math.Max(0, clipB - clipT);
+
+            for (int i = boxStart; i < ctx.Plan.Boxes.Count; i++)
+            {
+                RenderBox b = ctx.Plan.Boxes[i];
+                if (b.HasClip)
+                {
+                    int r = Math.Min(b.ClipX + b.ClipW, clipR);
+                    int bot = Math.Min(b.ClipY + b.ClipH, clipB);
+                    b.ClipX = Math.Max(b.ClipX, clipL);
+                    b.ClipY = Math.Max(b.ClipY, clipT);
+                    b.ClipW = Math.Max(0, r - b.ClipX);
+                    b.ClipH = Math.Max(0, bot - b.ClipY);
+                }
+                else
+                {
+                    b.HasClip = true;
+                    b.ClipX = clipL; b.ClipY = clipT;
+                    b.ClipW = clipW; b.ClipH = clipH;
+                }
+            }
+            for (int i = lineStart; i < ctx.Plan.Lines.Count; i++)
+            {
+                RenderLine l = ctx.Plan.Lines[i];
+                if (l.HasClip)
+                {
+                    int r = Math.Min(l.ClipX + l.ClipW, clipR);
+                    int bot = Math.Min(l.ClipY + l.ClipH, clipB);
+                    l.ClipX = Math.Max(l.ClipX, clipL);
+                    l.ClipY = Math.Max(l.ClipY, clipT);
+                    l.ClipW = Math.Max(0, r - l.ClipX);
+                    l.ClipH = Math.Max(0, bot - l.ClipY);
+                }
+                else
+                {
+                    l.HasClip = true;
+                    l.ClipX = clipL; l.ClipY = clipT;
+                    l.ClipW = clipW; l.ClipH = clipH;
+                }
+            }
+            for (int i = widgetStart; i < ctx.Plan.Widgets.Count; i++)
+            {
+                RenderWidget w = ctx.Plan.Widgets[i];
+                if (w.HasClip)
+                {
+                    int r = Math.Min(w.ClipX + w.ClipW, clipR);
+                    int bot = Math.Min(w.ClipY + w.ClipH, clipB);
+                    w.ClipX = Math.Max(w.ClipX, clipL);
+                    w.ClipY = Math.Max(w.ClipY, clipT);
+                    w.ClipW = Math.Max(0, r - w.ClipX);
+                    w.ClipH = Math.Max(0, bot - w.ClipY);
+                }
+                else
+                {
+                    w.HasClip = true;
+                    w.ClipX = clipL; w.ClipY = clipT;
+                    w.ClipW = clipW; w.ClipH = clipH;
+                }
+            }
+        }
 
         // bottom-anchored absolute/fixed (no top): shift the measured subtree
         // up/down into place once the real height is known. Only when the
@@ -684,7 +893,7 @@ public static class HtmlLayout
             else if (ctx.Images.ContainsKey(style.BgImage)) ctx.Images.TryGetValue(style.BgImage, out bgImg);
         }
 
-        bool paintBox = style.HasBg || bgImg != null || bt + bb + bl + br > 0;
+        bool paintBox = style.HasBg || bgImg != null || bt + bb + bl + br > 0 || !string.IsNullOrEmpty(style.BoxShadow) || style.Position == CssPos.Sticky || !string.IsNullOrEmpty(style.Transform);
         if (paintBox)
         {
             RenderBox box = new RenderBox
@@ -706,11 +915,26 @@ public static class HtmlLayout
                 StyleT = style.BorderTT, StyleB = style.BorderBB, StyleL = style.BorderLL, StyleR = style.BorderRR,
                 Hidden = hidden,
                 Node = node,
+                BoxShadow = style.BoxShadow,
+                IsSticky = style.Position == CssPos.Sticky,
+                StickyTop = style.PosT != CssComputed.Auto ? style.PosT : 0,
+                ParentBottom = ctx.CbBValid ? ctx.CbB : int.MaxValue,
+                Transform = null,
+                ZIndex = style.ZIndex,
             };
             if (boxStart >= 0 && boxStart <= ctx.Plan.Boxes.Count)
                 ctx.Plan.Boxes.Insert(boxStart, box);
             else
                 ctx.Plan.Boxes.Add(box);
+        }
+
+        if (!string.IsNullOrEmpty(style.Transform))
+        {
+            ParseTransformTranslate(style.Transform, boxW, boxHeight, ctx.Vw, ctx.Vh, out int tdx, out int tdy);
+            if (tdx != 0 || tdy != 0)
+            {
+                ShiftRange(ctx.Plan, boxStart, lineStart, widgetStart, linkStart, tdx, tdy);
+            }
         }
 
         // absolute/fixed are out of normal flow: leave the flow cursor alone.
@@ -732,15 +956,109 @@ public static class HtmlLayout
     private static void ShiftRange(RenderPlan plan, int boxStart, int lineStart,
         int widgetStart, int linkStart, int dx, int dy)
     {
-        for (int i = boxStart; i < plan.Boxes.Count; i++) { plan.Boxes[i].X += dx; plan.Boxes[i].Y += dy; }
+        for (int i = boxStart; i < plan.Boxes.Count; i++)
+        {
+            plan.Boxes[i].X += dx; plan.Boxes[i].Y += dy;
+            if (plan.Boxes[i].HasClip) { plan.Boxes[i].ClipX += dx; plan.Boxes[i].ClipY += dy; }
+        }
         for (int i = lineStart; i < plan.Lines.Count; i++)
         {
             RenderLine l = plan.Lines[i];
             l.Y += dy; l.TextX += dx; l.BulletX += dx;
+            if (l.HasClip) { l.ClipX += dx; l.ClipY += dy; }
             for (int j = 0; j < l.Spans.Count; j++) { l.Spans[j].X += dx; l.Spans[j].Y += dy; }
         }
-        for (int i = widgetStart; i < plan.Widgets.Count; i++) { plan.Widgets[i].X += dx; plan.Widgets[i].Y += dy; }
+        for (int i = widgetStart; i < plan.Widgets.Count; i++)
+        {
+            plan.Widgets[i].X += dx; plan.Widgets[i].Y += dy;
+            if (plan.Widgets[i].HasClip) { plan.Widgets[i].ClipX += dx; plan.Widgets[i].ClipY += dy; }
+        }
         for (int i = linkStart; i < plan.Links.Count; i++) { plan.Links[i].X += dx; plan.Links[i].Y += dy; }
+    }
+
+    private static void ParseTransformTranslate(string transform, int boxW, int boxH, int vw, int vh, out int dx, out int dy)
+    {
+        dx = 0;
+        dy = 0;
+        if (string.IsNullOrEmpty(transform)) return;
+
+        string t = transform.Trim();
+        int idx = 0;
+        while (idx < t.Length)
+        {
+            int pOpen = t.IndexOf('(', idx);
+            if (pOpen < 0) break;
+            int pClose = t.IndexOf(')', pOpen);
+            if (pClose < 0) break;
+
+            int fnStart = pOpen - 1;
+            while (fnStart >= idx && (char.IsLetterOrDigit(t[fnStart]) || t[fnStart] == '-')) fnStart--;
+            string fn = t.Substring(fnStart + 1, pOpen - fnStart - 1).Trim().ToLowerInvariant();
+            string args = t.Substring(pOpen + 1, pClose - pOpen - 1).Trim();
+
+            if (fn == "translatex")
+            {
+                dx += ParseTranslateComponent(args, boxW, vw);
+            }
+            else if (fn == "translatey")
+            {
+                dy += ParseTranslateComponent(args, boxH, vh);
+            }
+            else if (fn == "translate" || fn == "translate3d")
+            {
+                string[] parts = args.Split(',');
+                if (parts.Length > 0) dx += ParseTranslateComponent(parts[0], boxW, vw);
+                if (parts.Length > 1) dy += ParseTranslateComponent(parts[1], boxH, vh);
+            }
+
+            idx = pClose + 1;
+        }
+    }
+
+    private static int ParseTranslateComponent(string s, int boxSize, int viewSize)
+    {
+        if (string.IsNullOrEmpty(s)) return 0;
+        s = s.Trim();
+        if (s.EndsWith("%"))
+        {
+            string num = s.Substring(0, s.Length - 1).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double pct))
+            {
+                return (int)(boxSize * pct / 100.0);
+            }
+        }
+        else if (s.EndsWith("vw", StringComparison.OrdinalIgnoreCase))
+        {
+            string num = s.Substring(0, s.Length - 2).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v))
+            {
+                return (int)(viewSize * v / 100.0);
+            }
+        }
+        else if (s.EndsWith("vh", StringComparison.OrdinalIgnoreCase))
+        {
+            string num = s.Substring(0, s.Length - 2).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v))
+            {
+                return (int)(viewSize * v / 100.0);
+            }
+        }
+        else if (s.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+        {
+            string num = s.Substring(0, s.Length - 2).Trim();
+            if (double.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double px))
+            {
+                return (int)px;
+            }
+        }
+        else
+        {
+            if (double.TryParse(s, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double v))
+            {
+                return (int)v;
+            }
+        }
+        return 0;
     }
 
     // ---- flexbox ---------------------------------------------------------
@@ -801,12 +1119,15 @@ public static class HtmlLayout
                 Run r = it.Runs[i];
                 if (r.Break) continue;
                 int sz = r.Style != null ? r.Style.FontSize : 13;
-                w += ctx.Measure(r.Text, sz) + 6;   // + inter-token breathing room
+                w += ctx.Measure(r.Text, sz);
+                if (i + 1 < it.Runs.Count) w += 4;
             }
         }
         else
         {
             RenderPlan saved = ctx.Plan;
+            bool savedMeasuring = ctx.IsMeasuring;
+            ctx.IsMeasuring = true;
             RenderPlan scratch = new RenderPlan();
             ctx.Plan = scratch;
             CssComputed m = it.Style.Clone();
@@ -815,6 +1136,7 @@ public static class HtmlLayout
             int y = 0;
             LayoutBlockNode(it.Node, m, 0, 10000, ref y, ctx, 0);
             ctx.Plan = saved;
+            ctx.IsMeasuring = savedMeasuring;
             int contentX = m.BorderLW + m.PadL;
             int maxR = contentX;
             for (int li = 0; li < scratch.Lines.Count; li++)
@@ -826,6 +1148,11 @@ public static class HtmlLayout
                     RenderSpan s = line.Spans[si];
                     if (s.X + s.Width > maxR) maxR = s.X + s.Width;
                 }
+            }
+            for (int wi = 0; wi < scratch.Widgets.Count; wi++)
+            {
+                RenderWidget rw = scratch.Widgets[wi];
+                if (rw.X + rw.W > maxR) maxR = rw.X + rw.W;
             }
             w = maxR - contentX;
         }
@@ -859,7 +1186,7 @@ public static class HtmlLayout
         int bw = contentW + m.PadL + m.PadR + m.BorderLW + m.BorderRW;
         m.W = m.BoxSizing == CssBox.Border ? bw : contentW;
         int y2 = 0;
-        LayoutBlockNode(it.Node, m, 0, 10000, ref y2, ctx, 0);
+        LayoutBlockNode(it.Node, m, 0, bw, ref y2, ctx, 0);
         ctx.Plan = saved2;
         return y2 < 1 ? 1 : y2;
     }
@@ -914,6 +1241,12 @@ public static class HtmlLayout
                 CssComputed cs = ctx.Sheet.Compute(child, baseStyle, ctx.Vw, ctx.Vh);
                 if (cs.Display != CssDisplay.None)
                 {
+                    if (cs.Display == CssDisplay.Contents)
+                    {
+                        CollectFlexItems(child, cs, row, items, outOfFlow, ctx);
+                        child = child.Next;
+                        continue;
+                    }
                     if (cs.Position == CssPos.Absolute || cs.Position == CssPos.Fixed)
                     {
                         if (outOfFlow != null) outOfFlow.Add(child);
@@ -958,6 +1291,7 @@ public static class HtmlLayout
             it.Grow = s.FlexGrow; it.Shrink = s.FlexShrink; it.Order = s.Order;
             it.AlignSelf = s.AlignSelf;
             it.MinMain = row ? s.MinW : s.MinH;
+            if (it.IsAnonymous && row) it.MinMain = it.BaseSize;
             it.MaxMain = row ? s.MaxW : s.MaxH;
         }
     }
@@ -1013,6 +1347,7 @@ public static class HtmlLayout
     private static void LayoutFlex(DomNode container, CssComputed cstyle, CssComputed baseStyle,
         int contentX, int contentRight, ref int y, Ctx ctx)
     {
+        int flexStartY = y;
         bool row = cstyle.FlexDirection == CssFlexDir.Row || cstyle.FlexDirection == CssFlexDir.RowReverse;
         bool reverseMain = cstyle.FlexDirection == CssFlexDir.RowReverse || cstyle.FlexDirection == CssFlexDir.ColumnReverse;
         bool wrap = cstyle.FlexWrap == CssFlexWrap.Wrap || cstyle.FlexWrap == CssFlexWrap.WrapReverse;
@@ -1022,16 +1357,17 @@ public static class HtmlLayout
         List<DomNode> outOfFlow = new List<DomNode>();
         CollectFlexItems(container, baseStyle, row, items, outOfFlow, ctx);
 
-        // Lay out out-of-flow children (position: absolute / fixed) independently
-        for (int i = 0; i < outOfFlow.Count; i++)
+        if (items.Count == 0)
         {
-            DomNode oof = outOfFlow[i];
-            CssComputed cs = ctx.Sheet.Compute(oof, baseStyle, ctx.Vw, ctx.Vh);
-            int oofY = y;
-            LayoutBlockNode(oof, cs, contentX, contentRight, ref oofY, ctx, 0);
+            for (int i = 0; i < outOfFlow.Count; i++)
+            {
+                DomNode oof = outOfFlow[i];
+                CssComputed cs = ctx.Sheet.Compute(oof, baseStyle, ctx.Vw, ctx.Vh);
+                int oofY = flexStartY;
+                LayoutBlockNode(oof, cs, contentX, contentRight, ref oofY, ctx, 0);
+            }
+            return;
         }
-
-        if (items.Count == 0) return;
 
         CssAlignItems contAlign = cstyle.AlignItems == CssAlignItems.Auto ? CssAlignItems.Stretch : cstyle.AlignItems;
         int containerCross = contentRight - contentX;   // for row: width; used as line width
@@ -1149,16 +1485,19 @@ public static class HtmlLayout
                 long gaps = (long)mainGap * (hi - lo - 1);
                 int leftover = (int)(containerMainSize - usedOuter - gaps);
                 int lead = 0, extraGap = 0; int n = hi - lo;
-                switch (cstyle.JustifyContent)
+                if (!ctx.IsMeasuring)
                 {
-                    case CssJustify.FlexEnd: lead = leftover; break;
-                    case CssJustify.Center: lead = leftover / 2; break;
-                    case CssJustify.SpaceBetween: if (n > 1) extraGap = leftover / (n - 1); else lead = leftover / 2; break;
-                    case CssJustify.SpaceAround: lead = leftover / (2 * n); extraGap = n > 0 ? leftover / n : 0; break;
-                    case CssJustify.SpaceEvenly: lead = leftover / (n + 1); extraGap = leftover / (n + 1); break;
-                    default: lead = 0; break;
+                    switch (cstyle.JustifyContent)
+                    {
+                        case CssJustify.FlexEnd: lead = leftover; break;
+                        case CssJustify.Center: lead = leftover / 2; break;
+                        case CssJustify.SpaceBetween: if (n > 1) extraGap = leftover / (n - 1); else lead = leftover / 2; break;
+                        case CssJustify.SpaceAround: lead = leftover / (2 * n); extraGap = n > 0 ? leftover / n : 0; break;
+                        case CssJustify.SpaceEvenly: lead = leftover / (n + 1); extraGap = leftover / (n + 1); break;
+                        default: lead = 0; break;
+                    }
+                    if (leftover < 0) { lead = 0; extraGap = 0; }
                 }
-                if (leftover < 0) { lead = 0; extraGap = 0; }
 
                 // place items
                 int cur = lead;
@@ -1199,7 +1538,8 @@ public static class HtmlLayout
             else
             {
                 // column
-                ResolveFlexLine(items, lo, hi, cstyle.HasH ? cstyle.H : int.MaxValue, mainGap);
+                if (cstyle.HasH)
+                    ResolveFlexLine(items, lo, hi, cstyle.H, mainGap);
 
                 // measure natural main (height) for auto items already done; compute leftover if definite height
                 long usedOuter = 0;
@@ -1239,18 +1579,25 @@ public static class HtmlLayout
 
                     CssAlignItems al = ResolveAlign(it.AlignSelf, contAlign);
                     int boxLeft;
-                    switch (al)
+                    if (ctx.IsMeasuring)
                     {
-                        case CssAlignItems.FlexEnd: boxLeft = contentRight - it.MarginCross1 - bw; break;
-                        case CssAlignItems.Center: boxLeft = contentX + (containerCross - bw) / 2; break;
-                        default:
-                            if ((it.Style.MarginLAuto && it.Style.MarginRAuto) || (bw < containerCross && (cstyle.TextAlign == CssAlign.Center || it.Style.TextAlign == CssAlign.Center)))
-                                boxLeft = contentX + (containerCross - bw) / 2;
-                            else if (it.Style.MarginLAuto)
-                                boxLeft = contentRight - it.MarginCross1 - bw;
-                            else
-                                boxLeft = contentX + it.MarginCross0;
-                            break;
+                        boxLeft = contentX + it.MarginCross0;
+                    }
+                    else
+                    {
+                        switch (al)
+                        {
+                            case CssAlignItems.FlexEnd: boxLeft = contentRight - it.MarginCross1 - bw; break;
+                            case CssAlignItems.Center: boxLeft = contentX + (containerCross - bw) / 2; break;
+                            default:
+                                if ((it.Style.MarginLAuto && it.Style.MarginRAuto) || (bw < containerCross && (cstyle.TextAlign == CssAlign.Center || it.Style.TextAlign == CssAlign.Center)))
+                                    boxLeft = contentX + (containerCross - bw) / 2;
+                                else if (it.Style.MarginLAuto)
+                                    boxLeft = contentRight - it.MarginCross1 - bw;
+                                else
+                                    boxLeft = contentX + it.MarginCross0;
+                                break;
+                        }
                     }
 
                     LayFlexItem(it, boxLeft, boxTop, bw, bh, ctx);
@@ -1271,6 +1618,27 @@ public static class HtmlLayout
 
         if (row) y += totalCross;
         else y += mainCursor;
+
+        // Lay out out-of-flow children (position: absolute / fixed) independently after flex bounds are known
+        if (outOfFlow.Count > 0)
+        {
+            int savedCbB = ctx.CbB;
+            bool savedCbBValid = ctx.CbBValid;
+            if (cstyle.Position != CssPos.Static)
+            {
+                ctx.CbB = y;
+                ctx.CbBValid = true;
+            }
+            for (int i = 0; i < outOfFlow.Count; i++)
+            {
+                DomNode oof = outOfFlow[i];
+                CssComputed cs = ctx.Sheet.Compute(oof, baseStyle, ctx.Vw, ctx.Vh);
+                int oofY = flexStartY;
+                LayoutBlockNode(oof, cs, contentX, contentRight, ref oofY, ctx, 0);
+            }
+            ctx.CbB = savedCbB;
+            ctx.CbBValid = savedCbBValid;
+        }
     }
 
     // ---- lists -----------------------------------------------------------
@@ -1353,6 +1721,31 @@ public static class HtmlLayout
                     FlushRuns(runs, style, x + bulletSpace, right, ref y, ctx, marker, x);
                     marker = null; bulletSpace = 0;
                     runs.Add(new Run { Break = true });
+                }
+                else if (cs.Display == CssDisplay.Contents)
+                {
+                    DomNode cchild = child.FirstChild;
+                    while (cchild != null)
+                    {
+                        if (cchild.NodeType == DomNode.TextNode)
+                            AddTextRuns(runs, cchild.Text, style, null, child);
+                        else if (cchild.IsElement)
+                        {
+                            CssComputed ccs = ctx.Sheet.Compute(cchild, style, ctx.Vw, ctx.Vh);
+                            if (ccs.Display != CssDisplay.None)
+                            {
+                                if (IsBlockLevel(ccs))
+                                {
+                                    FlushRuns(runs, style, x + bulletSpace, right, ref y, ctx, marker, x);
+                                    marker = null; bulletSpace = 0;
+                                    LayoutBlockNode(cchild, ccs, x, right, ref y, ctx, 0);
+                                }
+                                else
+                                    CollectInline(cchild, ccs, runs, ctx, cchild.Tag == "a" ? cchild.GetAttr("href") : null);
+                            }
+                        }
+                        cchild = cchild.Next;
+                    }
                 }
                 else if (IsBlockLevel(cs))
                 {
@@ -1560,7 +1953,7 @@ public static class HtmlLayout
         int imgX = contentX;
         if (contentRight - contentX > w)
         {
-            if (style.TextAlign == CssAlign.Center || (style.MarginLAuto && style.MarginRAuto) || (node.Parent != null && ctx.Sheet.Compute(node.Parent, null, ctx.Vw, ctx.Vh).TextAlign == CssAlign.Center))
+            if (style.TextAlign == CssAlign.Center || (style.MarginLAuto && style.MarginRAuto))
                 imgX = contentX + (contentRight - contentX - w) / 2;
             else if (style.TextAlign == CssAlign.Right || style.MarginLAuto)
                 imgX = contentRight - w;
@@ -1611,7 +2004,7 @@ public static class HtmlLayout
         int imgX = contentX;
         if (contentRight - contentX > sw)
         {
-            if (style.TextAlign == CssAlign.Center || (style.MarginLAuto && style.MarginRAuto) || (node.Parent != null && ctx.Sheet.Compute(node.Parent, null, ctx.Vw, ctx.Vh).TextAlign == CssAlign.Center))
+            if (style.TextAlign == CssAlign.Center || (style.MarginLAuto && style.MarginRAuto))
                 imgX = contentX + (contentRight - contentX - sw) / 2;
             else if (style.TextAlign == CssAlign.Right || style.MarginLAuto)
                 imgX = contentRight - sw;
@@ -1634,6 +2027,215 @@ public static class HtmlLayout
         y += sh + style.MarginB;
     }
 
+    private static void EmitCanvas(DomNode node, CssComputed style, int contentX, int contentRight, ref int y, Ctx ctx)
+    {
+        y += style.MarginT;
+        int cw = style.HasW && style.W > 0 ? style.W : ParseInt(node.GetAttr("width"), 300);
+        int ch = style.HasH && style.H > 0 ? style.H : ParseInt(node.GetAttr("height"), 150);
+        if (cw < 1) cw = 1; if (ch < 1) ch = 1;
+        if (node.CanvasSurface == null)
+        {
+            node.CanvasSurface = new Cosmos.Kernel.System.Graphics.Bitmap(cw, ch, Cosmos.Kernel.System.Graphics.ColorDepth.ColorDepth32);
+        }
+        string key = "__canvas_node_" + node.GetHashCode() + "_" + cw + "_" + ch;
+        ctx.Images[key] = node.CanvasSurface;
+
+        int imgX = contentX;
+        if (contentRight - contentX > cw)
+        {
+            if (style.TextAlign == CssAlign.Center || (style.MarginLAuto && style.MarginRAuto))
+                imgX = contentX + (contentRight - contentX - cw) / 2;
+            else if (style.TextAlign == CssAlign.Right || style.MarginLAuto)
+                imgX = contentRight - cw;
+        }
+
+        RenderLine line = new RenderLine
+        {
+            Y = y,
+            Height = ch,
+            IsImage = true,
+            ImageW = cw,
+            ImageH = ch,
+            ImageAlt = node.GetAttr("aria-label") ?? "canvas",
+            Image = node.CanvasSurface,
+            TextX = imgX,
+            Node = node,
+            Hidden = style.Visibility != CssVis.Visible,
+        };
+        ctx.Plan.Lines.Add(line);
+        y += ch + style.MarginB;
+    }
+
+
+    private static void EmitVideo(DomNode node, CssComputed style, int contentX, int contentRight, ref int y, Ctx ctx)
+    {
+        y += style.MarginT;
+        int vw = style.HasW && style.W > 0 ? style.W : ParseInt(node.GetAttr("width"), 320);
+        int vh = style.HasH && style.H > 0 ? style.H : ParseInt(node.GetAttr("height"), 180);
+        if (vw < 40) vw = 40; if (vh < 30) vh = 30;
+
+        int vx = contentX + style.MarginL;
+        if (contentRight - contentX > vw)
+        {
+            if (style.TextAlign == CssAlign.Center || (style.MarginLAuto && style.MarginRAuto))
+                vx = contentX + (contentRight - contentX - vw) / 2;
+            else if (style.TextAlign == CssAlign.Right || style.MarginLAuto)
+                vx = contentRight - vw;
+        }
+
+        string videoSrc = node.GetAttr("src");
+        if (string.IsNullOrEmpty(videoSrc))
+        {
+            for (DomNode ch = node.FirstChild; ch != null; ch = ch.Next)
+            {
+                if (ch.Tag == "source")
+                {
+                    videoSrc = ch.GetAttr("src");
+                    if (!string.IsNullOrEmpty(videoSrc)) break;
+                }
+            }
+        }
+        string mediaLink = !string.IsNullOrEmpty(videoSrc) ? ("media:" + videoSrc) : null;
+
+        // Main video player screen box
+        ctx.Plan.Boxes.Add(new RenderBox
+        {
+            X = vx,
+            Y = y,
+            W = vw,
+            H = vh,
+            HasBg = true,
+            Bg = Color.FromArgb(16, 18, 24),
+            BorderRadius = 6,
+            BorderT = 1, BorderB = 1, BorderL = 1, BorderR = 1,
+            BorderCT = Color.FromArgb(60, 60, 60),
+            BorderCB = Color.FromArgb(60, 60, 60),
+            BorderCL = Color.FromArgb(60, 60, 60),
+            BorderCR = Color.FromArgb(60, 60, 60),
+            StyleT = CssBorder.Solid, StyleB = CssBorder.Solid, StyleL = CssBorder.Solid, StyleR = CssBorder.Solid,
+            Node = node,
+            Hidden = style.Visibility != CssVis.Visible
+        });
+
+        // Bottom control strip
+        int barH = Math.Min(28, vh / 4);
+        int barY = y + vh - barH;
+        ctx.Plan.Boxes.Add(new RenderBox
+        {
+            X = vx,
+            Y = barY,
+            W = vw,
+            H = barH,
+            HasBg = true,
+            Bg = Color.FromArgb(28, 30, 38),
+            BorderRadius = 0,
+            BorderT = 1,
+            BorderCT = Color.FromArgb(50, 52, 60),
+            StyleT = CssBorder.Solid,
+            Node = node,
+            Hidden = style.Visibility != CssVis.Visible
+        });
+
+        // Central Play button
+        int lineCenterY = y + (vh - barH) / 2 - 8;
+        RenderLine centerLine = new RenderLine { Y = lineCenterY, Height = 18, TextX = vx + vw / 2 - 32 };
+        centerLine.Spans.Add(new RenderSpan { Text = "[ Play Video ]", Color = Color.White, Href = mediaLink, Bold = true });
+        ctx.Plan.Lines.Add(centerLine);
+
+        // Control bar text (Play icon + time + WMP badge)
+        RenderLine barLine = new RenderLine { Y = barY + 5, Height = 14, TextX = vx + 8 };
+        barLine.Spans.Add(new RenderSpan { Text = "0:00 / 0:00", Color = Color.FromArgb(200, 200, 200), Href = mediaLink });
+        barLine.Spans.Add(new RenderSpan { Text = "  [Open in Media Player]", Color = Color.FromArgb(0, 160, 255), Href = mediaLink, Bold = true });
+        ctx.Plan.Lines.Add(barLine);
+
+        y += vh + style.MarginB;
+    }
+
+    private static void EmitAudio(DomNode node, CssComputed style, int contentX, int contentRight, ref int y, Ctx ctx)
+    {
+        y += style.MarginT;
+        int aw = style.HasW && style.W > 0 ? style.W : 300;
+        int ah = 32;
+        int ax = contentX + style.MarginL;
+
+        string audioSrc = node.GetAttr("src");
+        if (string.IsNullOrEmpty(audioSrc))
+        {
+            for (DomNode ch = node.FirstChild; ch != null; ch = ch.Next)
+            {
+                if (ch.Tag == "source")
+                {
+                    audioSrc = ch.GetAttr("src");
+                    if (!string.IsNullOrEmpty(audioSrc)) break;
+                }
+            }
+        }
+        string mediaLink = !string.IsNullOrEmpty(audioSrc) ? ("media:" + audioSrc) : null;
+
+        ctx.Plan.Boxes.Add(new RenderBox
+        {
+            X = ax,
+            Y = y,
+            W = aw,
+            H = ah,
+            HasBg = true,
+            Bg = Color.FromArgb(32, 34, 42),
+            BorderRadius = 4,
+            BorderT = 1, BorderB = 1, BorderL = 1, BorderR = 1,
+            BorderCT = Color.FromArgb(70, 70, 70),
+            BorderCB = Color.FromArgb(70, 70, 70),
+            BorderCL = Color.FromArgb(70, 70, 70),
+            BorderCR = Color.FromArgb(70, 70, 70),
+            StyleT = CssBorder.Solid, StyleB = CssBorder.Solid, StyleL = CssBorder.Solid, StyleR = CssBorder.Solid,
+            Node = node,
+            Hidden = style.Visibility != CssVis.Visible
+        });
+
+        RenderLine barLine = new RenderLine { Y = y + 7, Height = 16, TextX = ax + 10 };
+        barLine.Spans.Add(new RenderSpan { Text = "Audio Player", Color = Color.White, Href = mediaLink, Bold = true });
+        barLine.Spans.Add(new RenderSpan { Text = "   [Play in Media Player]", Color = Color.FromArgb(0, 180, 255), Href = mediaLink });
+        ctx.Plan.Lines.Add(barLine);
+
+        y += ah + style.MarginB;
+    }
+
+    private static void EmitIframe(DomNode node, CssComputed style, int contentX, int contentRight, ref int y, Ctx ctx)
+    {
+        y += style.MarginT;
+        int iw = style.HasW && style.W > 0 ? style.W : ParseInt(node.GetAttr("width"), 300);
+        int ih = style.HasH && style.H > 0 ? style.H : ParseInt(node.GetAttr("height"), 150);
+        if (iw < 1) iw = 1; if (ih < 1) ih = 1;
+        int by = y;
+        ctx.Plan.Boxes.Add(new RenderBox
+        {
+            X = contentX + style.MarginL,
+            Y = by,
+            W = iw,
+            H = ih,
+            HasBg = true,
+            Bg = Color.White,
+            BorderT = 1, BorderB = 1, BorderL = 1, BorderR = 1,
+            BorderCT = Color.FromArgb(180, 180, 180),
+            BorderCB = Color.FromArgb(180, 180, 180),
+            BorderCL = Color.FromArgb(180, 180, 180),
+            BorderCR = Color.FromArgb(180, 180, 180),
+            StyleT = CssBorder.Solid, StyleB = CssBorder.Solid, StyleL = CssBorder.Solid, StyleR = CssBorder.Solid,
+            Node = node,
+            Hidden = style.Visibility != CssVis.Visible,
+        });
+        string srcdoc = node.GetAttr("srcdoc");
+        if (!string.IsNullOrEmpty(srcdoc))
+        {
+            DomNode subDoc = HtmlDom.Parse(srcdoc);
+            if (subDoc != null)
+            {
+                int subY = by + 2;
+                LayoutContainer(subDoc, style, style, contentX + style.MarginL + 2, contentX + style.MarginL + iw - 2, ref subY, ctx);
+            }
+        }
+        y += ih + style.MarginB;
+    }
+
     private static void EmitRule(CssComputed style, int x, int right, ref int y, Ctx ctx)
     {
         y += style.MarginT;
@@ -1648,6 +2250,260 @@ public static class HtmlLayout
         };
         ctx.Plan.Lines.Add(rule);
         y = rule.Y + rule.Height + 4 + style.MarginB;
+    }
+
+    private struct GridTrack
+    {
+        public int Width;
+    }
+
+    private static List<GridTrack> ParseGridTracks(string def, int availW, int gap)
+    {
+        List<GridTrack> tracks = new List<GridTrack>();
+        if (string.IsNullOrEmpty(def)) return tracks;
+
+        string s = def.Trim();
+        int repIdx = s.IndexOf("repeat(", StringComparison.OrdinalIgnoreCase);
+        while (repIdx >= 0)
+        {
+            int closeParen = s.IndexOf(')', repIdx);
+            if (closeParen > repIdx)
+            {
+                string inner = s.Substring(repIdx + 7, closeParen - repIdx - 7);
+                int comma = inner.IndexOf(',');
+                if (comma > 0)
+                {
+                    string countStr = inner.Substring(0, comma).Trim();
+                    string unitStr = inner.Substring(comma + 1).Trim();
+                    int count = 1;
+                    if (int.TryParse(countStr, out int pc)) count = Math.Max(1, Math.Min(12, pc));
+                    StringBuilder repSb = new StringBuilder();
+                    for (int k = 0; k < count; k++)
+                    {
+                        if (k > 0) repSb.Append(' ');
+                        repSb.Append(unitStr);
+                    }
+                    s = s.Substring(0, repIdx) + repSb.ToString() + s.Substring(closeParen + 1);
+                }
+            }
+            repIdx = s.IndexOf("repeat(", StringComparison.OrdinalIgnoreCase);
+        }
+
+        string[] tokens = s.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+        if (tokens.Length == 0) return tracks;
+
+        int totalGap = Math.Max(0, (tokens.Length - 1) * gap);
+        int remainingW = Math.Max(0, availW - totalGap);
+        float totalFr = 0;
+        int fixedSum = 0;
+        float[] frs = new float[tokens.Length];
+        int[] fixedW = new int[tokens.Length];
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            string t = tokens[i].Trim();
+            if (t.EndsWith("fr", StringComparison.OrdinalIgnoreCase))
+            {
+                string num = t.Substring(0, t.Length - 2).Trim();
+                float frVal = 1f;
+                if (float.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float pf)) frVal = pf;
+                frs[i] = frVal;
+                totalFr += frVal;
+            }
+            else if (t.EndsWith("%"))
+            {
+                string num = t.Substring(0, t.Length - 1).Trim();
+                if (float.TryParse(num, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float pct))
+                {
+                    int w = (int)(availW * (pct / 100f));
+                    fixedW[i] = w;
+                    fixedSum += w;
+                }
+            }
+            else if (t.EndsWith("px", StringComparison.OrdinalIgnoreCase))
+            {
+                string num = t.Substring(0, t.Length - 2).Trim();
+                if (int.TryParse(num, out int px))
+                {
+                    fixedW[i] = px;
+                    fixedSum += px;
+                }
+            }
+            else if (t == "auto")
+            {
+                frs[i] = 1f;
+                totalFr += 1f;
+            }
+            else if (int.TryParse(t, out int px))
+            {
+                fixedW[i] = px;
+                fixedSum += px;
+            }
+        }
+
+        int frSpace = Math.Max(0, remainingW - fixedSum);
+
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            int w = fixedW[i];
+            if (frs[i] > 0 && totalFr > 0)
+            {
+                w = (int)(frSpace * (frs[i] / totalFr));
+            }
+            if (w < 1) w = 1;
+            tracks.Add(new GridTrack { Width = w });
+        }
+
+        return tracks;
+    }
+
+    private static void LayoutGrid(DomNode container, CssComputed style, CssComputed containerStyle,
+        int contentX, int contentRight, ref int y, Ctx ctx)
+    {
+        List<DomNode> items = new List<DomNode>();
+        DomNode ch = container.FirstChild;
+        while (ch != null)
+        {
+            if (ch.IsElement)
+            {
+                CssComputed cs = ctx.Sheet.Compute(ch, style, ctx.Vw, ctx.Vh);
+                if (cs.Display != CssDisplay.None) items.Add(ch);
+            }
+            ch = ch.Next;
+        }
+
+        if (items.Count == 0) return;
+
+        int availW = Math.Max(1, contentRight - contentX);
+        int colGap = style.GapCol;
+        int rowGap = style.GapRow;
+
+        List<GridTrack> colTracks = ParseGridTracks(style.GridTemplateColumns, availW, colGap);
+        if (colTracks.Count == 0)
+        {
+            colTracks.Add(new GridTrack { Width = availW });
+        }
+
+        int numCols = colTracks.Count;
+        int curCol = 0;
+        int rowTop = y;
+        int maxRowH = 0;
+
+        for (int i = 0; i < items.Count; i++)
+        {
+            DomNode item = items[i];
+            CssComputed cs = ctx.Sheet.Compute(item, style, ctx.Vw, ctx.Vh);
+            if (style.JustifyContent == CssJustify.Center && cs.TextAlign == CssAlign.Left)
+            {
+                cs.TextAlign = CssAlign.Center;
+            }
+
+            int cellX = contentX;
+            for (int c = 0; c < curCol; c++) cellX += colTracks[c].Width + colGap;
+            int cellW = colTracks[curCol].Width;
+
+            int itemY = rowTop;
+            LayoutBlockNode(item, cs, cellX, cellX + cellW, ref itemY, ctx, 0);
+            int itemH = itemY - rowTop;
+            if (itemH > maxRowH) maxRowH = itemH;
+
+            curCol++;
+            if (curCol >= numCols)
+            {
+                curCol = 0;
+                rowTop += maxRowH + rowGap;
+                maxRowH = 0;
+            }
+        }
+
+        if (curCol > 0)
+        {
+            rowTop += maxRowH;
+        }
+        else if (rowTop > y)
+        {
+            rowTop -= rowGap;
+        }
+
+        y = rowTop;
+    }
+
+    private static void AddImageRun(DomNode child, CssComputed cs, List<Run> runs, Ctx ctx, string href)
+    {
+        int iw = cs.HasW && cs.W > 0 ? cs.W : ParseInt(child.GetAttr("width"), 0);
+        int ih = cs.HasH && cs.H > 0 ? cs.H : ParseInt(child.GetAttr("height"), 0);
+        runs.Add(new Run
+        {
+            IsImage = true,
+            ImageSrc = child.GetAttr("src"),
+            ImageAlt = child.GetAttr("alt"),
+            ImageW = iw,
+            ImageH = ih,
+            Style = cs,
+            Href = href,
+            Node = child,
+        });
+    }
+
+    private static void AddSvgRun(DomNode child, CssComputed cs, CssComputed parentStyle, List<Run> runs, Ctx ctx, string href)
+    {
+        int sw = cs.HasW && cs.W > 0 ? cs.W : ParseInt(child.GetAttr("width"), 0);
+        int sh = cs.HasH && cs.H > 0 ? cs.H : ParseInt(child.GetAttr("height"), 0);
+        if (sw <= 0 || sh <= 0)
+        {
+            Svg.ParseViewBox(child.GetAttr("viewBox"), out _, out _, out float vbw, out float vbh);
+            if (sw <= 0) sw = vbw > 0 ? (int)Math.Ceiling(vbw) : 24;
+            if (sh <= 0) sh = vbh > 0 ? (int)Math.Ceiling(vbh) : 24;
+        }
+        if (sw > 560) sw = 560;
+        if (sh > 560) sh = 560;
+        if (sw < 1) sw = 1;
+        if (sh < 1) sh = 1;
+
+        uint currentColor = cs.HasColor ? cs.Color : (parentStyle != null && parentStyle.HasColor ? parentStyle.Color : 0xFFFFFFFF);
+        string key = "__svg_node_" + child.GetHashCode() + "_" + sw + "_" + sh;
+        if (!ctx.Images.ContainsKey(key))
+        {
+            Image svgImg = Svg.FromDom(child, sw, sh, currentColor);
+            ctx.Images[key] = svgImg;
+        }
+
+        runs.Add(new Run
+        {
+            IsImage = true,
+            ImageSrc = key,
+            ImageAlt = child.GetAttr("aria-label") ?? "",
+            ImageW = sw,
+            ImageH = sh,
+            Style = cs,
+            Href = href,
+            Node = child,
+        });
+    }
+
+    private static void AddCanvasRun(DomNode child, CssComputed cs, List<Run> runs, Ctx ctx, string href)
+    {
+        int cw = cs.HasW && cs.W > 0 ? cs.W : ParseInt(child.GetAttr("width"), 300);
+        int ch = cs.HasH && cs.H > 0 ? cs.H : ParseInt(child.GetAttr("height"), 150);
+        if (cw < 1) cw = 1; if (ch < 1) ch = 1;
+        if (child.CanvasSurface == null)
+        {
+            child.CanvasSurface = new Cosmos.Kernel.System.Graphics.Bitmap(cw, ch, Cosmos.Kernel.System.Graphics.ColorDepth.ColorDepth32);
+        }
+        string key = "__canvas_node_" + child.GetHashCode() + "_" + cw + "_" + ch;
+        ctx.Images[key] = child.CanvasSurface;
+
+        runs.Add(new Run
+        {
+            IsImage = true,
+            ImageSrc = key,
+            ImageAlt = child.GetAttr("aria-label") ?? "canvas",
+            ImageW = cw,
+            ImageH = ch,
+            Style = cs,
+            Href = href,
+            Node = child,
+        });
     }
 
     // ---- inline collection -----------------------------------------------
@@ -1707,58 +2563,23 @@ public static class HtmlLayout
                 }
                 else if (tag == "img")
                 {
-                    int iw = cs.HasW && cs.W > 0 ? cs.W : ParseInt(child.GetAttr("width"), 0);
-                    int ih = cs.HasH && cs.H > 0 ? cs.H : ParseInt(child.GetAttr("height"), 0);
-                    runs.Add(new Run
-                    {
-                        IsImage = true,
-                        ImageSrc = child.GetAttr("src"),
-                        ImageAlt = child.GetAttr("alt"),
-                        ImageW = iw,
-                        ImageH = ih,
-                        Style = cs,
-                        Href = href,
-                        Node = child,
-                    });
+                    AddImageRun(child, cs, runs, ctx, href);
                 }
                 else if (tag == "svg")
                 {
-                    int sw = cs.HasW && cs.W > 0 ? cs.W : ParseInt(child.GetAttr("width"), 0);
-                    int sh = cs.HasH && cs.H > 0 ? cs.H : ParseInt(child.GetAttr("height"), 0);
-                    if (sw <= 0 || sh <= 0)
-                    {
-                        Svg.ParseViewBox(child.GetAttr("viewBox"), out _, out _, out float vbw, out float vbh);
-                        if (sw <= 0) sw = vbw > 0 ? (int)Math.Ceiling(vbw) : 24;
-                        if (sh <= 0) sh = vbh > 0 ? (int)Math.Ceiling(vbh) : 24;
-                    }
-                    if (sw > 560) sw = 560;
-                    if (sh > 560) sh = 560;
-                    if (sw < 1) sw = 1;
-                    if (sh < 1) sh = 1;
-
-                    uint currentColor = cs.HasColor ? cs.Color : (style.HasColor ? style.Color : 0xFFFFFFFF);
-                    string key = "__svg_node_" + child.GetHashCode() + "_" + sw + "_" + sh;
-                    if (!ctx.Images.ContainsKey(key))
-                    {
-                        Image svgImg = Svg.FromDom(child, sw, sh, currentColor);
-                        ctx.Images[key] = svgImg;
-                    }
-
-                    runs.Add(new Run
-                    {
-                        IsImage = true,
-                        ImageSrc = key,
-                        ImageAlt = child.GetAttr("aria-label") ?? "",
-                        ImageW = sw,
-                        ImageH = sh,
-                        Style = cs,
-                        Href = href,
-                        Node = child,
-                    });
+                    AddSvgRun(child, cs, style, runs, ctx, href);
+                }
+                else if (tag == "canvas")
+                {
+                    AddCanvasRun(child, cs, runs, ctx, href);
                 }
                 else if (tag == "a")
                 {
                     CollectInline(child, cs, runs, ctx, child.GetAttr("href"));
+                }
+                else if (cs.Display == CssDisplay.Contents)
+                {
+                    CollectInline(child, cs, runs, ctx, href);
                 }
                 else if (IsBlockLevel(cs))
                 {
@@ -1995,7 +2816,8 @@ public static class HtmlLayout
             }
 
             // hard-break a single word wider than the line
-            if (!hasContent && w > contentRight - curX && tok.Text.Length > 1 && !nowrap)
+            bool allowBreakWord = st.WordBreak == "break-all" || (st.WordBreak == "break-word" && w > contentRight - curX) || tok.Text.Length > 25;
+            if (!hasContent && w > contentRight - curX && tok.Text.Length > 1 && !nowrap && allowBreakWord && (contentRight - curX >= 20))
             {
                 int cut = tok.Text.Length;
                 while (cut > 1)
@@ -2117,7 +2939,7 @@ public static class HtmlLayout
         if (h < 16) h = 16;
 
         int imgX = x;
-        if (availW > w)
+        if (!ctx.IsMeasuring && availW > w)
         {
             if (align == (int)CssAlign.Center || (tok.Style != null && tok.Style.TextAlign == CssAlign.Center))
                 imgX = x + (availW - w) / 2;
@@ -2156,6 +2978,8 @@ public static class HtmlLayout
     /// e.g. hidden inputs, which still take part in form submission).</summary>
     private static byte WidgetKindOf(DomNode node)
     {
+        if (node == null) return WidgetKind.NotAWidget;
+        if (node.GetAttr("hidden") != null) return WidgetKind.NotAWidget;
         string tag = node.Tag;
         if (tag == "input")
         {
@@ -2229,6 +3053,16 @@ public static class HtmlLayout
             default:
                 w = 0; h = 0;
                 break;
+        }
+
+        if (st != null)
+        {
+            if (st.HasW && st.W > 0) w = st.W;
+            if (st.HasH && st.H > 0) h = st.H;
+            if (st.MaxW < int.MaxValue && w > st.MaxW) w = st.MaxW;
+            if (st.MinW > 0 && w < st.MinW) w = st.MinW;
+            if (st.MaxH < int.MaxValue && h > st.MaxH) h = st.MaxH;
+            if (st.MinH > 0 && h < st.MinH) h = st.MinH;
         }
     }
 
@@ -2364,7 +3198,7 @@ public static class HtmlLayout
         string bullet, int bulletX, int align, int availWidth, int widgetStart = -1)
     {
         // horizontal alignment
-        if (align == (int)CssAlign.Center || align == (int)CssAlign.Right)
+        if (!ctx.IsMeasuring && (align == (int)CssAlign.Center || align == (int)CssAlign.Right))
         {
             int minX = int.MaxValue, maxX = int.MinValue;
             for (int i = 0; i < spans.Count; i++)

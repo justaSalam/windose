@@ -1,7 +1,9 @@
-﻿using Cosmos.Kernel.System.Graphics;
+using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Input;
 using System.Drawing;
+using System.IO;
+using Windose.System.Kernel.Subsystem;
 
 namespace Windose.System.Shell
 {
@@ -54,7 +56,19 @@ namespace Windose.System.Shell
                         break;
 
                     case FileType.File:
-                        this.icon = new Png("/mnt/System/Icons/file_lines.png");
+                        string ext = Path.GetExtension(fileEntry.FileName ?? "");
+                        string iconPath = Registry.GetString($"{StaticRegistry.FileAssociation}/{ext}", "/mnt/System/Icons/file_lines.png");
+                        try
+                        {
+                            if (File.Exists(iconPath))
+                                this.icon = new Png(iconPath);
+                            else
+                                this.icon = new Png("/mnt/System/Icons/file_lines.png");
+                        }
+                        catch
+                        {
+                            this.icon = new Png("/mnt/System/Icons/file_lines.png");
+                        }
                         break;
 
                     default:

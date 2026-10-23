@@ -18,12 +18,12 @@ using System.Text;
 // Computed style for one element
 // ---------------------------------------------------------------------------
 
-public enum CssDisplay : byte { Inline, Block, InlineBlock, ListItem, None, Flex, Table, TableRow, TableCell, TableCaption }
+public enum CssDisplay : byte { Inline, Block, InlineBlock, ListItem, None, Flex, Table, TableRow, TableCell, TableCaption, Grid, Contents }
 public enum CssAlign : byte { Left, Center, Right, Justify }
 public enum CssVAlign : byte { Baseline, Top, Middle, Bottom, Super, Sub }
 public enum CssTransform : byte { None, Upper, Lower, Capitalize }
 public enum CssWhite : byte { Normal, Pre, PreWrap, PreLine, Nowrap }
-public enum CssPos : byte { Static, Relative, Absolute, Fixed }
+public enum CssPos : byte { Static, Relative, Absolute, Fixed, Sticky }
 public enum CssFloat : byte { None, Left, Right }
 public enum CssClear : byte { None, Left, Right, Both }
 public enum CssBorder : byte { None, Solid, Dashed, Dotted, Double, Groove, Ridge, Inset, Outset }
@@ -88,7 +88,10 @@ public sealed class CssComputed
 
     // sizing
     public bool HasW, HasH; public int W, H;
+    public bool IsWPct, IsHPct; public float WPct, HPct;
     public int MinW, MaxW, MinH, MaxH;
+    public bool IsMinWPct, IsMaxWPct, IsMinHPct, IsMaxHPct;
+    public float MinWPct, MaxWPct, MinHPct, MaxHPct;
 
     // flexbox
     public CssFlexDir FlexDirection;
@@ -101,6 +104,13 @@ public sealed class CssComputed
     public int GapRow, GapCol;
     public int Order;
 
+    // CSS grid
+    public string GridTemplateColumns;
+    public string GridTemplateRows;
+    public string GridColumn;
+    public string GridRow;
+    public string Transform;
+
     // CSS custom properties (--*) and their resolution state
     public Dictionary<string, string> CustomProps;   // element's own --vars (may be null)
     public Dictionary<string, string> ResolvedVars;  // cascade result used for var() lookup
@@ -109,6 +119,17 @@ public sealed class CssComputed
     public CssVis Visibility;
     public float Opacity;                // 0..1
     public CssOverflow OverflowX, OverflowY;
+    public string BoxShadow;
+    public int ZIndex;
+
+    // UI & modern properties
+    public string Cursor;
+    public string UserSelect;
+    public string PointerEvents;
+    public string WordBreak;
+    public string TextOverflow;
+    public float AspectRatio;
+    public string ObjectFit;
 
     // list
     public CssListStyle ListStyleType;
@@ -210,7 +231,8 @@ public enum CssCondKind : byte
 {
     Id, Class, HasAttr, AttrEq, AttrPrefix, AttrSuffix, AttrContains, AttrWord, AttrDash,
     FirstChild, LastChild, OnlyChild, NthChild, FirstOfType, LastOfType, NthOfType,
-    Not, Empty, Link, Root
+    Not, Empty, Link, Root,
+    Checked, Disabled, Enabled, Focus, Is, Where, OnlyOfType, NthLastChild, Required, Optional, ReadOnly, ReadWrite, Has, Never
 }
 
 public sealed class CssCond
@@ -220,6 +242,8 @@ public sealed class CssCond
     public string Val;      // attribute comparison value
     public int A, B;        // for an+b
     public CssSelector Inner;// for :not()
+    public List<CssSelector> InnerList; // for :is(), :where()
+    public bool CaseInsensitive;
 }
 
 public sealed class CssCompound
@@ -273,9 +297,36 @@ public sealed class CssSelector
                     case CssCondKind.Empty:
                     case CssCondKind.Link:
                     case CssCondKind.Root:
+                    case CssCondKind.Checked:
+                    case CssCondKind.Disabled:
+                    case CssCondKind.Enabled:
+                    case CssCondKind.Focus:
+                    case CssCondKind.OnlyOfType:
+                    case CssCondKind.NthLastChild:
+                    case CssCondKind.Required:
+                    case CssCondKind.Optional:
+                    case CssCondKind.ReadOnly:
+                    case CssCondKind.ReadWrite:
                         b++; break;
                     case CssCondKind.Not:
                         if (cd.Inner != null) { a += cd.Inner.Spec.A; b += cd.Inner.Spec.B; c += cd.Inner.Spec.C; }
+                        break;
+                    case CssCondKind.Is:
+                    case CssCondKind.Where:
+                        if (cd.InnerList != null && cd.InnerList.Count > 0 && cd.Kind == CssCondKind.Is)
+                        {
+                            int maxA = 0, maxB = 0, maxC = 0;
+                            for (int k = 0; k < cd.InnerList.Count; k++)
+                            {
+                                if (cd.InnerList[k].Spec.A > maxA || (cd.InnerList[k].Spec.A == maxA && cd.InnerList[k].Spec.B > maxB))
+                                {
+                                    maxA = cd.InnerList[k].Spec.A;
+                                    maxB = cd.InnerList[k].Spec.B;
+                                    maxC = cd.InnerList[k].Spec.C;
+                                }
+                            }
+                            a += maxA; b += maxB; c += maxC;
+                        }
                         break;
                 }
             }
@@ -764,10 +815,16 @@ public sealed class CssSheet
             if (c == ':')
             {
                 bool dbl = i + 1 < s.Length && s[i + 1] == ':';
-                i = dbl ? i + 2 : i + 1;
-                int st = i;
-                while (i < s.Length && IsIdentChar(s[i])) i++;
-                string pseudo = s.Substring(st, i - st).ToLowerInvariant();
+                int peek = dbl ? i + 2 : i + 1;
+                int st = peek;
+                while (peek < s.Length && IsIdentChar(s[peek])) peek++;
+                string pName = s.Substring(st, peek - st).ToLowerInvariant();
+                if (dbl || pName == "before" || pName == "after" || pName == "first-line" || pName == "first-letter" || pName == "placeholder")
+                {
+                    break;
+                }
+                i = peek;
+                string pseudo = pName;
                 string arg = null;
                 if (i < s.Length && s[i] == '(')
                 {
@@ -783,6 +840,7 @@ public sealed class CssSheet
                 }
                 CssCond cd = ParsePseudoCond(pseudo, arg, dbl);
                 if (cd != null) { cp.Add(cd); any = true; }
+                else if (!dbl) { cp.Add(new CssCond { Kind = CssCondKind.Never }); any = true; }
                 continue;
             }
 
@@ -812,6 +870,16 @@ public sealed class CssSheet
             if (oi > 0) { name = inner.Substring(0, oi).Trim(); op = ops[k]; val = inner.Substring(oi + ops[k].Length).Trim(); break; }
         }
         name = name.ToLowerInvariant();
+        bool caseInsensitive = false;
+        if (val.EndsWith(" i") || val.EndsWith(" I"))
+        {
+            caseInsensitive = true;
+            val = val.Substring(0, val.Length - 2).Trim();
+        }
+        else if (val.EndsWith(" s") || val.EndsWith(" S"))
+        {
+            val = val.Substring(0, val.Length - 2).Trim();
+        }
         val = Unquote(val);
         CssCondKind kind;
         if (op == null) kind = CssCondKind.HasAttr;
@@ -821,7 +889,7 @@ public sealed class CssSheet
         else if (op == "*=") kind = CssCondKind.AttrContains;
         else if (op == "~=") kind = CssCondKind.AttrWord;
         else kind = CssCondKind.AttrDash;
-        return new CssCond { Kind = kind, Str = name, Val = val };
+        return new CssCond { Kind = kind, Str = name, Val = val, CaseInsensitive = caseInsensitive };
     }
 
     private static CssCond ParsePseudoCond(string pseudo, string arg, bool isElement)
@@ -833,26 +901,47 @@ public sealed class CssSheet
             case "only-child": return new CssCond { Kind = CssCondKind.OnlyChild };
             case "first-of-type": return new CssCond { Kind = CssCondKind.FirstOfType };
             case "last-of-type": return new CssCond { Kind = CssCondKind.LastOfType };
-            case "only-of-type": return new CssCond { Kind = CssCondKind.OnlyChild };
+            case "only-of-type": return new CssCond { Kind = CssCondKind.OnlyOfType };
             case "empty": return new CssCond { Kind = CssCondKind.Empty };
             case "root": return new CssCond { Kind = CssCondKind.Root };
             case "link": case "any-link": case "visited": return new CssCond { Kind = CssCondKind.Link };
             case "hover": case "focus": case "active": case "focus-within": case "focus-visible":
-                return null; // no interactivity: never match
-            case "checked": case "disabled": case "enabled": case "required": case "optional":
-            case "read-only": case "read-write":
-                return null;
+                return new CssCond { Kind = CssCondKind.Focus };
+            case "checked": return new CssCond { Kind = CssCondKind.Checked };
+            case "disabled": return new CssCond { Kind = CssCondKind.Disabled };
+            case "enabled": return new CssCond { Kind = CssCondKind.Enabled };
+            case "required": return new CssCond { Kind = CssCondKind.Required };
+            case "optional": return new CssCond { Kind = CssCondKind.Optional };
+            case "read-only": return new CssCond { Kind = CssCondKind.ReadOnly };
+            case "read-write": return new CssCond { Kind = CssCondKind.ReadWrite };
+            case "is":
+            case "where":
+                {
+                    if (string.IsNullOrEmpty(arg)) return null;
+                    List<CssSelector> list = CssSheet.ParseSelectors(arg);
+                    if (list == null || list.Count == 0) return null;
+                    return new CssCond { Kind = pseudo == "is" ? CssCondKind.Is : CssCondKind.Where, InnerList = list };
+                }
+            case "has":
+                {
+                    if (string.IsNullOrEmpty(arg)) return null;
+                    List<CssSelector> list = CssSheet.ParseSelectors(arg);
+                    if (list == null || list.Count == 0) return null;
+                    return new CssCond { Kind = CssCondKind.Has, InnerList = list };
+                }
             case "not":
                 {
                     CssSelector inner = ParseSelector(arg != null ? arg.Trim() : "");
                     if (inner == null) return null;
                     return new CssCond { Kind = CssCondKind.Not, Inner = inner };
                 }
-            case "nth-child": case "nth-of-type":
+            case "nth-child": case "nth-of-type": case "nth-last-child":
                 {
                     CssCond cd = ParseNth(arg != null ? arg.Trim() : "");
                     if (cd == null) return null;
-                    cd.Kind = pseudo == "nth-child" ? CssCondKind.NthChild : CssCondKind.NthOfType;
+                    if (pseudo == "nth-child") cd.Kind = CssCondKind.NthChild;
+                    else if (pseudo == "nth-of-type") cd.Kind = CssCondKind.NthOfType;
+                    else cd.Kind = CssCondKind.NthLastChild;
                     return cd;
                 }
             default:
@@ -920,7 +1009,14 @@ public sealed class CssSheet
             int colon = FindDeclColon(body, i, len);
             if (colon < 0)
             {
+                int brace = body.IndexOf('{', i);
                 int nextSemi = body.IndexOf(';', i);
+                if (brace >= 0 && (nextSemi < 0 || brace < nextSemi))
+                {
+                    int close = MatchBrace(body, brace, len);
+                    i = close < 0 ? len : close + 1;
+                    continue;
+                }
                 if (nextSemi >= 0) { i = nextSemi + 1; continue; }
                 break;
             }
@@ -980,6 +1076,81 @@ public sealed class CssSheet
         return end;
     }
 
+    public sealed class RuleRef
+    {
+        public CssRule Rule;
+        public CssSelector Selector;
+    }
+
+    private Dictionary<string, List<RuleRef>> idRules;
+    private Dictionary<string, List<RuleRef>> classRules;
+    private Dictionary<string, List<RuleRef>> tagRules;
+    private List<RuleRef> universalRules;
+    private List<RuleRef> pseudoRules;
+
+    private void EnsureIndexed()
+    {
+        if (idRules != null) return;
+        idRules = new Dictionary<string, List<RuleRef>>();
+        classRules = new Dictionary<string, List<RuleRef>>();
+        tagRules = new Dictionary<string, List<RuleRef>>();
+        universalRules = new List<RuleRef>();
+        pseudoRules = new List<RuleRef>();
+
+        for (int r = 0; r < Rules.Count; r++)
+        {
+            CssRule rule = Rules[r];
+            for (int s = 0; s < rule.Selectors.Count; s++)
+            {
+                CssSelector sel = rule.Selectors[s];
+                if (sel.PseudoElement != null)
+                {
+                    pseudoRules.Add(new RuleRef { Rule = rule, Selector = sel });
+                    continue;
+                }
+                if (sel.Compounds == null || sel.Compounds.Count == 0) continue;
+                CssCompound rightmost = sel.Compounds[sel.Compounds.Count - 1];
+
+                string idKey = null;
+                string classKey = null;
+                if (rightmost.Conds != null)
+                {
+                    for (int c = 0; c < rightmost.Conds.Count; c++)
+                    {
+                        if (rightmost.Conds[c].Kind == CssCondKind.Id && idKey == null)
+                            idKey = rightmost.Conds[c].Str;
+                        else if (rightmost.Conds[c].Kind == CssCondKind.Class && classKey == null)
+                            classKey = rightmost.Conds[c].Str;
+                    }
+                }
+
+                RuleRef rs = new RuleRef { Rule = rule, Selector = sel };
+                if (idKey != null)
+                {
+                    List<RuleRef> list;
+                    if (!idRules.TryGetValue(idKey, out list)) { list = new List<RuleRef>(); idRules[idKey] = list; }
+                    list.Add(rs);
+                }
+                else if (classKey != null)
+                {
+                    List<RuleRef> list;
+                    if (!classRules.TryGetValue(classKey, out list)) { list = new List<RuleRef>(); classRules[classKey] = list; }
+                    list.Add(rs);
+                }
+                else if (rightmost.Tag != null && rightmost.Tag != "*")
+                {
+                    List<RuleRef> list;
+                    if (!tagRules.TryGetValue(rightmost.Tag, out list)) { list = new List<RuleRef>(); tagRules[rightmost.Tag] = list; }
+                    list.Add(rs);
+                }
+                else
+                {
+                    universalRules.Add(rs);
+                }
+            }
+        }
+    }
+
     // ---- matching / cascade ----------------------------------------------
 
     /// <summary>
@@ -989,26 +1160,96 @@ public sealed class CssSheet
     public CssComputed Compute(DomNode el, CssComputed parent, int viewportW, int viewportH)
     {
         CssComputed c = CssComputed.Initial();
-        ApplyUaDefaults(c, el != null ? el.Tag : null);
         c.InheritFrom(parent);
+        ApplyUaDefaults(c, el);
         if (el != null && el.IsElement) ApplyPresentationalHints(c, el, viewportW);
+
+        EnsureIndexed();
 
         // gather matching declarations
         List<CssDecl> decls = new List<CssDecl>();
         List<CssSpecificity> specs = new List<CssSpecificity>();
-        for (int r = 0; r < Rules.Count; r++)
+
+        if (el != null && el.IsElement)
         {
-            CssRule rule = Rules[r];
-            if (rule.Media != null && !rule.Media.Matches(viewportW, viewportH)) continue;
-            for (int s = 0; s < rule.Selectors.Count; s++)
+            // 1. Universal rules
+            for (int i = 0; i < universalRules.Count; i++)
             {
-                CssSelector sel = rule.Selectors[s];
-                if (sel.PseudoElement != null) continue;   // handled separately
-                if (!Matches(sel, el)) continue;
-                for (int d = 0; d < rule.Decls.Count; d++)
+                RuleRef rr = universalRules[i];
+                if (rr.Rule.Media != null && !rr.Rule.Media.Matches(viewportW, viewportH)) continue;
+                if (!Matches(rr.Selector, el)) continue;
+                for (int d = 0; d < rr.Rule.Decls.Count; d++)
                 {
-                    decls.Add(rule.Decls[d]);
-                    specs.Add(sel.Spec);
+                    decls.Add(rr.Rule.Decls[d]);
+                    specs.Add(rr.Selector.Spec);
+                }
+            }
+
+            // 2. Tag rules
+            if (el.Tag != null)
+            {
+                List<RuleRef> tList;
+                if (tagRules.TryGetValue(el.Tag, out tList))
+                {
+                    for (int i = 0; i < tList.Count; i++)
+                    {
+                        RuleRef rr = tList[i];
+                        if (rr.Rule.Media != null && !rr.Rule.Media.Matches(viewportW, viewportH)) continue;
+                        if (!Matches(rr.Selector, el)) continue;
+                        for (int d = 0; d < rr.Rule.Decls.Count; d++)
+                        {
+                            decls.Add(rr.Rule.Decls[d]);
+                            specs.Add(rr.Selector.Spec);
+                        }
+                    }
+                }
+            }
+
+            // 3. Class rules
+            if (el.Classes != null)
+            {
+                for (int ci = 0; ci < el.Classes.Count; ci++)
+                {
+                    string cls = el.Classes[ci];
+                    bool dup = false;
+                    for (int k = 0; k < ci; k++) { if (el.Classes[k] == cls) { dup = true; break; } }
+                    if (dup) continue;
+
+                    List<RuleRef> cList;
+                    if (classRules.TryGetValue(cls, out cList))
+                    {
+                        for (int i = 0; i < cList.Count; i++)
+                        {
+                            RuleRef rr = cList[i];
+                            if (rr.Rule.Media != null && !rr.Rule.Media.Matches(viewportW, viewportH)) continue;
+                            if (!Matches(rr.Selector, el)) continue;
+                            for (int d = 0; d < rr.Rule.Decls.Count; d++)
+                            {
+                                decls.Add(rr.Rule.Decls[d]);
+                                specs.Add(rr.Selector.Spec);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 4. ID rules
+            if (el.Id != null)
+            {
+                List<RuleRef> idList;
+                if (idRules.TryGetValue(el.Id, out idList))
+                {
+                    for (int i = 0; i < idList.Count; i++)
+                    {
+                        RuleRef rr = idList[i];
+                        if (rr.Rule.Media != null && !rr.Rule.Media.Matches(viewportW, viewportH)) continue;
+                        if (!Matches(rr.Selector, el)) continue;
+                        for (int d = 0; d < rr.Rule.Decls.Count; d++)
+                        {
+                            decls.Add(rr.Rule.Decls[d]);
+                            specs.Add(rr.Selector.Spec);
+                        }
+                    }
                 }
             }
         }
@@ -1096,6 +1337,7 @@ public sealed class CssSheet
         c.FontSize = Math.Max(6, c.FontSize);
         if (!c.HasColor) { c.Color = 0xFF000000; c.HasColor = true; } // default black
         if (c.Opacity < 0) c.Opacity = 0; else if (c.Opacity > 1) c.Opacity = 1;
+        if (el != null && el.GetAttr("hidden") != null) c.Display = CssDisplay.None;
         return c;
     }
 
@@ -1196,12 +1438,14 @@ public sealed class CssSheet
 
     private static void SortDecls(List<CssDecl> decls, List<CssSpecificity> specs)
     {
-        // stable insertion sort by (!important, specificity, order)
+        // stable insertion sort in ascending priority order: (!important, specificity, order)
+        // Lower priority decls are placed first, higher priority decls are placed last,
+        // so applying in 0..N-1 order allows higher priority decls to override lower.
         for (int i = 1; i < decls.Count; i++)
         {
             CssDecl di = decls[i]; CssSpecificity si = specs[i];
             int j = i - 1;
-            while (j >= 0 && Lower(decls[j], specs[j], di, si))
+            while (j >= 0 && Higher(decls[j], specs[j], di, si))
             {
                 decls[j + 1] = decls[j]; specs[j + 1] = specs[j]; j--;
             }
@@ -1209,12 +1453,12 @@ public sealed class CssSheet
         }
     }
 
-    private static bool Lower(CssDecl a, CssSpecificity sa, CssDecl b, CssSpecificity sb)
+    private static bool Higher(CssDecl a, CssSpecificity sa, CssDecl b, CssSpecificity sb)
     {
-        if (a.Important != b.Important) return !a.Important; // important sorts later (higher)
+        if (a.Important != b.Important) return a.Important; // important has higher priority
         int cmp = sa.CompareTo(sb);
-        if (cmp != 0) return cmp < 0;
-        return a.Order < b.Order;
+        if (cmp != 0) return cmp > 0;
+        return a.Order > b.Order;
     }
 
     // ---- selector matching -----------------------------------------------
@@ -1288,19 +1532,39 @@ public sealed class CssSheet
                 return el.GetAttr(cd.Str) != null;
 
             case CssCondKind.AttrEq:
-                { string v = el.GetAttr(cd.Str); return v != null && v == cd.Val; }
+                {
+                    string v = el.GetAttr(cd.Str);
+                    if (v == null) return false;
+                    return cd.CaseInsensitive ? string.Equals(v, cd.Val, StringComparison.OrdinalIgnoreCase) : v == cd.Val;
+                }
             case CssCondKind.AttrPrefix:
-                { string v = el.GetAttr(cd.Str); return v != null && v.StartsWith(cd.Val); }
+                {
+                    string v = el.GetAttr(cd.Str);
+                    if (v == null) return false;
+                    return cd.CaseInsensitive ? v.StartsWith(cd.Val, StringComparison.OrdinalIgnoreCase) : v.StartsWith(cd.Val);
+                }
             case CssCondKind.AttrSuffix:
-                { string v = el.GetAttr(cd.Str); return v != null && EndsWith(v, cd.Val); }
+                {
+                    string v = el.GetAttr(cd.Str);
+                    if (v == null) return false;
+                    return cd.CaseInsensitive ? EndsWith(v.ToLowerInvariant(), cd.Val.ToLowerInvariant()) : EndsWith(v, cd.Val);
+                }
             case CssCondKind.AttrContains:
-                { string v = el.GetAttr(cd.Str); return v != null && v.IndexOf(cd.Val) >= 0; }
+                {
+                    string v = el.GetAttr(cd.Str);
+                    if (v == null) return false;
+                    return cd.CaseInsensitive ? v.IndexOf(cd.Val, StringComparison.OrdinalIgnoreCase) >= 0 : v.IndexOf(cd.Val) >= 0;
+                }
             case CssCondKind.AttrWord:
                 {
                     string v = el.GetAttr(cd.Str);
                     if (v == null) return false;
                     List<string> toks = SplitWs(v);
-                    for (int i = 0; i < toks.Count; i++) if (toks[i] == cd.Val) return true;
+                    for (int i = 0; i < toks.Count; i++)
+                    {
+                        if (cd.CaseInsensitive ? string.Equals(toks[i], cd.Val, StringComparison.OrdinalIgnoreCase) : toks[i] == cd.Val)
+                            return true;
+                    }
                     return false;
                 }
             case CssCondKind.AttrDash:
@@ -1328,6 +1592,37 @@ public sealed class CssSheet
                 return TypePosition(el) == 1;
             case CssCondKind.LastOfType:
                 return TypePosition(el) == LastTypePosition(el);
+            case CssCondKind.OnlyOfType:
+                return TypePosition(el) == 1 && LastTypePosition(el) == 1;
+
+            case CssCondKind.NthLastChild:
+                { int total = TotalElementSiblings(el); int pos = ElementPosition(el); return MatchNth(cd.A, cd.B, total - pos + 1); }
+
+            case CssCondKind.Checked:
+                return el.GetAttr("checked") != null;
+            case CssCondKind.Disabled:
+                return el.GetAttr("disabled") != null;
+            case CssCondKind.Enabled:
+                return (el.Tag == "input" || el.Tag == "button" || el.Tag == "select" || el.Tag == "textarea") && el.GetAttr("disabled") == null;
+            case CssCondKind.Focus:
+                return false;
+            case CssCondKind.Required:
+                return el.GetAttr("required") != null;
+            case CssCondKind.Optional:
+                return el.GetAttr("required") == null;
+            case CssCondKind.ReadOnly:
+                return el.GetAttr("readonly") != null;
+            case CssCondKind.ReadWrite:
+                return (el.Tag == "input" || el.Tag == "textarea") && el.GetAttr("readonly") == null && el.GetAttr("disabled") == null;
+
+            case CssCondKind.Is:
+            case CssCondKind.Where:
+                if (cd.InnerList != null)
+                {
+                    for (int k = 0; k < cd.InnerList.Count; k++)
+                        if (Matches(cd.InnerList[k], el)) return true;
+                }
+                return false;
 
             case CssCondKind.Empty:
                 {
@@ -1344,10 +1639,59 @@ public sealed class CssSheet
             case CssCondKind.Link:
                 return el.Tag == "a" && el.GetAttr("href") != null;
 
+            case CssCondKind.Never:
+                return false;
+
+            case CssCondKind.Has:
+                if (cd.InnerList != null)
+                {
+                    for (int k = 0; k < cd.InnerList.Count; k++)
+                        if (HasDescendantMatching(el, cd.InnerList[k])) return true;
+                }
+                return false;
+
             case CssCondKind.Not:
                 return cd.Inner != null && !Matches(cd.Inner, el);
         }
         return true;
+    }
+
+    private static bool HasDescendantMatching(DomNode root, CssSelector sel)
+    {
+        if (root == null || sel == null) return false;
+        List<DomNode> stack = new List<DomNode>();
+        DomNode c = root.FirstChild;
+        while (c != null)
+        {
+            if (c.IsElement) stack.Add(c);
+            c = c.Next;
+        }
+        while (stack.Count > 0)
+        {
+            DomNode curr = stack[stack.Count - 1];
+            stack.RemoveAt(stack.Count - 1);
+            if (Matches(sel, curr)) return true;
+            DomNode ch = curr.FirstChild;
+            while (ch != null)
+            {
+                if (ch.IsElement) stack.Add(ch);
+                ch = ch.Next;
+            }
+        }
+        return false;
+    }
+
+    private static int TotalElementSiblings(DomNode el)
+    {
+        if (el == null || el.Parent == null) return 1;
+        int count = 0;
+        DomNode n = el.Parent.FirstChild;
+        while (n != null)
+        {
+            if (n.IsElement) count++;
+            n = n.Next;
+        }
+        return count;
     }
 
     private static bool MatchNth(int a, int b, int pos)
@@ -1443,6 +1787,12 @@ public sealed class CssSheet
     private static void ApplyPresentationalHints(CssComputed c, DomNode el, int viewportW)
     {
         string tag = el.Tag != null ? el.Tag.ToLowerInvariant() : "";
+
+        // HTML5 hidden attribute: [hidden] { display: none; }
+        if (el.GetAttr("hidden") != null)
+        {
+            c.Display = CssDisplay.None;
+        }
 
         // align attribute
         string align = el.GetAttr("align");
@@ -1558,8 +1908,40 @@ public sealed class CssSheet
 
     // ---- UA defaults -----------------------------------------------------
 
+    private static bool HasOnlyFallbackOrEmptyChildren(DomNode parent)
+    {
+        if (parent == null) return false;
+        bool hasFallback = false;
+        for (DomNode c = parent.FirstChild; c != null; c = c.Next)
+        {
+            if (!c.IsElement)
+            {
+                if (!string.IsNullOrWhiteSpace(c.Text)) return false;
+                continue;
+            }
+            if (c.Tag == "noscript" || c.Tag == "template")
+            {
+                hasFallback = true;
+                continue;
+            }
+            if (c.Tag != "script" && c.Tag != "style" && c.Tag != "meta" && c.Tag != "link")
+            {
+                return false;
+            }
+        }
+        return hasFallback;
+    }
+
     public static void ApplyUaDefaults(CssComputed c, string tag)
     {
+        if (tag == null) return;
+        ApplyUaDefaults(c, new DomNode { Tag = tag, NodeType = DomNode.Element });
+    }
+
+    public static void ApplyUaDefaults(CssComputed c, DomNode el)
+    {
+        if (el == null) return;
+        string tag = el.Tag;
         if (tag == null) return;
         switch (tag)
         {
@@ -1568,8 +1950,13 @@ public sealed class CssSheet
                 if (tag == "body") { c.MarginL = 8; c.MarginR = 8; c.MarginT = 8; c.MarginB = 8; }
                 break;
             case "head": case "meta": case "link": case "title": case "script": case "style":
-            case "noscript": case "template":
                 c.Display = CssDisplay.None;
+                break;
+            case "noscript": case "template":
+                if (el.Parent != null && HasOnlyFallbackOrEmptyChildren(el.Parent))
+                    c.Display = CssDisplay.Block;
+                else
+                    c.Display = CssDisplay.None;
                 break;
             case "div": case "section": case "article": case "aside": case "header": case "footer":
             case "nav": case "main": case "figure": case "figcaption": case "details": case "summary":
@@ -1639,12 +2026,20 @@ public sealed class CssSheet
                 c.PadT = 2; c.PadB = 2; c.PadL = 6; c.PadR = 6;
                 break;
             case "svg":
+            case "canvas":
+            case "video":
+            case "audio":
+            case "iframe":
+            case "embed":
                 c.Display = CssDisplay.InlineBlock;
                 break;
-            case "canvas": case "video": case "audio": case "iframe": case "embed":
             case "object": case "map": case "area":
                 c.Display = CssDisplay.None; break;
             default:
+                if (tag.IndexOf('-') >= 0)
+                {
+                    c.Display = CssDisplay.Block;
+                }
                 break;
         }
     }
@@ -1655,23 +2050,22 @@ public sealed class CssSheet
     public CssComputed ComputePseudo(DomNode el, CssComputed elStyle, string pseudo, int vw, int vh, out string content)
     {
         content = null;
+        if (el == null || !el.IsElement) return null;
+        EnsureIndexed();
+        if (pseudoRules.Count == 0) return null;
+
         CssComputed c = null;
         List<CssDecl> decls = new List<CssDecl>();
         List<CssSpecificity> specs = new List<CssSpecificity>();
-        for (int r = 0; r < Rules.Count; r++)
+        for (int r = 0; r < pseudoRules.Count; r++)
         {
-            CssRule rule = Rules[r];
-            if (rule.Media != null && !rule.Media.Matches(vw, vh)) continue;
-            for (int s = 0; s < rule.Selectors.Count; s++)
+            RuleRef rr = pseudoRules[r];
+            if (rr.Selector.PseudoElement != pseudo) continue;
+            if (rr.Rule.Media != null && !rr.Rule.Media.Matches(vw, vh)) continue;
+            if (!Matches(rr.Selector, el)) continue;
+            for (int d = 0; d < rr.Rule.Decls.Count; d++)
             {
-                CssSelector sel = rule.Selectors[s];
-                if (sel.PseudoElement == null) continue;
-                if (sel.PseudoElement != pseudo) continue;
-                if (!Matches(sel, el)) continue;
-                for (int d = 0; d < rule.Decls.Count; d++)
-                {
-                    decls.Add(rule.Decls[d]); specs.Add(sel.Spec);
-                }
+                decls.Add(rr.Rule.Decls[d]); specs.Add(rr.Selector.Spec);
             }
         }
         if (decls.Count == 0) return null;
@@ -1709,11 +2103,13 @@ public sealed class CssSheet
                     else if (w == "inline-block") c.Display = CssDisplay.InlineBlock;
                     else if (w == "list-item") c.Display = CssDisplay.ListItem;
                     else if (w == "flex" || w == "inline-flex") c.Display = CssDisplay.Flex;
-                    else if (w == "grid" || w == "inline-grid" || w == "flow-root") c.Display = CssDisplay.Block;
+                    else if (w == "grid" || w == "inline-grid") c.Display = CssDisplay.Grid;
+                    else if (w == "flow-root") c.Display = CssDisplay.Block;
                     else if (w == "table") c.Display = CssDisplay.Table;
                     else if (w == "table-row") c.Display = CssDisplay.TableRow;
                     else if (w == "table-cell") c.Display = CssDisplay.TableCell;
                     else if (w == "table-caption") c.Display = CssDisplay.TableCaption;
+                    else if (w == "contents") c.Display = CssDisplay.Contents;
                     break;
                 }
             case "visibility":
@@ -1735,6 +2131,7 @@ public sealed class CssSheet
                     if (w == "relative") c.Position = CssPos.Relative;
                     else if (w == "absolute") c.Position = CssPos.Absolute;
                     else if (w == "fixed") c.Position = CssPos.Fixed;
+                    else if (w == "sticky") c.Position = CssPos.Sticky;
                     else c.Position = CssPos.Static;
                     break;
                 }
@@ -1887,13 +2284,23 @@ public sealed class CssSheet
                 {
                     string w = FirstWord(v);
                     if (w == "normal") { c.LineHeight = 0; break; }
-                    // unitless multiplier
-                    if (w.Length > 0 && (w[0] >= '0' && w[0] <= '9' || w[0] == '.'))
+                    if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px) && c.FontSize > 0)
                     {
-                        if (CssValue.TryFloat(w, out float f)) c.LineHeight = f;
+                        c.LineHeight = (float)px / c.FontSize;
                         break;
                     }
-                    if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px) && c.FontSize > 0) c.LineHeight = (float)px / c.FontSize;
+                    // unitless multiplier (pure number like 1.5)
+                    bool isUnitless = true;
+                    for (int chIdx = 0; chIdx < w.Length; chIdx++)
+                    {
+                        char ch = w[chIdx];
+                        if (!(ch >= '0' && ch <= '9' || ch == '.')) { isUnitless = false; break; }
+                    }
+                    if (isUnitless && CssValue.TryFloat(w, out float f))
+                    {
+                        c.LineHeight = f;
+                        break;
+                    }
                     break;
                 }
             case "white-space":
@@ -1917,6 +2324,32 @@ public sealed class CssSheet
             case "overflow-y": { string w = FirstWord(v); c.OverflowY = w == "hidden" ? CssOverflow.Hidden : (w == "scroll" ? CssOverflow.Scroll : (w == "auto" ? CssOverflow.Auto : CssOverflow.Visible)); break; }
 
             case "margin": ApplyMarginShorthand(c, v, c.FontSize, vw); break;
+            case "margin-inline": ApplyMarginInlineShorthand(c, v, c.FontSize, vw); break;
+            case "margin-block": ApplyMarginBlockShorthand(c, v, c.FontSize, vw); break;
+            case "margin-inline-start":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginL = 0; c.MarginLAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginL = px; c.MarginLAuto = false; }
+                    break;
+                }
+            case "margin-inline-end":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginR = 0; c.MarginRAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginR = px; c.MarginRAuto = false; }
+                    break;
+                }
+            case "margin-block-start":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginT = 0; c.MarginTAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginT = px; c.MarginTAuto = false; }
+                    break;
+                }
+            case "margin-block-end":
+                {
+                    if (FirstWord(v) == "auto") { c.MarginB = 0; c.MarginBAuto = true; }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.MarginB = px; c.MarginBAuto = false; }
+                    break;
+                }
             case "margin-top":
                 {
                     if (FirstWord(v) == "auto") { c.MarginT = 0; c.MarginTAuto = true; }
@@ -1943,17 +2376,36 @@ public sealed class CssSheet
                 }
 
             case "padding": ApplyPaddingShorthand(c, v, c.FontSize, vw); break;
+            case "padding-inline": ApplyPaddingInlineShorthand(c, v, c.FontSize, vw); break;
+            case "padding-block": ApplyPaddingBlockShorthand(c, v, c.FontSize, vw); break;
+            case "padding-inline-start": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadL = px; break; }
+            case "padding-inline-end": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadR = px; break; }
+            case "padding-block-start": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadT = px; break; }
+            case "padding-block-end": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadB = px; break; }
             case "padding-top": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadT = px; break; }
             case "padding-bottom": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadB = px; break; }
             case "padding-left": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadL = px; break; }
             case "padding-right": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PadR = px; break; }
 
-            // positioned offsets. Percentages resolve against the viewport width
-            // (documented approximation: really they use the containing block).
+            // positioned offsets & insets
+            case "inset": ApplyInsetShorthand(c, v, c.FontSize, vw); break;
+            case "inset-inline": ApplyInsetInlineShorthand(c, v, c.FontSize, vw); break;
+            case "inset-block": ApplyInsetBlockShorthand(c, v, c.FontSize, vw); break;
+            case "inset-inline-start": { if (FirstWord(v) == "auto") c.PosL = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosL = px; break; }
+            case "inset-inline-end": { if (FirstWord(v) == "auto") c.PosR = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosR = px; break; }
+            case "inset-block-start": { if (FirstWord(v) == "auto") c.PosT = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosT = px; break; }
+            case "inset-block-end": { if (FirstWord(v) == "auto") c.PosB = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosB = px; break; }
             case "top": { if (FirstWord(v) == "auto") c.PosT = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosT = px; break; }
             case "right": { if (FirstWord(v) == "auto") c.PosR = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosR = px; break; }
             case "bottom": { if (FirstWord(v) == "auto") c.PosB = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosB = px; break; }
             case "left": { if (FirstWord(v) == "auto") c.PosL = CssComputed.Auto; else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.PosL = px; break; }
+            case "z-index":
+                {
+                    string w = FirstWord(v);
+                    if (w == "auto") c.ZIndex = 0;
+                    else if (int.TryParse(w, out int z)) c.ZIndex = z;
+                    break;
+                }
 
             case "border": ApplyBorderShorthand(c, v, c.FontSize, vw, 0); break;
             case "border-top": ApplyBorderShorthand(c, v, c.FontSize, vw, 1); break;
@@ -1980,12 +2432,78 @@ public sealed class CssSheet
                     break;
                 }
 
-            case "width": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.W = px; c.HasW = true; } break; }
-            case "height": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.H = px; c.HasH = true; } break; }
-            case "min-width": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MinW = px; break; }
-            case "max-width": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MaxW = px; break; }
-            case "min-height": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MinH = px; break; }
-            case "max-height": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) c.MaxH = px; break; }
+            case "inline-size":
+            case "width":
+                {
+                    string tr = v != null ? v.Trim() : "";
+                    if (tr.EndsWith("%") && CssValue.TryFloat(tr.Substring(0, tr.Length - 1), out float pct))
+                    {
+                        c.IsWPct = true; c.WPct = pct; c.W = (int)Math.Round(pct * vw / 100.0); c.HasW = true;
+                    }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px))
+                    {
+                        c.IsWPct = false; c.W = px; c.HasW = true;
+                    }
+                    break;
+                }
+            case "block-size":
+            case "height":
+                {
+                    string tr = v != null ? v.Trim() : "";
+                    if (tr.EndsWith("%") && CssValue.TryFloat(tr.Substring(0, tr.Length - 1), out float pct))
+                    {
+                        c.IsHPct = true; c.HPct = pct; c.H = (int)Math.Round(pct * (vw * 0.75) / 100.0); c.HasH = true;
+                    }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px))
+                    {
+                        c.IsHPct = false; c.H = px; c.HasH = true;
+                    }
+                    break;
+                }
+            case "min-inline-size":
+            case "min-width":
+                {
+                    string tr = v != null ? v.Trim() : "";
+                    if (tr.EndsWith("%") && CssValue.TryFloat(tr.Substring(0, tr.Length - 1), out float pct))
+                    {
+                        c.IsMinWPct = true; c.MinWPct = pct; c.MinW = (int)Math.Round(pct * vw / 100.0);
+                    }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.IsMinWPct = false; c.MinW = px; }
+                    break;
+                }
+            case "max-inline-size":
+            case "max-width":
+                {
+                    string tr = v != null ? v.Trim() : "";
+                    if (tr.EndsWith("%") && CssValue.TryFloat(tr.Substring(0, tr.Length - 1), out float pct))
+                    {
+                        c.IsMaxWPct = true; c.MaxWPct = pct; c.MaxW = (int)Math.Round(pct * vw / 100.0);
+                    }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.IsMaxWPct = false; c.MaxW = px; }
+                    break;
+                }
+            case "min-block-size":
+            case "min-height":
+                {
+                    string tr = v != null ? v.Trim() : "";
+                    if (tr.EndsWith("%") && CssValue.TryFloat(tr.Substring(0, tr.Length - 1), out float pct))
+                    {
+                        c.IsMinHPct = true; c.MinHPct = pct; c.MinH = (int)Math.Round(pct * (vw * 0.75) / 100.0);
+                    }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.IsMinHPct = false; c.MinH = px; }
+                    break;
+                }
+            case "max-block-size":
+            case "max-height":
+                {
+                    string tr = v != null ? v.Trim() : "";
+                    if (tr.EndsWith("%") && CssValue.TryFloat(tr.Substring(0, tr.Length - 1), out float pct))
+                    {
+                        c.IsMaxHPct = true; c.MaxHPct = pct; c.MaxH = (int)Math.Round(pct * (vw * 0.75) / 100.0);
+                    }
+                    else if (CssValue.TryLengthPx(v, c.FontSize, vw, out int px)) { c.IsMaxHPct = false; c.MaxH = px; }
+                    break;
+                }
 
             // ---- flexbox ----
             case "flex-direction":
@@ -2003,6 +2521,26 @@ public sealed class CssSheet
                     if (w == "wrap") c.FlexWrap = CssFlexWrap.Wrap;
                     else if (w == "wrap-reverse") c.FlexWrap = CssFlexWrap.WrapReverse;
                     else c.FlexWrap = CssFlexWrap.NoWrap;
+                    break;
+                }
+            case "place-items":
+                {
+                    List<string> parts = SplitWs(v);
+                    if (parts.Count > 0)
+                    {
+                        ApplyDecl(c, "align-items", parts[0], vw, parent);
+                        ApplyDecl(c, "justify-items", parts.Count > 1 ? parts[1] : parts[0], vw, parent);
+                    }
+                    break;
+                }
+            case "place-content":
+                {
+                    List<string> parts = SplitWs(v);
+                    if (parts.Count > 0)
+                    {
+                        ApplyDecl(c, "align-content", parts[0], vw, parent);
+                        ApplyDecl(c, "justify-content", parts.Count > 1 ? parts[1] : parts[0], vw, parent);
+                    }
                     break;
                 }
             case "justify-content": case "justify-items": case "justify-self":
@@ -2052,6 +2590,15 @@ public sealed class CssSheet
             case "column-gap": { if (CssValue.TryLengthPx(v, c.FontSize, vw, out int cg)) c.GapCol = Math.Max(0, cg); break; }
             case "order": { if (CssValue.TryFloat(v, out float ord)) c.Order = (int)ord; break; }
 
+            // ---- CSS Grid ----
+            case "grid-template-columns": c.GridTemplateColumns = v.Trim(); break;
+            case "grid-template-rows": c.GridTemplateRows = v.Trim(); break;
+            case "grid-column": case "grid-column-start": case "grid-column-end": c.GridColumn = v.Trim(); break;
+            case "grid-row": case "grid-row-start": case "grid-row-end": c.GridRow = v.Trim(); break;
+            case "grid-gap": ApplyGapShorthand(c, v, c.FontSize, vw); break;
+            case "transform": c.Transform = v.Trim(); break;
+            case "box-shadow": c.BoxShadow = v.Trim(); break;
+
             case "list-style": ApplyListShorthand(c, v); break;
             case "list-style-type":
                 {
@@ -2070,6 +2617,65 @@ public sealed class CssSheet
                 }
             case "list-style-position":
                 // outside (default) only
+                break;
+
+            case "aspect-ratio":
+                {
+                    string p = v.Trim();
+                    int slash = p.IndexOf('/');
+                    if (slash > 0)
+                    {
+                        if (CssValue.TryFloat(p.Substring(0, slash).Trim(), out float w) &&
+                            CssValue.TryFloat(p.Substring(slash + 1).Trim(), out float h) && h > 0)
+                        {
+                            c.AspectRatio = w / h;
+                        }
+                    }
+                    else if (CssValue.TryFloat(p, out float r) && r > 0)
+                    {
+                        c.AspectRatio = r;
+                    }
+                    break;
+                }
+            case "object-fit":
+                c.ObjectFit = FirstWord(v);
+                break;
+            case "cursor":
+                c.Cursor = FirstWord(v);
+                break;
+            case "user-select":
+                c.UserSelect = FirstWord(v);
+                break;
+            case "pointer-events":
+                c.PointerEvents = FirstWord(v);
+                break;
+            case "word-break":
+            case "overflow-wrap":
+                c.WordBreak = FirstWord(v);
+                break;
+            case "text-overflow":
+                c.TextOverflow = FirstWord(v);
+                break;
+            case "transition":
+            case "animation":
+            case "outline":
+            case "outline-color":
+            case "outline-width":
+            case "outline-style":
+            case "all":
+            case "clip-path":
+            case "filter":
+            case "backdrop-filter":
+            case "will-change":
+            case "contain":
+            case "appearance":
+            case "-webkit-appearance":
+            case "touch-action":
+            case "scroll-behavior":
+            case "font-display":
+            case "writing-mode":
+            case "hyphens":
+                // recognized CSS properties
                 break;
         }
     }
@@ -2180,6 +2786,117 @@ public sealed class CssSheet
             else { CssValue.TryLengthPx(parts[1], fs, vw, out r); CssValue.TryLengthPx(parts[2], fs, vw, out b); CssValue.TryLengthPx(parts[3], fs, vw, out l); }
         }
         c.PadT = t; c.PadR = r; c.PadB = b; c.PadL = l;
+    }
+
+    private static void ApplyMarginInlineShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        int l = 0, r = 0;
+        bool lAuto = false, rAuto = false;
+        ParseMarginValue(parts[0], fs, vw, out l, out lAuto);
+        if (parts.Count == 1) { r = l; rAuto = lAuto; }
+        else { ParseMarginValue(parts[1], fs, vw, out r, out rAuto); }
+        c.MarginL = l; c.MarginR = r;
+        c.MarginLAuto = lAuto; c.MarginRAuto = rAuto;
+    }
+
+    private static void ApplyMarginBlockShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        int t = 0, b = 0;
+        bool tAuto = false, bAuto = false;
+        ParseMarginValue(parts[0], fs, vw, out t, out tAuto);
+        if (parts.Count == 1) { b = t; bAuto = tAuto; }
+        else { ParseMarginValue(parts[1], fs, vw, out b, out bAuto); }
+        c.MarginT = t; c.MarginB = b;
+        c.MarginTAuto = tAuto; c.MarginBAuto = bAuto;
+    }
+
+    private static void ApplyPaddingInlineShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        int l = 0, r = 0;
+        if (CssValue.TryLengthPx(parts[0], fs, vw, out l))
+        {
+            r = l;
+            if (parts.Count > 1) CssValue.TryLengthPx(parts[1], fs, vw, out r);
+        }
+        c.PadL = l; c.PadR = r;
+    }
+
+    private static void ApplyPaddingBlockShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        int t = 0, b = 0;
+        if (CssValue.TryLengthPx(parts[0], fs, vw, out t))
+        {
+            b = t;
+            if (parts.Count > 1) CssValue.TryLengthPx(parts[1], fs, vw, out b);
+        }
+        c.PadT = t; c.PadB = b;
+    }
+
+    private static void ParseInsetValue(string s, int fs, int vw, out int px)
+    {
+        if (s == "auto") px = CssComputed.Auto;
+        else if (CssValue.TryLengthPx(s, fs, vw, out int p)) px = p;
+        else px = CssComputed.Auto;
+    }
+
+    private static void ApplyInsetShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        int t = CssComputed.Auto, r = CssComputed.Auto, b = CssComputed.Auto, l = CssComputed.Auto;
+        ParseInsetValue(parts[0], fs, vw, out t);
+        if (parts.Count == 1)
+        {
+            r = b = l = t;
+        }
+        else if (parts.Count == 2)
+        {
+            ParseInsetValue(parts[1], fs, vw, out r);
+            b = t; l = r;
+        }
+        else if (parts.Count == 3)
+        {
+            ParseInsetValue(parts[1], fs, vw, out r);
+            ParseInsetValue(parts[2], fs, vw, out b);
+            l = r;
+        }
+        else
+        {
+            ParseInsetValue(parts[1], fs, vw, out r);
+            ParseInsetValue(parts[2], fs, vw, out b);
+            ParseInsetValue(parts[3], fs, vw, out l);
+        }
+        c.PosT = t; c.PosR = r; c.PosB = b; c.PosL = l;
+    }
+
+    private static void ApplyInsetInlineShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        int l = CssComputed.Auto, r = CssComputed.Auto;
+        ParseInsetValue(parts[0], fs, vw, out l);
+        r = l;
+        if (parts.Count > 1) ParseInsetValue(parts[1], fs, vw, out r);
+        c.PosL = l; c.PosR = r;
+    }
+
+    private static void ApplyInsetBlockShorthand(CssComputed c, string v, int fs, int vw)
+    {
+        List<string> parts = SplitWs(v);
+        if (parts.Count == 0) return;
+        int t = CssComputed.Auto, b = CssComputed.Auto;
+        ParseInsetValue(parts[0], fs, vw, out t);
+        b = t;
+        if (parts.Count > 1) ParseInsetValue(parts[1], fs, vw, out b);
+        c.PosT = t; c.PosB = b;
     }
 
     // flex: none | <grow> <shrink>? <basis>?  (basis "auto" or a length, grow/shrink unitless)

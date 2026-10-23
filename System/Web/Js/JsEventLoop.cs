@@ -46,6 +46,7 @@ public sealed class JsFetchResult
     public string StatusText = "";
     public string Headers = "";
     public string Body = "";
+    public string BodyText { get { return Body; } set { Body = value; } }
     public string Url = "";
     public string Error;   // non-null = network failure -> the promise rejects
 }
@@ -72,6 +73,48 @@ public sealed class JsEventLoop
     public Action ReloadHook;
     public Action<string> HistoryBackHook;
     public Action<string> HistoryForwardHook;
+    public Action PumpHook;
+
+    /// <summary>Await a promise synchronously within the event loop, pumping pending jobs until settled.</summary>
+    public object AwaitPromise(JsPromise promise, int timeoutMs = 15000)
+    {
+        if (promise == null) return JsUndefined.Instance;
+
+        // Drain any immediately queued microtasks first
+        DrainJobs();
+
+        if (promise.State == JsPromise.Fulfilled) return promise.Result;
+        if (promise.State == JsPromise.Rejected)
+            throw new JsThrown(promise.Result, JsValueOps.ToStringValue(promise.Result));
+
+        long startTicks = DateTime.UtcNow.Ticks;
+        long timeoutTicks = (long)timeoutMs * TimeSpan.TicksPerMillisecond;
+
+        while (promise.State == JsPromise.Pending)
+        {
+            if (PumpHook != null)
+            {
+                try { PumpHook(); } catch { }
+            }
+            RunDue(DateTime.UtcNow.Ticks);
+            DrainJobs();
+
+            if (promise.State != JsPromise.Pending) break;
+
+            if (DateTime.UtcNow.Ticks - startTicks > timeoutTicks)
+            {
+                throw JsErr.Type("Async operation timed out");
+            }
+
+            try { global::System.Threading.Thread.Sleep(5); } catch { }
+        }
+
+        if (promise.State == JsPromise.Fulfilled) return promise.Result;
+        if (promise.State == JsPromise.Rejected)
+            throw new JsThrown(promise.Result, JsValueOps.ToStringValue(promise.Result));
+
+        return promise.Result;
+    }
 
     // document.cookie, backed by the host's jar (url -> "a=b; c=d", and the
     // reverse for assignments). Both run on the UI thread.
@@ -106,6 +149,7 @@ public sealed class JsEventLoop
     /// <summary>Run queued Promise reactions until the queue drains (bounded).</summary>
     public void DrainJobs()
     {
+        if (Interp != null) Interp.ResetSteps();
         if (draining) return;          // a job may re-enter; the outer loop finishes
         draining = true;
         try

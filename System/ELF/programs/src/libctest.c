@@ -9,6 +9,29 @@
 static int fails;
 #define CHECK(c) do { if (!(c)) { printf("FAIL line %d: %s\n", __LINE__, #c); fails++; } } while (0)
 
+static int constructor_ran = 0;
+__attribute__((constructor)) static void my_init(void)
+{
+    constructor_ran = 42;
+}
+
+static void test_init_array(void)
+{
+    CHECK(constructor_ran == 42);
+}
+
+static void test_env_and_clipboard(void)
+{
+    CHECK(getenv("USER") != NULL && strcmp(getenv("USER"), "root") == 0);
+    CHECK(setenv("TEST_KEY", "TEST_VAL", 1) == 0);
+    CHECK(getenv("TEST_KEY") != NULL && strcmp(getenv("TEST_KEY"), "TEST_VAL") == 0);
+
+    char clip[64];
+    CHECK(k_clipboard_set("WindoseClip", 11) == 0);
+    int clen = k_clipboard_get(clip, (int)sizeof clip);
+    CHECK(clen == 11 && strcmp(clip, "WindoseClip") == 0);
+}
+
 // ---- things that need R_X86_64_RELATIVE relocations in a PIE ----
 static int add(int a, int b) { return a + b; }
 static int sub(int a, int b) { return a - b; }
@@ -130,6 +153,7 @@ int main(int argc, char **argv)
     printf("libctest: argc=%d pid=%d\n", argc, k_pid());
     CHECK(argc == 3 && strcmp(argv[1], "foo") == 0 && strcmp(argv[2], "bar") == 0);
     CHECK(argv[argc] == NULL);
+    test_init_array(); test_env_and_clipboard();
     test_relocs(); test_string(); test_stdlib(); test_qsort(); test_printf(); test_malloc();
     CHECK(k_ticks() >= 0);
     deep(20);

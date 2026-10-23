@@ -22,6 +22,9 @@ public sealed class JsProperty
     public bool Configurable = true;
     public JsPropKind Kind;
 
+    public bool IsAccessor { get { return Kind == JsPropKind.Accessor; } }
+    public bool IsData { get { return Kind == JsPropKind.Data; } }
+
     public static JsProperty Data(object value)
     {
         return new JsProperty { Value = value, Kind = JsPropKind.Data };
@@ -63,18 +66,19 @@ public class JsObject
 
     public bool TryGetRaw(string key, out JsProperty p)
     {
-        if (props == null) { p = null; return false; }
+        if (key == null || props == null) { p = null; return false; }
         return props.TryGetValue(key, out p);
     }
 
     public bool TryGetRaw(JsSymbol sym, out JsProperty p)
     {
-        if (symProps == null) { p = null; return false; }
+        if (sym == null || symProps == null) { p = null; return false; }
         return symProps.TryGetValue(sym, out p);
     }
 
     public void Define(string key, JsProperty p)
     {
+        if (key == null) key = "undefined";
         if (props == null) { props = new Dictionary<string, JsProperty>(); order = new List<string>(); }
         bool existed;
         JsProperty old;
@@ -85,19 +89,21 @@ public class JsObject
 
     public void Define(JsSymbol sym, JsProperty p)
     {
+        if (sym == null) return;
         if (symProps == null) symProps = new Dictionary<JsSymbol, JsProperty>();
         symProps[sym] = p;
     }
 
     public void Remove(string key)
     {
-        if (props == null) return;
+        if (key == null || props == null) return;
         if (props.Remove(key) && order != null) order.Remove(key);
     }
 
     public void Remove(JsSymbol sym)
     {
-        if (symProps != null) symProps.Remove(sym);
+        if (sym == null || symProps == null) return;
+        symProps.Remove(sym);
     }
 
     /// <summary>Enumerable string keys in insertion order (own properties only).</summary>
@@ -117,8 +123,11 @@ public class JsObject
         return result;
     }
 
-    public bool OwnHas(string key) { return props != null && props.ContainsKey(key); }
-    public bool OwnHas(JsSymbol sym) { return symProps != null && symProps.ContainsKey(sym); }
+    public bool OwnHas(string key) { return key != null && props != null && props.ContainsKey(key); }
+    public bool OwnHas(JsSymbol sym) { return sym != null && symProps != null && symProps.ContainsKey(sym); }
+    public bool HasOwnProperty(string key) { return OwnHas(key); }
+    public bool HasOwnProperty(JsSymbol sym) { return OwnHas(sym); }
+    public void SetPrototype(JsObject proto) { Prototype = proto; }
 
     // ---- prototype chain lookup ------------------------------------------
 
@@ -147,7 +156,7 @@ public class JsObject
     }
 
     /// <summary>Get a property (walking the chain), invoking accessors. Missing -> false.</summary>
-    public bool GetProperty(string key, out object value)
+    public virtual bool GetProperty(string key, out object value)
     {
         JsProperty p = Find(key);
         if (p == null) { value = JsUndefined.Instance; return false; }
@@ -191,7 +200,7 @@ public class JsObject
     }
 
     /// <summary>Set a property per ordinary [[Set]] semantics (walking the chain for setters).</summary>
-    public void SetProperty(string key, object value)
+    public virtual void SetProperty(string key, object value)
     {
         JsObject o = this;
         JsProperty p = null;
@@ -217,17 +226,12 @@ public class JsObject
         }
 
         if (!p.Writable) return; // silent failure in sloppy mode
-        // write to the property's own holder
-        JsProperty holder = null;
-        JsObject h = this;
-        while (h != null)
-        {
-            JsProperty cand;
-            if (h.TryGetRaw(key, out cand)) { holder = cand; break; }
-            h = h.Prototype;
-        }
-        if (holder != null) holder.Value = value;
-        else Define(key, JsProperty.Data(value));
+
+        JsProperty ownProp;
+        if (TryGetRaw(key, out ownProp))
+            ownProp.Value = value;
+        else
+            Define(key, JsProperty.Data(value));
     }
 
     public void SetProperty(JsSymbol sym, object value)
@@ -248,13 +252,17 @@ public class JsObject
             return;
         }
         if (!p.Writable) return;
-        p.Value = value;
+        JsProperty ownProp;
+        if (TryGetRaw(sym, out ownProp))
+            ownProp.Value = value;
+        else
+            Define(sym, JsProperty.Data(value));
     }
 
     public bool HasProperty(string key) { return Find(key) != null; }
     public bool HasProperty(JsSymbol sym) { return Find(sym) != null; }
 
-    public bool DeleteProperty(string key)
+    public virtual bool DeleteProperty(string key)
     {
         JsProperty p;
         if (TryGetRaw(key, out p))
@@ -497,6 +505,7 @@ public sealed class JsIterator : JsObject
 public sealed class JsDate : JsObject
 {
     public double Time;
+    public double TimeValue { get { return Time; } set { Time = value; } }
 
     public override string ClassTag { get { return "Date"; } }
 
@@ -590,4 +599,214 @@ public sealed class JsRegExpObject : JsObject
 
     public JsRegExpObject() { }
     public JsRegExpObject(JsObject proto, JsRegExp re) : base(proto) { Value = re; RegExpValue = re; }
+}
+
+/// <summary>ArrayBuffer instance: fixed-length raw binary data buffer.</summary>
+public sealed class JsArrayBuffer : JsObject
+{
+    public byte[] Data;
+    public int ByteLength { get { return Data != null ? Data.Length : 0; } }
+
+    public override string ClassTag { get { return "ArrayBuffer"; } }
+
+    public JsArrayBuffer(JsObject proto, int byteLength) : base(proto)
+    {
+        Data = new byte[byteLength > 0 ? byteLength : 0];
+    }
+
+    public JsArrayBuffer(JsObject proto, byte[] data) : base(proto)
+    {
+        Data = data != null ? data : new byte[0];
+    }
+}
+
+/// <summary>TypedArray instance: view over an ArrayBuffer (Uint8Array, Int32Array, etc.).</summary>
+public sealed class JsTypedArray : JsObject
+{
+    public JsArrayBuffer Buffer;
+    public int ByteOffset;
+    public int Length;
+    public int BytesPerElement;
+    public string ArrayKind;
+
+    public override string ClassTag { get { return ArrayKind != null ? ArrayKind : "TypedArray"; } }
+
+    public JsTypedArray(JsObject proto, JsArrayBuffer buffer, int byteOffset, int length, int bytesPerElement, string kind)
+        : base(proto)
+    {
+        Buffer = buffer;
+        ByteOffset = byteOffset;
+        Length = length;
+        BytesPerElement = bytesPerElement;
+        ArrayKind = kind;
+    }
+
+    public double GetElement(int index)
+    {
+        if (index < 0 || index >= Length || Buffer == null || Buffer.Data == null) return double.NaN;
+        int pos = ByteOffset + index * BytesPerElement;
+        if (pos + BytesPerElement > Buffer.Data.Length) return double.NaN;
+
+        switch (ArrayKind)
+        {
+            case "Int8Array": return (sbyte)Buffer.Data[pos];
+            case "Uint8Array":
+            case "Uint8ClampedArray": return Buffer.Data[pos];
+            case "Int16Array": return (short)(Buffer.Data[pos] | (Buffer.Data[pos + 1] << 8));
+            case "Uint16Array": return (ushort)(Buffer.Data[pos] | (Buffer.Data[pos + 1] << 8));
+            case "Int32Array": return (int)(Buffer.Data[pos] | (Buffer.Data[pos + 1] << 8) | (Buffer.Data[pos + 2] << 16) | (Buffer.Data[pos + 3] << 24));
+            case "Uint32Array": return (uint)(Buffer.Data[pos] | (Buffer.Data[pos + 1] << 8) | (Buffer.Data[pos + 2] << 16) | (Buffer.Data[pos + 3] << 24));
+            case "Float32Array": return BitConverter.ToSingle(Buffer.Data, pos);
+            case "Float64Array": return BitConverter.ToDouble(Buffer.Data, pos);
+            default: return Buffer.Data[pos];
+        }
+    }
+
+    public void SetElement(int index, double val)
+    {
+        if (index < 0 || index >= Length || Buffer == null || Buffer.Data == null) return;
+        int pos = ByteOffset + index * BytesPerElement;
+        if (pos + BytesPerElement > Buffer.Data.Length) return;
+
+        switch (ArrayKind)
+        {
+            case "Int8Array": Buffer.Data[pos] = (byte)(sbyte)val; break;
+            case "Uint8Array": Buffer.Data[pos] = (byte)val; break;
+            case "Uint8ClampedArray":
+                int clamped = (int)System.Math.Round(val);
+                if (clamped < 0) clamped = 0; else if (clamped > 255) clamped = 255;
+                Buffer.Data[pos] = (byte)clamped;
+                break;
+            case "Int16Array":
+                short s = (short)val;
+                Buffer.Data[pos] = (byte)(s & 0xFF); Buffer.Data[pos + 1] = (byte)((s >> 8) & 0xFF);
+                break;
+            case "Uint16Array":
+                ushort us = (ushort)val;
+                Buffer.Data[pos] = (byte)(us & 0xFF); Buffer.Data[pos + 1] = (byte)((us >> 8) & 0xFF);
+                break;
+            case "Int32Array":
+                int i = (int)val;
+                Buffer.Data[pos] = (byte)(i & 0xFF); Buffer.Data[pos + 1] = (byte)((i >> 8) & 0xFF);
+                Buffer.Data[pos + 2] = (byte)((i >> 16) & 0xFF); Buffer.Data[pos + 3] = (byte)((i >> 24) & 0xFF);
+                break;
+            case "Uint32Array":
+                uint u = (uint)val;
+                Buffer.Data[pos] = (byte)(u & 0xFF); Buffer.Data[pos + 1] = (byte)((u >> 8) & 0xFF);
+                Buffer.Data[pos + 2] = (byte)((u >> 16) & 0xFF); Buffer.Data[pos + 3] = (byte)((u >> 24) & 0xFF);
+                break;
+            case "Float32Array":
+                byte[] fb = BitConverter.GetBytes((float)val);
+                Array.Copy(fb, 0, Buffer.Data, pos, 4);
+                break;
+            case "Float64Array":
+                byte[] db = BitConverter.GetBytes(val);
+                Array.Copy(db, 0, Buffer.Data, pos, 8);
+                break;
+            default:
+                Buffer.Data[pos] = (byte)val;
+                break;
+        }
+    }
+
+    public override bool GetProperty(string key, out object value)
+    {
+        if (key == "length") { value = (double)Length; return true; }
+        if (key == "byteLength") { value = (double)(Length * BytesPerElement); return true; }
+        if (key == "byteOffset") { value = (double)ByteOffset; return true; }
+        if (key == "buffer") { value = Buffer != null ? (object)Buffer : JsNull.Instance; return true; }
+        if (key == "BYTES_PER_ELEMENT") { value = (double)BytesPerElement; return true; }
+
+        bool ok;
+        long idx = JsArray.KeyToIndex(key, out ok);
+        if (ok && idx >= 0 && idx < Length)
+        {
+            value = GetElement((int)idx);
+            return true;
+        }
+
+        return base.GetProperty(key, out value);
+    }
+
+    public override void SetProperty(string key, object value)
+    {
+        bool ok;
+        long idx = JsArray.KeyToIndex(key, out ok);
+        if (ok && idx >= 0 && idx < Length)
+        {
+            SetElement((int)idx, JsValueOps.ToNumber(value));
+            return;
+        }
+
+        base.SetProperty(key, value);
+    }
+}
+
+/// <summary>DataView instance: read/write multiple number types from an ArrayBuffer.</summary>
+public sealed class JsDataView : JsObject
+{
+    public JsArrayBuffer Buffer;
+    public int ByteOffset;
+    public int ByteLength;
+
+    public override string ClassTag { get { return "DataView"; } }
+
+    public JsDataView(JsObject proto, JsArrayBuffer buffer, int byteOffset, int byteLength) : base(proto)
+    {
+        Buffer = buffer;
+        ByteOffset = byteOffset;
+        ByteLength = byteLength;
+    }
+}
+
+/// <summary>ES6 Proxy instance: delegates operations through handler traps.</summary>
+public sealed class JsProxyObject : JsObject
+{
+    public JsObject Target;
+    public JsObject Handler;
+
+    public override string ClassTag { get { return Target != null ? Target.ClassTag : "Object"; } }
+
+    public JsProxyObject(JsObject target, JsObject handler) : base(target != null ? target.Prototype : null)
+    {
+        Target = target;
+        Handler = handler;
+    }
+
+    public override bool GetProperty(string key, out object value)
+    {
+        if (Handler != null && Handler.GetProperty("get", out object getFn) && getFn is JsFunction fn)
+        {
+            value = JsValueOps.Active != null
+                ? JsValueOps.Active.Call(fn, Handler, new object[] { Target, key, this }, false)
+                : JsUndefined.Instance;
+            return true;
+        }
+        return Target != null ? Target.GetProperty(key, out value) : base.GetProperty(key, out value);
+    }
+
+    public override void SetProperty(string key, object value)
+    {
+        if (Handler != null && Handler.GetProperty("set", out object setFn) && setFn is JsFunction fn)
+        {
+            if (JsValueOps.Active != null)
+                JsValueOps.Active.Call(fn, Handler, new object[] { Target, key, value, this }, false);
+            return;
+        }
+        if (Target != null) Target.SetProperty(key, value);
+        else base.SetProperty(key, value);
+    }
+
+    public override bool DeleteProperty(string key)
+    {
+        if (Handler != null && Handler.GetProperty("deleteProperty", out object delFn) && delFn is JsFunction fn)
+        {
+            if (JsValueOps.Active != null)
+            {
+                object res = JsValueOps.Active.Call(fn, Handler, new object[] { Target, key }, false);
+                return JsValueOps.ToBoolean(res);
+            }
+        }
+        return Target != null ? Target.DeleteProperty(key) : base.DeleteProperty(key);
+    }
 }

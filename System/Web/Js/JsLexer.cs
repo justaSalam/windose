@@ -253,26 +253,26 @@ public static class JsLexer
             {
                 // legacy octal literal (sloppy mode): treat as octal value
                 s.Pos++;
-                while (s.Pos < s.Src.Length && s.Src[s.Pos] >= '0' && s.Src[s.Pos] <= '7') s.Pos++;
+                while (s.Pos < s.Src.Length && ((s.Src[s.Pos] >= '0' && s.Src[s.Pos] <= '7') || s.Src[s.Pos] == '_')) s.Pos++;
                 EmitNumber(s, start, line, 8);
                 return;
             }
         }
 
-        while (s.Pos < s.Src.Length && IsDigit(s.Src[s.Pos])) s.Pos++;
+        while (s.Pos < s.Src.Length && (IsDigit(s.Src[s.Pos]) || s.Src[s.Pos] == '_')) s.Pos++;
         if (s.Pos < s.Src.Length && s.Src[s.Pos] == '.')
         {
             s.Pos++;
-            while (s.Pos < s.Src.Length && IsDigit(s.Src[s.Pos])) s.Pos++;
+            while (s.Pos < s.Src.Length && (IsDigit(s.Src[s.Pos]) || s.Src[s.Pos] == '_')) s.Pos++;
         }
         if (s.Pos < s.Src.Length && (s.Src[s.Pos] == 'e' || s.Src[s.Pos] == 'E'))
         {
             int save = s.Pos;
             s.Pos++;
             if (s.Pos < s.Src.Length && (s.Src[s.Pos] == '+' || s.Src[s.Pos] == '-')) s.Pos++;
-            if (s.Pos < s.Src.Length && IsDigit(s.Src[s.Pos]))
+            if (s.Pos < s.Src.Length && (IsDigit(s.Src[s.Pos]) || s.Src[s.Pos] == '_'))
             {
-                while (s.Pos < s.Src.Length && IsDigit(s.Src[s.Pos])) s.Pos++;
+                while (s.Pos < s.Src.Length && (IsDigit(s.Src[s.Pos]) || s.Src[s.Pos] == '_')) s.Pos++;
             }
             else s.Pos = save;
         }
@@ -282,12 +282,15 @@ public static class JsLexer
 
     private static void ScanRadix(State s, int radix)
     {
-        while (s.Pos < s.Src.Length && IsRadixDigit(s.Src[s.Pos], radix)) s.Pos++;
+        while (s.Pos < s.Src.Length && (IsRadixDigit(s.Src[s.Pos], radix) || s.Src[s.Pos] == '_')) s.Pos++;
     }
 
     private static void EmitNumber(State s, int start, int line, int radix)
     {
+        if (s.Pos < s.Src.Length && s.Src[s.Pos] == 'n') s.Pos++; // tolerate BigInt literal suffix
         string raw = s.Src.Substring(start, s.Pos - start);
+        if (raw.IndexOf('_') >= 0) raw = raw.Replace("_", "");
+        if (raw.EndsWith("n", StringComparison.OrdinalIgnoreCase)) raw = raw.Substring(0, raw.Length - 1);
         double value;
         if (radix == 10)
         {

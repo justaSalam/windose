@@ -171,7 +171,9 @@ public static class JsParser
                 JsToken n = Peek(p, 1);
                 if (n.Type == JsTokenType.Keyword && (string)n.Value == "function")
                 {
-                    JsFunctionNode fn = ParseFunction(p, true); // async ignored (runs synchronously)
+                    Advance(p); // consume async
+                    JsFunctionNode fn = ParseFunction(p, true);
+                    fn.IsAsync = true;
                     return new JsFunctionDecl(fn, line);
                 }
             }
@@ -1186,6 +1188,17 @@ public static class JsParser
 
         if (t.Type == JsTokenType.Ident)
         {
+            if ((string)t.Value == "async")
+            {
+                JsToken n = Peek(p, 1);
+                if (n.Type == JsTokenType.Keyword && (string)n.Value == "function")
+                {
+                    Advance(p); // consume async
+                    JsFunctionNode fn = ParseFunction(p, false);
+                    fn.IsAsync = true;
+                    return fn;
+                }
+            }
             Advance(p);
             return new JsIdentifier((string)t.Value, line);
         }
