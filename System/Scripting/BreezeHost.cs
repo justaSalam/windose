@@ -11,7 +11,7 @@ public static class BreezeHost
         {
             BreezeApplicationProcess process = new BreezeApplicationProcess(source, executablePath, arguments);
             runtime = process.Runtime;
-            ProcessManger.Start(process);
+            ProcessManager.Start(process);
             if (runtime.LastError != null)
             {
                 runtime.TerminateApplication();
@@ -51,7 +51,7 @@ public static class BreezeHost
         try
         {
             BreezeScheduledApplicationProcess process = new BreezeScheduledApplicationProcess(source, executablePath, arguments);
-            ProcessManger.Start(process);
+            ProcessManager.Start(process);
             return process.Runtime;
         }
         catch (Exception exception)
@@ -86,7 +86,7 @@ public static class BreezeHost
 
         try
         {
-            WindowManager.PostCommand("breeze.showError", () => ShowErrorNow(safeMessage));
+            WindowManager.RunOnUI(() => ShowErrorNow(safeMessage));
         }
         catch (Exception queueException)
         {

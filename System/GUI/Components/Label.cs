@@ -3,11 +3,11 @@ using System.Drawing;
 
 public class Label : Component
 {
-
     public bool useBackground = true;
     public bool useForeground = false;
     public int fontSize = 16;
     public Color textColor = Palette.ControlBlack;
+    public Color backgroundColor = Palette.ControlFace;
 
     public TrueTypeFont font = new TrueTypeFont("/mnt/System/Fonts/ARIAL.ttf");
 

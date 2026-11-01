@@ -11,7 +11,14 @@ using Windose;
 public class Component : IDisposable
 {
     public virtual string GetComponentName() => "UNASSIGNED COMPONENT";
-    public Canvas RenderCanvas => buffer;
+    public Canvas RenderCanvas
+    {
+        get
+        {
+            if (buffer == null) EnsureRenderSurface();
+            return buffer;
+        }
+    }
 
     public int Width
     {
@@ -215,8 +222,36 @@ public class Component : IDisposable
     }
 
     //Should not render until added as a child or is a parent
-    protected bool canRender = false;
-    public bool isRoot;
+    public bool canRender = false;
+    public bool isRoot = false;
+
+    public void RegisterAsRoot()
+    {
+        isRoot = true;
+        canRender = true;
+        EnsureRenderSurface();
+        lock (components)
+        {
+            if (!components.Contains(this))
+            {
+                components.Add(this);
+                WindowManager.MarkZOrderDirty();
+            }
+        }
+        MarkDirty();
+    }
+
+    public void UnregisterAsRoot()
+    {
+        isRoot = false;
+        canRender = false;
+        lock (components)
+        {
+            components.Remove(this);
+            WindowManager.MarkZOrderDirty();
+        }
+        WindowManager.Invalidate(this);
+    }
 
 
     protected Frame frame;
@@ -266,39 +301,31 @@ public class Component : IDisposable
 
     private void Init(int x, int y, int width, int height)
     {
-        lock (components)
+        rectangle = new Rectangle(x, y, width, height);
+        buffer = null!;
+        ownsRenderSurface = false;
+
+        children = new List<Component>();
+
+        dirty = false;
+        visible = true;
+        isRoot = false;
+        canRender = false;
+
+        zIndex = currentZIndex++;
+        state = State.Normal;
+    }
+
+    public void EnsureRenderSurface()
+    {
+        if (buffer == null || !ownsRenderSurface)
         {
-            rectangle = new Rectangle(x, y, width, height);
-            buffer = new ComponentBuffer(rectangle.Width, rectangle.Height);
+            int w = Math.Max(1, rectangle.Width);
+            int h = Math.Max(1, rectangle.Height);
+            buffer = new ComponentBuffer(w, h);
             ownsRenderSurface = true;
-
-            children = new List<Component>();
-
-            dirty = false;
-            visible = true;
-            isRoot = true;
-
-            if (useRightClick)
-            {
-                popup = new MenuPopup(220, 28 * 8);
-                popup.AddItem("Close", () =>
-                {
-                    popup.Hide();
-                });
-
-                rightClickAction += () =>
-                {
-                    popup.ShowAt(MouseManager.X, MouseManager.Y);
-                };
-            }
-
-            zIndex = currentZIndex;
-            state = State.Normal;
-
-            components.Add(this);
-            WindowManager.MarkZOrderDirty();
-            MarkDirty();
-            currentZIndex++;
+            for (int i = 0; i < children.Count; i++)
+                children[i].BindRenderSurface(buffer, false);
         }
     }
 
@@ -504,9 +531,7 @@ public class Component : IDisposable
         }
     }
 
-    public virtual void HandleMessage(UiMessage message)
-    {
-    }
+
 
     public void SetBounds(int x, int y, int width, int height)
     {
@@ -739,7 +764,7 @@ public class Component : IDisposable
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
         rectangle = new Rectangle(X, Y, width, height);
 
-        if (isRoot && (width != buffer.Width || height != buffer.Height))
+        if (isRoot && (buffer == null || width != buffer.Width || height != buffer.Height))
         {
             ResizeRenderSurface(width, height);
         }
@@ -818,13 +843,15 @@ public class Component : IDisposable
 
     public virtual void RemoveChild(Component child)
     {
+        if (child == null) return;
         bool removed;
         lock (children) { removed = children.Remove(child); }
         if (!removed) return;
 
         WindowManager.Invalidate(child.AbsoluteRectangle);
         child.parent = null;
-        child.isRoot = true;
+        child.canRender = false;
+        child.isRoot = false;
         child.InvalidateAbsolute();
         lock (components) { components.Remove(child); }
         MarkDirty();
@@ -1139,6 +1166,7 @@ public class Component : IDisposable
         localClip = Rectangle.Intersect(new Rectangle(0, 0, Width, Height), localClip);
         if (localClip.Width <= 0 || localClip.Height <= 0) return;
 
+        if (buffer == null) EnsureRenderSurface();
         buffer.ResetContext(localClip);
         try
         {
@@ -1181,12 +1209,12 @@ public class Component : IDisposable
         childrenDirty = false;
     }
 
-    private void BindRenderSurface(ComponentBuffer surface, bool ownsSurface)
+    private void BindRenderSurface(ComponentBuffer? surface, bool ownsSurface)
     {
-        if (ownsRenderSurface && !ReferenceEquals(buffer, surface))
+        if (ownsRenderSurface && buffer != null && !ReferenceEquals(buffer, surface))
             buffer.Dispose();
 
-        buffer = surface;
+        buffer = surface!;
         ownsRenderSurface = ownsSurface;
         for (int i = 0; i < children.Count; i++)
             children[i].BindRenderSurface(surface, false);
@@ -1220,9 +1248,15 @@ public class Component : IDisposable
 
         children.Clear();
 
-        if (ownsRenderSurface)
-            buffer?.Dispose();
-        components.Remove(this);
+        if (ownsRenderSurface && buffer != null)
+        {
+            buffer.Dispose();
+            buffer = null!;
+        }
+        lock (components)
+        {
+            components.Remove(this);
+        }
     }
 }
 public enum State

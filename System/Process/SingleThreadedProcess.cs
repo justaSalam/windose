@@ -73,9 +73,10 @@ public class SingleThreadedProcess : Process
 
     public override void Dispose()
     {
-        onDispose?.Invoke();
+        if (!Initialized && !Running) return;
         Running = false;
         Initialized = false;
+        onDispose?.Invoke();
     }
 }
 

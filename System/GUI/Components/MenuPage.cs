@@ -4,9 +4,9 @@ public class MenuPage : MenuPopup
     {
     }
 
-    public MenuItem AddCommand(string text, string command, Component target = null, object data = null)
+    public MenuItem AddCommand(string text, Action action)
     {
-        return AddItem(text, () => WindowManager.PostCommand(command, target: target, data: data));
+        return AddItem(text, action);
     }
 
     public override string GetComponentName() => "MenuPage";

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Threading;
@@ -534,11 +534,15 @@ public class WebView : Component
             case WidgetKind.Button:
             {
                 CloseSelectPopup();
-                string type = w.Node.Tag == "input" ? InputTypeOf(w.Node) : (w.Node.GetAttr("type") ?? "submit");
+                string type = w.Node.Tag == "input" ? InputTypeOf(w.Node) : (w.Node.GetAttr("type") ?? (AncestorForm(w.Node) != null ? "submit" : "button"));
                 type = type.ToLowerInvariant();
+                if (type == "button") break;
                 if (type == "reset") { ResetForm(AncestorForm(w.Node)); break; }
-                // submit (or the default for <button>)
-                SubmitFromControl(w.Node);
+                if (type == "submit")
+                {
+                    DomNode form = AncestorForm(w.Node);
+                    if (form != null) SubmitFromControl(w.Node);
+                }
                 break;
             }
 
@@ -575,7 +579,8 @@ public class WebView : Component
     private void SubmitFromControl(DomNode control)
     {
         DomNode form = AncestorForm(control);
-        string method = form != null ? form.GetAttr("method") : null;
+        if (form == null) return;
+        string method = form.GetAttr("method");
         if (method == null || method.Length == 0) method = "get";
         method = method.ToLowerInvariant();
         string action = form != null ? form.GetAttr("action") : null;

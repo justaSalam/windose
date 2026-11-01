@@ -205,15 +205,42 @@ public static class YouTubeHydrator
 
         sb.Append("<div class=\"content-area\"><div class=\"watch-layout\">");
 
+        string durationRaw = ExtractJsonString(html, 0, "lengthSeconds", "approxDurationMs");
+        int durationSec = 180;
+        if (!string.IsNullOrEmpty(durationRaw))
+        {
+            if (int.TryParse(durationRaw, out int ds))
+            {
+                if (ds > 10000) ds = ds / 1000;
+                if (ds > 0) durationSec = ds;
+            }
+        }
+        int durMin = durationSec / 60;
+        int durRemSec = durationSec % 60;
+        string durationStr = durMin + ":" + (durRemSec < 10 ? "0" : "") + durRemSec;
+
         // Primary watch column
         sb.Append("<div class=\"watch-primary\">");
-        sb.Append("<div class=\"player-container\">");
-        string thumbUrl = "https://i.ytimg.com/vi/" + videoId + "/hqdefault.jpg";
-        sb.Append("<a href=\"media:https://www.youtube.com/watch?v=" + videoId + "\">");
-        sb.Append("<img class=\"player-poster\" src=\"" + thumbUrl + "\" alt=\"Video Player\">");
-        sb.Append("<div class=\"play-btn-overlay\">&#9658;</div>");
-        sb.Append("</a>");
-        sb.Append("<div class=\"player-controls-bar\"><a class=\"wmp-play-btn\" href=\"media:https://www.youtube.com/watch?v=" + videoId + "\">&#9658; Play in Windows Media Player</a></div>");
+        sb.Append("<div class=\"player-container\" id=\"yt-player-box\">");
+        string thumbUrl = ExtractMeta(html, "og:image");
+        if (string.IsNullOrEmpty(thumbUrl))
+        {
+            thumbUrl = "https://i.ytimg.com/vi/" + videoId + "/maxresdefault.jpg";
+        }
+        sb.Append("<div class=\"player-screen-wrap\" id=\"yt-screen-wrap\" onclick=\"toggleYtPlay(event)\">");
+        sb.Append("<img id=\"yt-video-poster\" class=\"player-poster\" src=\"" + thumbUrl + "\" alt=\"Video Player\">");
+        sb.Append("<div id=\"yt-play-overlay\" class=\"play-btn-overlay\">&#9658;</div>");
+        sb.Append("</div>");
+
+        sb.Append("<div class=\"player-controls-bar\">");
+        sb.Append("<button id=\"yt-play-btn\" type=\"button\" class=\"yt-btn-play\" onclick=\"toggleYtPlay(event)\">&#9658;</button>");
+        sb.Append("<div class=\"yt-progress-container\" id=\"yt-progress-bar\" onclick=\"seekYtVideo(event)\">");
+        sb.Append("<div id=\"yt-progress-fill\" class=\"yt-progress-fill\"></div>");
+        sb.Append("</div>");
+        sb.Append("<span id=\"yt-time-text\" class=\"yt-time-text\">0:00 / " + EscapeHtml(durationStr) + "</span>");
+        string mediaTarget = "media:https://www.youtube.com/watch?v=" + videoId + "&title=" + UriEscape(title) + "&channel=" + UriEscape(channel);
+        sb.Append("<a class=\"wmp-play-btn\" href=\"" + mediaTarget + "\">&#9658; Open in Windows Media Player (HD)</a>");
+        sb.Append("</div>");
         sb.Append("</div>");
 
         sb.Append("<h1 class=\"watch-title\">" + EscapeHtml(title) + "</h1>");
@@ -246,6 +273,53 @@ public static class YouTubeHydrator
         sb.Append("</div>");
 
         sb.Append("</div></div>");
+
+        sb.Append("<script>");
+        sb.Append("var ytPlaying = false;");
+        sb.Append("var ytCurSec = 0;");
+        sb.Append("var ytTotalSec = " + durationSec + ";");
+        sb.Append("var ytTimer = null;");
+        sb.Append("function padTime(n) { return (n < 10 ? '0' : '') + n; }");
+        sb.Append("function fmtYtTime(s) { var m = Math.floor(s / 60); var sec = Math.floor(s % 60); return m + ':' + padTime(sec); }");
+        sb.Append("function updateYtUi() {");
+        sb.Append("  var fill = document.getElementById('yt-progress-fill');");
+        sb.Append("  if (fill) { var pct = Math.min(100, Math.max(0, (ytCurSec / ytTotalSec) * 100)); fill.style.width = pct + '%'; }");
+        sb.Append("  var txt = document.getElementById('yt-time-text');");
+        sb.Append("  if (txt) { txt.textContent = fmtYtTime(ytCurSec) + ' / ' + fmtYtTime(ytTotalSec); }");
+        sb.Append("}");
+        sb.Append("function toggleYtPlay(e) {");
+        sb.Append("  if (e && e.preventDefault) e.preventDefault();");
+        sb.Append("  ytPlaying = !ytPlaying;");
+        sb.Append("  var overlay = document.getElementById('yt-play-overlay');");
+        sb.Append("  var btn = document.getElementById('yt-play-btn');");
+        sb.Append("  if (ytPlaying) {");
+        sb.Append("    if (overlay) overlay.style.display = 'none';");
+        sb.Append("    if (btn) btn.textContent = '||';");
+        sb.Append("    if (!ytTimer) {");
+        sb.Append("      ytTimer = setInterval(function() {");
+        sb.Append("        ytCurSec += 0.25;");
+        sb.Append("        if (ytCurSec >= ytTotalSec) { ytCurSec = 0; toggleYtPlay(); }");
+        sb.Append("        updateYtUi();");
+        sb.Append("      }, 250);");
+        sb.Append("    }");
+        sb.Append("  } else {");
+        sb.Append("    if (overlay) overlay.style.display = 'flex';");
+        sb.Append("    if (btn) btn.textContent = '>';");
+        sb.Append("    if (ytTimer) { clearInterval(ytTimer); ytTimer = null; }");
+        sb.Append("  }");
+        sb.Append("  return false;");
+        sb.Append("}");
+        sb.Append("function seekYtVideo(e) {");
+        sb.Append("  if (e && e.preventDefault) e.preventDefault();");
+        sb.Append("  ytCurSec = Math.floor(0.5 * ytTotalSec);");
+        sb.Append("  updateYtUi();");
+        sb.Append("  return false;");
+        sb.Append("}");
+        sb.Append("var _b = document.getElementById('yt-play-btn'); if (_b) _b.onclick = toggleYtPlay;");
+        sb.Append("var _w = document.getElementById('yt-screen-wrap'); if (_w) _w.onclick = toggleYtPlay;");
+        sb.Append("var _o = document.getElementById('yt-play-overlay'); if (_o) _o.onclick = toggleYtPlay;");
+        sb.Append("var _p = document.getElementById('yt-progress-bar'); if (_p) _p.onclick = seekYtVideo;");
+        sb.Append("</script>");
 
         AppendFooter(sb);
         sb.Append("</body></html>");
@@ -409,7 +483,7 @@ public static class YouTubeHydrator
         sb.Append(".video-grid { display: flex; flex-wrap: wrap; gap: 16px; }");
         sb.Append(".video-card { width: 230px; margin-bottom: 12px; }");
         sb.Append(".thumb-wrapper { position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #222; aspect-ratio: 16 / 9; }");
-        sb.Append(".video-thumb { width: 100%; height: 130px; display: block; object-fit: cover; }");
+        sb.Append(".video-thumb { width: 100%; height: auto; aspect-ratio: 16 / 9; display: block; object-fit: cover; }");
         sb.Append(".duration-badge { position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.8); color: #fff; font-size: 11px; font-weight: bold; padding: 1px 4px; border-radius: 4px; }");
         sb.Append(".small-badge { bottom: 4px; right: 4px; font-size: 10px; padding: 1px 3px; }");
         sb.Append(".video-meta { padding-top: 8px; }");
@@ -427,12 +501,18 @@ public static class YouTubeHydrator
         sb.Append(".search-snippet { font-size: 12px; color: #888; line-height: 1.4; max-height: 2.8em; overflow: hidden; }");
         sb.Append(".watch-layout { display: flex; gap: 24px; }");
         sb.Append(".watch-primary { flex: 2; }");
-        sb.Append(".player-container { position: relative; width: 100%; background: #000; border-radius: 12px; overflow: hidden; }");
-                sb.Append(".player-controls-bar { background: #1a1a1a; padding: 10px 16px; border-radius: 0 0 8px 8px; border-top: 1px solid #333; }");
-        sb.Append(".wmp-play-btn { display: inline-block; background: #0078d7; color: #fff; font-weight: 600; padding: 8px 18px; border-radius: 6px; text-decoration: none; font-size: 13px; }");
+        sb.Append(".player-container { position: relative; width: 100%; background: #000; border-radius: 8px; overflow: hidden; }");
+        sb.Append(".player-screen-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; cursor: pointer; background: #000; overflow: hidden; }");
+        sb.Append(".player-poster { width: 100%; height: auto; aspect-ratio: 16 / 9; display: block; border-radius: 8px 8px 0 0; }");
+        sb.Append(".play-btn-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 68px; height: 48px; background: rgba(255,0,0,0.85); color: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); cursor: pointer; }");
+        sb.Append(".player-controls-bar { display: flex; align-items: center; gap: 12px; background: #1a1a1a; padding: 10px 16px; border-radius: 0 0 8px 8px; border-top: 1px solid #333; }");
+        sb.Append(".yt-btn-play { background: #333; border: 1px solid #555; color: #fff; border-radius: 4px; padding: 6px 12px; font-size: 14px; cursor: pointer; }");
+        sb.Append(".yt-btn-play:hover { background: #444; }");
+        sb.Append(".yt-progress-container { flex: 1; height: 8px; background: #444; border-radius: 4px; overflow: hidden; cursor: pointer; position: relative; }");
+        sb.Append(".yt-progress-fill { height: 100%; width: 0%; background: #ff0000; border-radius: 4px; }");
+        sb.Append(".yt-time-text { font-size: 12px; color: #ddd; white-space: nowrap; }");
+        sb.Append(".wmp-play-btn { display: inline-block; background: #0078d7; color: #fff; font-weight: 600; padding: 6px 14px; border-radius: 6px; text-decoration: none; font-size: 12px; white-space: nowrap; margin-left: auto; }");
         sb.Append(".wmp-play-btn:hover { background: #1084e3; }");
-        sb.Append(".player-poster { width: 100%; height: 360px; display: block; object-fit: cover; }");
-        sb.Append(".play-btn-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 68px; height: 48px; background: rgba(255,0,0,0.85); color: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }");
         sb.Append(".watch-title { font-size: 18px; font-weight: 700; margin: 12px 0 8px 0; line-height: 1.3; }");
         sb.Append(".watch-info-bar { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #222; margin-bottom: 12px; }");
         sb.Append(".channel-box { display: flex; align-items: center; gap: 10px; }");

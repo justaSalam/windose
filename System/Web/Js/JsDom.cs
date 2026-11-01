@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -512,6 +512,15 @@ public sealed class JsDom
     // lazily and only re-parsed when that changes.
     public JsObject ComputedPrototype;
     public JsObject CanvasContextPrototype;
+    public JsObject WebGLContextPrototype;
+    public JsObject WebGL2ContextPrototype;
+    public JsObject WebGLShaderPrototype;
+    public JsObject WebGLProgramPrototype;
+    public JsObject WebGLBufferPrototype;
+    public JsObject WebGLTexturePrototype;
+    public JsObject WebGLFramebufferPrototype;
+    public JsObject WebGLRenderbufferPrototype;
+    public JsObject WebGLUniformLocationPrototype;
     private CssSheet styleSheet;
     private string styleCss = "";
     private int styleVw = 1024, styleVh = 768;
@@ -1027,6 +1036,34 @@ public sealed class JsDom
         DefineOn(ElementPrototype, "getRootNode", ElGetRootNode, 0);
         DefineOn(ElementPrototype, "animate", ElAnimate, 2);
         DefineAccessor(ElementPrototype, "content", ElTemplateContentGet, null);
+
+        // media element methods & accessors
+        DefineOn(ElementPrototype, "canPlayType", ElCanPlayType, 1);
+        DefineOn(ElementPrototype, "play", ElPlay, 0);
+        DefineOn(ElementPrototype, "pause", ElPause, 0);
+        DefineOn(ElementPrototype, "load", ElLoad, 0);
+
+        DefineAccessor(ElementPrototype, "paused", ElPausedGet, null);
+        DefineAccessor(ElementPrototype, "currentTime", ElCurrentTimeGet, ElCurrentTimeSet);
+        DefineAccessor(ElementPrototype, "duration", ElDurationGet, null);
+        DefineAccessor(ElementPrototype, "ended", ElEndedGet, null);
+        DefineAccessor(ElementPrototype, "muted", ElMutedGet, ElMutedSet);
+        DefineAccessor(ElementPrototype, "volume", ElVolumeGet, ElVolumeSet);
+        DefineAccessor(ElementPrototype, "readyState", ElReadyStateGet, null);
+        DefineAccessor(ElementPrototype, "networkState", ElNetworkStateGet, null);
+        DefineAccessor(ElementPrototype, "videoWidth", ElVideoWidthGet, null);
+        DefineAccessor(ElementPrototype, "videoHeight", ElVideoHeightGet, null);
+        DefineAccessor(ElementPrototype, "playbackRate", ElPlaybackRateGet, ElPlaybackRateSet);
+        DefineAccessor(ElementPrototype, "defaultPlaybackRate", ElPlaybackRateGet, null);
+        DefineAccessor(ElementPrototype, "autoplay", ElAutoplayGet, ElAutoplaySet);
+        DefineAccessor(ElementPrototype, "loop", ElLoopGet, ElLoopSet);
+        DefineAccessor(ElementPrototype, "controls", ElControlsGet, ElControlsSet);
+        DefineAccessor(ElementPrototype, "poster", ElPosterGet, ElPosterSet);
+        DefineAccessor(ElementPrototype, "preload", ElPreloadGet, ElPreloadSet);
+        DefineAccessor(ElementPrototype, "currentSrc", ElCurrentSrcGet, null);
+        DefineAccessor(ElementPrototype, "buffered", ElBufferedGet, null);
+        DefineAccessor(ElementPrototype, "played", ElPlayedGet, null);
+        DefineAccessor(ElementPrototype, "seekable", ElSeekableGet, null);
     }
 
     // ---- form-control accessors (stage 3) ---------------------------------
@@ -1973,6 +2010,295 @@ public sealed class JsDom
         return JsUndefined.Instance;
     }
 
+    // ---- media element methods & accessors ---------------------------------
+
+    private object ElCanPlayType(JsCallArgs a)
+    {
+        if (a.ArgCount == 0) return "";
+        string mime = JsValueOps.ToStringValue(a.Get(0)).Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(mime)) return "";
+        if (mime.StartsWith("audio/mpeg") || mime.StartsWith("audio/mp3") ||
+            mime.StartsWith("audio/wav") || mime.StartsWith("audio/wave") || mime.StartsWith("audio/x-wav") ||
+            mime.StartsWith("audio/aac") || mime.StartsWith("audio/ogg") ||
+            mime.StartsWith("video/mp4") || mime.StartsWith("video/webm") || mime.StartsWith("video/ogg"))
+        {
+            return mime.IndexOf("codecs") >= 0 ? "probably" : "maybe";
+        }
+        return "";
+    }
+
+    private object ElPlay(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        e.SetProperty("_paused", false);
+        JsEventLoop loop = Realm.Interp != null ? Realm.Interp.EnsureLoop() : null;
+        JsPromise p = new JsPromise(Realm.PromisePrototype);
+        JsBrowser.FulfillPromise(loop, p, JsUndefined.Instance);
+        if (loop != null && e.Node != null)
+        {
+            loop.EnqueueJob(delegate
+            {
+                Dispatch(e.Node, "play");
+                Dispatch(e.Node, "playing");
+            });
+        }
+        return p;
+    }
+
+    private object ElPause(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        e.SetProperty("_paused", true);
+        JsEventLoop loop = Realm.Interp != null ? Realm.Interp.EnsureLoop() : null;
+        if (loop != null && e.Node != null)
+        {
+            loop.EnqueueJob(delegate
+            {
+                Dispatch(e.Node, "pause");
+            });
+        }
+        return JsUndefined.Instance;
+    }
+
+    private object ElLoad(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        e.SetProperty("_paused", true);
+        e.SetProperty("_currentTime", 0.0);
+        return JsUndefined.Instance;
+    }
+
+    private object ElPausedGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.GetProperty("_paused", out object v)) return JsValueOps.ToBoolean(v);
+        return true;
+    }
+
+    private object ElCurrentTimeGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.GetProperty("_currentTime", out object v)) return v;
+        return 0.0;
+    }
+
+    private object ElCurrentTimeSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        double t = JsValueOps.ToNumber(a.Get(0));
+        e.SetProperty("_currentTime", t);
+        return JsUndefined.Instance;
+    }
+
+    private object ElDurationGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null && (e.Node.Tag == "video" || e.Node.Tag == "audio"))
+        {
+            string src = e.Node.GetAttr("src");
+            if (!string.IsNullOrEmpty(src)) return 120.0;
+        }
+        return double.NaN;
+    }
+
+    private object ElEndedGet(JsCallArgs a)
+    {
+        return false;
+    }
+
+    private object ElMutedGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node != null && e.Node.GetAttr("muted") != null;
+    }
+
+    private object ElMutedSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        bool m = JsValueOps.ToBoolean(a.Get(0));
+        if (m) SetAttribute(e.Node, "muted", "");
+        else if (e.Node != null && e.Node.Attrs != null) e.Node.Attrs.Remove("muted");
+        return JsUndefined.Instance;
+    }
+
+    private object ElVolumeGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.GetProperty("_volume", out object v)) return v;
+        return 1.0;
+    }
+
+    private object ElVolumeSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        double vol = System.Math.Max(0.0, System.Math.Min(1.0, JsValueOps.ToNumber(a.Get(0))));
+        e.SetProperty("_volume", vol);
+        return JsUndefined.Instance;
+    }
+
+    private object ElReadyStateGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null && (e.Node.Tag == "video" || e.Node.Tag == "audio"))
+        {
+            string src = e.Node.GetAttr("src");
+            if (!string.IsNullOrEmpty(src)) return 4.0;
+        }
+        return 0.0;
+    }
+
+    private object ElNetworkStateGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null && (e.Node.Tag == "video" || e.Node.Tag == "audio"))
+        {
+            string src = e.Node.GetAttr("src");
+            if (!string.IsNullOrEmpty(src)) return 1.0;
+        }
+        return 0.0;
+    }
+
+    private object ElVideoWidthGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null)
+        {
+            string sw = e.Node.GetAttr("width");
+            if (!string.IsNullOrEmpty(sw) && int.TryParse(sw, out int pw) && pw > 0) return (double)pw;
+        }
+        return 640.0;
+    }
+
+    private object ElVideoHeightGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.Node != null)
+        {
+            string sh = e.Node.GetAttr("height");
+            if (!string.IsNullOrEmpty(sh) && int.TryParse(sh, out int ph) && ph > 0) return (double)ph;
+        }
+        return 360.0;
+    }
+
+    private object ElPlaybackRateGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        if (e.GetProperty("_playbackRate", out object v)) return v;
+        return 1.0;
+    }
+
+    private object ElPlaybackRateSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        double r = JsValueOps.ToNumber(a.Get(0));
+        e.SetProperty("_playbackRate", r);
+        return JsUndefined.Instance;
+    }
+
+    private object ElAutoplayGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node != null && e.Node.GetAttr("autoplay") != null;
+    }
+
+    private object ElAutoplaySet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        bool b = JsValueOps.ToBoolean(a.Get(0));
+        if (b) SetAttribute(e.Node, "autoplay", "");
+        else if (e.Node != null && e.Node.Attrs != null) e.Node.Attrs.Remove("autoplay");
+        return JsUndefined.Instance;
+    }
+
+    private object ElLoopGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node != null && e.Node.GetAttr("loop") != null;
+    }
+
+    private object ElLoopSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        bool b = JsValueOps.ToBoolean(a.Get(0));
+        if (b) SetAttribute(e.Node, "loop", "");
+        else if (e.Node != null && e.Node.Attrs != null) e.Node.Attrs.Remove("loop");
+        return JsUndefined.Instance;
+    }
+
+    private object ElControlsGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node != null && e.Node.GetAttr("controls") != null;
+    }
+
+    private object ElControlsSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        bool b = JsValueOps.ToBoolean(a.Get(0));
+        if (b) SetAttribute(e.Node, "controls", "");
+        else if (e.Node != null && e.Node.Attrs != null) e.Node.Attrs.Remove("controls");
+        return JsUndefined.Instance;
+    }
+
+    private object ElPosterGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node != null ? (e.Node.GetAttr("poster") ?? "") : "";
+    }
+
+    private object ElPosterSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        SetAttribute(e.Node, "poster", JsValueOps.ToStringValue(a.Get(0)));
+        return JsUndefined.Instance;
+    }
+
+    private object ElPreloadGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node != null ? (e.Node.GetAttr("preload") ?? "auto") : "auto";
+    }
+
+    private object ElPreloadSet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        SetAttribute(e.Node, "preload", JsValueOps.ToStringValue(a.Get(0)));
+        return JsUndefined.Instance;
+    }
+
+    private object ElCurrentSrcGet(JsCallArgs a)
+    {
+        JsElementObject e = A(a);
+        return e.Node != null ? (e.Node.GetAttr("src") ?? "") : "";
+    }
+
+    private object ElBufferedGet(JsCallArgs a)
+    {
+        JsObject tr = Realm.NewObject();
+        tr.Define("length", JsProperty.DataNonEnum(1.0));
+        DefineOn(tr, "start", delegate (JsCallArgs a2) { return 0.0; }, 1);
+        DefineOn(tr, "end", delegate (JsCallArgs a2) { return 120.0; }, 1);
+        return tr;
+    }
+
+    private object ElPlayedGet(JsCallArgs a)
+    {
+        JsObject tr = Realm.NewObject();
+        tr.Define("length", JsProperty.DataNonEnum(0.0));
+        DefineOn(tr, "start", delegate (JsCallArgs a2) { return 0.0; }, 1);
+        DefineOn(tr, "end", delegate (JsCallArgs a2) { return 0.0; }, 1);
+        return tr;
+    }
+
+    private object ElSeekableGet(JsCallArgs a)
+    {
+        JsObject tr = Realm.NewObject();
+        tr.Define("length", JsProperty.DataNonEnum(1.0));
+        DefineOn(tr, "start", delegate (JsCallArgs a2) { return 0.0; }, 1);
+        DefineOn(tr, "end", delegate (JsCallArgs a2) { return 120.0; }, 1);
+        return tr;
+    }
+
     private object ElInsertAdjacentHTML(JsCallArgs a)
     {
         JsElementObject e = A(a);
@@ -2117,6 +2443,25 @@ public sealed class JsDom
             newCtx.Define("canvas", JsProperty.DataNonEnum(e));
             e.SetProperty("_canvas2d", newCtx);
             return newCtx;
+        }
+        if (ctxType == "webgl" || ctxType == "experimental-webgl" || ctxType == "webgl2")
+        {
+            string key = ctxType == "webgl2" ? "_webgl2" : "_webgl";
+            if (e.GetProperty(key, out object glCtx)) return glCtx;
+            int w = 300, h = 150;
+            string sw = e.Node.GetAttr("width");
+            string sh = e.Node.GetAttr("height");
+            if (!string.IsNullOrEmpty(sw) && int.TryParse(sw, out int pw) && pw > 0) w = pw;
+            if (!string.IsNullOrEmpty(sh) && int.TryParse(sh, out int ph) && ph > 0) h = ph;
+            if (w > 2048) w = 2048; if (h > 2048) h = 2048;
+            if (e.Node.CanvasSurface == null)
+            {
+                e.Node.CanvasSurface = new Cosmos.Kernel.System.Graphics.Bitmap(w, h, Cosmos.Kernel.System.Graphics.ColorDepth.ColorDepth32);
+            }
+
+            JsObject newGl = BuildWebGLContextInstance(e, ctxType);
+            e.SetProperty(key, newGl);
+            return newGl;
         }
         return JsNull.Instance;
     }
@@ -2870,7 +3215,7 @@ public sealed class JsDom
             "HTMLTextAreaElement", "HTMLSelectElement", "HTMLOptionElement", "HTMLFormElement", "HTMLTableElement",
             "HTMLTableRowElement", "HTMLTableCellElement", "HTMLUListElement", "HTMLOListElement", "HTMLLIElement",
             "HTMLScriptElement", "HTMLStyleElement", "HTMLLinkElement", "HTMLMetaElement", "HTMLIFrameElement",
-            "HTMLCanvasElement", "HTMLAudioElement", "HTMLVideoElement", "HTMLUnknownElement"
+            "HTMLCanvasElement", "HTMLAudioElement", "HTMLVideoElement", "HTMLMediaElement", "HTMLUnknownElement"
         };
         for (int i = 0; i < elementClasses.Length; i++)
         {
@@ -2933,8 +3278,12 @@ public sealed class JsDom
         Realm.Global.Define("DOMTokenList", JsProperty.Data(Realm.MakeCtor("DOMTokenList", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, Realm.NewObject(collProto))));
         Realm.Global.Define("NamedNodeMap", JsProperty.Data(Realm.MakeCtor("NamedNodeMap", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, Realm.NewObject(collProto))));
 
+        JsObject trProto = Realm.NewObject();
+        Realm.Global.Define("TimeRanges", JsProperty.Data(Realm.MakeCtor("TimeRanges", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, trProto)));
+
         BuildRange(Realm);
         BuildCanvas2D(Realm);
+        BuildWebGL(Realm);
     }
 
     private void BuildRange(JsRealm realm)
@@ -3727,6 +4076,21 @@ public sealed class JsDom
         {
             TryCall((JsFunction)p.Value, obj, ev);
         }
+        else if (obj is JsElementObject elObj && elObj.Node != null && Interp != null)
+        {
+            string inlineAttr = elObj.Node.GetAttr("on" + ev.Type);
+            if (!string.IsNullOrEmpty(inlineAttr))
+            {
+                try
+                {
+                    JsProgram prog = JsParser.ParseProgram(inlineAttr);
+                    Interp.RunProgram(prog);
+                    Interp.DrainJobs();
+                    ev.DefaultPrevented = true;
+                }
+                catch { }
+            }
+        }
     }
 
     private void TryCall(JsFunction fn, object thisVal, JsEventObject ev)
@@ -4127,6 +4491,487 @@ public sealed class JsDom
         JsElementObject e = a.ThisValue as JsElementObject;
         if (e == null) throw JsErr.Type("Illegal invocation");
         return e;
+    }
+
+    private JsObject BuildWebGLContextInstance(JsElementObject e, string ctxType)
+    {
+        JsObject proto = ctxType == "webgl2" ? WebGL2ContextPrototype : WebGLContextPrototype;
+        JsObject newCtx = Realm.NewObject(proto);
+        newCtx.Define("canvas", JsProperty.DataNonEnum(e));
+        int w = 300, h = 150;
+        if (e.Node != null)
+        {
+            string sw = e.Node.GetAttr("width");
+            string sh = e.Node.GetAttr("height");
+            if (!string.IsNullOrEmpty(sw) && int.TryParse(sw, out int pw) && pw > 0) w = pw;
+            if (!string.IsNullOrEmpty(sh) && int.TryParse(sh, out int ph) && ph > 0) h = ph;
+        }
+        newCtx.Define("drawingBufferWidth", JsProperty.DataNonEnum((double)w));
+        newCtx.Define("drawingBufferHeight", JsProperty.DataNonEnum((double)h));
+        return newCtx;
+    }
+
+    private static void DefineGlConstants(JsObject target)
+    {
+        target.Define("DEPTH_BUFFER_BIT", JsProperty.DataNonEnum((double)0x00000100));
+        target.Define("STENCIL_BUFFER_BIT", JsProperty.DataNonEnum((double)0x00000400));
+        target.Define("COLOR_BUFFER_BIT", JsProperty.DataNonEnum((double)0x00004000));
+        target.Define("POINTS", JsProperty.DataNonEnum((double)0x0000));
+        target.Define("LINES", JsProperty.DataNonEnum((double)0x0001));
+        target.Define("LINE_LOOP", JsProperty.DataNonEnum((double)0x0002));
+        target.Define("LINE_STRIP", JsProperty.DataNonEnum((double)0x0003));
+        target.Define("TRIANGLES", JsProperty.DataNonEnum((double)0x0004));
+        target.Define("TRIANGLE_STRIP", JsProperty.DataNonEnum((double)0x0005));
+        target.Define("TRIANGLE_FAN", JsProperty.DataNonEnum((double)0x0006));
+        target.Define("BYTE", JsProperty.DataNonEnum((double)0x1400));
+        target.Define("UNSIGNED_BYTE", JsProperty.DataNonEnum((double)0x1401));
+        target.Define("SHORT", JsProperty.DataNonEnum((double)0x1402));
+        target.Define("UNSIGNED_SHORT", JsProperty.DataNonEnum((double)0x1403));
+        target.Define("INT", JsProperty.DataNonEnum((double)0x1404));
+        target.Define("UNSIGNED_INT", JsProperty.DataNonEnum((double)0x1405));
+        target.Define("FLOAT", JsProperty.DataNonEnum((double)0x1406));
+        target.Define("FRAGMENT_SHADER", JsProperty.DataNonEnum((double)0x8B30));
+        target.Define("VERTEX_SHADER", JsProperty.DataNonEnum((double)0x8B31));
+        target.Define("COMPILE_STATUS", JsProperty.DataNonEnum((double)0x8B81));
+        target.Define("LINK_STATUS", JsProperty.DataNonEnum((double)0x8B82));
+        target.Define("VALIDATE_STATUS", JsProperty.DataNonEnum((double)0x8B83));
+        target.Define("ARRAY_BUFFER", JsProperty.DataNonEnum((double)0x8892));
+        target.Define("ELEMENT_ARRAY_BUFFER", JsProperty.DataNonEnum((double)0x8893));
+        target.Define("STATIC_DRAW", JsProperty.DataNonEnum((double)0x88E4));
+        target.Define("DYNAMIC_DRAW", JsProperty.DataNonEnum((double)0x88E8));
+        target.Define("STREAM_DRAW", JsProperty.DataNonEnum((double)0x88E0));
+        target.Define("TEXTURE_2D", JsProperty.DataNonEnum((double)0x0DE1));
+        target.Define("TEXTURE_CUBE_MAP", JsProperty.DataNonEnum((double)0x8513));
+        target.Define("RGBA", JsProperty.DataNonEnum((double)0x1908));
+        target.Define("RGB", JsProperty.DataNonEnum((double)0x1907));
+        target.Define("ALPHA", JsProperty.DataNonEnum((double)0x1906));
+        target.Define("LUMINANCE", JsProperty.DataNonEnum((double)0x1909));
+        target.Define("LUMINANCE_ALPHA", JsProperty.DataNonEnum((double)0x190A));
+        target.Define("DEPTH_COMPONENT", JsProperty.DataNonEnum((double)0x1902));
+        target.Define("TEXTURE_MAG_FILTER", JsProperty.DataNonEnum((double)0x2800));
+        target.Define("TEXTURE_MIN_FILTER", JsProperty.DataNonEnum((double)0x2801));
+        target.Define("TEXTURE_WRAP_S", JsProperty.DataNonEnum((double)0x2802));
+        target.Define("TEXTURE_WRAP_T", JsProperty.DataNonEnum((double)0x2803));
+        target.Define("NEAREST", JsProperty.DataNonEnum((double)0x2600));
+        target.Define("LINEAR", JsProperty.DataNonEnum((double)0x2601));
+        target.Define("CLAMP_TO_EDGE", JsProperty.DataNonEnum((double)0x812F));
+        target.Define("REPEAT", JsProperty.DataNonEnum((double)0x2901));
+        target.Define("MIRRORED_REPEAT", JsProperty.DataNonEnum((double)0x8370));
+        target.Define("FRAMEBUFFER", JsProperty.DataNonEnum((double)0x8D40));
+        target.Define("RENDERBUFFER", JsProperty.DataNonEnum((double)0x8D41));
+        target.Define("COLOR_ATTACHMENT0", JsProperty.DataNonEnum((double)0x8CE0));
+        target.Define("DEPTH_ATTACHMENT", JsProperty.DataNonEnum((double)0x8D00));
+        target.Define("STENCIL_ATTACHMENT", JsProperty.DataNonEnum((double)0x8D20));
+        target.Define("DEPTH_STENCIL_ATTACHMENT", JsProperty.DataNonEnum((double)0x821A));
+        target.Define("FRAMEBUFFER_COMPLETE", JsProperty.DataNonEnum((double)0x8CD5));
+        target.Define("VENDOR", JsProperty.DataNonEnum((double)0x1F00));
+        target.Define("RENDERER", JsProperty.DataNonEnum((double)0x1F01));
+        target.Define("VERSION", JsProperty.DataNonEnum((double)0x1F02));
+        target.Define("SHADING_LANGUAGE_VERSION", JsProperty.DataNonEnum((double)0x8B8C));
+        target.Define("MAX_TEXTURE_SIZE", JsProperty.DataNonEnum((double)0x0D33));
+        target.Define("MAX_VIEWPORT_DIMS", JsProperty.DataNonEnum((double)0x0D3A));
+        target.Define("MAX_VERTEX_ATTRIBS", JsProperty.DataNonEnum((double)0x8869));
+        target.Define("MAX_VERTEX_UNIFORM_VECTORS", JsProperty.DataNonEnum((double)0x8DFB));
+        target.Define("MAX_VARYING_VECTORS", JsProperty.DataNonEnum((double)0x8DFC));
+        target.Define("MAX_COMBINED_TEXTURE_IMAGE_UNITS", JsProperty.DataNonEnum((double)0x8B4D));
+        target.Define("MAX_VERTEX_TEXTURE_IMAGE_UNITS", JsProperty.DataNonEnum((double)0x8B4C));
+        target.Define("MAX_TEXTURE_IMAGE_UNITS", JsProperty.DataNonEnum((double)0x8872));
+        target.Define("MAX_FRAGMENT_UNIFORM_VECTORS", JsProperty.DataNonEnum((double)0x8DFD));
+        target.Define("MAX_RENDERBUFFER_SIZE", JsProperty.DataNonEnum((double)0x84E8));
+        target.Define("ALIASED_LINE_WIDTH_RANGE", JsProperty.DataNonEnum((double)0x846E));
+        target.Define("ALIASED_POINT_SIZE_RANGE", JsProperty.DataNonEnum((double)0x846D));
+        target.Define("UNPACK_ALIGNMENT", JsProperty.DataNonEnum((double)0x0CF5));
+        target.Define("NO_ERROR", JsProperty.DataNonEnum(0.0));
+        target.Define("INVALID_ENUM", JsProperty.DataNonEnum((double)0x0500));
+        target.Define("INVALID_VALUE", JsProperty.DataNonEnum((double)0x0501));
+        target.Define("INVALID_OPERATION", JsProperty.DataNonEnum((double)0x0502));
+        target.Define("OUT_OF_MEMORY", JsProperty.DataNonEnum((double)0x0505));
+    }
+
+    private void BuildWebGL(JsRealm realm)
+    {
+        WebGLContextPrototype = realm.NewObject();
+        WebGLContextPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLRenderingContext");
+
+        WebGL2ContextPrototype = realm.NewObject(WebGLContextPrototype);
+        WebGL2ContextPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGL2RenderingContext");
+
+        WebGLShaderPrototype = realm.NewObject();
+        WebGLShaderPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLShader");
+
+        WebGLProgramPrototype = realm.NewObject();
+        WebGLProgramPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLProgram");
+
+        WebGLBufferPrototype = realm.NewObject();
+        WebGLBufferPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLBuffer");
+
+        WebGLTexturePrototype = realm.NewObject();
+        WebGLTexturePrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLTexture");
+
+        WebGLFramebufferPrototype = realm.NewObject();
+        WebGLFramebufferPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLFramebuffer");
+
+        WebGLRenderbufferPrototype = realm.NewObject();
+        WebGLRenderbufferPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLRenderbuffer");
+
+        WebGLUniformLocationPrototype = realm.NewObject();
+        WebGLUniformLocationPrototype.SetWellKnown(JsWellKnown.ToStringTag, "WebGLUniformLocation");
+
+        DefineGlConstants(WebGLContextPrototype);
+        DefineGlConstants(WebGL2ContextPrototype);
+
+        JsNativeFn noop = delegate (JsCallArgs a) { return JsUndefined.Instance; };
+
+        DefineOn(WebGLContextPrototype, "getParameter", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount == 0) return 0.0;
+            double p = JsValueOps.ToNumber(a.Get(0));
+            int pname = (int)p;
+            switch (pname)
+            {
+                case 0x1F02: // VERSION
+                {
+                    JsObject ctx = a.ThisValue as JsObject;
+                    bool is2 = ctx != null && ctx.Prototype == WebGL2ContextPrototype;
+                    return is2 ? "WebGL 2.0 (Windose Managed)" : "WebGL 1.0 (Windose Managed)";
+                }
+                case 0x8B8C: // SHADING_LANGUAGE_VERSION
+                {
+                    JsObject ctx = a.ThisValue as JsObject;
+                    bool is2 = ctx != null && ctx.Prototype == WebGL2ContextPrototype;
+                    return is2 ? "WebGL GLSL ES 3.00 (Windose)" : "WebGL GLSL ES 1.00 (Windose)";
+                }
+                case 0x1F00: return "Windose Project"; // VENDOR
+                case 0x1F01: return "Windose Managed WebGL Engine"; // RENDERER
+                case 0x0D33: return 4096.0; // MAX_TEXTURE_SIZE
+                case 0x0D3A: // MAX_VIEWPORT_DIMS
+                {
+                    JsArray dims = realm.NewArray();
+                    dims.Items.Add(4096.0);
+                    dims.Items.Add(4096.0);
+                    return dims;
+                }
+                case 0x8869: return 16.0; // MAX_VERTEX_ATTRIBS
+                case 0x8DFB: return 256.0; // MAX_VERTEX_UNIFORM_VECTORS
+                case 0x8DFC: return 16.0; // MAX_VARYING_VECTORS
+                case 0x8B4D: return 32.0; // MAX_COMBINED_TEXTURE_IMAGE_UNITS
+                case 0x8B4C: return 16.0; // MAX_VERTEX_TEXTURE_IMAGE_UNITS
+                case 0x8872: return 16.0; // MAX_TEXTURE_IMAGE_UNITS
+                case 0x8DFD: return 256.0; // MAX_FRAGMENT_UNIFORM_VECTORS
+                case 0x84E8: return 4096.0; // MAX_RENDERBUFFER_SIZE
+                case 0x0CF5: return 4.0; // UNPACK_ALIGNMENT
+                case 0x846E: // ALIASED_LINE_WIDTH_RANGE
+                {
+                    JsArray r = realm.NewArray();
+                    r.Items.Add(1.0);
+                    r.Items.Add(1.0);
+                    return r;
+                }
+                case 0x846D: // ALIASED_POINT_SIZE_RANGE
+                {
+                    JsArray r = realm.NewArray();
+                    r.Items.Add(1.0);
+                    r.Items.Add(1024.0);
+                    return r;
+                }
+                default:
+                    return 0.0;
+            }
+        }, 1);
+
+        DefineOn(WebGLContextPrototype, "getExtension", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount == 0) return JsNull.Instance;
+            string name = JsValueOps.ToStringValue(a.Get(0)).Trim();
+            if (name == "WEBGL_lose_context" || name == "OES_texture_float" ||
+                name == "OES_element_index_uint" || name == "ANGLE_instanced_arrays" ||
+                name == "EXT_texture_filter_anisotropic" || name == "WEBGL_depth_texture")
+            {
+                JsObject ext = realm.NewObject();
+                return ext;
+            }
+            return JsNull.Instance;
+        }, 1);
+
+        DefineOn(WebGLContextPrototype, "getSupportedExtensions", delegate (JsCallArgs a)
+        {
+            JsArray exts = realm.NewArray();
+            exts.Items.Add("ANGLE_instanced_arrays");
+            exts.Items.Add("OES_texture_float");
+            exts.Items.Add("OES_element_index_uint");
+            exts.Items.Add("WEBGL_depth_texture");
+            exts.Items.Add("EXT_texture_filter_anisotropic");
+            return exts;
+        }, 0);
+
+        DefineOn(WebGLContextPrototype, "createShader", delegate (JsCallArgs a)
+        {
+            JsObject sh = realm.NewObject(WebGLShaderPrototype);
+            if (a.ArgCount > 0) sh.SetProperty("_type", a.Get(0));
+            return sh;
+        }, 1);
+
+        DefineOn(WebGLContextPrototype, "shaderSource", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount > 1 && a.Get(0) is JsObject sh)
+            {
+                sh.SetProperty("_source", a.Get(1));
+            }
+            return JsUndefined.Instance;
+        }, 2);
+
+        DefineOn(WebGLContextPrototype, "compileShader", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount > 0 && a.Get(0) is JsObject sh)
+            {
+                sh.SetProperty("_compiled", true);
+            }
+            return JsUndefined.Instance;
+        }, 1);
+
+        DefineOn(WebGLContextPrototype, "getShaderParameter", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount > 1)
+            {
+                int pname = (int)JsValueOps.ToNumber(a.Get(1));
+                if (pname == 0x8B81) return true; // COMPILE_STATUS
+                if (pname == 0x8B80) return false; // DELETE_STATUS
+                if (pname == 0x8B4F && a.Get(0) is JsObject sh && sh.GetProperty("_type", out object t)) return t; // SHADER_TYPE
+            }
+            return true;
+        }, 2);
+
+        DefineOn(WebGLContextPrototype, "getShaderInfoLog", delegate (JsCallArgs a) { return ""; }, 1);
+        DefineOn(WebGLContextPrototype, "deleteShader", noop, 1);
+
+        DefineOn(WebGLContextPrototype, "createProgram", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(WebGLProgramPrototype);
+        }, 0);
+
+        DefineOn(WebGLContextPrototype, "attachShader", noop, 2);
+        DefineOn(WebGLContextPrototype, "detachShader", noop, 2);
+
+        DefineOn(WebGLContextPrototype, "linkProgram", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount > 0 && a.Get(0) is JsObject prog)
+            {
+                prog.SetProperty("_linked", true);
+            }
+            return JsUndefined.Instance;
+        }, 1);
+
+        DefineOn(WebGLContextPrototype, "getProgramParameter", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount > 1)
+            {
+                int pname = (int)JsValueOps.ToNumber(a.Get(1));
+                if (pname == 0x8B82) return true; // LINK_STATUS
+                if (pname == 0x8B83) return true; // VALIDATE_STATUS
+                if (pname == 0x8B84) return ""; // INFO_LOG_LENGTH
+                if (pname == 0x8B89) return 0.0; // ACTIVE_UNIFORMS
+                if (pname == 0x8B86) return 0.0; // ACTIVE_ATTRIBUTES
+            }
+            return true;
+        }, 2);
+
+        DefineOn(WebGLContextPrototype, "getProgramInfoLog", delegate (JsCallArgs a) { return ""; }, 1);
+        DefineOn(WebGLContextPrototype, "deleteProgram", noop, 1);
+        DefineOn(WebGLContextPrototype, "useProgram", noop, 1);
+
+        DefineOn(WebGLContextPrototype, "createBuffer", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(WebGLBufferPrototype);
+        }, 0);
+
+        DefineOn(WebGLContextPrototype, "bindBuffer", noop, 2);
+        DefineOn(WebGLContextPrototype, "bufferData", noop, 3);
+        DefineOn(WebGLContextPrototype, "bufferSubData", noop, 3);
+        DefineOn(WebGLContextPrototype, "deleteBuffer", noop, 1);
+
+        DefineOn(WebGLContextPrototype, "createTexture", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(WebGLTexturePrototype);
+        }, 0);
+
+        DefineOn(WebGLContextPrototype, "bindTexture", noop, 2);
+        DefineOn(WebGLContextPrototype, "texParameteri", noop, 3);
+        DefineOn(WebGLContextPrototype, "texParameterf", noop, 3);
+        DefineOn(WebGLContextPrototype, "texImage2D", noop, 6);
+        DefineOn(WebGLContextPrototype, "texSubImage2D", noop, 7);
+        DefineOn(WebGLContextPrototype, "generateMipmap", noop, 1);
+        DefineOn(WebGLContextPrototype, "deleteTexture", noop, 1);
+
+        DefineOn(WebGLContextPrototype, "createFramebuffer", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(WebGLFramebufferPrototype);
+        }, 0);
+
+        DefineOn(WebGLContextPrototype, "bindFramebuffer", noop, 2);
+        DefineOn(WebGLContextPrototype, "checkFramebufferStatus", delegate (JsCallArgs a) { return (double)0x8CD5; }, 1); // FRAMEBUFFER_COMPLETE
+        DefineOn(WebGLContextPrototype, "deleteFramebuffer", noop, 1);
+
+        DefineOn(WebGLContextPrototype, "createRenderbuffer", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(WebGLRenderbufferPrototype);
+        }, 0);
+
+        DefineOn(WebGLContextPrototype, "bindRenderbuffer", noop, 2);
+        DefineOn(WebGLContextPrototype, "renderbufferStorage", noop, 4);
+        DefineOn(WebGLContextPrototype, "framebufferTexture2D", noop, 5);
+        DefineOn(WebGLContextPrototype, "framebufferRenderbuffer", noop, 4);
+        DefineOn(WebGLContextPrototype, "deleteRenderbuffer", noop, 1);
+
+        DefineOn(WebGLContextPrototype, "getAttribLocation", delegate (JsCallArgs a) { return 0.0; }, 2);
+        DefineOn(WebGLContextPrototype, "getUniformLocation", delegate (JsCallArgs a)
+        {
+            JsObject uLoc = realm.NewObject(WebGLUniformLocationPrototype);
+            if (a.ArgCount > 1) uLoc.SetProperty("_name", a.Get(1));
+            return uLoc;
+        }, 2);
+
+        DefineOn(WebGLContextPrototype, "enableVertexAttribArray", noop, 1);
+        DefineOn(WebGLContextPrototype, "disableVertexAttribArray", noop, 1);
+        DefineOn(WebGLContextPrototype, "vertexAttribPointer", noop, 6);
+
+        DefineOn(WebGLContextPrototype, "uniform1f", noop, 2);
+        DefineOn(WebGLContextPrototype, "uniform1i", noop, 2);
+        DefineOn(WebGLContextPrototype, "uniform2f", noop, 3);
+        DefineOn(WebGLContextPrototype, "uniform2i", noop, 3);
+        DefineOn(WebGLContextPrototype, "uniform3f", noop, 4);
+        DefineOn(WebGLContextPrototype, "uniform3i", noop, 4);
+        DefineOn(WebGLContextPrototype, "uniform4f", noop, 5);
+        DefineOn(WebGLContextPrototype, "uniform4i", noop, 5);
+        DefineOn(WebGLContextPrototype, "uniform1fv", noop, 2);
+        DefineOn(WebGLContextPrototype, "uniform2fv", noop, 2);
+        DefineOn(WebGLContextPrototype, "uniform3fv", noop, 2);
+        DefineOn(WebGLContextPrototype, "uniform4fv", noop, 2);
+        DefineOn(WebGLContextPrototype, "uniformMatrix2fv", noop, 3);
+        DefineOn(WebGLContextPrototype, "uniformMatrix3fv", noop, 3);
+        DefineOn(WebGLContextPrototype, "uniformMatrix4fv", noop, 3);
+
+        DefineOn(WebGLContextPrototype, "viewport", noop, 4);
+        DefineOn(WebGLContextPrototype, "scissor", noop, 4);
+
+        DefineOn(WebGLContextPrototype, "clearColor", delegate (JsCallArgs a)
+        {
+            JsObject ctx = a.ThisValue as JsObject;
+            if (ctx != null)
+            {
+                double r = a.ArgCount > 0 ? JsValueOps.ToNumber(a.Get(0)) : 0.0;
+                double g = a.ArgCount > 1 ? JsValueOps.ToNumber(a.Get(1)) : 0.0;
+                double b = a.ArgCount > 2 ? JsValueOps.ToNumber(a.Get(2)) : 0.0;
+                double al = a.ArgCount > 3 ? JsValueOps.ToNumber(a.Get(3)) : 1.0;
+                int ir = System.Math.Max(0, System.Math.Min(255, (int)(r * 255.0)));
+                int ig = System.Math.Max(0, System.Math.Min(255, (int)(g * 255.0)));
+                int ib = System.Math.Max(0, System.Math.Min(255, (int)(b * 255.0)));
+                int ia = System.Math.Max(0, System.Math.Min(255, (int)(al * 255.0)));
+                uint c = (uint)((ia << 24) | (ir << 16) | (ig << 8) | ib);
+                ctx.SetProperty("_clearColor", c);
+            }
+            return JsUndefined.Instance;
+        }, 4);
+
+        DefineOn(WebGLContextPrototype, "clearDepth", noop, 1);
+        DefineOn(WebGLContextPrototype, "clearStencil", noop, 1);
+
+        DefineOn(WebGLContextPrototype, "clear", delegate (JsCallArgs a)
+        {
+            JsObject ctx = a.ThisValue as JsObject;
+            if (ctx != null && ctx.GetProperty("canvas", out object cv) && cv is JsElementObject el && el.Node != null && el.Node.CanvasSurface is Cosmos.Kernel.System.Graphics.Bitmap bmp && bmp.RawData != null)
+            {
+                uint c = 0xFF000000;
+                if (ctx.GetProperty("_clearColor", out object clr) && clr is uint uc) c = uc;
+                int len = bmp.RawData.Length;
+                for (int i = 0; i < len; i++) bmp.RawData[i] = (int)c;
+                MarkChanged();
+            }
+            return JsUndefined.Instance;
+        }, 1);
+
+        DefineOn(WebGLContextPrototype, "drawArrays", noop, 3);
+        DefineOn(WebGLContextPrototype, "drawElements", noop, 4);
+        DefineOn(WebGLContextPrototype, "flush", noop, 0);
+        DefineOn(WebGLContextPrototype, "finish", noop, 0);
+        DefineOn(WebGLContextPrototype, "getError", delegate (JsCallArgs a) { return 0.0; }, 0); // NO_ERROR
+        DefineOn(WebGLContextPrototype, "pixelStorei", noop, 2);
+        DefineOn(WebGLContextPrototype, "enable", noop, 1);
+        DefineOn(WebGLContextPrototype, "disable", noop, 1);
+        DefineOn(WebGLContextPrototype, "blendFunc", noop, 2);
+        DefineOn(WebGLContextPrototype, "blendFuncSeparate", noop, 4);
+        DefineOn(WebGLContextPrototype, "blendEquation", noop, 1);
+        DefineOn(WebGLContextPrototype, "blendEquationSeparate", noop, 2);
+        DefineOn(WebGLContextPrototype, "cullFace", noop, 1);
+        DefineOn(WebGLContextPrototype, "frontFace", noop, 1);
+        DefineOn(WebGLContextPrototype, "depthFunc", noop, 1);
+        DefineOn(WebGLContextPrototype, "depthMask", noop, 1);
+        DefineOn(WebGLContextPrototype, "depthRange", noop, 2);
+        DefineOn(WebGLContextPrototype, "colorMask", noop, 4);
+        DefineOn(WebGLContextPrototype, "stencilFunc", noop, 3);
+        DefineOn(WebGLContextPrototype, "stencilMask", noop, 1);
+        DefineOn(WebGLContextPrototype, "stencilOp", noop, 3);
+
+        DefineOn(WebGLContextPrototype, "getContextAttributes", delegate (JsCallArgs a)
+        {
+            JsObject attr = realm.NewObject();
+            attr.Define("alpha", JsProperty.Data(true));
+            attr.Define("depth", JsProperty.Data(true));
+            attr.Define("stencil", JsProperty.Data(false));
+            attr.Define("antialias", JsProperty.Data(true));
+            attr.Define("premultipliedAlpha", JsProperty.Data(true));
+            attr.Define("preserveDrawingBuffer", JsProperty.Data(false));
+            return attr;
+        }, 0);
+
+        DefineOn(WebGLContextPrototype, "isContextLost", delegate (JsCallArgs a) { return false; }, 0);
+        DefineOn(WebGLContextPrototype, "readPixels", noop, 7);
+        DefineOn(WebGLContextPrototype, "activeTexture", noop, 1);
+
+        // WebGL2 specific methods
+        DefineOn(WebGL2ContextPrototype, "createVertexArray", delegate (JsCallArgs a) { return realm.NewObject(); }, 0);
+        DefineOn(WebGL2ContextPrototype, "bindVertexArray", noop, 1);
+        DefineOn(WebGL2ContextPrototype, "deleteVertexArray", noop, 1);
+        DefineOn(WebGL2ContextPrototype, "createQuery", delegate (JsCallArgs a) { return realm.NewObject(); }, 0);
+        DefineOn(WebGL2ContextPrototype, "deleteQuery", noop, 1);
+        DefineOn(WebGL2ContextPrototype, "createSampler", delegate (JsCallArgs a) { return realm.NewObject(); }, 0);
+        DefineOn(WebGL2ContextPrototype, "deleteSampler", noop, 1);
+        DefineOn(WebGL2ContextPrototype, "createTransformFeedback", delegate (JsCallArgs a) { return realm.NewObject(); }, 0);
+        DefineOn(WebGL2ContextPrototype, "deleteTransformFeedback", noop, 1);
+        DefineOn(WebGL2ContextPrototype, "drawArraysInstanced", noop, 4);
+        DefineOn(WebGL2ContextPrototype, "drawElementsInstanced", noop, 5);
+        DefineOn(WebGL2ContextPrototype, "vertexAttribDivisor", noop, 2);
+        DefineOn(WebGL2ContextPrototype, "texStorage2D", noop, 5);
+        DefineOn(WebGL2ContextPrototype, "texStorage3D", noop, 6);
+        DefineOn(WebGL2ContextPrototype, "texImage3D", noop, 10);
+
+        // Global constructors
+        JsFunction glCtor = realm.MakeCtor("WebGLRenderingContext", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLContextPrototype);
+        DefineGlConstants(glCtor);
+        realm.Global.Define("WebGLRenderingContext", JsProperty.Data(glCtor));
+
+        JsFunction gl2Ctor = realm.MakeCtor("WebGL2RenderingContext", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGL2ContextPrototype);
+        DefineGlConstants(gl2Ctor);
+        realm.Global.Define("WebGL2RenderingContext", JsProperty.Data(gl2Ctor));
+
+        realm.Global.Define("WebGLShader", JsProperty.Data(realm.MakeCtor("WebGLShader", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLShaderPrototype)));
+        realm.Global.Define("WebGLProgram", JsProperty.Data(realm.MakeCtor("WebGLProgram", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLProgramPrototype)));
+        realm.Global.Define("WebGLBuffer", JsProperty.Data(realm.MakeCtor("WebGLBuffer", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLBufferPrototype)));
+        realm.Global.Define("WebGLTexture", JsProperty.Data(realm.MakeCtor("WebGLTexture", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLTexturePrototype)));
+        realm.Global.Define("WebGLFramebuffer", JsProperty.Data(realm.MakeCtor("WebGLFramebuffer", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLFramebufferPrototype)));
+        realm.Global.Define("WebGLRenderbuffer", JsProperty.Data(realm.MakeCtor("WebGLRenderbuffer", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLRenderbufferPrototype)));
+        realm.Global.Define("WebGLUniformLocation", JsProperty.Data(realm.MakeCtor("WebGLUniformLocation", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, WebGLUniformLocationPrototype)));
+
+        JsObject activeInfoProto = realm.NewObject();
+        activeInfoProto.Define("name", JsProperty.Data(""));
+        activeInfoProto.Define("size", JsProperty.Data(1.0));
+        activeInfoProto.Define("type", JsProperty.Data((double)0x1406));
+        realm.Global.Define("WebGLActiveInfo", JsProperty.Data(realm.MakeCtor("WebGLActiveInfo", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, activeInfoProto)));
+
+        JsObject precProto = realm.NewObject();
+        precProto.Define("rangeMin", JsProperty.Data(127.0));
+        precProto.Define("rangeMax", JsProperty.Data(127.0));
+        precProto.Define("precision", JsProperty.Data(23.0));
+        realm.Global.Define("WebGLShaderPrecisionFormat", JsProperty.Data(realm.MakeCtor("WebGLShaderPrecisionFormat", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, precProto)));
     }
 
     private JsElementObject RequireNode(object v)

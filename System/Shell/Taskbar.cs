@@ -26,6 +26,7 @@ public class Taskbar : Component
     public Taskbar(int x, int y, int width, int height) : base(x, y, width, height)
     {
         zLayer = DrawLayer.Taskbar;
+        RegisterAsRoot();
         if (Palette.GlassEnabled)
         {
             useGlass = true;

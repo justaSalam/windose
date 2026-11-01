@@ -645,21 +645,17 @@ public class FileExplorer : Window
         return parent + "/" + name;
     }
 
-    public override void HandleMessage(UiMessage message)
-    {
-        if (message.Command == "filesystem.changed"
-            && currentLocation != null
-            && (currentLocation.StartsWith("/mnt", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(currentLocation, "control", StringComparison.OrdinalIgnoreCase)))
-        {
-
-            PopulateFiles(currentLocation);
-        }
-    }
-
     private void OnFileSystemChanged(FileSystemChange change)
     {
-        WindowManager.PostCommand("filesystem.changed", target: this, data: change);
+        WindowManager.RunOnUI(() =>
+        {
+            if (currentLocation != null
+                && (currentLocation.StartsWith("/mnt", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(currentLocation, "control", StringComparison.OrdinalIgnoreCase)))
+            {
+                PopulateFiles(currentLocation);
+            }
+        });
     }
 
     public override void Dispose()

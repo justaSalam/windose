@@ -570,7 +570,7 @@ public sealed class BreezeRuntime
                 return (double)(DateTime.UtcNow.Ticks / TimeSpan.TicksPerMillisecond);
 
             case "processCount":
-                return (double)ProcessManger.ProcessCount;
+                return (double)ProcessManager.ProcessCount;
 
             case "log":
                 //Serial.WriteString("[Breeze:" + processHandle.name + "] " + ToText(args[0]) + "\n");

@@ -121,6 +121,22 @@ public static class Registry
         Load();
     }
 
+    public static RegistryEntry[] GetEntries(string path)
+    {
+        path = NormalizeKey(path);
+        lock (sync)
+        {
+            var result = new List<RegistryEntry>();
+            foreach (var kvp in entries)
+            {
+                if (kvp.Key.StartsWith(path, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Add(kvp.Value);
+                }
+            }
+            return result.ToArray();
+        }
+    }
 
     /// <summary>
     /// Defines a new persistent Regitry Key

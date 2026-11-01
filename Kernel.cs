@@ -8,6 +8,7 @@ using Cosmos.Kernel.System.Input;
 using Cosmos.Kernel.System.Network;
 using Windose.Programs.Breeze;
 using Windose.System.Elf;
+using Windose.System.Features;
 using Windose.System.Kernel;
 using Windose.System.Kernel.FileSystem;
 using Windose.System.Kernel.Subsystem;
@@ -61,13 +62,20 @@ public class Kernel : Sys.Kernel
 
         new Thread(() =>
         {
-            DhcpClient dhcpClient = new();
-
-            if (dhcpClient.SendDiscoverPacket() != -1)
+            try
             {
-                IPConfig? config = NetworkManager.Primary.IPConfig;
+                DhcpClient dhcpClient = new();
+                if (dhcpClient.SendDiscoverPacket() != -1)
+                {
+                    IPConfig? config = NetworkManager.Primary.IPConfig;
+                    if (config != null)
+                        SystemLogger.WriteLine("DHCP", $"Configured IP: {config.Address}", ConsoleMessageType.Log);
+                }
             }
-
+            catch (Exception ex)
+            {
+                SystemLogger.WriteLine("DHCP", $"DHCP configuration failed: {ex.Message}", ConsoleMessageType.Warning);
+            }
         }).Start();
 
         Palette.Initialize();
@@ -114,9 +122,9 @@ public class Kernel : Sys.Kernel
 
 
 
-        ProcessManger.Start(explorer);
-        ProcessManger.Start(windowManager);
-        ProcessManger.Start(new HotkeyManager());
+        ProcessManager.Start(explorer);
+        ProcessManager.Start(windowManager);
+        ProcessManager.Start(new HotkeyManager());
 
         if (UserAccount.accounts.Count > 0)
             LockManager.Lock();
@@ -126,9 +134,12 @@ public class Kernel : Sys.Kernel
         Directory.CreateDirectory("/mnt/Programs");
         Directory.CreateDirectory("/mnt/Apps");
         Directory.CreateDirectory(SystemPaths.SystemLua);
-        File.WriteAllText(SystemPaths.SystemLua + "/init.lua", "terminal.write('^blueHello From Lua!')\nterminal.write('Running From: ' .. terminal.currentDirectory())\n ");
-        File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
-        File.WriteAllText("/mnt/System/Lua/demo.lua", "windose.open(\"explorer\")");
+        if (!File.Exists(SystemPaths.SystemLua + "/init.lua"))
+            File.WriteAllText(SystemPaths.SystemLua + "/init.lua", "terminal.write('^blueHello From Lua!')\nterminal.write('Running From: ' .. terminal.currentDirectory())\n ");
+        if (!File.Exists("/mnt/Programs/ControlTest.breeze"))
+            File.WriteAllText("/mnt/Programs/ControlTest.breeze", ControlTest.data);
+        if (!File.Exists("/mnt/System/Lua/demo.lua"))
+            File.WriteAllText("/mnt/System/Lua/demo.lua", "windose.open(\"explorer\")");
 
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze", "service.control");
 
@@ -156,20 +167,7 @@ public class Kernel : Sys.Kernel
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
         FileAssociations.DiscoverPrograms(typeof(Kernel).Assembly);
 
-        ResourceLoader.WriteStorage("/mnt/Programs/window.elf", "Windose.System.ELF.programs.bin.window.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/hello.elf", "Windose.System.ELF.programs.bin.hello.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/canvas.elf", "Windose.System.ELF.programs.bin.canvas.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/explorer.elf", "Windose.System.ELF.programs.bin.explorer.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/calc.elf", "Windose.System.ELF.programs.bin.calc.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/search.elf", "Windose.System.ELF.programs.bin.search.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/run.elf", "Windose.System.ELF.programs.bin.run.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/pager.elf", "Windose.System.ELF.programs.bin.pager.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/widgets.elf", "Windose.System.ELF.programs.bin.widgets.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/libctest.elf", "Windose.System.ELF.programs.bin.libctest.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/memhog.elf", "Windose.System.ELF.programs.bin.memhog.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/spin.elf", "Windose.System.ELF.programs.bin.spin.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/cosmoslogindialog.elf", "Windose.System.ELF.programs.bin.cosmoslogindialog.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/aeroeditor.elf", "Windose.System.ELF.programs.bin.aeroeditor.elf", true);
+
 
     }
 
@@ -186,21 +184,7 @@ public class Kernel : Sys.Kernel
     {
         try
         {
-
-            ulong freeMemoryMb = MemoryDiagnostics.FreePages * MemoryDiagnostics.PageSizeBytes / ByteSize.Megabyte;
-
-
-            if (freeMemoryMb < 32)
-            {
-                Console.Clear();
-                Console.BackgroundColor = ConsoleColor.Red;
-                Console.ForegroundColor = ConsoleColor.White;
-                SystemLogger.WriteLine("KERNEL", "Panic", ConsoleMessageType.Warning, true);
-                SystemLogger.WriteLine("KERNEL", "Low memory warning: " + freeMemoryMb + " MB free", ConsoleMessageType.Warning, true);
-                SystemLogger.WriteLine("KERNEL", "Insufficient memory available", ConsoleMessageType.Fatal, true);
-                Power.Halt();
-                return;
-            }
+            if (!MemoryCheck.Pass()) return;
 
             int nowTick = Environment.TickCount;
             if (FrameCount > 0)
@@ -225,7 +209,7 @@ public class Kernel : Sys.Kernel
 
             long processStartedAt = PerformanceMetrics.Now;
 
-            ProcessManger.Update();
+            ProcessManager.Update();
 
             PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
 

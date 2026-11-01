@@ -2718,8 +2718,24 @@ public static class HtmlLayout
                 if (ih <= 0 && tok.Style != null && tok.Style.HasH) ih = tok.Style.H;
 
                 if (iw > 0 && ih > 0) { }
-                else if (iw > 0) { ih = natH > 0 && natW > 0 ? natH * iw / natW : iw; }
-                else if (ih > 0) { iw = natW > 0 && natH > 0 ? natW * ih / natH : ih; }
+                else if (iw > 0)
+                {
+                    if (tok.Style != null && tok.Style.AspectRatio > 0)
+                        ih = (int)Math.Round(iw / tok.Style.AspectRatio);
+                    else if (natH > 0 && natW > 0)
+                        ih = natH * iw / natW;
+                    else
+                        ih = Math.Max(16, iw * 9 / 16);
+                }
+                else if (ih > 0)
+                {
+                    if (tok.Style != null && tok.Style.AspectRatio > 0)
+                        iw = (int)Math.Round(ih * tok.Style.AspectRatio);
+                    else if (natW > 0 && natH > 0)
+                        iw = natW * ih / natH;
+                    else
+                        iw = Math.Max(16, ih * 16 / 9);
+                }
                 else if (natW > 0 && natH > 0) { iw = natW; ih = natH; }
                 else { iw = 32; ih = 32; }
 
@@ -2927,14 +2943,32 @@ public static class HtmlLayout
         int natH = img != null && img.Height > 0 ? img.Height : 0;
         int w, h;
         if (tok.ImageW > 0 && tok.ImageH > 0) { w = tok.ImageW; h = tok.ImageH; }
-        else if (tok.ImageW > 0) { w = tok.ImageW; h = natH > 0 && natW > 0 ? natH * w / natW : tok.ImageW; }
-        else if (tok.ImageH > 0) { h = tok.ImageH; w = natW > 0 && natH > 0 ? natW * h / natH : tok.ImageH; }
+        else if (tok.ImageW > 0)
+        {
+            if (tok.Style != null && tok.Style.AspectRatio > 0)
+                h = (int)Math.Round(tok.ImageW / tok.Style.AspectRatio);
+            else if (natH > 0 && natW > 0)
+                h = natH * tok.ImageW / natW;
+            else
+                h = Math.Max(16, tok.ImageW * 9 / 16);
+            w = tok.ImageW;
+        }
+        else if (tok.ImageH > 0)
+        {
+            if (tok.Style != null && tok.Style.AspectRatio > 0)
+                w = (int)Math.Round(tok.ImageH * tok.Style.AspectRatio);
+            else if (natW > 0 && natH > 0)
+                w = natW * tok.ImageH / natH;
+            else
+                w = Math.Max(16, tok.ImageH * 16 / 9);
+            h = tok.ImageH;
+        }
         else { w = natW > 0 ? natW : 48; h = natH > 0 ? natH : 48; }
         // Clamp to the available content width and a sane max height, preserving aspect ratio.
-        int maxW = availW > 40 ? Math.Min(availW, 560) : 560;
-        int maxH = 400;
-        if (w > maxW) { h = h * maxW / Math.Max(1, w); w = maxW; }
-        if (h > maxH) { w = w * maxH / Math.Max(1, h); h = maxH; }
+        int maxW = availW > 40 ? availW : 1200;
+        int maxH = 800;
+        if (w > maxW) { h = Math.Max(16, h * maxW / Math.Max(1, w)); w = maxW; }
+        if (h > maxH && tok.ImageH <= 0) { w = Math.Max(16, w * maxH / Math.Max(1, h)); h = maxH; }
         if (w < 16) w = 16;
         if (h < 16) h = 16;
 

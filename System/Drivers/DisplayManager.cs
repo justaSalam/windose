@@ -1,7 +1,5 @@
 using System.Drawing;
-
 using Cosmos.Kernel.System.Graphics;
-using Cosmos.Kernel.System.Timers;
 using Windose.System.Kernel;
 
 namespace Windose.Drivers;
@@ -13,8 +11,6 @@ public sealed class DisplayManager
     public int Width => canvas == null ? 0 : canvas.Width;
     public int Height => canvas == null ? 0 : canvas.Height;
 
-    private Component test;
-
     public DisplayManager()
     {
         canvas = Kernel.canvas;
@@ -24,57 +20,49 @@ public sealed class DisplayManager
         int depth = (int)Registry.GetInteger("System/Display/BitsPerPixel", 32);
 
         BackBuffer = new ComponentBuffer(canvas.Width, canvas.Height);
-
-        TimerManager.ScheduleRecurring(() =>
-        {
-            isCursorVisible = !isCursorVisible;
-        }, TimeSpan.FromMilliseconds(83));
-       
-        test = new Component(200, 200, 100, 100);
-       
     }
-
 
     public void Present(int cursorX, int cursorY, bool contentChanged)
     {
-        // Skip the fullscreen upload when neither the backbuffer nor the cursor changed.
+        bool isStarting = LaunchTracker.isStarting;
+        bool cursorBlink = isStarting && ((Environment.TickCount / 150) % 2 != 0);
+
+        // Skip the fullscreen upload when neither the backbuffer nor the cursor state changed.
         bool cursorChanged = cursorX != lastCursorX || cursorY != lastCursorY
-            || isCursorVisible != lastCursorVisible || LaunchTracker.isStarting != lastStarting;
+            || isStarting != lastStarting
+            || (isStarting && cursorBlink != lastCursorBlink);
+
         if (!firstPresent && !contentChanged && !cursorChanged)
             return;
 
         firstPresent = false;
         lastCursorX = cursorX;
         lastCursorY = cursorY;
-        lastCursorVisible = isCursorVisible;
-        lastStarting = LaunchTracker.isStarting;
+        lastStarting = isStarting;
+        lastCursorBlink = cursorBlink;
 
         long uploadStartedAt = PerformanceMetrics.Now;
         canvas.DrawCanvas(BackBuffer, 0, 0);
-
         PerformanceMetrics.UploadTicks = PerformanceMetrics.Now - uploadStartedAt;
 
         long overlayStartedAt = PerformanceMetrics.Now;
-        DrawCursor(cursorX, cursorY);
+        DrawCursor(cursorX, cursorY, cursorBlink);
         PerformanceMetrics.OverlayTicks = PerformanceMetrics.Now - overlayStartedAt;
 
         long displayStartedAt = PerformanceMetrics.Now;
         canvas.Display();
-
         PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
     }
 
-    private bool isCursorVisible = true;
     private bool firstPresent = true;
     private int lastCursorX = int.MinValue;
     private int lastCursorY = int.MinValue;
-    private bool lastCursorVisible;
     private bool lastStarting;
+    private bool lastCursorBlink;
 
-    private void DrawCursor(int x, int y)
+    private void DrawCursor(int x, int y, bool isHiddenByBlink)
     {
-        if (!isCursorVisible && LaunchTracker.isStarting) return;
+        if (isHiddenByBlink) return;
         canvas.DrawImage(Cursors.arrow, x, y);
     }
-
-}
+}

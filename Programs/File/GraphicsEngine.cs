@@ -9,8 +9,8 @@ using Windose;
 public class GraphicsEngine : Window
 {
     private Canvas canvas;
-
     private Vector3 position;
+
     public GraphicsEngine(int x = 180, int y = 120, int width = 660, int height = 460) : base(x, y, width, height, "SVGA3D Graphics Viewport Test", true)
     {
         canvas = Canvas.GetFullScreen();
@@ -20,13 +20,48 @@ public class GraphicsEngine : Window
     {
         base.Update();
 
+        // ── Step 1: Try to obtain a Canvas3D ───────────────────────────────
+        Canvas3D? canvas3D = Canvas.GetFullScreen() as Canvas3D;
 
-        if (Canvas.GetFullScreen() is not Canvas3D canvas3D)
+        if (canvas3D == null)
         {
-            Console.WriteLine("This display device has no 3D.");
-            return;
+            // The cached canvas is not 3D.  Check whether the primary display
+            // actually supports 3D now (the VMware SVGA driver probes during
+            // boot, so by the time a user opens this window it should be ready).
+            var display = DisplayManager.Primary;
+            if (display != null)
+            {
+                Console.WriteLine("[SVGA3D] Primary display: " + display.DriverName + " \"" + display.Name + "\"");
+                Console.WriteLine("[SVGA3D] IsFirmware: " + display.IsFirmware);
+            }
+
+            if (display != null && display.TryGetFacet<ICanvas3DFactory>(out _))
+            {
+                // The display *does* support 3D, but the canvas was originally
+                // created as a plain 2D Canvas (timing issue during boot).
+                // Force re-creation so we get a Canvas3D this time.
+                Console.WriteLine("[SVGA3D] ICanvas3DFactory available — forcing canvas re-creation...");
+
+                Canvas.DisableFullScreen();
+                var newCanvas = Canvas.GetFullScreen(new Mode(1920, 1080, ColorDepth.ColorDepth32));
+                Kernel.canvas = newCanvas;
+                canvas = newCanvas;
+                canvas3D = newCanvas as Canvas3D;
+
+                if (canvas3D != null)
+                    Console.WriteLine("[SVGA3D] Canvas3D created successfully: " + newCanvas.Name);
+            }
+
+            if (canvas3D == null)
+            {
+                Console.WriteLine("[SVGA3D] 3D hardware acceleration is not available on this display.");
+                Console.WriteLine("[SVGA3D] Ensure VMware settings have:  mks.enable3d = \"TRUE\"");
+                Console.WriteLine("[SVGA3D] Check serial/debug output for the Cosmos SVGA driver probe log.");
+                return;
+            }
         }
 
+        // ── Step 2: Set up scene (runs once, then enters the render loop) ──
         MouseManager.SetScreenSize(canvas3D.Width, canvas3D.Height);
         canvas3D.Camera = new Camera3D(new Vector3(0f, 2.6f, 4.6f), new Vector3(0f, 0.9f, 0f));
 
@@ -36,18 +71,18 @@ public class GraphicsEngine : Window
         ReadOnlySpan<Vector3> positions =
         [
             new(H, -H, H), new(H, -H, -H), new(H, H, -H), new(H, H, H),         // +X
-    new(-H, -H, -H), new(-H, -H, H), new(-H, H, H), new(-H, H, -H),     // -X
-    new(-H, H, H), new(H, H, H), new(H, H, -H), new(-H, H, -H),         // +Y
-    new(-H, -H, -H), new(H, -H, -H), new(H, -H, H), new(-H, -H, H),     // -Y
-    new(-H, -H, H), new(H, -H, H), new(H, H, H), new(-H, H, H),         // +Z
-    new(H, -H, -H), new(-H, -H, -H), new(-H, H, -H), new(H, H, -H),     // -Z
-];
+            new(-H, -H, -H), new(-H, -H, H), new(-H, H, H), new(-H, H, -H),     // -X
+            new(-H, H, H), new(H, H, H), new(H, H, -H), new(-H, H, -H),         // +Y
+            new(-H, -H, -H), new(H, -H, -H), new(H, -H, H), new(-H, -H, H),     // -Y
+            new(-H, -H, H), new(H, -H, H), new(H, H, H), new(-H, H, H),         // +Z
+            new(H, -H, -H), new(-H, -H, -H), new(-H, H, -H), new(H, H, -H),     // -Z
+        ];
 
         ReadOnlySpan<Color> faceColors =
         [
             Color.Crimson, Color.MediumSeaGreen, Color.Gold,
-    Color.DarkOrange, Color.DodgerBlue, Color.MediumOrchid,
-];
+            Color.DarkOrange, Color.DodgerBlue, Color.MediumOrchid,
+        ];
 
         Span<uint> colors = stackalloc uint[positions.Length];
         Span<ushort> indices = stackalloc ushort[faceColors.Length * 6];
@@ -77,6 +112,7 @@ public class GraphicsEngine : Window
         Quaternion orientation = Quaternion.Identity;
         long previous = Stopwatch.GetTimestamp();
 
+        // ── Step 3: Render loop ────────────────────────────────────────────
         while (true)
         {
             long now = Stopwatch.GetTimestamp();
@@ -115,7 +151,7 @@ public class GraphicsEngine : Window
 
         if(keyEvent.Key == Key.Escape)
         {
-            ProcessManger.QueueStop(process);
+            ProcessManager.QueueStop(process);
         }
 
         switch(keyEvent.Key)

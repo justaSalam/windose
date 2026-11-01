@@ -2,89 +2,88 @@ using Windose;
 
 public partial class WindowManager
 {
-    public static void PostMessage(UiMessage message)
+    private static readonly Queue<Action> uiActions = new Queue<Action>();
+    private static readonly object uiQueueLock = new object();
+
+    /// <summary>
+    /// Enqueues an action to be executed safely on the WindowManager UI thread.
+    /// </summary>
+    public static void RunOnUI(Action action)
     {
-        if (message.Type == UiMessageType.None) return;
-        lock (messageQueueLock) messageQueue.Add(message);
+        if (action == null) return;
+        lock (uiQueueLock) uiActions.Enqueue(action);
     }
 
-    public static void PostCommand(string command, Action action = null, Component target = null, object data = null)
-    {
-        PostMessage(UiMessage.ForCommand(command, action, target, data));
-    }
-
+    /// <summary>
+    /// Thread-safe post for registering a window.
+    /// </summary>
     public static void PostRegister(Window window)
     {
-        PostMessage(UiMessage.ForWindow(UiMessageType.RegisterWindow, window));
+        if (window == null) return;
+        RunOnUI(() => RegisterNow(window));
     }
 
+    /// <summary>
+    /// Thread-safe post for closing a window.
+    /// </summary>
     public static void PostClose(Window window)
     {
-        PostMessage(UiMessage.ForWindow(UiMessageType.CloseWindow, window));
+        if (window == null) return;
+        RunOnUI(() => CloseNow(window));
     }
 
-    private readonly List<UiMessage> dispatchScratch = new List<UiMessage>();
+    /// <summary>
+    /// Compatibility helper for running actions on the UI thread.
+    /// </summary>
+    public static void PostCommand(string command, Action? action = null, Component? target = null, object? data = null)
+    {
+        if (action != null)
+        {
+            RunOnUI(() =>
+            {
+                action();
+                target?.MarkDirty();
+            });
+        }
+    }
 
     private void DispatchMessages()
     {
         long startedAt = PerformanceMetrics.Now;
-        dispatchScratch.Clear();
-        lock (messageQueueLock)
-        {
-            int count = Math.Min(128, messageQueue.Count);
-            if (count == 0)
-            {
-                PerformanceMetrics.AddMessages(startedAt);
-                return;
-            }
-            for (int i = 0; i < count; i++)
-                dispatchScratch.Add(messageQueue[i]);
-            messageQueue.RemoveRange(0, count);
-        }
 
-        for (int i = 0; i < dispatchScratch.Count; i++)
+        while (true)
         {
-            UiMessage message = dispatchScratch[i];
-            try { DispatchMessage(message); }
+            Action? action = null;
+            lock (uiQueueLock)
+            {
+                if (uiActions.Count > 0)
+                    action = uiActions.Dequeue();
+            }
+
+            if (action == null) break;
+
+            try
+            {
+                action();
+            }
             catch (Exception exception)
             {
-                Window owner = message.Window ?? message.Target?.GetOwningWindow();
-                FailApplication(owner, "processing " + message.Type, exception);
+                FailApplication(focusedWindow, "executing UI action", exception);
             }
         }
 
         PerformanceMetrics.AddMessages(startedAt);
     }
 
-    private void DispatchMessage(UiMessage message)
+    public static T? FindWindow<T>() where T : Window
     {
-        switch (message.Type)
+        lock (windows)
         {
-            case UiMessageType.Command:
-                if (message.Target != null)
-                    message.Target.HandleMessage(message);
-
-                message.Action?.Invoke();
-                if (message.Target != null)
-                    message.Target.MarkDirty();
-                break;
-
-            case UiMessageType.RegisterWindow:
-                RegisterNow(message.Window);
-                break;
-
-            case UiMessageType.CloseWindow:
-                CloseNow(message.Window);
-                break;
-        }
-    }
-
-    public static T FindWindow<T>() where T : Window
-    {
-        for (int i = windows.Count - 1; i >= 0; i--)
-        {
-            if (windows[i] is T window)
-                return window;
+            for (int i = windows.Count - 1; i >= 0; i--)
+            {
+                if (windows[i] is T window)
+                    return window;
+            }
         }
 
         return null;

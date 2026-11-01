@@ -19,7 +19,7 @@ public class TaskSwitcher : Component
     {
         zLayer = DrawLayer.Overlay;
         Visible = false;
-        isRoot = true;
+        RegisterAsRoot();
     }
 
     public static bool VisibleNow => instance != null && instance.Visible;

@@ -1,7 +1,7 @@
 // WindoseBridge.cs - connects the ELF loader to Windose's Window / Component / Button / Label / Panel,
 // the WindowManager, the process list and System.IO.
 // Written against the signatures you pasted; NOT compiled against your project (I can't see Label, Palette,
-// ProcessManger, SingleThreadedProcess). Expect to fix a name or two. Needs the two edits in README_WINDOW_PATCH.txt.
+// ProcessManager, SingleThreadedProcess). Expect to fix a name or two. Needs the two edits in README_WINDOW_PATCH.txt.
 using System;
 using System.Drawing;
 using Cosmos.Kernel.System.FileSystem;
@@ -90,14 +90,14 @@ namespace Windose.System.Elf
             proc.onUpdate += delegate () { };
             proc.onDispose += delegate () { ElfRunner.Kill(p.Pid); };
             p.HostData = proc;
-            ProcessManger.QueueStart(proc);
+            ProcessManager.QueueStart(proc);
         }
 
         public void ProgramExited(ElfProgram p)
         {
             ForgetOwner(p);
             SingleThreadedProcess proc = p.HostData as SingleThreadedProcess;
-            if (proc != null) ProcessManger.QueueStop(proc);
+            if (proc != null) ProcessManager.QueueStop(proc);
         }
 
         // ---------------------------------------------------------------- UI

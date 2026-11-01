@@ -1,5 +1,6 @@
 ﻿
 using Cosmos.Kernel.System.Input;
+using Windose.System.Elf;
 using Windose.System.Features;
 using Windose.System.System_Calls;
 
@@ -12,6 +13,26 @@ public class HotkeyManager : SingleThreadedProcess
     { 
         canOverridePriority = false;
         canTerminate = false;
+
+
+        RegisterHotkey(new KeyEvent { Key = Key.Tab, Modifiers = ConsoleModifiers.Alt }, TaskSwitcher.Cycle);
+        RegisterHotkey(new KeyEvent { Key = Key.LeftArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(0));
+        RegisterHotkey(new KeyEvent { Key = Key.RightArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(1));
+        RegisterHotkey(new KeyEvent { Key = Key.UpArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(2));
+        RegisterHotkey(new KeyEvent { Key = Key.D, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, WindowManager.ToggleShowDesktop);
+        RegisterHotkey(new KeyEvent { Key = Key.L, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, LockManager.Lock);
+        RegisterHotkey(new KeyEvent { Key = Key.LeftArrow, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, WindowManager.PrevDesktop);
+        RegisterHotkey(new KeyEvent { Key = Key.RightArrow, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, WindowManager.NextDesktop);
+        RegisterHotkey(new KeyEvent { Key = Key.R, Modifiers = ConsoleModifiers.Alt }, () =>
+        {
+            string error;
+            ElfProgram program = ElfRunner.Spawn(File.ReadAllBytes("/mnt/Programs/run.elf"), "Run", ["run"], out error);
+            if (program == null)
+                SystemLogger.WriteLine("Hotkey", "Could not start Run: " + error, ConsoleMessageType.Error);
+        });
+        RegisterHotkey(new KeyEvent { Key = Key.E, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.PostRegister(new FileExplorer(100, 100, 800, 500, "File Explorer")));
+        RegisterHotkey(new KeyEvent { Key = Key.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
+
     }
 
     /// <summary>

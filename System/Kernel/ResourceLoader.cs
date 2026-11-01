@@ -7,6 +7,11 @@ namespace Windose.System.Kernel
 {
     public static class ResourceLoader
     {
+        static ResourceLoader()
+        {
+            SysRequired();
+        }
+
         public static Assembly assembly { get; private set; } = typeof(ResourceLoader).Assembly;
         /// <summary>
         /// Loads a resource from the embedded resources and returns its byte array representation.
@@ -141,6 +146,26 @@ namespace Windose.System.Kernel
                     WriteStorage(path, resource);
                 }
             }
+        }
+
+        private static void SysRequired()
+        {
+            WriteStorage("/mnt/Programs/window.elf", "Windose.System.ELF.programs.bin.window.elf", true);
+            WriteStorage("/mnt/Programs/hello.elf", "Windose.System.ELF.programs.bin.hello.elf", true);
+            WriteStorage("/mnt/Programs/canvas.elf", "Windose.System.ELF.programs.bin.canvas.elf", true);
+            WriteStorage("/mnt/Programs/explorer.elf", "Windose.System.ELF.programs.bin.explorer.elf", true);
+            WriteStorage("/mnt/Programs/calc.elf", "Windose.System.ELF.programs.bin.calc.elf", true);
+            WriteStorage("/mnt/Programs/search.elf", "Windose.System.ELF.programs.bin.search.elf", true);
+            WriteStorage("/mnt/Programs/run.elf", "Windose.System.ELF.programs.bin.run.elf", true);
+            WriteStorage("/mnt/Programs/pager.elf", "Windose.System.ELF.programs.bin.pager.elf", true);
+            WriteStorage("/mnt/Programs/widgets.elf", "Windose.System.ELF.programs.bin.widgets.elf", true);
+            WriteStorage("/mnt/Programs/libctest.elf", "Windose.System.ELF.programs.bin.libctest.elf", true);
+            WriteStorage("/mnt/Programs/memhog.elf", "Windose.System.ELF.programs.bin.memhog.elf", true);
+            WriteStorage("/mnt/Programs/spin.elf", "Windose.System.ELF.programs.bin.spin.elf", true);
+            WriteStorage("/mnt/Programs/cosmoslogindialog.elf", "Windose.System.ELF.programs.bin.cosmoslogindialog.elf", true);
+            WriteStorage("/mnt/Programs/newelfapp.elf", "Windose.System.ELF.programs.bin.newelfapp.elf", true);
+
+            WriteStorage("/mnt/Programs/aeroeditor.elf", "Windose.System.ELF.programs.bin.aeroeditor.elf", true);
         }
     }
 }

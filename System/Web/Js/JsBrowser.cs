@@ -141,6 +141,10 @@ public static class JsBrowser
         BuildTextEncoding(realm);
         BuildCssObject(realm);
         BuildEventSource(realm);
+        BuildWebAssembly(realm, loop);
+        BuildAudioContext(realm);
+        BuildNotification(realm, loop);
+        BuildBroadcastChannel(realm);
     }
 
     // ---- small helpers ----------------------------------------------------
@@ -1421,10 +1425,24 @@ public static class JsBrowser
         DefineMethod(realm, sw, "register", delegate (JsCallArgs a)
         {
             JsPromise p = new JsPromise(realm.PromisePrototype);
-            RejectPromise(loop, p, JsBuiltins.CreateErrorObject(realm, "TypeError", "ServiceWorker not supported"));
+            JsObject reg = realm.NewObject();
+            reg.Define("scope", JsProperty.Data("/"));
+            reg.Define("active", JsProperty.Data(JsNull.Instance));
+            reg.Define("installing", JsProperty.Data(JsNull.Instance));
+            reg.Define("waiting", JsProperty.Data(JsNull.Instance));
+            JsPromise updateP = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, updateP, JsUndefined.Instance);
+            DefineMethod(realm, reg, "update", delegate (JsCallArgs a2) { return updateP; }, 0);
+            JsPromise unregP = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, unregP, true);
+            DefineMethod(realm, reg, "unregister", delegate (JsCallArgs a2) { return unregP; }, 0);
+            DefineMethod(realm, reg, "addEventListener", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 2);
+            DefineMethod(realm, reg, "removeEventListener", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 2);
+            FulfillPromise(loop, p, reg);
             return p;
         }, 1);
         sw.Define("ready", JsProperty.Data(new JsPromise(realm.PromisePrototype)));
+        sw.Define("controller", JsProperty.Data(JsNull.Instance));
         DefineMethod(realm, sw, "addEventListener", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
         DefineMethod(realm, sw, "removeEventListener", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
         nav.Define("serviceWorker", JsProperty.Data(sw));
@@ -1440,6 +1458,116 @@ public static class JsBrowser
         DefineMethod(realm, conn, "removeEventListener", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
         nav.Define("connection", JsProperty.Data(conn));
         nav.Define("networkInformation", JsProperty.Data(conn));
+
+        // plugins and mimeTypes
+        JsObject pluginArr = realm.NewObject();
+        pluginArr.Define("length", JsProperty.Data(1.0));
+        JsObject pdfPlugin = realm.NewObject();
+        pdfPlugin.Define("name", JsProperty.Data("PDF Viewer"));
+        pdfPlugin.Define("filename", JsProperty.Data("internal-pdf-viewer"));
+        pdfPlugin.Define("description", JsProperty.Data("Portable Document Format"));
+        pluginArr.Define("0", JsProperty.Data(pdfPlugin));
+        DefineMethod(realm, pluginArr, "item", delegate (JsCallArgs a) { return a.ArgCount > 0 && JsValueOps.ToNumber(a.Get(0)) == 0.0 ? pdfPlugin : JsNull.Instance; }, 1);
+        DefineMethod(realm, pluginArr, "namedItem", delegate (JsCallArgs a) { return a.ArgCount > 0 && JsValueOps.ToStringValue(a.Get(0)) == "PDF Viewer" ? pdfPlugin : JsNull.Instance; }, 1);
+        nav.Define("plugins", JsProperty.Data(pluginArr));
+
+        JsObject mimeArr = realm.NewObject();
+        mimeArr.Define("length", JsProperty.Data(1.0));
+        JsObject pdfMime = realm.NewObject();
+        pdfMime.Define("type", JsProperty.Data("application/pdf"));
+        pdfMime.Define("suffixes", JsProperty.Data("pdf"));
+        pdfMime.Define("description", JsProperty.Data("PDF Document"));
+        pdfMime.Define("enabledPlugin", JsProperty.Data(pdfPlugin));
+        mimeArr.Define("0", JsProperty.Data(pdfMime));
+        DefineMethod(realm, mimeArr, "item", delegate (JsCallArgs a) { return a.ArgCount > 0 && JsValueOps.ToNumber(a.Get(0)) == 0.0 ? pdfMime : JsNull.Instance; }, 1);
+        DefineMethod(realm, mimeArr, "namedItem", delegate (JsCallArgs a) { return a.ArgCount > 0 && JsValueOps.ToStringValue(a.Get(0)) == "application/pdf" ? pdfMime : JsNull.Instance; }, 1);
+        nav.Define("mimeTypes", JsProperty.Data(mimeArr));
+        nav.Define("pdfViewerEnabled", JsProperty.Data(true));
+
+        // userAgentData (Client Hints)
+        JsObject uad = realm.NewObject();
+        uad.Define("mobile", JsProperty.Data(false));
+        uad.Define("platform", JsProperty.Data("Windows"));
+        JsArray brands = realm.NewArray();
+        JsObject b1 = realm.NewObject();
+        b1.Define("brand", JsProperty.Data("Chromium"));
+        b1.Define("version", JsProperty.Data("120"));
+        brands.Items.Add(b1);
+        JsObject b2 = realm.NewObject();
+        b2.Define("brand", JsProperty.Data("Google Chrome"));
+        b2.Define("version", JsProperty.Data("120"));
+        brands.Items.Add(b2);
+        uad.Define("brands", JsProperty.Data(brands));
+        DefineMethod(realm, uad, "getHighEntropyValues", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject res = realm.NewObject();
+            res.Define("architecture", JsProperty.Data("x86"));
+            res.Define("bitness", JsProperty.Data("64"));
+            res.Define("model", JsProperty.Data(""));
+            res.Define("platform", JsProperty.Data("Windows"));
+            res.Define("platformVersion", JsProperty.Data("15.0.0"));
+            res.Define("mobile", JsProperty.Data(false));
+            res.Define("brands", JsProperty.Data(brands));
+            FulfillPromise(loop, p, res);
+            return p;
+        }, 1);
+        nav.Define("userAgentData", JsProperty.Data(uad));
+
+        // permissions
+        JsObject perm = realm.NewObject();
+        DefineMethod(realm, perm, "query", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject status = realm.NewObject();
+            status.Define("state", JsProperty.Data("granted"));
+            status.Define("name", JsProperty.Data(a.ArgCount > 0 && a.Get(0) is JsObject desc && desc.GetProperty("name", out object nv) ? nv : ""));
+            DefineMethod(realm, status, "addEventListener", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 2);
+            DefineMethod(realm, status, "removeEventListener", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 2);
+            FulfillPromise(loop, p, status);
+            return p;
+        }, 1);
+        nav.Define("permissions", JsProperty.Data(perm));
+
+        // mediaCapabilities
+        JsObject mc = realm.NewObject();
+        DefineMethod(realm, mc, "decodingInfo", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject res = realm.NewObject();
+            res.Define("supported", JsProperty.Data(true));
+            res.Define("smooth", JsProperty.Data(true));
+            res.Define("powerEfficient", JsProperty.Data(true));
+            FulfillPromise(loop, p, res);
+            return p;
+        }, 1);
+        DefineMethod(realm, mc, "encodingInfo", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject res = realm.NewObject();
+            res.Define("supported", JsProperty.Data(true));
+            res.Define("smooth", JsProperty.Data(true));
+            res.Define("powerEfficient", JsProperty.Data(true));
+            FulfillPromise(loop, p, res);
+            return p;
+        }, 1);
+        nav.Define("mediaCapabilities", JsProperty.Data(mc));
+
+        // mediaDevices
+        JsObject md = realm.NewObject();
+        DefineMethod(realm, md, "getUserMedia", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, p, realm.NewObject());
+            return p;
+        }, 1);
+        DefineMethod(realm, md, "enumerateDevices", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, p, realm.NewArray());
+            return p;
+        }, 0);
+        nav.Define("mediaDevices", JsProperty.Data(md));
 
         realm.Global.Define("navigator", JsProperty.Data(nav));
     }
@@ -1691,6 +1819,14 @@ public static class JsBrowser
             bool matches = false;
             if (query.IndexOf("prefers-color-scheme: dark") >= 0) matches = false;
             else if (query.IndexOf("prefers-color-scheme: light") >= 0) matches = true;
+            else if (query.IndexOf("prefers-reduced-motion: no-preference") >= 0) matches = true;
+            else if (query.IndexOf("prefers-reduced-motion") >= 0) matches = false;
+            else if (query.IndexOf("hover: hover") >= 0) matches = true;
+            else if (query.IndexOf("hover: none") >= 0) matches = false;
+            else if (query.IndexOf("pointer: fine") >= 0) matches = true;
+            else if (query.IndexOf("pointer: coarse") >= 0) matches = false;
+            else if (query.IndexOf("orientation: landscape") >= 0) matches = true;
+            else if (query.IndexOf("orientation: portrait") >= 0) matches = false;
             else if (query.IndexOf("min-width") >= 0) matches = true;
             else if (query.IndexOf("all") >= 0 || query.IndexOf("screen") >= 0) matches = true;
 
@@ -2931,6 +3067,50 @@ public static class JsBrowser
             case "transform":
             case "transition":
             case "animation":
+            case "aspect-ratio":
+            case "object-fit":
+            case "object-position":
+            case "box-shadow":
+            case "text-shadow":
+            case "backdrop-filter":
+            case "filter":
+            case "color-scheme":
+            case "contain":
+            case "content-visibility":
+            case "will-change":
+            case "user-select":
+            case "pointer-events":
+            case "touch-action":
+            case "grid-column":
+            case "grid-column-start":
+            case "grid-column-end":
+            case "grid-row":
+            case "grid-row-start":
+            case "grid-row-end":
+            case "grid-area":
+            case "grid-template-areas":
+            case "grid-auto-flow":
+            case "grid-auto-rows":
+            case "grid-auto-columns":
+            case "outline":
+            case "outline-color":
+            case "outline-style":
+            case "outline-width":
+            case "outline-offset":
+            case "letter-spacing":
+            case "word-spacing":
+            case "word-break":
+            case "word-wrap":
+            case "overflow-wrap":
+            case "white-space":
+            case "vertical-align":
+            case "list-style":
+            case "list-style-type":
+            case "list-style-position":
+            case "list-style-image":
+            case "border-collapse":
+            case "border-spacing":
+            case "table-layout":
                 return true;
             default:
                 return false;
@@ -3033,6 +3213,370 @@ public static class JsBrowser
         esCtor.Define("CLOSED", JsProperty.Data(2.0));
 
         realm.Global.Define("EventSource", JsProperty.Data(esCtor));
+    }
+
+    private static void BuildWebAssembly(JsRealm realm, JsEventLoop loop)
+    {
+        JsObject wasm = realm.NewObject();
+        wasm.SetWellKnown(JsWellKnown.ToStringTag, "WebAssembly");
+
+        DefineMethod(realm, wasm, "validate", delegate (JsCallArgs a)
+        {
+            if (a.ArgCount > 0 && a.Get(0) is JsTypedArray ta && ta.Buffer != null && ta.Buffer.Data != null && ta.Buffer.Data.Length >= 4)
+            {
+                byte[] d = ta.Buffer.Data;
+                return d[0] == 0x00 && d[1] == 0x61 && d[2] == 0x73 && d[3] == 0x6d;
+            }
+            if (a.ArgCount > 0 && a.Get(0) is JsArrayBuffer ab && ab.Data != null && ab.Data.Length >= 4)
+            {
+                byte[] d = ab.Data;
+                return d[0] == 0x00 && d[1] == 0x61 && d[2] == 0x73 && d[3] == 0x6d;
+            }
+            return false;
+        }, 1);
+
+        JsObject modProto = realm.NewObject();
+        JsFunction modCtor = realm.MakeCtor("Module", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(modProto);
+        }, 1, modProto);
+        DefineMethod(realm, modCtor, "exports", delegate (JsCallArgs a) { return realm.NewArray(); }, 1);
+        DefineMethod(realm, modCtor, "imports", delegate (JsCallArgs a) { return realm.NewArray(); }, 1);
+        wasm.Define("Module", JsProperty.Data(modCtor));
+
+        JsObject instProto = realm.NewObject();
+        JsFunction instCtor = realm.MakeCtor("Instance", delegate (JsCallArgs a)
+        {
+            JsObject inst = realm.NewObject(instProto);
+            inst.Define("exports", JsProperty.Data(realm.NewObject()));
+            return inst;
+        }, 1, instProto);
+        wasm.Define("Instance", JsProperty.Data(instCtor));
+
+        JsObject memProto = realm.NewObject();
+        JsFunction memCtor = realm.MakeCtor("Memory", delegate (JsCallArgs a)
+        {
+            JsObject mem = realm.NewObject(memProto);
+            int initialPages = 1;
+            if (a.ArgCount > 0 && a.Get(0) is JsObject desc)
+            {
+                if (desc.GetProperty("initial", out object initVal))
+                    initialPages = (int)JsValueOps.ToNumber(initVal);
+            }
+            if (initialPages < 1) initialPages = 1;
+            if (initialPages > 256) initialPages = 256;
+            byte[] buf = new byte[initialPages * 65536];
+            JsArrayBuffer ab = new JsArrayBuffer(realm.ObjectPrototype, buf);
+            mem.Define("buffer", JsProperty.Data(ab));
+            DefineMethod(realm, mem, "grow", delegate (JsCallArgs a2) { return 0.0; }, 1);
+            return mem;
+        }, 1, memProto);
+        wasm.Define("Memory", JsProperty.Data(memCtor));
+
+        JsObject tableProto = realm.NewObject();
+        JsFunction tableCtor = realm.MakeCtor("Table", delegate (JsCallArgs a)
+        {
+            JsObject tbl = realm.NewObject(tableProto);
+            tbl.Define("length", JsProperty.Data(0.0));
+            DefineMethod(realm, tbl, "grow", delegate (JsCallArgs a2) { return 0.0; }, 1);
+            DefineMethod(realm, tbl, "get", delegate (JsCallArgs a2) { return JsNull.Instance; }, 1);
+            DefineMethod(realm, tbl, "set", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 2);
+            return tbl;
+        }, 1, tableProto);
+        wasm.Define("Table", JsProperty.Data(tableCtor));
+
+        JsObject globalProto = realm.NewObject();
+        JsFunction globalCtor = realm.MakeCtor("Global", delegate (JsCallArgs a)
+        {
+            JsObject g = realm.NewObject(globalProto);
+            object val = a.ArgCount > 1 ? a.Get(1) : 0.0;
+            g.Define("value", JsProperty.Data(val));
+            return g;
+        }, 1, globalProto);
+        wasm.Define("Global", JsProperty.Data(globalCtor));
+
+        JsFunction compileErrorCtor = realm.MakeCtor("CompileError", delegate (JsCallArgs a)
+        {
+            return JsBuiltins.CreateErrorObject(realm, "CompileError", a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "");
+        }, 1, realm.ErrorPrototype);
+        JsFunction linkErrorCtor = realm.MakeCtor("LinkError", delegate (JsCallArgs a)
+        {
+            return JsBuiltins.CreateErrorObject(realm, "LinkError", a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "");
+        }, 1, realm.ErrorPrototype);
+        JsFunction runtimeErrorCtor = realm.MakeCtor("RuntimeError", delegate (JsCallArgs a)
+        {
+            return JsBuiltins.CreateErrorObject(realm, "RuntimeError", a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : "");
+        }, 1, realm.ErrorPrototype);
+
+        wasm.Define("CompileError", JsProperty.Data(compileErrorCtor));
+        wasm.Define("LinkError", JsProperty.Data(linkErrorCtor));
+        wasm.Define("RuntimeError", JsProperty.Data(runtimeErrorCtor));
+
+        DefineMethod(realm, wasm, "compile", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject mod = realm.NewObject(modProto);
+            FulfillPromise(loop, p, mod);
+            return p;
+        }, 1);
+
+        DefineMethod(realm, wasm, "instantiate", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject result = realm.NewObject();
+            JsObject mod = realm.NewObject(modProto);
+            JsObject inst = realm.NewObject(instProto);
+            inst.Define("exports", JsProperty.Data(realm.NewObject()));
+            result.Define("module", JsProperty.Data(mod));
+            result.Define("instance", JsProperty.Data(inst));
+            FulfillPromise(loop, p, result);
+            return p;
+        }, 1);
+
+        DefineMethod(realm, wasm, "compileStreaming", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject mod = realm.NewObject(modProto);
+            FulfillPromise(loop, p, mod);
+            return p;
+        }, 1);
+
+        DefineMethod(realm, wasm, "instantiateStreaming", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject result = realm.NewObject();
+            JsObject mod = realm.NewObject(modProto);
+            JsObject inst = realm.NewObject(instProto);
+            inst.Define("exports", JsProperty.Data(realm.NewObject()));
+            result.Define("module", JsProperty.Data(mod));
+            result.Define("instance", JsProperty.Data(inst));
+            FulfillPromise(loop, p, result);
+            return p;
+        }, 1);
+
+        realm.Global.Define("WebAssembly", JsProperty.Data(wasm));
+    }
+
+    private static void BuildAudioContext(JsRealm realm)
+    {
+        JsEventLoop loop = realm.Interp != null ? realm.Interp.EnsureLoop() : null;
+        JsObject actxProto = realm.NewObject();
+        actxProto.SetWellKnown(JsWellKnown.ToStringTag, "AudioContext");
+
+        JsObject nodeProto = realm.NewObject();
+        JsNativeFn noop = delegate (JsCallArgs a) { return a.ArgCount > 0 ? a.Get(0) : JsUndefined.Instance; };
+        DefineMethod(realm, nodeProto, "connect", noop, 1);
+        DefineMethod(realm, nodeProto, "disconnect", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 0);
+
+        JsObject paramProto = realm.NewObject();
+        paramProto.Define("value", JsProperty.Data(1.0));
+        DefineMethod(realm, paramProto, "setValueAtTime", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+        DefineMethod(realm, paramProto, "linearRampToValueAtTime", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+        DefineMethod(realm, paramProto, "exponentialRampToValueAtTime", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+        DefineMethod(realm, paramProto, "setTargetAtTime", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 3);
+        DefineMethod(realm, paramProto, "setValueCurveAtTime", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 3);
+        DefineMethod(realm, paramProto, "cancelScheduledValues", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 1);
+
+        JsObject destNode = realm.NewObject(nodeProto);
+        destNode.Define("maxChannelCount", JsProperty.Data(2.0));
+        destNode.Define("numberOfInputs", JsProperty.Data(1.0));
+        destNode.Define("numberOfOutputs", JsProperty.Data(0.0));
+
+        JsObject audioBufProto = realm.NewObject();
+        audioBufProto.SetWellKnown(JsWellKnown.ToStringTag, "AudioBuffer");
+        DefineMethod(realm, audioBufProto, "getChannelData", delegate (JsCallArgs a)
+        {
+            JsObject ab = a.ThisValue as JsObject;
+            int len = 44100;
+            if (ab != null && ab.GetProperty("length", out object lv)) len = (int)JsValueOps.ToNumber(lv);
+            byte[] bytes = new byte[len * 4];
+            JsArrayBuffer buf = new JsArrayBuffer(realm.ObjectPrototype, bytes);
+            return new JsTypedArray(realm.ObjectPrototype, buf, 0, len, 4, "Float32Array");
+        }, 1);
+        DefineMethod(realm, audioBufProto, "copyFromChannel", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+        DefineMethod(realm, audioBufProto, "copyToChannel", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+
+        actxProto.Define("state", JsProperty.Data("running"));
+        actxProto.Define("sampleRate", JsProperty.Data(44100.0));
+        actxProto.Define("destination", JsProperty.Data(destNode));
+        DefineAccessor(realm, actxProto, "currentTime", delegate (JsCallArgs a)
+        {
+            return (double)DateTime.UtcNow.Ticks / 10000000.0;
+        }, null);
+
+        DefineMethod(realm, actxProto, "createGain", delegate (JsCallArgs a)
+        {
+            JsObject g = realm.NewObject(nodeProto);
+            JsObject gp = realm.NewObject(paramProto);
+            gp.SetProperty("value", 1.0);
+            g.Define("gain", JsProperty.Data(gp));
+            return g;
+        }, 0);
+
+        DefineMethod(realm, actxProto, "createOscillator", delegate (JsCallArgs a)
+        {
+            JsObject osc = realm.NewObject(nodeProto);
+            JsObject freq = realm.NewObject(paramProto);
+            freq.SetProperty("value", 440.0);
+            osc.Define("frequency", JsProperty.Data(freq));
+            osc.Define("type", JsProperty.Data("sine"));
+            DefineMethod(realm, osc, "start", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 0);
+            DefineMethod(realm, osc, "stop", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 0);
+            return osc;
+        }, 0);
+
+        DefineMethod(realm, actxProto, "createBufferSource", delegate (JsCallArgs a)
+        {
+            JsObject src = realm.NewObject(nodeProto);
+            src.Define("buffer", JsProperty.Data(JsNull.Instance));
+            src.Define("loop", JsProperty.Data(false));
+            JsObject pr = realm.NewObject(paramProto);
+            pr.SetProperty("value", 1.0);
+            src.Define("playbackRate", JsProperty.Data(pr));
+            DefineMethod(realm, src, "start", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 0);
+            DefineMethod(realm, src, "stop", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 0);
+            return src;
+        }, 0);
+
+        DefineMethod(realm, actxProto, "createBuffer", delegate (JsCallArgs a)
+        {
+            int ch = a.ArgCount > 0 ? (int)JsValueOps.ToNumber(a.Get(0)) : 2;
+            int len = a.ArgCount > 1 ? (int)JsValueOps.ToNumber(a.Get(1)) : 44100;
+            double rate = a.ArgCount > 2 ? JsValueOps.ToNumber(a.Get(2)) : 44100.0;
+            JsObject ab = realm.NewObject(audioBufProto);
+            ab.Define("numberOfChannels", JsProperty.Data((double)ch));
+            ab.Define("length", JsProperty.Data((double)len));
+            ab.Define("sampleRate", JsProperty.Data(rate));
+            ab.Define("duration", JsProperty.Data(rate > 0 ? len / rate : 0.0));
+            return ab;
+        }, 3);
+
+        DefineMethod(realm, actxProto, "decodeAudioData", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            JsObject ab = realm.NewObject(audioBufProto);
+            ab.Define("numberOfChannels", JsProperty.Data(2.0));
+            ab.Define("length", JsProperty.Data(44100.0));
+            ab.Define("sampleRate", JsProperty.Data(44100.0));
+            ab.Define("duration", JsProperty.Data(1.0));
+            FulfillPromise(loop, p, ab);
+            if (a.ArgCount > 1 && a.Get(1) is JsFunction succ)
+            {
+                loop.EnqueueJob(delegate
+                {
+                    realm.Interp.Call(succ, realm.Global, new object[] { ab }, false);
+                });
+            }
+            return p;
+        }, 1);
+
+        DefineMethod(realm, actxProto, "resume", delegate (JsCallArgs a)
+        {
+            JsObject ctx = a.ThisValue as JsObject;
+            if (ctx != null) ctx.SetProperty("state", "running");
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, p, JsUndefined.Instance);
+            return p;
+        }, 0);
+
+        DefineMethod(realm, actxProto, "suspend", delegate (JsCallArgs a)
+        {
+            JsObject ctx = a.ThisValue as JsObject;
+            if (ctx != null) ctx.SetProperty("state", "suspended");
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, p, JsUndefined.Instance);
+            return p;
+        }, 0);
+
+        DefineMethod(realm, actxProto, "close", delegate (JsCallArgs a)
+        {
+            JsObject ctx = a.ThisValue as JsObject;
+            if (ctx != null) ctx.SetProperty("state", "closed");
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, p, JsUndefined.Instance);
+            return p;
+        }, 0);
+
+        DefineMethod(realm, actxProto, "createAnalyser", delegate (JsCallArgs a)
+        {
+            JsObject an = realm.NewObject(nodeProto);
+            an.Define("fftSize", JsProperty.Data(2048.0));
+            an.Define("frequencyBinCount", JsProperty.Data(1024.0));
+            DefineMethod(realm, an, "getByteFrequencyData", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 1);
+            DefineMethod(realm, an, "getByteTimeDomainData", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 1);
+            DefineMethod(realm, an, "getFloatFrequencyData", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 1);
+            DefineMethod(realm, an, "getFloatTimeDomainData", delegate (JsCallArgs a2) { return JsUndefined.Instance; }, 1);
+            return an;
+        }, 0);
+
+        DefineMethod(realm, actxProto, "createBiquadFilter", delegate (JsCallArgs a) { return realm.NewObject(nodeProto); }, 0);
+        DefineMethod(realm, actxProto, "createDelay", delegate (JsCallArgs a) { return realm.NewObject(nodeProto); }, 0);
+        DefineMethod(realm, actxProto, "createConvolver", delegate (JsCallArgs a) { return realm.NewObject(nodeProto); }, 0);
+        DefineMethod(realm, actxProto, "createDynamicsCompressor", delegate (JsCallArgs a) { return realm.NewObject(nodeProto); }, 0);
+        DefineMethod(realm, actxProto, "createStereoPanner", delegate (JsCallArgs a) { return realm.NewObject(nodeProto); }, 0);
+        DefineMethod(realm, actxProto, "createPanner", delegate (JsCallArgs a) { return realm.NewObject(nodeProto); }, 0);
+
+        JsFunction actxCtor = realm.MakeCtor("AudioContext", delegate (JsCallArgs a)
+        {
+            return realm.NewObject(actxProto);
+        }, 0, actxProto);
+
+        realm.Global.Define("AudioContext", JsProperty.Data(actxCtor));
+        realm.Global.Define("webkitAudioContext", JsProperty.Data(actxCtor));
+        realm.Global.Define("AudioNode", JsProperty.Data(realm.MakeCtor("AudioNode", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, nodeProto)));
+        realm.Global.Define("AudioBuffer", JsProperty.Data(realm.MakeCtor("AudioBuffer", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, audioBufProto)));
+        realm.Global.Define("AudioParam", JsProperty.Data(realm.MakeCtor("AudioParam", delegate (JsCallArgs a) { throw JsErr.Type("Illegal constructor"); }, 0, paramProto)));
+    }
+
+    private static void BuildNotification(JsRealm realm, JsEventLoop loop)
+    {
+        JsObject notifProto = realm.NewObject();
+        DefineMethod(realm, notifProto, "close", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 0);
+        DefineMethod(realm, notifProto, "addEventListener", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+        DefineMethod(realm, notifProto, "removeEventListener", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+
+        JsFunction notifCtor = realm.MakeCtor("Notification", delegate (JsCallArgs a)
+        {
+            JsObject notif = realm.NewObject(notifProto);
+            notif.Define("title", JsProperty.Data(a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : ""));
+            return notif;
+        }, 1, notifProto);
+
+        notifCtor.Define("permission", JsProperty.Data("granted"));
+        DefineMethod(realm, notifCtor, "requestPermission", delegate (JsCallArgs a)
+        {
+            JsPromise p = new JsPromise(realm.PromisePrototype);
+            FulfillPromise(loop, p, "granted");
+            if (a.ArgCount > 0 && a.Get(0) is JsFunction cb)
+            {
+                loop.EnqueueJob(delegate
+                {
+                    realm.Interp.Call(cb, realm.Global, new object[] { "granted" }, false);
+                });
+            }
+            return p;
+        }, 0);
+
+        realm.Global.Define("Notification", JsProperty.Data(notifCtor));
+    }
+
+    private static void BuildBroadcastChannel(JsRealm realm)
+    {
+        JsObject bcProto = realm.NewObject();
+        DefineMethod(realm, bcProto, "postMessage", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 1);
+        DefineMethod(realm, bcProto, "close", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 0);
+        DefineMethod(realm, bcProto, "addEventListener", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+        DefineMethod(realm, bcProto, "removeEventListener", delegate (JsCallArgs a) { return JsUndefined.Instance; }, 2);
+        DefineMethod(realm, bcProto, "dispatchEvent", delegate (JsCallArgs a) { return true; }, 1);
+
+        JsFunction bcCtor = realm.MakeCtor("BroadcastChannel", delegate (JsCallArgs a)
+        {
+            JsObject bc = realm.NewObject(bcProto);
+            bc.Define("name", JsProperty.Data(a.ArgCount > 0 ? JsValueOps.ToStringValue(a.Get(0)) : ""));
+            return bc;
+        }, 1, bcProto);
+
+        realm.Global.Define("BroadcastChannel", JsProperty.Data(bcCtor));
     }
 }
 

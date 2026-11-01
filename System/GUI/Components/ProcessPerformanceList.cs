@@ -70,10 +70,10 @@ public class ProcessPerformanceList : Component
         int y = headerHeight + 4;
         totalVisibleProcesses = 0;
 
-        for (int i = 0; i < ProcessManger.ProcessCount; i++)
+        for (int i = 0; i < ProcessManager.ProcessCount; i++)
         {
             
-            Process process = ProcessManger.GetProcessAt(i);
+            Process process = ProcessManager.GetProcessAt(i);
             if (programsOnly && process.processType != ProcessType.Program)
             {
                 continue;
@@ -134,13 +134,13 @@ public class ProcessPerformanceList : Component
 
         int runningCount = 0;
         int crashedCount = 0;
-        for (int i = 0; i < ProcessManger.ProcessCount; i++)
+        for (int i = 0; i < ProcessManager.ProcessCount; i++)
         {
-            Process p = ProcessManger.GetProcessAt(i);
+            Process p = ProcessManager.GetProcessAt(i);
             if (p.Running) runningCount++;
             if (p.IsCrashed) crashedCount++;
         }
-        string summary = "Processes: " + ProcessManger.ProcessCount + "  Running: " + runningCount;
+        string summary = "Processes: " + ProcessManager.ProcessCount + "  Running: " + runningCount;
         if (crashedCount > 0) summary += "  Crashed: " + crashedCount;
         DrawString(summary, Palette.ControlBlack, 6, summaryY + 2, 14);
     }
@@ -220,9 +220,9 @@ public class ProcessPerformanceList : Component
         if (row < 0) return null;
 
         int visibleRow = 0;
-        for (int i = 0; i < ProcessManger.ProcessCount; i++)
+        for (int i = 0; i < ProcessManager.ProcessCount; i++)
         {
-            Process process = ProcessManger.GetProcessAt(i);
+            Process process = ProcessManager.GetProcessAt(i);
             if (programsOnly && process.processType != ProcessType.Program) continue;
             if (visibleRow < scrollOffset) { visibleRow++; continue; }
             if (visibleRow - scrollOffset == row) return process;
@@ -233,23 +233,23 @@ public class ProcessPerformanceList : Component
 
     private void EndSelectedProcess()
     {
-        if (selectedProcess == null || !selectedProcess.canTerminate || !ProcessManger.Contains(selectedProcess)) return;
-        ProcessManger.Stop(selectedProcess);
+        if (selectedProcess == null || !selectedProcess.canTerminate || !ProcessManager.Contains(selectedProcess)) return;
+        ProcessManager.Stop(selectedProcess);
         selectedProcess = null;
         MarkDirty();
     }
 
     private void RestartSelectedProcess()
     {
-        if (selectedProcess == null || !ProcessManger.Contains(selectedProcess)) return;
-        ProcessManger.Restart(selectedProcess);
+        if (selectedProcess == null || !ProcessManager.Contains(selectedProcess)) return;
+        ProcessManager.Restart(selectedProcess);
         selectedProcess = null;
         MarkDirty();
     }
 
     private void SetPriority(ProcessPriority priority)
     {
-        if (selectedProcess == null || !ProcessManger.Contains(selectedProcess))
+        if (selectedProcess == null || !ProcessManager.Contains(selectedProcess))
         {
             return;
         }

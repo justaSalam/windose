@@ -13,7 +13,7 @@ public static class WebUrl
         if (s.Length == 0) return null;
 
         string lower = s.ToLowerInvariant();
-        if (lower.StartsWith("about:") || lower.StartsWith("file:") || lower.StartsWith("data:") || lower.StartsWith("javascript:") || lower.StartsWith("mailto:")) return s;
+        if (lower.StartsWith("about:") || lower.StartsWith("file:") || lower.StartsWith("data:") || lower.StartsWith("javascript:") || lower.StartsWith("mailto:") || lower.StartsWith("media:")) return s;
         if (s.IndexOf("://") >= 0) return s;
         if (s.StartsWith("//")) return "http:" + s;
 
@@ -63,7 +63,7 @@ public static class WebUrl
         if (h.Length == 0) return baseHref;
 
         string lower = h.ToLowerInvariant();
-        if (lower.StartsWith("about:") || lower.StartsWith("data:") || lower.StartsWith("javascript:") || lower.StartsWith("mailto:") || lower.StartsWith("file:") || h.IndexOf("://") >= 0) return h;
+        if (lower.StartsWith("about:") || lower.StartsWith("data:") || lower.StartsWith("javascript:") || lower.StartsWith("mailto:") || lower.StartsWith("file:") || lower.StartsWith("media:") || h.IndexOf("://") >= 0) return h;
         if (h.StartsWith("//"))
         {
             string scheme = SchemeOf(baseHref);

@@ -1,6 +1,5 @@
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
-using System.ComponentModel;
 using System.Drawing;
 using Windose;
 using Windose.Drivers;
@@ -14,14 +13,12 @@ public partial class WindowManager : SingleThreadedProcess
 
     private static List<Rectangle> dirtyRects = new List<Rectangle>();
     private static readonly object dirtyRectsLock = new object();
-    private static List<UiMessage> messageQueue = new List<UiMessage>();
 
-    private static readonly object messageQueueLock = new object();
 
     private static readonly HashSet<Window> failedWindows = new HashSet<Window>();
     private static bool fullComposePending = true;
 
-    private readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
+    private static readonly List<ApplicationFailure> pendingFailures = new List<ApplicationFailure>();
 
     private static bool hasPreviewRect;
 
@@ -65,12 +62,11 @@ public partial class WindowManager : SingleThreadedProcess
 
     public WindowManager() : base("Desktop Window Manager", ProcessType.System)
     {
-        components = Component.components;
         canTerminate = false;
         canOverridePriority = false;
     }
 
-    private List<Component> components;
+    private static List<Component> components => Component.components;
 
     public override void Update()
     {
@@ -183,20 +179,16 @@ public partial class WindowManager : SingleThreadedProcess
         {
             lastFocusedWindow = null;
         }
-        if (focusedWindow == lastFocusedWindow || lastFocusedWindow == null)
-        {
-            return;
-        }
-        if (focusedWindow == null)
+
+        if (focusedWindow == null || lastFocusedWindow == null || focusedWindow == lastFocusedWindow)
         {
             return;
         }
 
+        Window target = lastFocusedWindow;
         focusedWindow.SetFocused(false);
-        SetFocusedWindow(lastFocusedWindow);
-        BringToFront(focusedWindow);
-
-
+        SetFocusedWindow(target);
+        BringToFront(target);
     }
 
     private void ComposeDirtyRegions()
@@ -235,9 +227,9 @@ public partial class WindowManager : SingleThreadedProcess
             for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
             {
                 Component component = components[componentIndex];
-                if (component == null || !component.Visible || !component.isRoot) continue;
+                if (component == null || !component.Visible || !component.isRoot || !component.canRender) continue;
 
-                if (component is Window rooto && !IsOnCurrentDesktop(rooto)) continue;
+                if (component is Window rooto && (!IsOnCurrentDesktop(rooto) || rooto.isMinimized)) continue;
 
                 Rectangle componentBounds = component.AbsoluteRectangle;
                 Rectangle clipped = Rectangle.Intersect(componentBounds, region);
@@ -426,6 +418,8 @@ public partial class WindowManager : SingleThreadedProcess
 
     private static void RegisterNow(Window window)
     {
+        if (window == null) return;
+
         lock (windows)
         {
             if (windows.Contains(window)) return;
@@ -442,10 +436,10 @@ public partial class WindowManager : SingleThreadedProcess
             lastOpenBounds = window.bounds;
 
             window.desktop = window.showInTaskbar ? CurrentDesktop : -1;
-            window.zIndex = nextZIndex;
+            window.zIndex = nextZIndex++;
+            window.RegisterAsRoot();
             window.Start();
             windows.Add(window);
-            nextZIndex++;
             MarkZOrderDirty();
             SetFocusedWindow(window);
 
@@ -456,8 +450,7 @@ public partial class WindowManager : SingleThreadedProcess
 
             if (!window.showInTaskbar || Explorer.taskbar == null) return;
 
-            int taskbarButtonWidth = Math.Max(84, window.text.Length * 7 + (window.Icon == null ? 18 : 38));
-            taskbarButtonWidth = Math.Min(taskbarButtonWidth, 180);
+            int taskbarButtonWidth = Math.Clamp(window.text.Length * 7 + (window.Icon == null ? 18 : 38), 84, 180);
             int taskbarButtonHeight = Math.Max(24, Explorer.taskbar.Height - 6);
 
             Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
@@ -495,7 +488,6 @@ public partial class WindowManager : SingleThreadedProcess
             Explorer.taskbar.ForceDirty();
             Invalidate(Explorer.taskbar.AbsoluteRectangle);
         }
-
     }
 
     public static void Close(Window window)
@@ -657,26 +649,22 @@ public partial class WindowManager : SingleThreadedProcess
             SetFocusedWindow(nextWindow);
     }
 
-    private void FailApplication(Window window, string operation, Exception exception)
+    private static void FailApplication(Window? window, string operation, Exception? exception)
     {
         if (window != null && failedWindows.Contains(window))
         {
             return;
         }
-        string applicationName = window?.text;
-        if (string.IsNullOrEmpty(applicationName))
-        {
-            applicationName = "Application";
-        }
 
-        string detail = exception?.Message;
-        if (string.IsNullOrEmpty(detail))
-        {
-            detail = "Unknown error";
-        }
+        string applicationName = string.IsNullOrEmpty(window?.text) ? "Application" : window.text;
+        string detail = string.IsNullOrEmpty(exception?.Message) ? "Unknown error" : exception.Message;
 
-        SystemLogger.WriteLine(applicationName, "failed while " + operation + ": " + detail + "\n", ConsoleMessageType.Error);
-        pendingFailures.Add(new ApplicationFailure(applicationName, operation, detail));
+        SystemLogger.WriteLine(applicationName, $"failed while {operation}: {detail}\n", ConsoleMessageType.Error);
+
+        lock (windows)
+        {
+            pendingFailures.Add(new ApplicationFailure(applicationName, operation, detail));
+        }
 
         if (window == null)
         {
@@ -702,17 +690,37 @@ public partial class WindowManager : SingleThreadedProcess
         PostClose(window);
     }
 
-    private void ShowPendingFailures()
+    public static void ReportLaunchCrash(Exception? exception)
+    {
+        string detail = string.IsNullOrEmpty(exception?.Message) ? "Unknown error during application launch." : exception.Message;
+        SystemLogger.WriteLine("LaunchTracker", "Failed to launch application: " + detail, ConsoleMessageType.Error);
+
+        lock (windows)
+        {
+            pendingFailures.Add(new ApplicationFailure("Application", "launching", detail));
+        }
+
+        ClearPreviewRect();
+        InvalidateAll();
+    }
+
+    private static void ShowPendingFailures()
     {
         if (pendingFailures.Count == 0) return;
 
-        for (int i = 0; i < pendingFailures.Count; i++)
+        List<ApplicationFailure> failures;
+        lock (windows)
         {
-            ApplicationFailure failure = pendingFailures[i];
+            failures = new List<ApplicationFailure>(pendingFailures);
+            pendingFailures.Clear();
+        }
+
+        for (int i = 0; i < failures.Count; i++)
+        {
+            ApplicationFailure failure = failures[i];
             try
             {
-                string message = failure.application + " crashed while " + failure.operation + ": " + failure.detail;
-
+                string message = $"{failure.application} crashed while {failure.operation}: {failure.detail}";
 
                 Window error = new Window(140, 140, 680, 130, "Application Error", true)
                 {
@@ -727,7 +735,6 @@ public partial class WindowManager : SingleThreadedProcess
                     useBackground = true,
                     horizontalAlignment = HorizontalAlignment.Stretch,
                     Margin = new Thickness(8, 34, 8, 8),
-
                 };
                 error.AddChild(text);
                 RegisterNow(error);
@@ -737,16 +744,15 @@ public partial class WindowManager : SingleThreadedProcess
                 SystemLogger.WriteLine("DWM", "Could not display application error: " + reportException.Message + "\n", ConsoleMessageType.Error);
             }
         }
-
-        pendingFailures.Clear();
     }
 
-    private void CloseNow(Window window)
+    private static void CloseNow(Window window)
     {
+        if (window == null) return;
+
         lock (windows)
         {
-
-            if (window == null || !windows.Contains(window)) return;
+            if (!windows.Contains(window)) return;
 
             BreezeRuntime.NotifyWindowClosed(window);
 
@@ -762,22 +768,22 @@ public partial class WindowManager : SingleThreadedProcess
             if (capturedComponent != null && capturedComponent.GetOwningWindow() == window)
                 capturedComponent = null;
 
-            if (taskbarButtons.ContainsKey(window))
+            if (taskbarButtons.TryGetValue(window, out Button? taskbarButton))
             {
-                Button taskbarButton = taskbarButtons[window];
-
                 taskbarButtons.Remove(window);
 
-                Explorer.taskbar.windows.Remove(taskbarButton);
-                Explorer.taskbar.bar.RemoveStackChild(taskbarButton);
-                Explorer.taskbar.bar.ForceDirty();
-                Explorer.taskbar.ForceDirty();
-
-                Invalidate(Explorer.taskbar.AbsoluteRectangle);
-
+                if (Explorer.taskbar != null)
+                {
+                    Explorer.taskbar.windows.Remove(taskbarButton);
+                    Explorer.taskbar.bar.RemoveStackChild(taskbarButton);
+                    Explorer.taskbar.bar.ForceDirty();
+                    Explorer.taskbar.ForceDirty();
+                    Invalidate(Explorer.taskbar.AbsoluteRectangle);
+                }
             }
 
             windows.Remove(window);
+            window.UnregisterAsRoot();
             failedWindows.Remove(window);
             showDesktopHidden.Remove(window);
 
@@ -819,11 +825,14 @@ public partial class WindowManager : SingleThreadedProcess
 
     public static void InvalidateAll()
     {
-        for (int i = 0; i < Component.components.Count; i++)
+        lock (Component.components)
         {
-            Component component = Component.components[i];
-            if (component == null || !component.Visible) continue;
-            component.ForceDirty();
+            for (int i = 0; i < Component.components.Count; i++)
+            {
+                Component component = Component.components[i];
+                if (component == null || !component.Visible) continue;
+                component.ForceDirty();
+            }
         }
 
         Invalidate(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));

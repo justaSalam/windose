@@ -60,6 +60,7 @@ public class Desktop : Component
         }
 
         zLayer = DrawLayer.Desktop;
+        RegisterAsRoot();
 
         ApplyRegistryBackground();
         ApplyIconGridSettings();

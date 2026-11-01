@@ -65,6 +65,8 @@ public class Window : Component
     public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png? icon = null) : base(x, y, width, height)
     {
         canRender = true;
+        isRoot = true;
+        EnsureRenderSurface();
         text = title;
         Icon = icon;
         bounds = new Rectangle(x, y, width, height);
@@ -75,7 +77,10 @@ public class Window : Component
         //process.onStart += () => WindowManager.PostRegister(this);
         process.onDispose += () => 
         {
-            WindowManager.PostClose(this); 
+            if (!disposed)
+            {
+                WindowManager.PostClose(this);
+            }
             onClosed?.Invoke(); 
         };
         process.onUpdate += Update;
@@ -91,7 +96,7 @@ public class Window : Component
 
     public void Start()
     {
-        ProcessManger.QueueStart(process);
+        ProcessManager.QueueStart(process);
     }
 
     public override void Update()
@@ -768,6 +773,11 @@ public class Window : Component
         focusedComponent = null;
         titlebar = null;
 
+        if (process != null && process.Running)
+        {
+            process.Running = false;
+            ProcessManager.QueueStop(process);
+        }
 
         children.Clear();
         base.Dispose();
@@ -779,6 +789,6 @@ public class Window : Component
     {
         if (closeRequested) return;
         closeRequested = true;
-        ProcessManger.QueueStop(process);
+        ProcessManager.QueueStop(process);
     }
 }

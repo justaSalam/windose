@@ -91,7 +91,7 @@ public static class BreezeServiceManager
     {
         BreezeServiceHandle service = Find(name);
         if (service == null || service.Protected) return false;
-        ProcessManger.QueueStop(service.Process);
+        ProcessManager.QueueStop(service.Process);
         return true;
     }
 
@@ -100,13 +100,13 @@ public static class BreezeServiceManager
         BreezeServiceHandle service = Find(name);
         if (service == null || service.Process == null || !service.Process.CanRestart) return false;
         lock (sync) restartAttempts.Remove(service.Name);
-        ProcessManger.QueueRestart(service.Process, true);
+        ProcessManager.QueueRestart(service.Process, true);
         return true;
     }
 
     public static bool StartFile(string path)
     {
-        ProcessManger.QueueStart(new BreezeScheduledApplicationProcess(File.ReadAllText(path), path));
+        ProcessManager.QueueStart(new BreezeScheduledApplicationProcess(File.ReadAllText(path), path));
         return true;
     }
 
@@ -140,7 +140,7 @@ public static class BreezeServiceManager
             try
             {
                 Process replacement = stopped.Process.startInfo.RestartFactory();
-                if (replacement != null) ProcessManger.QueueStart(replacement);
+                if (replacement != null) ProcessManager.QueueStart(replacement);
             }
             catch (Exception exception)
             {

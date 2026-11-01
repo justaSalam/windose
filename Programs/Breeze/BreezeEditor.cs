@@ -487,12 +487,7 @@ show(main);
 
     private void OnFileSystemChanged(FileSystemChange change)
     {
-        WindowManager.PostCommand("editor.project.changed", target: this, data: change);
-    }
-
-    public override void HandleMessage(UiMessage message)
-    {
-        if (message.Command == "editor.project.changed") RefreshProjectExplorer();
+        WindowManager.RunOnUI(RefreshProjectExplorer);
     }
 
     private static void CollectDocumentSymbols(List<BreezeToken> tokens,

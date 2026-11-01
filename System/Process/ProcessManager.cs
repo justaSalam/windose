@@ -3,7 +3,7 @@ using Cosmos.Kernel.Core.Memory.GarbageCollector;
 using Cosmos.Kernel.Core.Memory.Heap;
 using Cosmos.Kernel.System.Diagnostics;
 
-public static class ProcessManger
+public static class ProcessManager
 {
     private sealed class PendingRestart
     {
@@ -28,8 +28,8 @@ public static class ProcessManger
     private static bool isUpdating;
 
 
-    private static int gcFrameCounter;
-    private static int gcMaxFramesBetweenCollections = 1500;
+    private static int lastGcTick;
+    private const int GcIntervalMs = 30000;
 
 
     public static SingleThreadedProcess Start(SingleThreadedProcess process)
@@ -163,11 +163,11 @@ public static class ProcessManger
 
     private static void ScheduleGarbageCollection()
     {
-        gcFrameCounter++;
-
-        if (gcFrameCounter >= gcMaxFramesBetweenCollections)
+        int now = Environment.TickCount;
+        if (lastGcTick == 0) lastGcTick = now;
+        if (unchecked(now - lastGcTick) >= GcIntervalMs)
         {
-            gcFrameCounter = 0;
+            lastGcTick = now;
             MemoryDiagnostics.Collect();
         }
     }
@@ -304,3 +304,23 @@ public static class ProcessManger
     }
 
 }
+
+[Obsolete("Use ProcessManager instead")]
+public static class ProcessManger
+{
+    public static List<SingleThreadedProcess> processes => ProcessManager.processes;
+    public static List<ScheduledProcess> scheduledProcesses => ProcessManager.scheduledProcesses;
+    public static int ProcessCount => ProcessManager.ProcessCount;
+    public static SingleThreadedProcess Start(SingleThreadedProcess process) => ProcessManager.Start(process);
+    public static ScheduledProcess Start(ScheduledProcess process) => ProcessManager.Start(process);
+    public static void Update() => ProcessManager.Update();
+    public static void QueueStart(Process process) => ProcessManager.QueueStart(process);
+    public static void QueueStop(Process process) => ProcessManager.QueueStop(process);
+    public static void QueueRestart(Process process, bool force = false) => ProcessManager.QueueRestart(process, force);
+    public static void Stop(Process process) => ProcessManager.Stop(process);
+    public static void Stop(SingleThreadedProcess process) => ProcessManager.Stop(process);
+    public static void Stop(ScheduledProcess process) => ProcessManager.Stop(process);
+    public static bool Restart(Process process) => ProcessManager.Restart(process);
+    public static Process GetProcessAt(int index) => ProcessManager.GetProcessAt(index);
+    public static bool Contains(Process process) => ProcessManager.Contains(process);
+}

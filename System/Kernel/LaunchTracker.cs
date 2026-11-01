@@ -14,24 +14,33 @@ namespace Windose.System.Kernel
             Interlocked.Increment(ref startingCount);
             new Thread(() =>
             {
+                Window? win = null;
                 try
                 {
-                    WindowManager.Register(create());
+                    win = create();
+                    if (win != null)
+                    {
+                        WindowManager.Register(win);
+                    }
                 }
                 catch (Exception ex)
                 {
                     SystemLogger.WriteLine("LaunchTracker", $"Error launching window: {ex.Message}", ConsoleMessageType.Error, true);
                     SystemLogger.WriteLine("LaunchTracker", $"           Stack trace: {ex.StackTrace}", ConsoleMessageType.Error, true);
                     SystemLogger.WriteLine("LaunchTracker", $"                  Type: {ex.GetType().FullName}", ConsoleMessageType.Error, true);
+
+                    if (win != null)
+                    {
+                        try { win.Dispose(); } catch { }
+                    }
+
+                    WindowManager.ReportLaunchCrash(ex);
                 }
                 finally
                 {
                     Interlocked.Decrement(ref startingCount);
                 }
-              
-
             }).Start();
-            
         }
     }
 }

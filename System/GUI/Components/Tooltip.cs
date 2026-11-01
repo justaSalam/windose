@@ -46,6 +46,7 @@ public class Tooltip : Component
     {
         Visible = false;
         zLayer = DrawLayer.Overlay;
+        RegisterAsRoot();
     }
 
     public void AttachTo(Component component, string text)

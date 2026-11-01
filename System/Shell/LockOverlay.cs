@@ -20,7 +20,7 @@ public class LockOverlay : Component
     {
         zLayer = DrawLayer.Overlay;
         Visible = false;
-        isRoot = true;
+        RegisterAsRoot();
 
         int cx = Width / 2;
         titleLabel = new Label(cx - 150, Height / 2 - 110, 300, 28)

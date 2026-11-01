@@ -53,7 +53,7 @@ public class ScheduledProcess : Process
         }
     }
 
-    // Scheduled processes run from WorkerLoop, not ProcessManger.Update.
+    // Scheduled processes run from WorkerLoop, not ProcessManager.Update.
     public override void Main() { }
 
     private void WorkerLoop()
