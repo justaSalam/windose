@@ -169,7 +169,6 @@ public class Kernel : Sys.Kernel
         ResourceLoader.WriteStorage("/mnt/Programs/memhog.elf", "Windose.System.ELF.programs.bin.memhog.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/spin.elf", "Windose.System.ELF.programs.bin.spin.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/cosmoslogindialog.elf", "Windose.System.ELF.programs.bin.cosmoslogindialog.elf", true);
-        ResourceLoader.WriteStorage("/mnt/Programs/newelfapp.elf", "Windose.System.ELF.programs.bin.newelfapp.elf", true);
         ResourceLoader.WriteStorage("/mnt/Programs/aeroeditor.elf", "Windose.System.ELF.programs.bin.aeroeditor.elf", true);
 
     }
