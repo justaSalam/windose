@@ -138,6 +138,8 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, byte*, int, int> ClipboardSet;                        // (pid, text, len) -> 0
         public delegate* unmanaged<int, byte*, byte*, int, int> GetEnv;                        // (pid, name, buf, max) -> len
         public delegate* unmanaged<int, byte*, byte*, int> SetEnv;                            // (pid, name, value) -> 0
+        public delegate* unmanaged<int, int, int, int, int, int, int> CreateTerminal;         // (pid, parent, x, y, w, h) -> handle
+        public delegate* unmanaged<int, int, byte*, int> SetIcon;                             // (pid, win, iconPath) -> 0
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -267,6 +269,16 @@ namespace Windose.System.Elf
         }
 
         // ---------------------------------------------------------------- start / run
+
+        /// <summary>Reads an ELF file from disk and spawns it on its own thread.</summary>
+        public static ElfProgram RunFile(string path, string[]? args = null)
+        {
+            if (!File.Exists(path)) return null;
+            byte[] data = File.ReadAllBytes(path);
+            string name = Path.GetFileName(path);
+            string[] fullArgs = args != null && args.Length > 0 ? args : new string[] { name };
+            return Spawn(data, name, fullArgs, out _);
+        }
 
         /// <summary>Loads and starts a program on its own thread. Returns null on failure (reason in 'error').
         /// 'args' are the arguments after the program name.</summary>
@@ -501,6 +513,8 @@ namespace Windose.System.Elf
             api.ClipboardSet = &ApiClipboardSet;
             api.GetEnv = &ApiGetEnv;
             api.SetEnv = &ApiSetEnv;
+            api.CreateTerminal = &ApiCreateTerminal;
+            api.SetIcon = &ApiSetIcon;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -533,11 +547,20 @@ namespace Windose.System.Elf
             try
             {
                 ElfProgram p = Live(pid);
-                Action<ElfProgram, string> output = Output;
-                if (p == null || output == null || text == null || len <= 0 || len > 4096) return;
+                if (p == null || text == null || len <= 0 || len > 4096) return;
                 char[] c = new char[len];
                 for (int i = 0; i < len; i++) c[i] = (char)text[i];
-                output(p, new string(c));
+                string s = new string(c);
+
+                if (p.OutputHandler != null)
+                {
+                    p.OutputHandler(s);
+                }
+                else
+                {
+                    Action<ElfProgram, string> output = Output;
+                    output?.Invoke(p, s);
+                }
             }
             catch { }
         }
@@ -2385,6 +2408,42 @@ namespace Windose.System.Elf
         }
 
         [UnmanagedCallersOnly]
+        private static int ApiSetIcon(int pid, int winHandle, byte* iconPath)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host;
+                if (host == null || iconPath == null) return -1;
+                object obj = p.Objs.Get(winHandle);
+                if (obj == null) return -1;
+                string path = CStr(iconPath);
+                return host.SetIcon(obj, path) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCreateTerminal(int pid, int parent, int x, int y, int w, int h)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host;
+                if (host == null || p.Objs.Count >= MaxObjectsPerProgram) return 0;
+                object par = p.Objs.Get(parent);
+                if (par == null) return 0;
+                object term = host.CreateTerminal(par, x, y, w, h);
+                if (term == null) return 0;
+                int handle = p.Objs.Add(term);
+                if (handle == 0) { host.Close(term); return 0; }
+                host.Bind(term, handle, p);
+                return handle;
+            }
+            catch { return 0; }
+        }
+
+[UnmanagedCallersOnly]
         private static int ApiSetEnv(int pid, byte* name, byte* val)
         {
             try

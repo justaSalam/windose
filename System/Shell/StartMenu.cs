@@ -1,4 +1,5 @@
 using Cosmos.Kernel.System;
+using Windose.System.Elf;
 using Cosmos.Kernel.System.Graphics;
 using System.Drawing;
 using Windose.Programs;
@@ -129,12 +130,16 @@ public class StartMenu : Window
 
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/console_prompt.png"), "Command Prompt", () =>
         {
-            LaunchTracker.Start(() => new CommandPrompt());
+            if (File.Exists("/mnt/Programs/terminal.elf"))
+                ElfRunner.RunFile("/mnt/Programs/terminal.elf");
+            else
+                LaunchTracker.Start(() => new CommandPrompt());
         });
 
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/console_prompt.png"), "Lua", () =>
         {
             string script = "local w = win.createWindow(\"Lua App\", 160, 120, 360, 220)\nlocal label = win.createLabel(\"Hello from Lua ABI\", 24, 48, 220, 28)\nlocal button = win.createButton(\"Close\", 24, 90, 90, 28)\n\nwin.addChild(w, label)\nwin.addChild(w, button)\n\nwin.setOnClick(button, function()\n  win.closeWindow(w)\nend)\n\nwin.showWindow(w)";
+            _ = script;
 
         });
 

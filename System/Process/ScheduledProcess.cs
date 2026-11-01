@@ -16,12 +16,13 @@ public class ScheduledProcess : Process
     private volatile bool workerExited = false;
     private readonly int updateIntervalMs;
 
-    public ScheduledProcess(string name, ProcessType processType)
+    public ScheduledProcess(string name, ProcessType processType, int updateIntervalMs = 0)
     {
         startInfo.Name = name;
 
         this.name = name;
         this.processType = processType;
+        this.updateIntervalMs = updateIntervalMs;
 
         Running = false;
         Initialized = false;
@@ -44,7 +45,7 @@ public class ScheduledProcess : Process
             workerThread.Start();
             onStart?.Invoke();
         }
-        catch (Exception exception)
+        catch (Exception)
         {
             Running = false;
             Initialized = false;
@@ -67,7 +68,7 @@ public class ScheduledProcess : Process
                 Thread.Sleep(0);
             }
         }
-        catch (Exception exception)
+        catch (Exception)
         {
         }
         finally

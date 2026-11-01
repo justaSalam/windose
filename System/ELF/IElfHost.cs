@@ -8,6 +8,7 @@ namespace Windose.System.Elf
     {
         /// <summary>Create a top-level window. Return null on failure.</summary>
         object CreateWindow(int w, int h, string title);
+        bool SetIcon(object window, string iconPath);
 
         /// <summary>Create a button inside 'parent' (an object you returned earlier). Null on failure.</summary>
         object CreateButton(object parent, int x, int y, int w, int h, string text);
@@ -213,6 +214,7 @@ namespace Windose.System.Elf
 
         byte[] ReadFile(string path);                 // null if missing
         bool WriteFile(string path, byte[] data);
+        object CreateTerminal(object parent, int x, int y, int w, int h);
 
         /// <summary>A program was loaded and its thread is about to start (e.g. register it in the process list).</summary>
         void ProgramStarted(ElfProgram program);

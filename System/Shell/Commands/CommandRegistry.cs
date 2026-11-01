@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using Cosmos.Executable.Lua;
+using Windose.System.Elf;
 using Windose.System.Kernel.FileSystem;
 using Windose.System.Lua;
 using Windose.System.Shell.Commands;
@@ -38,6 +42,124 @@ public static class CommandRegistry
         return true;
     }
 
+    public static string? ResolveElfPath(string currentDir, string target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return null;
+
+        // 1. Direct or rooted path
+        if (File.Exists(target)) return target;
+
+        // 2. Relative to current directory
+        string c1 = Path.Combine(currentDir, target);
+        if (File.Exists(c1)) return c1;
+
+        if (!target.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+        {
+            string c1e = Path.Combine(currentDir, target + ".elf");
+            if (File.Exists(c1e)) return c1e;
+        }
+
+        // 3. /mnt/Programs/
+        string p1 = Path.Combine("/mnt/Programs", target);
+        if (File.Exists(p1)) return p1;
+
+        if (!target.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+        {
+            string p1e = Path.Combine("/mnt/Programs", target + ".elf");
+            if (File.Exists(p1e)) return p1e;
+        }
+
+        // 4. /mnt/Apps/
+        string a1 = Path.Combine("/mnt/Apps", target);
+        if (File.Exists(a1)) return a1;
+
+        if (!target.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+        {
+            string a1e = Path.Combine("/mnt/Apps", target + ".elf");
+            if (File.Exists(a1e)) return a1e;
+        }
+
+        return null;
+    }
+
+    public static bool ExecuteElf(CommandContext context, string elfPath, string[] args)
+    {
+        try
+        {
+            byte[] fileBytes = File.ReadAllBytes(elfPath);
+            string progName = Path.GetFileName(elfPath);
+            string[] fullArgs = new string[args.Length + 1];
+            fullArgs[0] = progName;
+            Array.Copy(args, 0, fullArgs, 1, args.Length);
+
+            ElfProgram program = ElfRunner.Spawn(fileBytes, progName, fullArgs, out string error);
+            if (program == null)
+            {
+                context.WriteLine($"Failed to start ELF program {progName}: {error}");
+                return false;
+            }
+
+            program.Env["PWD"] = context.CurrentDirectory;
+
+            var lineBuf = new System.Text.StringBuilder();
+            program.OutputHandler = text =>
+            {
+                if (text == "\033[2J")
+                {
+                    context.Clear();
+                    lock (lineBuf) { lineBuf.Clear(); }
+                    return;
+                }
+
+                lock (lineBuf)
+                {
+                    for (int i = 0; i < text.Length; i++)
+                    {
+                        char c = text[i];
+                        if (c == '\n')
+                        {
+                            string line = lineBuf.ToString();
+                            lineBuf.Clear();
+                            context.WriteLine(line);
+                        }
+                        else if (c != '\r')
+                        {
+                            lineBuf.Append(c);
+                        }
+                    }
+                }
+            };
+
+            // If the program completes quickly (CLI commands like dir, cat, echo, mem),
+            // wait for it so the prompt returns immediately after output.
+            // If it creates a GUI window, unblock the terminal promptly.
+            bool exited = program.Wait(200);
+            if (!exited)
+            {
+                if (program.Objs.Count == 0)
+                {
+                    program.Wait();
+                }
+            }
+
+            lock (lineBuf)
+            {
+                if (lineBuf.Length > 0)
+                {
+                    context.WriteLine(lineBuf.ToString());
+                    lineBuf.Clear();
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            context.WriteLine($"ELF execution error: {ex.Message}");
+            return false;
+        }
+    }
+
     public static void Execute(CommandContext context, string commandLine)
     {
         if (context == null) throw new ArgumentNullException(nameof(context));
@@ -45,52 +167,68 @@ public static class CommandRegistry
         string[] parts = Parse(commandLine);
         if (parts.Length == 0) return;
 
-        if (!commands.TryGetValue(parts[0], out IShellCommand command))
-        {
-            string scriptPath = ResolveLuaScript(parts[0]);
+        string cmd = parts[0];
+        string[] arguments = new string[parts.Length - 1];
+        Array.Copy(parts, 1, arguments, 0, arguments.Length);
 
-            if (scriptPath != "")
+        // Internal shell commands that must run in-process (e.g. 'cd' to change current working directory)
+        if (string.Equals(cmd, "cd", StringComparison.OrdinalIgnoreCase))
+        {
+            if (commands.TryGetValue(cmd, out IShellCommand cdCmd))
             {
-                LuaInterpreter lua = new()
-                {
-                    WorkingDirectory = context.CurrentDirectory, // where dofile, require and io.open start relative paths from
-                };
-                //LuaBindings.RegisterBindings(lua, context);
-                try
-                {
-                    
-                    new LuaWindoseLib(scriptPath, ["*"]).Install(lua.State);
-                    lua.DoFile(scriptPath);
-                }
-                catch (LuaException e)
-                {
-                    // A syntax error, or a runtime error no pcall caught
-                    context.WriteLine(e.Message);
-                    context.WriteLine(e.LuaStackTrace);
-                }
-                catch (LuaExitException e)
-                {
-                    context.WriteLine($"Lua script exited with code {e.ExitCode}");
-                    // The script called os.exit(e.ExitCode)
-                }
+                cdCmd.Execute(context, arguments);
+                return;
             }
-            else
+        }
+
+        // 1. Try to resolve and execute an ELF binary first (e.g. dir, cat, echo, mem, calc, terminal, etc.)
+        string? elfPath = ResolveElfPath(context.CurrentDirectory, cmd);
+        if (elfPath != null)
+        {
+            ExecuteElf(context, elfPath, arguments);
+            return;
+        }
+
+        // 2. Try C# built-in shell commands
+        if (commands.TryGetValue(cmd, out IShellCommand command))
+        {
+            try
             {
-                context.WriteLine("Bad command or file name: " + parts[0]);
+                command.Execute(context, arguments);
+            }
+            catch (Exception exception)
+            {
+                context.WriteLine("Command failed: " + exception.Message);
             }
             return;
         }
 
-        string[] arguments = new string[parts.Length - 1];
-        Array.Copy(parts, 1, arguments, 0, arguments.Length);
-
-        try
+        // 3. Try Lua script
+        string scriptPath = ResolveLuaScript(cmd);
+        if (scriptPath != "")
         {
-            command.Execute(context, arguments);
+            LuaInterpreter lua = new()
+            {
+                WorkingDirectory = context.CurrentDirectory,
+            };
+            try
+            {
+                new LuaWindoseLib(scriptPath, ["*"]).Install(lua.State);
+                lua.DoFile(scriptPath);
+            }
+            catch (LuaException e)
+            {
+                context.WriteLine(e.Message);
+                context.WriteLine(e.LuaStackTrace);
+            }
+            catch (LuaExitException e)
+            {
+                context.WriteLine($"Lua script exited with code {e.ExitCode}");
+            }
         }
-        catch (Exception exception)
+        else
         {
-            context.WriteLine("Command failed: " + exception.Message);
+            context.WriteLine("Bad command or file name: " + cmd);
         }
     }
 

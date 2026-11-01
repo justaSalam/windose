@@ -138,7 +138,7 @@ public sealed class TerminalView : Component
         }
         color = DefaultColor; len = 0; return false;
     }
-    public void Clear()
+    public new void Clear()
     {
         lines.Clear();
         scrollLine = 0;

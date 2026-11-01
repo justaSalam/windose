@@ -1310,7 +1310,7 @@ public static class JsBuiltins
         SetTag(realm, sp, "String");
         sp.Define("length", JsProperty.DataNonEnum(0.0));
 
-        JsNativeFn strMethod = null; // placeholder to keep pattern clear
+
 
         DefineStr(realm, "at", 1, delegate (JsRealm r, string s, JsCallArgs a)
         {

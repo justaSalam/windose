@@ -272,14 +272,14 @@ public static class HtmlLayout
         public int BorderMain, BorderCross;    // border start+end combined
 
         public int BaseSize;      // flex base size (content-box, main axis)
-        public int MainSize;      // resolved main size (content-box)
+
         public int CrossSize;     // resolved cross size (content-box); 0 = auto/stretch
         public int MinMain, MaxMain;
         public float Grow, Shrink;
         public int Order;
         public CssAlignItems AlignSelf;
 
-        public int MainPos, CrossPos;   // resolved border-box origin in container content coords
+
     }
 
     // ---- entry point -----------------------------------------------------
@@ -2682,7 +2682,7 @@ public static class HtmlLayout
         List<RenderSpan> spans = new List<RenderSpan>();
         int lineH = LineHeightOf(baseStyle);
         bool hasContent = false;
-        bool firstLine = true;
+
         string curBullet = bullet;
         int curBulletX = bulletX;
         int lineWidStart = ctx.Plan.Widgets.Count;
@@ -2698,7 +2698,7 @@ public static class HtmlLayout
                 spans = new List<RenderSpan>();
                 curX = contentX;
                 hasContent = false;
-                firstLine = false;
+
                 curBullet = null;
                 lineWidStart = ctx.Plan.Widgets.Count;
                 continue;
@@ -2751,7 +2751,7 @@ public static class HtmlLayout
                     spans = new List<RenderSpan>();
                     curX = contentX;
                     hasContent = false;
-                    firstLine = false;
+    
                     curBullet = null;
                     lineH = LineHeightOf(baseStyle);
                     lineWidStart = ctx.Plan.Widgets.Count;
@@ -2791,7 +2791,7 @@ public static class HtmlLayout
                     spans = new List<RenderSpan>();
                     curX = contentX;
                     hasContent = false;
-                    firstLine = false;
+    
                     curBullet = null;
                     lineH = LineHeightOf(baseStyle);
                     lineWidStart = ctx.Plan.Widgets.Count;
@@ -2825,7 +2825,7 @@ public static class HtmlLayout
                 spans = new List<RenderSpan>();
                 curX = contentX;
                 hasContent = false;
-                firstLine = false;
+
                 curBullet = null;
                 lineH = lh;
                 lineWidStart = ctx.Plan.Widgets.Count;
@@ -2850,7 +2850,7 @@ public static class HtmlLayout
                 spans = new List<RenderSpan>();
                 curX = contentX;
                 hasContent = false;
-                firstLine = false;
+
                 curBullet = null;
                 lineH = lh;
                 lineWidStart = ctx.Plan.Widgets.Count;

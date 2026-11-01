@@ -4,10 +4,10 @@ using System.Drawing;
 
 public sealed class ControlEnv : Window
 {
-    private DockPanel dock;
+
     public ControlEnv(int x, int y) : base(x, y, 400, 250, "Winver", true)
     {
-        dock = new DockPanel(0,0,Width, Height)
+        DockPanel dock = new DockPanel(0,0,Width, Height)
         {
             verticalAlignment = VerticalAlignment.Stretch,
             horizontalAlignment = HorizontalAlignment.Stretch,

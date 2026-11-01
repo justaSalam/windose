@@ -153,6 +153,8 @@ typedef struct KernelApi {
     int      (KABI *clipboard_set)(int pid, const char *text, int len);
     int      (KABI *get_env)(int pid, const char *name, char *buf, int max);
     int      (KABI *set_env)(int pid, const char *name, const char *val);
+    handle_t (KABI *create_terminal)(int pid, handle_t parent, int x, int y, int w, int h);
+    int      (KABI *set_icon)(int pid, handle_t win, const char *icon_path);
 } KernelApi;
 
 extern KernelApi *__k;
@@ -175,6 +177,12 @@ static inline int      k_ticks(void)                                { return __k
 static inline int      k_yield(void)                               { return __kchk(__k->yield(__k->pid)); }
 static inline int      k_spawn(const char *path, const char *argbuf, int arglen) { return __kchk(__k->spawn(__k->pid, path, argbuf, arglen)); }
 static inline int      k_kill(int target)                         { return __kchk(__k->kill(__k->pid, target)); }
+static inline int      k_set_icon(handle_t win, const char *icon_path) { return __kchk(__k->set_icon(__k->pid, win, icon_path)); }
+static inline handle_t k_create_window_with_icon(int w, int h, const char *title, const char *icon_path) {
+    handle_t win = k_create_window(w, h, title);
+    if (win && icon_path) k_set_icon(win, icon_path);
+    return win;
+}
 static inline handle_t k_create_canvas(handle_t parent, int x, int y, int w, int h) { return __kchk(__k->create_canvas(__k->pid, parent, x, y, w, h)); }
 static inline int      k_draw_pixels(handle_t canvas, int x, int y, int w, int h, const void *buf, int len) { return __kchk(__k->draw_pixels(__k->pid, canvas, x, y, w, h, buf, len)); }
 static inline int      k_resize_window(handle_t win, int w, int h) { return __kchk(__k->resize_window(__k->pid, win, w, h)); }
@@ -279,6 +287,7 @@ static inline int      k_clipboard_get(char *buf, int max) { return __kchk(__k->
 static inline int      k_clipboard_set(const char *text, int len) { return __kchk(__k->clipboard_set(__k->pid, text, len)); }
 static inline int      k_get_env(const char *name, char *buf, int max) { return __kchk(__k->get_env(__k->pid, name, buf, max)); }
 static inline int      k_set_env(const char *name, const char *val) { return __kchk(__k->set_env(__k->pid, name, val)); }
+static inline handle_t k_create_terminal(handle_t parent, int x, int y, int w, int h) { return __kchk(__k->create_terminal(__k->pid, parent, x, y, w, h)); }
 static inline int      k_pid(void)                                  { return __k->pid; }
 
 #endif

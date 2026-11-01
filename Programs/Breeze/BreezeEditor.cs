@@ -46,7 +46,7 @@ show(main);
     private readonly DocumentTabStrip tabStrip;
     private readonly TreeView projectTree;
     private readonly ScrollView projectScroll;
-    private readonly IWindoseFileSystem subscribedFileSystem;
+
     private int activeDocumentIndex = -1;
     private string projectRoot = @"/mnt/Apps";
     private bool diagnosticsPending;
@@ -546,7 +546,7 @@ show(main);
 
     public override void Dispose()
     {
-        if (subscribedFileSystem != null) subscribedFileSystem.Changed -= OnFileSystemChanged;
+
         base.Dispose();
     }
 

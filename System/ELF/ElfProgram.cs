@@ -20,6 +20,8 @@ namespace Windose.System.Elf
         public object HostData;
         /// <summary>Text payload of the last drag-and-drop onto this program's windows.</summary>
         public string LastDropText;
+        /// <summary>Redirects program stdout / k_write to a custom sink (e.g. terminal output).</summary>
+        public Action<string>? OutputHandler;
 
         internal readonly HandleTable Objs = new HandleTable();
         internal readonly ElfEventQueue Events = new ElfEventQueue();

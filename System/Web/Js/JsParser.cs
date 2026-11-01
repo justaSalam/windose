@@ -282,8 +282,7 @@ public static class JsParser
     private static JsNode ParseFor(P p)
     {
         int line = Advance(p).Line; // for
-        bool isAwait = false;
-        if (IsIdent(p, "await")) { Advance(p); isAwait = true; } // tolerated, no-op
+        if (IsIdent(p, "await")) { Advance(p); } // tolerated, no-op
         Expect(p, "(");
 
         // empty init

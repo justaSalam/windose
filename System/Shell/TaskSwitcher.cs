@@ -13,7 +13,7 @@ public class TaskSwitcher : Component
     private const int IdleTimeoutMs = 2000;
 
     private List<Window> items = new List<Window>();
-    private int selected;
+
 
     private TaskSwitcher() : base(0, 0, 320, 60)
     {

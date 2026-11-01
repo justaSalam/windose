@@ -9,7 +9,7 @@ public class ProcessPerformanceList : Component
     public Color textColor = Palette.ControlBlack;
     public bool programsOnly;
     private readonly MenuPopup contextMenu;
-    private readonly MenuItem priorityMenu;
+
     private readonly MenuItem endTaskItem;
     private readonly MenuItem restartTaskItem;
     private readonly MenuItem openLocationItem;
@@ -330,9 +330,9 @@ public class ProcessPerformanceList : Component
             contextMenu.Hide();
             contextMenu.Dispose();
         }
-        if (priorityMenu != null)
+        if (setPriorityItem != null)
         {
-            priorityMenu.Dispose();
+            setPriorityItem.Dispose();
         }
         base.Dispose();
     }

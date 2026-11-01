@@ -6,7 +6,8 @@
     <TargetFramework>net10.0</TargetFramework>
 	  <CosmosEnableUsb>True</CosmosEnableUsb>
 	  <CosmosEnableAudio>True</CosmosEnableAudio>
-	  <NoWarn>$(NoWarn);COSMOS0001;COSMOS0003</NoWarn>
+	  <Nullable>annotations</Nullable>
+	  <NoWarn>$(NoWarn);COSMOS0001;COSMOS0003;IL2026</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -292,6 +293,15 @@
     <EmbeddedResource Include=".\System\ELF\programs\bin\cosmoslogindialog.elf" />
       <EmbeddedResource Include=".\System\ELF\programs\bin\newelfapp.elf" />
       <EmbeddedResource Include=".\System\ELF\programs\bin\aeroeditor.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\dir.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\cat.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\echo.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\cls.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\mem.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\mkdir.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\rm.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\touch.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\terminal.elf" />
   </ItemGroup>
 
     <ItemGroup>

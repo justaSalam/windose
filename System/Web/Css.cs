@@ -954,7 +954,7 @@ public sealed class CssSheet
         s = s.ToLowerInvariant().Replace(" ", "");
         if (s == "odd") return new CssCond { A = 2, B = 1 };
         if (s == "even") return new CssCond { A = 2, B = 0 };
-        int sign = 1, a = 0, b = 0; bool hasA = false;
+        int a = 0, b = 0; bool hasA = false;
         int i = 0;
         // parse an+b
         if (s.StartsWith("n"))

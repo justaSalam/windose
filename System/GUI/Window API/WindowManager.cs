@@ -490,6 +490,47 @@ public partial class WindowManager : SingleThreadedProcess
         }
     }
 
+    public static void UpdateWindowIcon(Window window, Png? icon)
+    {
+        if (window == null) return;
+        lock (windows)
+        {
+            if (taskbarButtons.TryGetValue(window, out Button? btn) && btn != null)
+            {
+                btn.image = icon;
+                int taskbarButtonWidth = Math.Clamp(window.text.Length * 7 + (icon == null ? 18 : 38), 84, 180);
+                btn.Resize(taskbarButtonWidth, btn.Height);
+                btn.MarkDirty();
+                if (Explorer.taskbar != null)
+                {
+                    Explorer.taskbar.ForceDirty();
+                    Invalidate(Explorer.taskbar.AbsoluteRectangle);
+                }
+            }
+        }
+        Invalidate(window.bounds);
+    }
+
+    public static void UpdateWindowTitle(Window window, string title)
+    {
+        if (window == null) return;
+        lock (windows)
+        {
+            if (taskbarButtons.TryGetValue(window, out Button? btn) && btn != null)
+            {
+                btn.text = title ?? "";
+                int taskbarButtonWidth = Math.Clamp((title ?? "").Length * 7 + (window.Icon == null ? 18 : 38), 84, 180);
+                btn.Resize(taskbarButtonWidth, btn.Height);
+                btn.MarkDirty();
+                if (Explorer.taskbar != null)
+                {
+                    Explorer.taskbar.ForceDirty();
+                    Invalidate(Explorer.taskbar.AbsoluteRectangle);
+                }
+            }
+        }
+    }
+
     public static void Close(Window window)
     {
         if (window == null) return;

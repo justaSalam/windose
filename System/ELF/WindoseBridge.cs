@@ -5,6 +5,7 @@
 using System;
 using System.Drawing;
 using Cosmos.Kernel.System.FileSystem;
+using Cosmos.Kernel.System.Graphics;
 using Windose.System.Kernel;
 using Windose.System.System_Calls;
 
@@ -102,6 +103,86 @@ namespace Windose.System.Elf
 
         // ---------------------------------------------------------------- UI
 
+        public static Png? ResolveIcon(string? title, string? progName)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(progName))
+                {
+                    string baseName = Path.GetFileNameWithoutExtension(progName).ToLowerInvariant();
+                    string sidecar = $"/mnt/Programs/{baseName}.png";
+                    if (File.Exists(sidecar)) return new Png(sidecar);
+
+                    string sysIcon = $"/mnt/System/Icons/{baseName}.png";
+                    if (File.Exists(sysIcon)) return new Png(sysIcon);
+                }
+
+                string combined = ((title ?? "") + " " + (progName ?? "")).ToLowerInvariant();
+
+                if (combined.Contains("terminal") || combined.Contains("prompt") || combined.Contains("cmd") || combined.Contains("console"))
+                    return LoadPngIfExists("/mnt/System/Icons/console_prompt.png");
+
+                if (combined.Contains("calc"))
+                    return LoadPngIfExists("/mnt/System/Icons/calculator.png");
+
+                if (combined.Contains("explorer") || combined.Contains("file"))
+                    return LoadPngIfExists("/mnt/System/Icons/search_directory.png") ?? LoadPngIfExists("/mnt/System/Icons/directory_explorer.png");
+
+                if (combined.Contains("editor") || combined.Contains("notepad") || combined.Contains("write") || combined.Contains("text"))
+                    return LoadPngIfExists("/mnt/System/Icons/write_wordpad.png");
+
+                if (combined.Contains("clock") || combined.Contains("time"))
+                    return LoadPngIfExists("/mnt/System/Icons/clock.png");
+
+                if (combined.Contains("paint") || combined.Contains("canvas") || combined.Contains("draw"))
+                    return LoadPngIfExists("/mnt/System/Icons/true_type_paint.png");
+
+                if (combined.Contains("task") || combined.Contains("perf") || combined.Contains("monitor") || combined.Contains("process"))
+                    return LoadPngIfExists("/mnt/System/Icons/computer_taskmgr.png");
+
+                if (combined.Contains("logon") || combined.Contains("login") || combined.Contains("user"))
+                    return LoadPngIfExists("/mnt/System/Icons/users_key.png") ?? LoadPngIfExists("/mnt/System/Icons/user_world.png");
+
+                if (combined.Contains("search") || combined.Contains("find"))
+                    return LoadPngIfExists("/mnt/System/Icons/search_file.png");
+
+                if (combined.Contains("setting") || combined.Contains("config") || combined.Contains("gear"))
+                    return LoadPngIfExists("/mnt/System/Icons/settings_gear.png");
+
+                if (combined.Contains("disk") || combined.Contains("drive"))
+                    return LoadPngIfExists("/mnt/System/Icons/hard_disk_drive.png");
+
+                if (combined.Contains("media") || combined.Contains("player") || combined.Contains("audio") || combined.Contains("sound"))
+                    return LoadPngIfExists("/mnt/System/Icons/media_player.png");
+
+                return LoadPngIfExists("/mnt/System/Icons/executable.png") ?? LoadPngIfExists("/mnt/System/Icons/shell_window.png");
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static Png? LoadPngIfExists(string path)
+        {
+            try
+            {
+                if (File.Exists(path)) return new Png(path);
+            }
+            catch { }
+            return null;
+        }
+
+        public bool SetIcon(object window, string iconPath)
+        {
+            if (window is Window win)
+            {
+                win.SetIcon(iconPath);
+                return true;
+            }
+            return false;
+        }
+
         // Programs see a client area of w x h; we add the frame and title bar around it.
         public object CreateWindow(int w, int h, string title)
         {
@@ -109,11 +190,75 @@ namespace Windose.System.Elf
             int border = Palette.BorderSize;
             int titleH = Palette.TitleBarHeight;
 
+            Png? icon = ResolveIcon(title, null);
+
             ElfWindow win = new ElfWindow(80 + n * 30, 80 + n * 30,
                                           w + border * 2, h + titleH + border,
-                                          title);
+                                          title, icon);
             WindowManager.Register(win);   // posts to the DWM: starts the process, z-order, focus, taskbar button
             return win;
+        }
+
+        public object CreateTerminal(object parent, int x, int y, int w, int h)
+        {
+            Component p = parent as Component;
+            if (p == null) return null;
+
+            CommandRegistry.EnsureBuiltIns();
+
+            Thickness rootMargin = p is Window
+                ? new Thickness(Palette.TitleBarHeight, Palette.BorderSize, Palette.BorderSize, Palette.BorderSize)
+                : new Thickness(0);
+
+            DockPanel root = new DockPanel(0, 0, p.Width, p.Height)
+            {
+                horizontalAlignment = HorizontalAlignment.Stretch,
+                verticalAlignment = VerticalAlignment.Stretch,
+                Margin = rootMargin,
+                Padding = new Thickness(0),
+                clampSize = false,
+                useBackground = true,
+                backgroundColor = Color.Black,
+            };
+
+            TerminalView output = new TerminalView(0, 0, p.Width, p.Height)
+            {
+                horizontalAlignment = HorizontalAlignment.Stretch,
+                verticalAlignment = VerticalAlignment.Stretch,
+                Margin = new Thickness(0),
+            };
+
+            CommandContext context = new CommandContext(
+                writeLine: output.WriteLine,
+                clear: output.Clear,
+                close: () => { },
+                readLine: output.ReadLineSync);
+
+            output.OnTopLevelSubmit = line =>
+            {
+                new Thread(() => CommandRegistry.Execute(context, line)).Start();
+            };
+
+            output.PromptProvider = () => $"windose@user: {context.CurrentDirectory} ";
+
+            output.WriteLine("Windose Command Prompt");
+            output.WriteLine("Type help for available commands.");
+            output.WriteLine();
+
+            root.AddDockChild(output, Dock.Fill);
+
+            lock (Component.components)
+            {
+                p.AddChild(root);
+            }
+
+            if (p is Window win)
+            {
+                win.SetFocusedComponent(output);
+            }
+            output.RequestFocus();
+
+            return output;
         }
 
         public object CreateButton(object parent, int x, int y, int w, int h, string text)
@@ -171,6 +316,11 @@ namespace Windose.System.Elf
             {
                 ewin.Owner = owner;
                 ewin.ProgramHandle = h;
+                if (owner != null && (ewin.Icon == null || ewin.Icon == LoadPngIfExists("/mnt/System/Icons/executable.png")))
+                {
+                    Png? resolved = ResolveIcon(ewin.text, owner.Name);
+                    if (resolved != null) ewin.SetIcon(resolved);
+                }
                 ewin.DragDropped += delegate (DragData data)
                 {
                     owner.LastDropText = data != null ? data.Text ?? "" : "";
@@ -941,7 +1091,13 @@ namespace Windose.System.Elf
             {
                 string app = (name ?? "").Trim().ToLowerInvariant();
                 if (app == "explorer") LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
-                else if (app == "terminal") LaunchTracker.Start(() => new CommandPrompt());
+                else if (app == "terminal")
+                {
+                    if (File.Exists("/mnt/Programs/terminal.elf"))
+                        ElfRunner.RunFile("/mnt/Programs/terminal.elf");
+                    else
+                        LaunchTracker.Start(() => new CommandPrompt());
+                }
                 else if (app == "editor")
                 {
                     if (string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new BreezeEditor());

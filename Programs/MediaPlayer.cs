@@ -179,7 +179,7 @@ public class MediaPlayer : Window
     private int totalFrames;
     private float currentFps = 30f;
     private int lastFrameTick;
-    private bool isScrubbing;
+
 
     public MediaPlayer(string? initialPath = null, int x = 140, int y = 100, int width = 720, int height = 520)
         : base(x, y, width, height, "Windows Media Player", true, new Png("/mnt/System/Icons/media_player.png"))
@@ -541,10 +541,7 @@ public class MediaPlayer : Window
                 }
             }
 
-            if (!isScrubbing)
-            {
-                UpdateScrubberPosition();
-            }
+            UpdateScrubberPosition();
             UpdateTimeLabels();
             screen.MarkDirty();
         }

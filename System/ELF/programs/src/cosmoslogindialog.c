@@ -12,7 +12,7 @@
 
 /* Component Handles */
 static handle_t main_win = 0;
-static handle_t h_login_card = 0;
+
 static handle_t h_lbl_logo = 0;
 static handle_t h_lbl_sub = 0;
 static handle_t h_inp_user = 0;

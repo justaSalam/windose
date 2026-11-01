@@ -189,7 +189,7 @@ int main(int argc, char **argv)
     int i;
     (void)argc; (void)argv;
 
-    win = k_create_window(280, 380, "Calculator");
+    win = k_create_window_with_icon(280, 380, "Calculator", "/mnt/System/Icons/calculator.png");
     if (!win) { puts("window creation failed"); return 1; }
     display = k_create_label(win, 8, 8, "");
     if (!display) { puts("label failed"); k_close(win); return 1; }

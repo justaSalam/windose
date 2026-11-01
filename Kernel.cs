@@ -168,7 +168,7 @@ public class Kernel : Sys.Kernel
         FileAssociations.DiscoverPrograms(typeof(Kernel).Assembly);
 
 
-
+        ResourceLoader.SysRequired();
     }
 
 

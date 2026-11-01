@@ -10,7 +10,7 @@ public class Panel : Component
     public bool blendBackground = false;
     private bool useGradient = false;
     public Color borderColor = Color.White;
-    public string text = "";
+
     public int fontSize = 0;
     public int textOffsetX = 0;
     public Color textColor = Color.Black;

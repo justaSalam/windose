@@ -142,7 +142,7 @@ public static class BreezeServiceManager
                 Process replacement = stopped.Process.startInfo.RestartFactory();
                 if (replacement != null) ProcessManager.QueueStart(replacement);
             }
-            catch (Exception exception)
+            catch (Exception)
             {
             }
         }

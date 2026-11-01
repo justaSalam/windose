@@ -500,7 +500,7 @@ public class JsInterpreter
             case JsKind.Member:
                 if (mode == BindMode.Assign)
                 {
-                    object recv; bool sc;
+
                     // compute the base object for the member
                     JsMember m = (JsMember)pattern;
                     object baseVal = EvalExpr(m.Object, scope);
@@ -1244,7 +1244,6 @@ public class JsInterpreter
             JsNode target = n.Operand;
             if (target.Kind == JsKind.Member)
             {
-                object recv; bool sc;
                 // evaluate base and key without invoking as method
                 JsMember m = (JsMember)target;
                 object baseVal = EvalExpr(m.Object, scope);

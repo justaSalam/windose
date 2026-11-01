@@ -49,8 +49,64 @@ public class Window : Component
     private int lastTitlePress;
 
     protected Component? focusedComponent;
+    public void SetFocusedComponent(Component? c)
+    {
+        focusedComponent = c;
+        c?.RequestFocus();
+    }
 
     public Png? Icon;
+
+    public void SetIcon(Png? icon)
+    {
+        Icon = icon;
+        if (hasTitleBar && titlebar != null)
+        {
+            titlebar.textOffsetX = (icon != null ? 26 : 0);
+            titlebar.MarkDirty();
+        }
+        WindowManager.UpdateWindowIcon(this, icon);
+        MarkDirty();
+    }
+
+    public void SetIcon(string? iconPath)
+    {
+        if (string.IsNullOrWhiteSpace(iconPath))
+        {
+            SetIcon((Png?)null);
+            return;
+        }
+
+        try
+        {
+            string p = iconPath.Trim();
+            if (File.Exists(p))
+            {
+                SetIcon(new Png(p));
+                return;
+            }
+
+            string name = Path.GetFileName(p);
+            string sys = Path.Combine("/mnt/System/Icons", name);
+            if (File.Exists(sys))
+            {
+                SetIcon(new Png(sys));
+                return;
+            }
+
+            if (!sys.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+            {
+                sys += ".png";
+                if (File.Exists(sys))
+                {
+                    SetIcon(new Png(sys));
+                    return;
+                }
+            }
+        }
+        catch { }
+    }
+
     private StackPanel titlebar;
     private bool hasTitleBar;
     private bool windowFocused;
@@ -139,7 +195,9 @@ public class Window : Component
 
         if (Icon != null)
         {
-            DrawImageStretch(Icon, new(WindowFrameInset + 2, WindowFrameInset + 2, 16, 16));
+            int iconY = hasTitleBar ? Math.Max(2, (Palette.TitleBarHeight - 16) / 2) : WindowFrameInset + 2;
+            int iconX = hasTitleBar ? Palette.BorderSize + 4 : WindowFrameInset + 2;
+            DrawImageStretch(Icon, new Rectangle(iconX, iconY, 16, 16));
         }
 
         //if (Width > WindowFrameInset * 2 && Height > WindowFrameInset * 2)
@@ -253,7 +311,7 @@ public class Window : Component
                 spacing = 1
             };
 
-            if (Icon != null) titlebar.textOffsetX = 25;
+            if (Icon != null) titlebar.textOffsetX = 26;
 
             AddChild(titlebar);
             hasTitleBar = true;
@@ -354,6 +412,7 @@ public class Window : Component
             titlebar.MarkDirty();
         }
 
+        WindowManager.UpdateWindowTitle(this, text);
         MarkDirty();
     }
 

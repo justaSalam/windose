@@ -7,11 +7,6 @@ namespace Windose.System.Kernel
 {
     public static class ResourceLoader
     {
-        static ResourceLoader()
-        {
-            SysRequired();
-        }
-
         public static Assembly assembly { get; private set; } = typeof(ResourceLoader).Assembly;
         /// <summary>
         /// Loads a resource from the embedded resources and returns its byte array representation.
@@ -148,7 +143,7 @@ namespace Windose.System.Kernel
             }
         }
 
-        private static void SysRequired()
+        public static void SysRequired()
         {
             WriteStorage("/mnt/Programs/window.elf", "Windose.System.ELF.programs.bin.window.elf", true);
             WriteStorage("/mnt/Programs/hello.elf", "Windose.System.ELF.programs.bin.hello.elf", true);
@@ -166,6 +161,15 @@ namespace Windose.System.Kernel
             WriteStorage("/mnt/Programs/newelfapp.elf", "Windose.System.ELF.programs.bin.newelfapp.elf", true);
 
             WriteStorage("/mnt/Programs/aeroeditor.elf", "Windose.System.ELF.programs.bin.aeroeditor.elf", true);
+            WriteStorage("/mnt/Programs/dir.elf", "Windose.System.ELF.programs.bin.dir.elf", true);
+            WriteStorage("/mnt/Programs/cat.elf", "Windose.System.ELF.programs.bin.cat.elf", true);
+            WriteStorage("/mnt/Programs/echo.elf", "Windose.System.ELF.programs.bin.echo.elf", true);
+            WriteStorage("/mnt/Programs/cls.elf", "Windose.System.ELF.programs.bin.cls.elf", true);
+            WriteStorage("/mnt/Programs/mem.elf", "Windose.System.ELF.programs.bin.mem.elf", true);
+            WriteStorage("/mnt/Programs/mkdir.elf", "Windose.System.ELF.programs.bin.mkdir.elf", true);
+            WriteStorage("/mnt/Programs/rm.elf", "Windose.System.ELF.programs.bin.rm.elf", true);
+            WriteStorage("/mnt/Programs/touch.elf", "Windose.System.ELF.programs.bin.touch.elf", true);
+            WriteStorage("/mnt/Programs/terminal.elf", "Windose.System.ELF.programs.bin.terminal.elf", true);
         }
     }
 }

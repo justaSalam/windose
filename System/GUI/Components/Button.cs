@@ -8,7 +8,7 @@ public class Button : Component
     public ImageDisplayMode imageDisplayMode = ImageDisplayMode.None;
     public Label? label;
     public Image? image;
-    public string text = "";
+
 
     public bool useBackground = true;
     public bool useBorders = false;

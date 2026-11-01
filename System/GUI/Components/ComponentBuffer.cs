@@ -4,8 +4,8 @@ using System.Drawing;
 
 public class ComponentBuffer : Canvas
 {
-    public int Width { get; private set; }
-    public int Height { get; private set; }
+    public new int Width { get; private set; }
+    public new int Height { get; private set; }
     public int[] Buffer => GetBuffer();
 
     private const int MaxClipDepth = 32;
@@ -105,7 +105,7 @@ public class ComponentBuffer : Canvas
         BlendPixel(buffer, y * Width + x, color.ToArgb());
     }
 
-    public new void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
+    public void DrawImage(Image image, int x, int y, bool preventOffBoundPixels = true)
     {
         DrawArrayAlphaClipped(image.RawData, image.Width, 0, 0, x, y, image.Width, image.Height);
     }
@@ -170,7 +170,7 @@ public class ComponentBuffer : Canvas
         return Buffer[y * Width + x];
     }
 
-    public new void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
+    public void DrawFilledRectangle(Color color, int xStart, int yStart, int width, int height, bool preventOffBoundPixels = true)
     {
         if (height == -1)
         {

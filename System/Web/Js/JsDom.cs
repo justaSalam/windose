@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -1208,7 +1208,7 @@ public sealed class JsDom
     {
         if (node.Attrs == null) return 0;
         string key = "data-sel-" + which;
-        string v;
+
         if (node.Attrs.ContainsKey(key))
         {
             int.TryParse(node.Attrs[key], out int parsed);

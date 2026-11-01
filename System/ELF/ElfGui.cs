@@ -1,5 +1,6 @@
 // ElfGui.cs - Windose UI objects owned by ELF programs: event-reporting windows and pixel canvases.
 using Cosmos.Kernel.System.Input;
+using Cosmos.Kernel.System.Graphics;
 using System;
 using System.Drawing;
 
@@ -19,9 +20,20 @@ namespace Windose.System.Elf
         private int lastMouseX = int.MinValue;
         private int lastMouseY = int.MinValue;
 
-        public ElfWindow(int x, int y, int width, int height, string title)
-            : base(x, y, width, height, title, true)
+        public ElfWindow(int x, int y, int width, int height, string title, Png? icon = null)
+            : base(x, y, width, height, title, true, icon)
         {
+        }
+
+        private static TerminalView? FindTerminal(Component parent)
+        {
+            if (parent is TerminalView tv && tv.Visible) return tv;
+            for (int i = 0; i < parent.children.Count; i++)
+            {
+                TerminalView? found = FindTerminal(parent.children[i]);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         public override void HandleKeyboard(KeyEvent keyEvent)
@@ -49,6 +61,16 @@ namespace Windose.System.Elf
             {
                 if (focusedComponent is TextField field && field.Visible && field.IsInputEnabled())
                     field.HandleKeyboard(keyEvent);
+                else if (focusedComponent is TerminalView term && term.Visible && term.IsInputEnabled())
+                    term.HandleKeyboard(keyEvent);
+                else
+                {
+                    TerminalView? tv = FindTerminal(this);
+                    if (tv != null && tv.Visible)
+                    {
+                        tv.HandleKeyboard(keyEvent);
+                    }
+                }
             }
             catch { }
             // Swallowed otherwise: ELF children (button/label/canvas) take no keyboard input.
