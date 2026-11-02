@@ -96,21 +96,19 @@ public class Taskbar : Component
             Padding = new Thickness(modern ? 1 : 3),
             leftClickAction = () =>
             {
-                if (File.Exists("/mnt/Programs/startmenu.elf"))
+                if (Explorer.startMenu != null)
                 {
-                    ElfProgram? existing = ElfRunner.Find("startmenu.elf");
-                    if (existing != null)
+                    bool show = !Explorer.startMenu.Visible;
+                    if (show)
                     {
-                        ElfRunner.Kill(existing.Pid);
+                        Explorer.startMenu.Visible = true;
+                        WindowManager.Activate(Explorer.startMenu);
+                        try { Windose.System.Media.AudioEngine.Instance.PlayClick(); } catch { }
                     }
                     else
                     {
-                        ElfRunner.RunFile("/mnt/Programs/startmenu.elf");
+                        Explorer.startMenu.HideMenuImmediate();
                     }
-                }
-                else if (Explorer.startMenu != null)
-                {
-                    Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
                 }
             }
         };

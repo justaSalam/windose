@@ -1,4 +1,4 @@
-﻿
+
 using Cosmos.Kernel.System.Input;
 using Windose.System.Elf;
 using Windose.System.Features;
@@ -32,7 +32,17 @@ public class HotkeyManager : SingleThreadedProcess
         RegisterHotkey(new KeyEvent { Key = Key.Escape, Modifiers = ConsoleModifiers.Control }, () =>
         {
             if (Explorer.startMenu != null)
-                Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
+            {
+                if (!Explorer.startMenu.Visible)
+                {
+                    Explorer.startMenu.Visible = true;
+                    WindowManager.Activate(Explorer.startMenu);
+                }
+                else
+                {
+                    Explorer.startMenu.HideMenuImmediate();
+                }
+            }
         });
         RegisterHotkey(new KeyEvent { Key = Key.DownArrow, Modifiers = ConsoleModifiers.Alt }, () =>
         {
