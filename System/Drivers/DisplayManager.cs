@@ -1,3 +1,4 @@
+using System;
 using System.Drawing;
 using Cosmos.Kernel.System.Graphics;
 using Windose.System.Kernel;
@@ -10,6 +11,13 @@ public sealed class DisplayManager
     public ComponentBuffer BackBuffer { get; private set; }
     public int Width => canvas == null ? 0 : canvas.Width;
     public int Height => canvas == null ? 0 : canvas.Height;
+
+    private bool firstPresent = true;
+    private int lastCursorX = int.MinValue;
+    private int lastCursorY = int.MinValue;
+    private CursorType lastCursorType = CursorType.Arrow;
+    private bool lastStarting;
+    private bool lastCursorBlink;
 
     public DisplayManager()
     {
@@ -26,9 +34,11 @@ public sealed class DisplayManager
     {
         bool isStarting = LaunchTracker.isStarting;
         bool cursorBlink = isStarting && ((Environment.TickCount / 150) % 2 != 0);
+        CursorType currentCursor = CursorManager.Current;
 
         // Skip the fullscreen upload when neither the backbuffer nor the cursor state changed.
         bool cursorChanged = cursorX != lastCursorX || cursorY != lastCursorY
+            || currentCursor != lastCursorType
             || isStarting != lastStarting
             || (isStarting && cursorBlink != lastCursorBlink);
 
@@ -38,6 +48,7 @@ public sealed class DisplayManager
         firstPresent = false;
         lastCursorX = cursorX;
         lastCursorY = cursorY;
+        lastCursorType = currentCursor;
         lastStarting = isStarting;
         lastCursorBlink = cursorBlink;
 
@@ -54,15 +65,14 @@ public sealed class DisplayManager
         PerformanceMetrics.DisplayTicks = PerformanceMetrics.Now - displayStartedAt;
     }
 
-    private bool firstPresent = true;
-    private int lastCursorX = int.MinValue;
-    private int lastCursorY = int.MinValue;
-    private bool lastStarting;
-    private bool lastCursorBlink;
-
     private void DrawCursor(int x, int y, bool isHiddenByBlink)
     {
         if (isHiddenByBlink) return;
-        canvas.DrawImage(Cursors.arrow, x, y);
+        CursorType cursorType = CursorManager.Current;
+        var (hotspotX, hotspotY) = CursorManager.GetHotspot(cursorType);
+        Image img = CursorManager.GetCursorImage(cursorType);
+        int drawX = x - hotspotX;
+        int drawY = y - hotspotY;
+        canvas.DrawImage(img, drawX, drawY);
     }
-}
+}
