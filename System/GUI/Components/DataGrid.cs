@@ -100,6 +100,11 @@ public class DataGrid : Component
         if (index < -1 || index >= rows.Count) return;
         if (SelectedRow == index) return;
         SelectedRow = index;
+        if (SelectedRow >= 0 && Parent is ScrollView scroll)
+        {
+            int rowY = HeaderHeight + SelectedRow * RowHeight;
+            scroll.ScrollIntoView(new Rectangle(0, rowY, Width, RowHeight));
+        }
         MarkDirty();
         SelectedChanged?.Invoke(SelectedRow);
     }
@@ -145,6 +150,14 @@ public class DataGrid : Component
 
     public int GetContentHeight() => HeaderHeight + rows.Count * RowHeight;
 
+    public int GetContentWidth()
+    {
+        int w = 0;
+        for (int i = 0; i < columns.Count; i++)
+            w += columns[i].Width;
+        return w;
+    }
+
     public override void DrawLocal()
     {
         DrawFilledRectangle(Palette.ControlFace, 0, 0, Width, Height);
@@ -162,10 +175,19 @@ public class DataGrid : Component
         }
         DrawLine(Palette.ControlShadow, 0, HeaderHeight - 1, Math.Max(0, Width - 1), HeaderHeight - 1);
 
-        for (int r = 0; r < rows.Count; r++)
+        int start = 0;
+        int end = rows.Count - 1;
+
+        if (Parent is ScrollView scroll)
+        {
+            int vh = scroll.GetViewportHeight();
+            start = Math.Max(0, (scroll.scrollY - HeaderHeight) / Math.Max(1, RowHeight));
+            end = Math.Min(rows.Count - 1, (scroll.scrollY + vh - HeaderHeight) / Math.Max(1, RowHeight) + 1);
+        }
+
+        for (int r = start; r <= end; r++)
         {
             int y = HeaderHeight + r * RowHeight;
-            if (y >= Height) break;
             if (r == SelectedRow)
                 DrawFilledRectangle(Palette.Highlight, 0, y, Width, RowHeight);
             x = 0;

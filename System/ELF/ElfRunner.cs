@@ -140,6 +140,11 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, byte*, byte*, int> SetEnv;                            // (pid, name, value) -> 0
         public delegate* unmanaged<int, int, int, int, int, int, int> CreateTerminal;         // (pid, parent, x, y, w, h) -> handle
         public delegate* unmanaged<int, int, byte*, int> SetIcon;                             // (pid, win, iconPath) -> 0
+        public delegate* unmanaged<int, int, int, int, int, byte*, int, int> CreateWindowEx; // (pid, x, y, w, h, title, flags) -> handle
+        public delegate* unmanaged<int, int, int, int, int> MoveWindow;                      // (pid, win, x, y) -> 0
+        public delegate* unmanaged<int, int*, int*, int> ScreenSize;                          // (pid, out_w, out_h) -> 0
+        public delegate* unmanaged<int, int, int> RestartProc;                                // (pid, target) -> 0
+        public delegate* unmanaged<int, int> RestartShell;                                    // (pid) -> 0
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -161,7 +166,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 11;
+        public const int ApiVersion = 12;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -277,7 +282,14 @@ namespace Windose.System.Elf
             byte[] data = File.ReadAllBytes(path);
             string name = Path.GetFileName(path);
             string[] fullArgs = args != null && args.Length > 0 ? args : new string[] { name };
-            return Spawn(data, name, fullArgs, out _);
+            ElfProgram p = Spawn(data, name, fullArgs, out _);
+            if (p != null)
+            {
+                p.FilePath = path;
+                p.OriginalBytes = data;
+                RecordProgramInfo(p.Pid, name, path, data, fullArgs);
+            }
+            return p;
         }
 
         /// <summary>Loads and starts a program on its own thread. Returns null on failure (reason in 'error').
@@ -310,6 +322,8 @@ namespace Windose.System.Elf
             {
                 if (Programs.Count >= MaxPrograms) { error = "too many running programs"; return null; }
                 p = new ElfProgram(_nextPid++, name, full);
+                p.OriginalBytes = file;
+                RecordProgramInfo(p.Pid, name, null, file, full);
                 Programs[p.Pid] = p;
                 lock (ExitedCodesLock)
                 {
@@ -515,6 +529,11 @@ namespace Windose.System.Elf
             api.SetEnv = &ApiSetEnv;
             api.CreateTerminal = &ApiCreateTerminal;
             api.SetIcon = &ApiSetIcon;
+            api.CreateWindowEx = &ApiCreateWindowEx;
+            api.MoveWindow = &ApiMoveWindow;
+            api.ScreenSize = &ApiScreenSize;
+            api.RestartProc = &ApiRestartProc;
+            api.RestartShell = &ApiRestartShell;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -2466,6 +2485,183 @@ namespace Windose.System.Elf
                 return 0;
             }
             catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCreateWindowEx(int pid, int x, int y, int w, int h, byte* title, int flags)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host;
+                if (host == null || w <= 0 || h <= 0) return 0;
+                string t = CStr(title) ?? "";
+                object obj = host.CreateWindowEx(x, y, w, h, t, flags);
+                if (obj == null) return 0;
+                int handle = p.Objs.Add(obj);
+                if (handle == 0) { host.Close(obj); return 0; }
+                host.Bind(obj, handle, p);
+                return handle;
+            }
+            catch { return 0; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiMoveWindow(int pid, int winHandle, int x, int y)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host;
+                if (host == null) return -1;
+                object obj = p.Objs.Get(winHandle);
+                if (obj == null) return -1;
+                return host.MoveWindow(obj, x, y) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiScreenSize(int pid, int* outW, int* outH)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host;
+                if (host == null) return -1;
+                host.GetScreenSize(out int w, out int h);
+                if (outW != null) *outW = w;
+                if (outH != null) *outH = h;
+                return 0;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiRestartProc(int pid, int targetPid)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host;
+                if (host == null) return -1;
+                return host.RestartProcess(targetPid) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiRestartShell(int pid)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host;
+                if (host == null) return -1;
+                return host.RestartShell() ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        private static readonly Dictionary<int, (string Name, string? FilePath, byte[]? OriginalBytes, string[]? Args)> _recentProgramInfo =
+            new Dictionary<int, (string Name, string? FilePath, byte[]? OriginalBytes, string[]? Args)>();
+
+        internal static void RecordProgramInfo(int pid, string name, string? path, byte[]? bytes, string[]? args)
+        {
+            lock (_recentProgramInfo)
+            {
+                _recentProgramInfo[pid] = (name, path, bytes, args);
+            }
+        }
+
+        public static ElfProgram? Restart(int pid)
+        {
+            byte[]? bytes = null;
+            string name = "";
+            string? path = null;
+            string[]? args = null;
+
+            ElfProgram? old = Get(pid);
+            if (old != null)
+            {
+                name = old.Name;
+                path = old.FilePath;
+                bytes = old.OriginalBytes;
+                args = old.Args;
+            }
+            else
+            {
+                lock (_recentProgramInfo)
+                {
+                    if (_recentProgramInfo.TryGetValue(pid, out var info))
+                    {
+                        name = info.Name;
+                        path = info.FilePath;
+                        bytes = info.OriginalBytes;
+                        args = info.Args;
+                    }
+                }
+            }
+
+            if (bytes == null && !string.IsNullOrEmpty(path) && File.Exists(path))
+            {
+                try { bytes = File.ReadAllBytes(path); } catch { }
+            }
+
+            if (bytes == null) return null;
+
+            Kill(pid);
+
+            string[] passArgs = args != null && args.Length > 1 ? args[1..] : Array.Empty<string>();
+            ElfProgram? repl = Spawn(bytes, name, passArgs, out _);
+            if (repl != null)
+            {
+                repl.FilePath = path;
+                repl.OriginalBytes = bytes;
+                RecordProgramInfo(repl.Pid, name, path, bytes, repl.Args);
+            }
+            return repl;
+        }
+
+        public static ElfProgram? Restart(string nameOrPath)
+        {
+            if (string.IsNullOrEmpty(nameOrPath)) return null;
+            foreach (ElfProgram p in List())
+            {
+                if (p.State != ElfState.Exited &&
+                    (string.Equals(p.Name, nameOrPath, StringComparison.OrdinalIgnoreCase) ||
+                     (!string.IsNullOrEmpty(p.FilePath) && string.Equals(Path.GetFileName(p.FilePath), nameOrPath, StringComparison.OrdinalIgnoreCase))))
+                {
+                    return Restart(p.Pid);
+                }
+            }
+            lock (_recentProgramInfo)
+            {
+                foreach (var kv in _recentProgramInfo)
+                {
+                    if (string.Equals(kv.Value.Name, nameOrPath, StringComparison.OrdinalIgnoreCase) ||
+                        (!string.IsNullOrEmpty(kv.Value.FilePath) && string.Equals(Path.GetFileName(kv.Value.FilePath), nameOrPath, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return Restart(kv.Key);
+                    }
+                }
+            }
+            return null;
+        }
+
+        public static ElfProgram? Find(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return null;
+            foreach (ElfProgram p in List())
+            {
+                if (p.State != ElfState.Exited &&
+                    (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase) ||
+                     (!string.IsNullOrEmpty(p.FilePath) && string.Equals(Path.GetFileName(p.FilePath), name, StringComparison.OrdinalIgnoreCase))))
+                {
+                    return p;
+                }
+            }
+            return null;
         }
     }
 }

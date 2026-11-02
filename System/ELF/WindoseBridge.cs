@@ -88,6 +88,12 @@ namespace Windose.System.Elf
         public void ProgramStarted(ElfProgram p)
         {
             SingleThreadedProcess proc = new SingleThreadedProcess("elf: " + p.Name, ProcessType.Program);
+            proc.canTerminate = true;
+            proc.startInfo.RestartFactory = () =>
+            {
+                ElfProgram? restarted = ElfRunner.Restart(p.Pid);
+                return restarted?.HostData as Process;
+            };
             proc.onUpdate += delegate () { };
             proc.onDispose += delegate () { ElfRunner.Kill(p.Pid); };
             p.HostData = proc;
@@ -197,6 +203,75 @@ namespace Windose.System.Elf
                                           title, icon);
             WindowManager.Register(win);   // posts to the DWM: starts the process, z-order, focus, taskbar button
             return win;
+        }
+
+        public object CreateWindowEx(int x, int y, int w, int h, string title, int flags)
+        {
+            bool useTitleBar = (flags & 1) == 0;
+            bool showInTaskbar = (flags & 2) == 0;
+            bool isPopup = (flags & 4) != 0;
+            bool borderless = (flags & 8) != 0;
+
+            int border = borderless ? 0 : Palette.BorderSize;
+            int titleH = useTitleBar ? Palette.TitleBarHeight : 0;
+
+            Png? icon = ResolveIcon(title, null);
+
+            ElfWindow win = new ElfWindow(x, y,
+                                          w + (borderless ? 0 : border * 2),
+                                          h + titleH + (borderless ? 0 : border),
+                                          title, icon, useTitleBar, showInTaskbar);
+            if (borderless)
+            {
+                win.drawFrame = false;
+            }
+            if (isPopup)
+            {
+                win.zLayer = DrawLayer.Popup;
+            }
+
+            WindowManager.Register(win);
+            return win;
+        }
+
+        public bool MoveWindow(object window, int x, int y)
+        {
+            if (window is Window win)
+            {
+                win.ApplyBounds(new Rectangle(x, y, win.Width, win.Height));
+                win.ForceDirty();
+                WindowManager.Invalidate(win.bounds);
+                return true;
+            }
+            if (window is Component comp)
+            {
+                int cx = (comp.Parent is Window pwin && pwin.HasTitleBar) ? x + Palette.BorderSize : x;
+                int cy = (comp.Parent is Window pwin2 && pwin2.HasTitleBar) ? y + Palette.TitleBarHeight : y;
+                comp.SetBounds(cx, cy, comp.Width, comp.Height);
+                if (comp.Parent is ElfWindow elfWin)
+                {
+                    elfWin.UpdateChildLayout(comp, x, y, comp.Width, comp.Height);
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public void GetScreenSize(out int width, out int height)
+        {
+            width = Global.screenWidth;
+            height = Global.screenHeight;
+        }
+
+        public bool RestartProcess(int pid)
+        {
+            return ElfRunner.Restart(pid) != null;
+        }
+
+        public bool RestartShell()
+        {
+            Explorer.RestartShell();
+            return true;
         }
 
         public object CreateTerminal(object parent, int x, int y, int w, int h)
@@ -482,10 +557,25 @@ namespace Windose.System.Elf
 
         public bool ResizeWindow(object window, int w, int h)
         {
-            Window win = window as Window;
-            if (win == null || w <= 0 || h <= 0) return false;
-            win.SetClientSize(w, h);
-            return true;
+            if (window is Window win)
+            {
+                if (w <= 0 || h <= 0) return false;
+                win.SetClientSize(w, h);
+                return true;
+            }
+            if (window is Component comp)
+            {
+                if (w <= 0 || h <= 0) return false;
+                comp.SetBounds(comp.X, comp.Y, w, h);
+                if (comp.Parent is ElfWindow elfWin)
+                {
+                    int ox = comp.X - elfWin.ClientOriginX;
+                    int oy = comp.Y - elfWin.ClientOriginY;
+                    elfWin.UpdateChildLayout(comp, ox, oy, w, h);
+                }
+                return true;
+            }
+            return false;
         }
 
         // ---------------------------------------------------------------- widgets
@@ -905,6 +995,10 @@ namespace Windose.System.Elf
             TextField t = obj as TextField;
             if (t == null) return false;
             t.Multiline = multiline;
+            if (multiline && t.Parent is ElfWindow elfWin)
+            {
+                elfWin.RecalculateLayout();
+            }
             t.MarkDirty();
             return true;
         }
@@ -1090,7 +1184,13 @@ namespace Windose.System.Elf
             try
             {
                 string app = (name ?? "").Trim().ToLowerInvariant();
-                if (app == "explorer") LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
+                if (app == "explorer")
+                {
+                    if (File.Exists("/mnt/Programs/explorer.elf"))
+                        ElfRunner.RunFile("/mnt/Programs/explorer.elf", string.IsNullOrEmpty(arg) ? new string[] { "/mnt" } : new string[] { arg });
+                    else
+                        LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", arg ?? "/mnt"));
+                }
                 else if (app == "terminal")
                 {
                     if (File.Exists("/mnt/Programs/terminal.elf"))
@@ -1106,8 +1206,33 @@ namespace Windose.System.Elf
                 else if (app == "taskmgr") LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
                 else if (app == "registry") LaunchTracker.Start(() => new RegistryEditor());
                 else if (app == "settings") LaunchTracker.Start(() => new DisplaySettings());
+                else if (app == "lock") LockManager.Lock();
+                else if (app == "shutdown") { Desktop.SaveLayout(); Cosmos.Kernel.System.Power.Shutdown(); }
+                else if (app == "reboot") { Desktop.SaveLayout(); Cosmos.Kernel.System.Power.Reboot(); }
+                else if (app == "control")
+                {
+                    FileExplorer exp = new FileExplorer(100, 100, 700, 480, "Control Panel");
+                    exp.NavigateToPath("control");
+                    LaunchTracker.Start(() => exp);
+                }
+                else if (app == "devicemanager") LaunchTracker.Start(() => new DeviceManager(100, 100, 600, 350));
+                else if (app == "diskmanagement") LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350));
+                else if (app == "sysdump") SystemLogger.Dump();
+                else if (app == "shell_restart" || app == "restart_shell") Explorer.RestartShell();
                 else if (app == "imageviewer" && !string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new ImageViewer(arg, 120, 120, 640, 480));
-                else return false;
+                else if (File.Exists(name))
+                {
+                    ElfRunner.RunFile(name, string.IsNullOrEmpty(arg) ? null : new string[] { arg });
+                }
+                else
+                {
+                    string candidate = "/mnt/Programs/" + (name.EndsWith(".elf", StringComparison.OrdinalIgnoreCase) ? name : name + ".elf");
+                    if (File.Exists(candidate))
+                    {
+                        ElfRunner.RunFile(candidate, string.IsNullOrEmpty(arg) ? null : new string[] { arg });
+                    }
+                    else return false;
+                }
                 return true;
             }
             catch { return false; }
@@ -1461,7 +1586,7 @@ namespace Windose.System.Elf
         }
 
         // Program coordinates are relative to the window's client area (inside frame + title bar).
-        private static int ClientX(Component parent, int x) { return parent is Window ? x + Palette.BorderSize : x; }
-        private static int ClientY(Component parent, int y) { return parent is Window ? y + Palette.TitleBarHeight : y; }
+        private static int ClientX(Component parent, int x) { return (parent is Window win && win.HasTitleBar) ? x + Palette.BorderSize : x; }
+        private static int ClientY(Component parent, int y) { return (parent is Window win && win.HasTitleBar) ? y + Palette.TitleBarHeight : y; }
     }
 }

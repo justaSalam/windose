@@ -21,6 +21,7 @@ namespace Windose.System.Elf
         public const int Focus = 7;       // A = 1 gained, 0 lost
         public const int Drop = 8;        // A = x, B = y (window-local); text via dnd_get_text
         public const int DoubleClick = 9; // like Click (selection already reported), for open-on-double-click
+        public const int Resize = 10;     // Handle = window, A = client width, B = client height
     }
 
     public sealed class ElfEventQueue

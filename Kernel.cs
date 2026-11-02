@@ -1,7 +1,3 @@
-///TODO Implement lua scripts instead of hardcoded programs for terminal;
-using Cosmos.Executable.Lua;
-using Cosmos.Kernel.Core.Scheduler;
-using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
@@ -29,7 +25,6 @@ public class Kernel : Sys.Kernel
     private WindowManager windowManager;
     public Drivers.DisplayManager displayDriver;
 
-    [global::System.Runtime.InteropServices.UnmanagedCallersOnly(EntryPoint = "RhDebugBreak")]
     public static void RhDebugBreak()
     {
     }
@@ -37,7 +32,7 @@ public class Kernel : Sys.Kernel
     protected override void OnBoot()
     {
         base.OnBoot();
-        SchedulerManager.SetScheduler(new MlfqScheduler());
+        //SchedulerManager.SetScheduler(new MlfqScheduler());
     }
 
     protected override void BeforeRun()

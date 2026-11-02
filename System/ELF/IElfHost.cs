@@ -9,6 +9,11 @@ namespace Windose.System.Elf
         /// <summary>Create a top-level window. Return null on failure.</summary>
         object CreateWindow(int w, int h, string title);
         bool SetIcon(object window, string iconPath);
+        object CreateWindowEx(int x, int y, int w, int h, string title, int flags);
+        bool MoveWindow(object window, int x, int y);
+        void GetScreenSize(out int width, out int height);
+        bool RestartProcess(int pid);
+        bool RestartShell();
 
         /// <summary>Create a button inside 'parent' (an object you returned earlier). Null on failure.</summary>
         object CreateButton(object parent, int x, int y, int w, int h, string text);

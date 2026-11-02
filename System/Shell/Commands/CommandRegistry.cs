@@ -267,6 +267,60 @@ public static class CommandRegistry
         Register(new MemoryInfoCommand());
         Register(new DrawingDebugCommand());
         Register(new DiskPart());
+        Register(new DelegateCommand("restart", "Restarts a process or the shell.", "restart <shell|explorer|pid|name>", (context, args) =>
+        {
+            if (args.Length == 0 || args[0].Equals("shell", StringComparison.OrdinalIgnoreCase) || args[0].Equals("explorer", StringComparison.OrdinalIgnoreCase))
+            {
+                context.WriteLine("Restarting Explorer shell...");
+                Explorer.RestartShell();
+                return;
+            }
+
+            string target = args[0];
+            if (int.TryParse(target, out int pid))
+            {
+                if (Windose.System.Elf.ElfRunner.Restart(pid) != null)
+                {
+                    context.WriteLine($"Restarted ELF process {pid}.");
+                    return;
+                }
+                for (int i = 0; i < ProcessManager.ProcessCount; i++)
+                {
+                    Process p = ProcessManager.GetProcessAt(i);
+                    if (p != null && p.id == pid)
+                    {
+                        if (ProcessManager.Restart(p))
+                            context.WriteLine($"Restarted process '{p.name}' (PID {pid}).");
+                        else
+                            context.WriteLine($"Process '{p.name}' cannot be restarted.");
+                        return;
+                    }
+                }
+                context.WriteLine($"Process PID {pid} not found.");
+            }
+            else
+            {
+                if (Windose.System.Elf.ElfRunner.Restart(target) != null)
+                {
+                    context.WriteLine($"Restarted ELF program '{target}'.");
+                    return;
+                }
+                for (int i = 0; i < ProcessManager.ProcessCount; i++)
+                {
+                    Process p = ProcessManager.GetProcessAt(i);
+                    if (p != null && (string.Equals(p.name, target, StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(p.name, "elf: " + target, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (ProcessManager.Restart(p))
+                            context.WriteLine($"Restarted process '{p.name}'.");
+                        else
+                            context.WriteLine($"Process '{p.name}' cannot be restarted.");
+                        return;
+                    }
+                }
+                context.WriteLine($"Process '{target}' not found.");
+            }
+        }));
 
 
         // Register(new DiskManagerCommand());

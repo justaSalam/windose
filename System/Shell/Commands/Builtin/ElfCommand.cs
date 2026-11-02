@@ -7,7 +7,7 @@ public sealed class ElfCommand : IShellCommand
 {
     public string Name => "elf";
     public string Description => "ELF program runner";
-    public string Usage => "elf <program.elf> | elf run <file.elf> | elf list | elf kill <pid> | elf wait <pid>";
+    public string Usage => "elf <program.elf> | elf run <file.elf> | elf list | elf kill <pid> | elf wait <pid> | elf restart <pid|name>";
     private readonly SubcommandDispatcher dispatcher;
 
     public ElfCommand()
@@ -16,7 +16,8 @@ public sealed class ElfCommand : IShellCommand
             .Add("list", "", 0, ListElfProcess)
             .Add("run", "run <file.elf>", 1, RunElf)
             .Add("kill", "kill <pid>", 1, KillElf)
-            .Add("wait", "wait <pid>", 1, WaitElf);
+            .Add("wait", "wait <pid>", 1, WaitElf)
+            .Add("restart", "restart <pid|name>", 1, RestartElf);
     }
 
     private void RunElf(CommandContext context, string[] args)
@@ -102,7 +103,8 @@ public sealed class ElfCommand : IShellCommand
         if (!sub.Equals("list", StringComparison.OrdinalIgnoreCase) &&
             !sub.Equals("run", StringComparison.OrdinalIgnoreCase) &&
             !sub.Equals("kill", StringComparison.OrdinalIgnoreCase) &&
-            !sub.Equals("wait", StringComparison.OrdinalIgnoreCase))
+            !sub.Equals("wait", StringComparison.OrdinalIgnoreCase) &&
+            !sub.Equals("restart", StringComparison.OrdinalIgnoreCase))
         {
             RunElf(context, args);
             return;
@@ -138,5 +140,28 @@ public sealed class ElfCommand : IShellCommand
             context.WriteLine($"Wait timed out for process {pid}");
         else
             context.WriteLine($"Process {pid} not found");
+    }
+
+    private void RestartElf(CommandContext context, string[] args)
+    {
+        string target = args[0];
+        ElfProgram? p;
+        if (int.TryParse(target, out int pid))
+        {
+            p = ElfRunner.Restart(pid);
+        }
+        else
+        {
+            p = ElfRunner.Restart(target);
+        }
+
+        if (p != null)
+        {
+            context.WriteLine($"Restarted ELF program '{p.Name}' (new PID: {p.Pid}).");
+        }
+        else
+        {
+            context.WriteLine($"Failed to restart ELF program: '{target}'.");
+        }
     }
 }

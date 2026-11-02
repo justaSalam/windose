@@ -92,7 +92,18 @@ public class StartMenu : Window
         };
         programsMenu = programs;
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/directx.png"), "VMWare SVGA Test", () => LaunchTracker.Start(() => new GraphicsEngine()));
-        programs.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () => LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt")));
+        programs.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () =>
+        {
+            if (File.Exists("/mnt/Programs/explorer.elf"))
+            {
+                byte[] data = File.ReadAllBytes("/mnt/Programs/explorer.elf");
+                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { "/mnt" }, out _);
+            }
+            else
+            {
+                LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
+            }
+        });
 
 
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/hard_disk_drive_pie.png"), "Disk Management", () => LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350)));
@@ -191,6 +202,7 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
+        powerOptions.AddSubmenuItem("Restart Shell", () => Explorer.RestartShell());
         powerOptions.AddSubmenuItem("Lock", () => LockManager.Lock());
         powerOptions.AddSubmenuItem("Log Off", () =>
         {

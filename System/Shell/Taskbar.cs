@@ -1,7 +1,9 @@
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
+using System.IO;
 using System.Drawing;
 using Windose.System.Kernel;
+using Windose.System.Elf;
 
 public class Taskbar : Component
 {
@@ -69,6 +71,7 @@ public class Taskbar : Component
         };
         contextMenu.AddItem("Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
         contextMenu.AddSeparator();
+        contextMenu.AddItem("Restart Shell", () => Explorer.RestartShell());
         contextMenu.AddItem("Minimize All Windows", WindowManager.MinimizeAllWindows);
         contextMenu.AddItem("Properties", () => LaunchTracker.Start(() => new DisplaySettings(contextX, contextY)));
 
@@ -93,7 +96,22 @@ public class Taskbar : Component
             Padding = new Thickness(modern ? 1 : 3),
             leftClickAction = () =>
             {
-                Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
+                if (File.Exists("/mnt/Programs/startmenu.elf"))
+                {
+                    ElfProgram? existing = ElfRunner.Find("startmenu.elf");
+                    if (existing != null)
+                    {
+                        ElfRunner.Kill(existing.Pid);
+                    }
+                    else
+                    {
+                        ElfRunner.RunFile("/mnt/Programs/startmenu.elf");
+                    }
+                }
+                else if (Explorer.startMenu != null)
+                {
+                    Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
+                }
             }
         };
         bar.AddStackChild(startButton);

@@ -582,7 +582,15 @@ public class Desktop : Component
         string path = icon.fileEntry.AbsoluteLocation;
         if (Directory.Exists(path))
         {
-            LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, icon.fileEntry.FileName, path));
+            if (File.Exists("/mnt/Programs/explorer.elf"))
+            {
+                byte[] data = File.ReadAllBytes("/mnt/Programs/explorer.elf");
+                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { path }, out _);
+            }
+            else
+            {
+                LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, icon.fileEntry.FileName, path));
+            }
         }
         else if (File.Exists(path))
         {
@@ -889,6 +897,14 @@ public class Desktop : Component
     public override void Dispose()
     {
         Registry.Changed -= OnRegistryChanged;
+        if (trashSubscribed)
+        {
+            TrashManager.Changed -= RefreshTrashIcon;
+            trashSubscribed = false;
+        }
+        scaledWallpaper?.Dispose();
+        scaledWallpaper = null;
+        Icons.Clear();
         base.Dispose();
     }
 

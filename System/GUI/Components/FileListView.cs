@@ -120,15 +120,24 @@ public class FileListView : Component
     private void DrawLargeIcons()
     {
         int columns = Math.Max(1, Width / Math.Max(1, largeCellWidth));
+        int start = 0;
+        int end = items.Count - 1;
 
-        for (int i = 0; i < items.Count; i++)
+        if (Parent is ScrollView scroll)
+        {
+            int vh = scroll.GetViewportHeight();
+            int startRow = Math.Max(0, scroll.scrollY / Math.Max(1, largeCellHeight));
+            int endRow = (scroll.scrollY + vh) / Math.Max(1, largeCellHeight) + 1;
+            start = Math.Max(0, startRow * columns);
+            end = Math.Min(items.Count - 1, endRow * columns + columns - 1);
+        }
+
+        for (int i = start; i <= end; i++)
         {
             int column = i % columns;
             int row = i / columns;
             int x = column * largeCellWidth;
             int y = row * largeCellHeight;
-
-            if (y >= Height) continue;
 
             DrawItemLarge(items[i], x, y, largeCellWidth, largeCellHeight);
         }
@@ -159,8 +168,19 @@ public class FileListView : Component
     {
         int rowHeight = smallRowHeight;
         int columns = Math.Max(1, Width / 180);
+        int start = 0;
+        int end = items.Count - 1;
 
-        for (int i = 0; i < items.Count; i++)
+        if (Parent is ScrollView scroll)
+        {
+            int vh = scroll.GetViewportHeight();
+            int startRow = Math.Max(0, scroll.scrollY / Math.Max(1, rowHeight));
+            int endRow = (scroll.scrollY + vh) / Math.Max(1, rowHeight) + 1;
+            start = Math.Max(0, startRow * columns);
+            end = Math.Min(items.Count - 1, endRow * columns + columns - 1);
+        }
+
+        for (int i = start; i <= end; i++)
         {
             int column = i % columns;
             int row = i / columns;
@@ -173,7 +193,17 @@ public class FileListView : Component
 
     private void DrawList()
     {
-        for (int i = 0; i < items.Count; i++)
+        int start = 0;
+        int end = items.Count - 1;
+
+        if (Parent is ScrollView scroll)
+        {
+            int vh = scroll.GetViewportHeight();
+            start = Math.Max(0, scroll.scrollY / Math.Max(1, smallRowHeight));
+            end = Math.Min(items.Count - 1, (scroll.scrollY + vh) / Math.Max(1, smallRowHeight) + 1);
+        }
+
+        for (int i = start; i <= end; i++)
         {
             int y = i * smallRowHeight;
             DrawItemRow(items[i], 4, y, Width - 8, smallRowHeight, true);
@@ -184,11 +214,19 @@ public class FileListView : Component
     {
         DrawDetailsHeader();
 
-        for (int i = 0; i < items.Count; i++)
+        int start = 0;
+        int end = items.Count - 1;
+
+        if (Parent is ScrollView scroll)
+        {
+            int vh = scroll.GetViewportHeight();
+            start = Math.Max(0, (scroll.scrollY - headerHeight) / Math.Max(1, detailsRowHeight));
+            end = Math.Min(items.Count - 1, (scroll.scrollY + vh - headerHeight) / Math.Max(1, detailsRowHeight) + 1);
+        }
+
+        for (int i = start; i <= end; i++)
         {
             int y = headerHeight + i * detailsRowHeight;
-            if (y >= Height) continue;
-
             DrawDetailsRow(items[i], y);
         }
     }
@@ -429,7 +467,39 @@ public class FileListView : Component
         selectedItem = item;
 
         if (selectedItem != null)
+        {
             selectedItem.selected = true;
+
+            int index = items.IndexOf(selectedItem);
+            if (index >= 0 && Parent is ScrollView scroll)
+            {
+                int itemY = 0;
+                int itemHeight = largeCellHeight;
+                if (viewMode == ListViewMode.LargeIcon)
+                {
+                    int columns = Math.Max(1, Width / Math.Max(1, largeCellWidth));
+                    itemY = (index / columns) * largeCellHeight;
+                    itemHeight = largeCellHeight;
+                }
+                else if (viewMode == ListViewMode.SmallIcon)
+                {
+                    int columns = Math.Max(1, Width / 180);
+                    itemY = (index / columns) * smallRowHeight;
+                    itemHeight = smallRowHeight;
+                }
+                else if (viewMode == ListViewMode.List)
+                {
+                    itemY = index * smallRowHeight;
+                    itemHeight = smallRowHeight;
+                }
+                else
+                {
+                    itemY = headerHeight + index * detailsRowHeight;
+                    itemHeight = detailsRowHeight;
+                }
+                scroll.ScrollIntoView(new Rectangle(0, itemY, Width, itemHeight));
+            }
+        }
 
         selectedChanged?.Invoke(selectedItem);
         MarkDirty();
@@ -488,6 +558,18 @@ public class FileListView : Component
         }
 
         return Height;
+    }
+
+    public int GetContentWidth()
+    {
+        if (viewMode == ListViewMode.Details && headerWidths != null)
+        {
+            int total = 0;
+            for (int i = 0; i < headerWidths.Length; i++)
+                total += headerWidths[i];
+            return total;
+        }
+        return Width;
     }
 
     public override string GetComponentName() => "ListView";

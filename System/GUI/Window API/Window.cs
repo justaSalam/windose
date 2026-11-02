@@ -107,8 +107,9 @@ public class Window : Component
         catch { }
     }
 
-    private StackPanel titlebar;
+    protected StackPanel titlebar;
     private bool hasTitleBar;
+    public bool HasTitleBar => hasTitleBar;
     private bool windowFocused;
 
 
@@ -180,10 +181,15 @@ public class Window : Component
     /// <summary>
     /// Component rendering, coordinates relative to the window
     /// </summary>
+    public bool drawFrame = true;
+
     public override void DrawLocal()
     {
-        if (useGlass) DrawGlassFrame();
-        else DrawRaisedRectangle(0, 0, Width, Height);
+        if (drawFrame)
+        {
+            if (useGlass) DrawGlassFrame();
+            else DrawRaisedRectangle(0, 0, Width, Height);
+        }
 
 
         foreach (Component child in children)
@@ -306,7 +312,7 @@ public class Window : Component
                 fontSize = 15,
                 horizontalAlignment = HorizontalAlignment.Stretch,
                 orientation = StackOrientation.Horizontal,
-                Margin = new Thickness(border, 0, border, 0),
+                Margin = Thickness.FromLTRB(border, 0, border, 0),
                 Padding = new Thickness(0),
                 spacing = 1
             };
@@ -725,13 +731,30 @@ public class Window : Component
         MarkDirty();
     }
 
+    public override void Resize(int width, int height)
+    {
+        base.Resize(width, height);
+        bounds.Width = Width;
+        bounds.Height = Height;
+        if (hasTitleBar && titlebar != null)
+        {
+            int border = Palette.BorderSize;
+            titlebar.SetBounds(border, 0, Math.Max(1, Width - border * 2), Palette.TitleBarHeight);
+        }
+        OnWindowResized();
+    }
+
+    protected virtual void OnWindowResized()
+    {
+    }
+
     private void Resize(int x, int y, int width, int height)
     {
         Rectangle oldBounds = bounds;
 
         X = x;
         Y = y;
-        base.Resize(width, height);
+        Resize(width, height);
 
         bounds.X = X;
         bounds.Y = Y;
@@ -749,8 +772,8 @@ public class Window : Component
     {
         if (width <= 0 || height <= 0) return;
         Resize(bounds.X, bounds.Y,
-               width + Palette.BorderSize * 2,
-               height + Palette.TitleBarHeight + Palette.BorderSize);
+               width + (drawFrame ? Palette.BorderSize * 2 : 0),
+               height + (hasTitleBar ? Palette.TitleBarHeight : 0) + (drawFrame ? Palette.BorderSize : 0));
     }
 
     internal void ApplyBounds(Rectangle rect)
@@ -760,7 +783,7 @@ public class Window : Component
         X = rect.X;
         Y = rect.Y;
         if (rect.Width != Width || rect.Height != Height)
-            base.Resize(rect.Width, rect.Height);
+            Resize(rect.Width, rect.Height);
 
         bounds.X = X;
         bounds.Y = Y;

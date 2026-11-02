@@ -8,7 +8,6 @@ public class ListView : Component
     public List<ListViewItem> items = new List<ListViewItem>();
     public ListViewItem selectedItem;
 
-
     public int detailsRowHeight = 20;
     public int headerHeight = 20;
     public int fontSize = 16;
@@ -19,7 +18,6 @@ public class ListView : Component
     public int iconSize = 16;
     private const int IconSlot = 22;
 
-
     public Action<ListViewItem> selectedChanged;
     public Action<ListViewItem> itemDoubleClick;
     public Action<ListViewItem, int, int> itemRightClick;
@@ -29,7 +27,6 @@ public class ListView : Component
     private int lastClickIndex = -1;
     private int lastClickTick;
     public int doubleClickInterval = 1200;
-
 
     public ListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -83,14 +80,21 @@ public class ListView : Component
 
         DrawHeader();
 
-        for (int i = 0; i < items.Count; i++)
-        {
-            int y = headerHeight + i * detailsRowHeight;
-            if (y >= Height) continue;
+        int start = 0;
+        int end = items.Count - 1;
 
-            DrawRow(items[i], y);
+        if (Parent is ScrollView scroll)
+        {
+            int vh = scroll.GetViewportHeight();
+            start = Math.Max(0, (scroll.scrollY - headerHeight) / Math.Max(1, detailsRowHeight));
+            end = Math.Min(items.Count - 1, (scroll.scrollY + vh - headerHeight) / Math.Max(1, detailsRowHeight) + 1);
         }
 
+        for (int i = start; i <= end; i++)
+        {
+            int y = headerHeight + i * detailsRowHeight;
+            DrawRow(items[i], y);
+        }
     }
 
     private void DrawHeader()
@@ -111,8 +115,6 @@ public class ListView : Component
             columnIndex++;
         }
     }
-
-
 
     private void DrawRow(ListViewItem item, int y)
     {
@@ -142,7 +144,7 @@ public class ListView : Component
 
     private string Clip(string s, int pixelWidth)
     {
-        int glyph = Math.Max(1, fontSize / 2);   // same 8px-at-16 assumption as before; swap in a real measure if you have one
+        int glyph = Math.Max(1, fontSize / 2);
         int max = Math.Max(0, pixelWidth / glyph);
 
         return s.Length <= max ? s : s.Substring(0, max);
@@ -167,7 +169,6 @@ public class ListView : Component
 
             viewportRightClick?.Invoke(mouseX, mouseY);
             return true;
-
         }
 
         switch (mouse.left)
@@ -210,6 +211,13 @@ public class ListView : Component
     {
         selectedItem = item;
 
+        int index = selectedItem == null ? -1 : items.IndexOf(selectedItem);
+        if (index >= 0 && Parent is ScrollView scroll)
+        {
+            int itemY = headerHeight + index * detailsRowHeight;
+            scroll.ScrollIntoView(new Rectangle(0, itemY, Width, detailsRowHeight));
+        }
+
         selectedChanged?.Invoke(selectedItem);
         MarkDirty();
     }
@@ -249,11 +257,9 @@ public class ListView : Component
 
     public int GetItemIndexAt(int localX, int localY)
     {
-
         if (localY < headerHeight) return -1;
         int detailsIndex = (localY - headerHeight) / detailsRowHeight;
         return detailsIndex >= 0 && detailsIndex < items.Count ? detailsIndex : -1;
-
     }
 
     public int GetContentHeight()
@@ -261,8 +267,17 @@ public class ListView : Component
         return Math.Max(headerHeight + detailsRowHeight, headerHeight + items.Count * detailsRowHeight);
     }
 
+    public int GetContentWidth()
+    {
+        int w = 0;
+        for (int i = 0; i < columns.Count; i++)
+            w += columns[i].Width;
+        return w;
+    }
+
     public override string GetComponentName() => "ListView";
 }
+
 public class ListViewColumn
 {
     public string Header;

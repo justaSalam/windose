@@ -22,6 +22,8 @@ namespace Windose.System.Elf
         public string LastDropText;
         /// <summary>Redirects program stdout / k_write to a custom sink (e.g. terminal output).</summary>
         public Action<string>? OutputHandler;
+        public string? FilePath { get; internal set; }
+        public byte[]? OriginalBytes { get; internal set; }
 
         internal readonly HandleTable Objs = new HandleTable();
         internal readonly ElfEventQueue Events = new ElfEventQueue();

@@ -21,6 +21,7 @@
       "Cosmos.Kernel.System.Graphics.Enabled": true,
       "Cosmos.Kernel.Core.Scheduler.Enabled": true,
       "Cosmos.Kernel.System.Audio.Enabled": true,
+      "Cosmos.Kernel.Core.FinalizerThread.Enabled": true,
       "Microsoft.Extensions.DependencyInjection.VerifyOpenGenericServiceTrimmability": true,
       "System.ComponentModel.DefaultValueAttribute.IsSupported": false,
       "System.ComponentModel.Design.IDesignerHost.IsSupported": false,

@@ -107,29 +107,38 @@ public class TreeView : Component
     private void DrawItem(TreeViewItem item, int depth, ref int row)
     {
         int y = row * rowHeight;
-        if (y >= Height) return;
+        bool visibleInView = true;
 
-        int x = 4 + depth * indentWidth;
-        bool selected = item == selectedItem || item.selected;
-
-        if (item.HasChildren())
-            DrawExpandBox(item, x, y);
-
-        if (selected)
+        if (Parent is ScrollView scroll)
         {
-            DrawFilledRectangle(Palette.Highlight, x + IconOffset, y + 1, Math.Max(1, Width - x - IconOffset - 2), rowHeight - 2);
+            int vh = scroll.GetViewportHeight();
+            visibleInView = y + rowHeight >= scroll.scrollY && y <= scroll.scrollY + vh;
         }
 
-        int textX = x + 18;
-        if (item.image != null)
+        if (visibleInView)
         {
-            DrawImageStretch(item.image, new Rectangle(x + IconOffset, y + Math.Max(0, (rowHeight - IconSize) / 2), IconSize, IconSize));
-            textX += IconOffset + IconSize + 4 - 18;
-        }
+            int x = 4 + depth * indentWidth;
+            bool selected = item == selectedItem || item.selected;
 
-        DrawAlignedText(item.text, selected ? Palette.HighlightText : textColor, fontSize,
-            new Rectangle(textX, y, Math.Max(0, Width - textX - Padding.right), rowHeight),
-            HorizontalAlignment.Left, VerticalAlignment.Center);
+            if (item.HasChildren())
+                DrawExpandBox(item, x, y);
+
+            if (selected)
+            {
+                DrawFilledRectangle(Palette.Highlight, x + IconOffset, y + 1, Math.Max(1, Width - x - IconOffset - 2), rowHeight - 2);
+            }
+
+            int textX = x + 18;
+            if (item.image != null)
+            {
+                DrawImageStretch(item.image, new Rectangle(x + IconOffset, y + Math.Max(0, (rowHeight - IconSize) / 2), IconSize, IconSize));
+                textX += IconOffset + IconSize + 4 - 18;
+            }
+
+            DrawAlignedText(item.text, selected ? Palette.HighlightText : textColor, fontSize,
+                new Rectangle(textX, y, Math.Max(0, Width - textX - Padding.right), rowHeight),
+                HorizontalAlignment.Left, VerticalAlignment.Center);
+        }
 
         row++;
 
@@ -234,10 +243,47 @@ public class TreeView : Component
         selectedItem = item;
 
         if (selectedItem != null)
+        {
             selectedItem.selected = true;
+
+            if (Parent is ScrollView scroll)
+            {
+                int rowIdx = GetVisibleItemIndex(selectedItem);
+                if (rowIdx >= 0)
+                {
+                    int itemY = rowIdx * rowHeight;
+                    scroll.ScrollIntoView(new Rectangle(0, itemY, Width, rowHeight));
+                }
+            }
+        }
 
         selectedChanged?.Invoke(selectedItem);
         MarkDirty();
+    }
+
+    public int GetVisibleItemIndex(TreeViewItem target)
+    {
+        if (target == null) return -1;
+        int row = 0;
+        for (int i = 0; i < roots.Count; i++)
+        {
+            int found = GetVisibleItemIndex(roots[i], target, ref row);
+            if (found >= 0) return found;
+        }
+        return -1;
+    }
+
+    private int GetVisibleItemIndex(TreeViewItem current, TreeViewItem target, ref int row)
+    {
+        if (current == target) return row;
+        row++;
+        if (!current.expanded) return -1;
+        for (int i = 0; i < current.children.Count; i++)
+        {
+            int found = GetVisibleItemIndex(current.children[i], target, ref row);
+            if (found >= 0) return found;
+        }
+        return -1;
     }
 
     public override void HandleKeyboard(KeyEvent keyEvent)

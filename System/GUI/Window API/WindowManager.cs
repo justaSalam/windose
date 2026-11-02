@@ -112,6 +112,60 @@ public partial class WindowManager : SingleThreadedProcess
         }
     }
 
+    public static void RebuildTaskbarButtons()
+    {
+        lock (windows)
+        {
+            taskbarButtons.Clear();
+            if (Explorer.taskbar == null || Explorer.taskbar.bar == null) return;
+            Explorer.taskbar.windows.Clear();
+
+            for (int i = 0; i < windows.Count; i++)
+            {
+                Window window = windows[i];
+                if (window == null || !window.showInTaskbar) continue;
+
+                int taskbarButtonWidth = Math.Clamp(window.text.Length * 7 + (window.Icon == null ? 18 : 38), 84, 180);
+                int taskbarButtonHeight = Math.Max(24, Explorer.taskbar.Height - 6);
+
+                Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
+                {
+                    verticalAlignment = VerticalAlignment.Center,
+                    contentAlignment = HorizontalAlignment.Left,
+                    iconSize = 16,
+                    iconTextGap = 4,
+                    Padding = new Thickness(3),
+                    Margin = new Thickness(2, 1, 2, 1),
+                    useBorders = !Palette.FlatControls,
+                    image = window.Icon,
+
+                    leftClickAction = () =>
+                    {
+                        if (window.isMinimized)
+                        {
+                            Restore(window);
+                        }
+                        else if (focusedWindow == window)
+                        {
+                            Minimize(window);
+                        }
+                        else
+                        {
+                            Activate(window);
+                        }
+                    }
+                };
+
+                taskbarButtons[window] = taskbarButton;
+                Explorer.taskbar.windows.Add(taskbarButton);
+                Explorer.taskbar.bar.AddStackChild(taskbarButton);
+            }
+            RefreshTaskbarButtons();
+            Explorer.taskbar.ForceDirty();
+            Invalidate(Explorer.taskbar.AbsoluteRectangle);
+        }
+    }
+
     internal static void FocusWindowImmediate(Window window)
     {
         if (window == null) return;

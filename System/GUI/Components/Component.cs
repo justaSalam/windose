@@ -268,6 +268,7 @@ public class Component : IDisposable
 
     public HorizontalAlignment horizontalAlignment = HorizontalAlignment.Left;
     public VerticalAlignment verticalAlignment = VerticalAlignment.Top;
+    public bool managesChildLayout = false;
 
 
     public Action leftClickAction;
@@ -553,7 +554,7 @@ public class Component : IDisposable
     public virtual void ResolveHorizontalAnchor()
     {
         if (dock != Dock.None) return;   // DockPanel owns X/width
-        if (isRoot || parent == null) return;
+        if (isRoot || parent == null || parent.managesChildLayout) return;
 
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
 
@@ -586,7 +587,7 @@ public class Component : IDisposable
     {
         if (dock != Dock.None) return;   // DockPanel owns X/width
 
-        if (isRoot || parent == null) return;
+        if (isRoot || parent == null || parent.managesChildLayout) return;
 
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
 
