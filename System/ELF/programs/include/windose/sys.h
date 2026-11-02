@@ -82,4 +82,23 @@ static inline int notify_post(const char *title, const char *text) {
     return __kchk(__k->notify_send(__k->pid, title, text));
 }
 
+// ---- Audio & Sound Effects ----
+static inline int sound_play(const char *name) {
+    return __kchk(__k->play_sound(__k->pid, name));
+}
+static inline int wave_play(const void *buf, int len) {
+    return __kchk(__k->play_wave(__k->pid, buf, len));
+}
+
+// ---- Built-in Shell Dialogs & Metrics ----
+static inline int shell_run_dialog(void) {
+    return __kchk(__k->shell_run_dialog(__k->pid));
+}
+static inline int shell_about_dialog(void) {
+    return __kchk(__k->shell_about_dialog(__k->pid));
+}
+static inline int system_metrics(int metric) {
+    return __kchk(__k->get_system_metrics(__k->pid, metric));
+}
+
 #endif // WINDOSE_SYS_H

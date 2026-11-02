@@ -129,7 +129,8 @@ public partial class WindowManager : SingleThreadedProcess
                 int taskbarButtonWidth = Math.Clamp(window.text.Length * 7 + (window.Icon == null ? 18 : 38), 84, 180);
                 int taskbarButtonHeight = Math.Max(24, Explorer.taskbar.Height - 6);
 
-                Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
+                Button? taskbarButton = null;
+                taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
                 {
                     verticalAlignment = VerticalAlignment.Center,
                     contentAlignment = HorizontalAlignment.Left,
@@ -154,6 +155,12 @@ public partial class WindowManager : SingleThreadedProcess
                         {
                             Activate(window);
                         }
+                    },
+                    rightClickAction = () =>
+                    {
+                        int btnX = taskbarButton?.AbsoluteX ?? 0;
+                        int btnY = Math.Max(0, (Explorer.taskbar?.Y ?? Global.screenHeight - 40) - 160);
+                        window.ShowSystemMenu(btnX, btnY);
                     }
                 };
 
@@ -528,7 +535,8 @@ public partial class WindowManager : SingleThreadedProcess
             int taskbarButtonWidth = Math.Clamp(window.text.Length * 7 + (window.Icon == null ? 18 : 38), 84, 180);
             int taskbarButtonHeight = Math.Max(24, Explorer.taskbar.Height - 6);
 
-            Button taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
+            Button? taskbarButton = null;
+            taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
             {
                 verticalAlignment = VerticalAlignment.Center,
                 contentAlignment = HorizontalAlignment.Left,
@@ -553,6 +561,12 @@ public partial class WindowManager : SingleThreadedProcess
                     {
                         Activate(window);
                     }
+                },
+                rightClickAction = () =>
+                {
+                    int btnX = taskbarButton?.AbsoluteX ?? 0;
+                    int btnY = Math.Max(0, (Explorer.taskbar?.Y ?? Global.screenHeight - 40) - 160);
+                    window.ShowSystemMenu(btnX, btnY);
                 }
             };
 

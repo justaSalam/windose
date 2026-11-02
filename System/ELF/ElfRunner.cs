@@ -145,6 +145,16 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, int*, int*, int> ScreenSize;                          // (pid, out_w, out_h) -> 0
         public delegate* unmanaged<int, int, int> RestartProc;                                // (pid, target) -> 0
         public delegate* unmanaged<int, int> RestartShell;                                    // (pid) -> 0
+        public delegate* unmanaged<int, byte*, int> PlaySound;                                // (pid, name) -> 0
+        public delegate* unmanaged<int, byte*, int, int> PlayWave;                            // (pid, buf, len) -> 0
+        public delegate* unmanaged<int, int, int> SetCursor;                                  // (pid, cursorType) -> 0
+        public delegate* unmanaged<int, int, int> WindowMinimize;                             // (pid, win) -> 0
+        public delegate* unmanaged<int, int, int> WindowMaximize;                             // (pid, win) -> 0
+        public delegate* unmanaged<int, int, int> WindowRestore;                              // (pid, win) -> 0
+        public delegate* unmanaged<int, int, int> WindowGetState;                             // (pid, win) -> state
+        public delegate* unmanaged<int, int> ShellRunDialog;                                  // (pid) -> 0
+        public delegate* unmanaged<int, int> ShellAboutDialog;                                // (pid) -> 0
+        public delegate* unmanaged<int, int, int> GetSystemMetrics;                           // (pid, metric) -> val
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -166,7 +176,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 12;
+        public const int ApiVersion = 13;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -534,6 +544,16 @@ namespace Windose.System.Elf
             api.ScreenSize = &ApiScreenSize;
             api.RestartProc = &ApiRestartProc;
             api.RestartShell = &ApiRestartShell;
+            api.PlaySound = &ApiPlaySound;
+            api.PlayWave = &ApiPlayWave;
+            api.SetCursor = &ApiSetCursor;
+            api.WindowMinimize = &ApiWindowMinimize;
+            api.WindowMaximize = &ApiWindowMaximize;
+            api.WindowRestore = &ApiWindowRestore;
+            api.WindowGetState = &ApiWindowGetState;
+            api.ShellRunDialog = &ApiShellRunDialog;
+            api.ShellAboutDialog = &ApiShellAboutDialog;
+            api.GetSystemMetrics = &ApiGetSystemMetrics;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -2561,6 +2581,134 @@ namespace Windose.System.Elf
                 return host.RestartShell() ? 0 : -1;
             }
             catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiPlaySound(int pid, byte* name)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                string s = CStr(name);
+                IElfHost host = Host; if (host == null) return -1;
+                return host.PlaySound(s) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiPlayWave(int pid, byte* buf, int len)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                if (buf == null || len <= 0 || len > MaxIo) return -1;
+                byte[] wave = new byte[len];
+                for (int i = 0; i < len; i++) wave[i] = buf[i];
+                IElfHost host = Host; if (host == null) return -1;
+                return host.PlayWave(wave) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiSetCursor(int pid, int cursorType)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.SetCursor(cursorType) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWindowMinimize(int pid, int winHandle)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(winHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.WindowMinimize(obj) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWindowMaximize(int pid, int winHandle)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(winHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.WindowMaximize(obj) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWindowRestore(int pid, int winHandle)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(winHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.WindowRestore(obj) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWindowGetState(int pid, int winHandle)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(winHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.WindowGetState(obj);
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiShellRunDialog(int pid)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.ShellRunDialog() ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiShellAboutDialog(int pid)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.ShellAboutDialog() ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiGetSystemMetrics(int pid, int metric)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return 0;
+                return host.GetSystemMetrics(metric);
+            }
+            catch { return 0; }
         }
 
         private static readonly Dictionary<int, (string Name, string? FilePath, byte[]? OriginalBytes, string[]? Args)> _recentProgramInfo =

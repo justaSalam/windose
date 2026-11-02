@@ -226,5 +226,16 @@ namespace Windose.System.Elf
 
         /// <summary>The program finished (exit, kill or crash-return) and all its resources were released.</summary>
         void ProgramExited(ElfProgram program);
+
+        bool PlaySound(string soundName);
+        bool PlayWave(byte[] waveData);
+        bool SetCursor(int cursorType);
+        bool WindowMinimize(object window);
+        bool WindowMaximize(object window);
+        bool WindowRestore(object window);
+        int WindowGetState(object window);
+        bool ShellRunDialog();
+        bool ShellAboutDialog();
+        int GetSystemMetrics(int metric);
     }
 }

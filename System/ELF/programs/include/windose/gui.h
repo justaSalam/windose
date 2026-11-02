@@ -43,6 +43,21 @@ static inline int win_set_desktop(handle_t win, int desktop_idx) {
 static inline int win_accept_drop(handle_t win, int enabled) {
     return __kchk(__k->drop_accept(__k->pid, win, enabled));
 }
+static inline int win_minimize(handle_t win) {
+    return __kchk(__k->window_minimize(__k->pid, win));
+}
+static inline int win_maximize(handle_t win) {
+    return __kchk(__k->window_maximize(__k->pid, win));
+}
+static inline int win_restore(handle_t win) {
+    return __kchk(__k->window_restore(__k->pid, win));
+}
+static inline int win_get_state(handle_t win) {
+    return __kchk(__k->window_get_state(__k->pid, win));
+}
+static inline int set_cursor(int cursor_type) {
+    return __kchk(__k->set_cursor(__k->pid, cursor_type));
+}
 
 // ---- Events ----
 static inline int event_poll(Event *e) {

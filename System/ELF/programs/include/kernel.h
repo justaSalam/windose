@@ -139,5 +139,15 @@ static inline int      k_move_window(handle_t win, int x, int y) { return win_mo
 static inline int      k_screen_size(int *out_w, int *out_h) { return screen_get_size(out_w, out_h); }
 static inline int      k_restart_proc(int target) { return proc_restart(target); }
 static inline int      k_restart_shell(void) { return shell_restart(); }
+static inline int      k_play_sound(const char *name) { return sound_play(name); }
+static inline int      k_play_wave(const void *buf, int len) { return wave_play(buf, len); }
+static inline int      k_set_cursor(int cursor_type) { return set_cursor(cursor_type); }
+static inline int      k_window_minimize(handle_t win) { return win_minimize(win); }
+static inline int      k_window_maximize(handle_t win) { return win_maximize(win); }
+static inline int      k_window_restore(handle_t win) { return win_restore(win); }
+static inline int      k_window_get_state(handle_t win) { return win_get_state(win); }
+static inline int      k_shell_run_dialog(void) { return shell_run_dialog(); }
+static inline int      k_shell_about_dialog(void) { return shell_about_dialog(); }
+static inline int      k_get_system_metrics(int metric) { return system_metrics(metric); }
 
 #endif // WINDOSE_KERNEL_H

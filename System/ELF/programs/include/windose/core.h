@@ -7,10 +7,43 @@
 
 // Calling convention for host <-> guest boundary
 #define KABI __attribute__((sysv_abi))
-#define KAPI_VERSION 12
+#define KAPI_VERSION 13
 #define K_KILLED (-100)
 
 typedef int handle_t; // opaque kernel handle; 0 = invalid/none
+
+// System metrics (matches GetSystemMetrics)
+enum {
+    SM_CXSCREEN     = 0,
+    SM_CYSCREEN     = 1,
+    SM_CYCAPTION    = 2,
+    SM_CXBORDER     = 3,
+    SM_CYTASKBAR    = 4,
+    SM_WORKWIDTH    = 5,
+    SM_WORKHEIGHT   = 6
+};
+
+// Window states
+enum {
+    WINDOW_STATE_NORMAL        = 0,
+    WINDOW_STATE_MINIMIZED     = 1,
+    WINDOW_STATE_MAXIMIZED     = 2,
+    WINDOW_STATE_SNAPPED_LEFT  = 3,
+    WINDOW_STATE_SNAPPED_RIGHT = 4
+};
+
+// Standard cursors
+enum {
+    CURSOR_ARROW    = 0,
+    CURSOR_HAND     = 1,
+    CURSOR_IBEAM    = 2,
+    CURSOR_SIZENS   = 3,
+    CURSOR_SIZEWE   = 4,
+    CURSOR_SIZENWSE = 5,
+    CURSOR_SIZENESW = 6,
+    CURSOR_SIZEALL  = 7,
+    CURSOR_WAIT     = 8
+};
 
 // Window creation flags
 enum {
@@ -165,6 +198,16 @@ typedef struct KernelApi {
     int      (KABI *screen_size)(int pid, int *out_w, int *out_h);
     int      (KABI *restart_proc)(int pid, int target_pid);
     int      (KABI *restart_shell)(int pid);
+    int      (KABI *play_sound)(int pid, const char *name);
+    int      (KABI *play_wave)(int pid, const void *wave_buf, int len);
+    int      (KABI *set_cursor)(int pid, int cursor_type);
+    int      (KABI *window_minimize)(int pid, handle_t win);
+    int      (KABI *window_maximize)(int pid, handle_t win);
+    int      (KABI *window_restore)(int pid, handle_t win);
+    int      (KABI *window_get_state)(int pid, handle_t win);
+    int      (KABI *shell_run_dialog)(int pid);
+    int      (KABI *shell_about_dialog)(int pid);
+    int      (KABI *get_system_metrics)(int pid, int metric);
 } KernelApi;
 
 extern KernelApi *__k;

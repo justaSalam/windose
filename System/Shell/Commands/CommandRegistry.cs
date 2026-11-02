@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Cosmos.Executable.Lua;
+using Windose.Programs;
 using Windose.System.Elf;
+using Windose.System.Kernel;
 using Windose.System.Kernel.FileSystem;
 using Windose.System.Lua;
 using Windose.System.Shell.Commands;
@@ -640,6 +642,29 @@ public static class CommandRegistry
             }
         }));
         RegisterAlias("taskkill", "kill");
+
+        Register(new DelegateCommand("run", "Opens the Run dialog.", "run", (context, args) =>
+        {
+            LaunchTracker.Start(() => new RunDialog());
+        }));
+
+        Register(new DelegateCommand("winver", "Displays About Windows dialog.", "winver", (context, args) =>
+        {
+            LaunchTracker.Start(() => new AboutWindows());
+        }));
+        RegisterAlias("about", "winver");
+
+        Register(new DelegateCommand("calc", "Launches Calculator.", "calc", (context, args) =>
+        {
+            LaunchTracker.Start(() => new Calculator());
+        }));
+        RegisterAlias("calculator", "calc");
+
+        Register(new DelegateCommand("mspaint", "Launches MS Paint.", "mspaint", (context, args) =>
+        {
+            LaunchTracker.Start(() => new Paint());
+        }));
+        RegisterAlias("paint", "mspaint");
 
 
         // Register(new DiskManagerCommand());

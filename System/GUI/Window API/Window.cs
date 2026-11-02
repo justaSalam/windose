@@ -1038,6 +1038,32 @@ public class Window : Component
         MarkDirty(false);
     }
 
+    public void Minimize() => WindowManager.Minimize(this);
+    public void Maximize()
+    {
+        if (!isMaximized && canMaximize)
+            WindowManager.ToggleMaximize(this);
+    }
+    public void Restore()
+    {
+        if (isMinimized)
+            WindowManager.Activate(this);
+        else if (isMaximized)
+            WindowManager.ToggleMaximize(this);
+        else if (isSnapped)
+            SnapTo(2);
+    }
+    public int State
+    {
+        get
+        {
+            if (isMinimized) return 1;
+            if (isMaximized) return 2;
+            if (isSnapped) return 3;
+            return 0;
+        }
+    }
+
     internal void MinimizeWindow()
     {
         if (isMinimized) return;

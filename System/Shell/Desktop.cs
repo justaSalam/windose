@@ -295,7 +295,11 @@ public class Desktop : Component
     {
         MessageBox.Show("Empty the Recycle Bin?", "Recycle Bin", delegate (int index)
         {
-            if (index == 0) TrashManager.Empty();
+            if (index == 0)
+            {
+                TrashManager.Empty();
+                try { Windose.System.Media.AudioEngine.Instance.PlayTrash(); } catch { }
+            }
         }, "Empty", "Cancel");
     }
 

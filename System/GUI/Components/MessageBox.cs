@@ -1,5 +1,6 @@
 using Cosmos.Kernel.System.Input;
 using System.Drawing;
+using Windose.System.Media;
 
 /// <summary>
 /// Simple modal-style dialog: message text plus a row of buttons.
@@ -23,6 +24,7 @@ public class MessageBox : Window
 
     public static MessageBox Show(string text, string title, Action<int> onResult = null, params string[] buttons)
     {
+        try { AudioEngine.Instance.PlayErrorSound(); } catch { }
         if (buttons == null || buttons.Length == 0)
             buttons = new string[] { "OK" };
 

@@ -140,6 +140,41 @@ namespace Windose.System.Media
             }
         }
 
+        public void PlayStartup() => PlayStartupSound();
+        public void PlayError() => PlayErrorSound();
+
+        public void PlayClick()
+        {
+            try
+            {
+                if (File.Exists("/mnt/System/Media/click.wav"))
+                {
+                    PlayFile("/mnt/System/Media/click.wav");
+                    return;
+                }
+                if (IsPlaying) return;
+                byte[] click = CreateClickWave(40, 1200f);
+                PlayWave(click);
+            }
+            catch { }
+        }
+
+        public void PlayTrash()
+        {
+            try
+            {
+                if (File.Exists("/mnt/System/Media/recycle.wav"))
+                {
+                    PlayFile("/mnt/System/Media/recycle.wav");
+                    return;
+                }
+                if (IsPlaying) return;
+                byte[] trash = CreateRustleWave(350);
+                PlayWave(trash);
+            }
+            catch { }
+        }
+
         public void PlayStartupSound()
         {
             try
@@ -365,5 +400,87 @@ namespace Windose.System.Media
 
             return wav;
         }
+
+        public static byte[] CreateClickWave(int durationMs = 40, float freq = 1200f)
+        {
+            int sampleRate = 44100;
+            int totalSamples = (int)(sampleRate * (durationMs / 1000.0f));
+            int dataBytes = totalSamples * 4;
+            byte[] wav = new byte[44 + dataBytes];
+
+            wav[0] = (byte)'R'; wav[1] = (byte)'I'; wav[2] = (byte)'F'; wav[3] = (byte)'F';
+            int fileSizeMinus8 = 36 + dataBytes;
+            Array.Copy(BitConverter.GetBytes(fileSizeMinus8), 0, wav, 4, 4);
+            wav[8] = (byte)'W'; wav[9] = (byte)'A'; wav[10] = (byte)'V'; wav[11] = (byte)'E';
+
+            wav[12] = (byte)'f'; wav[13] = (byte)'m'; wav[14] = (byte)'t'; wav[15] = (byte)' ';
+            Array.Copy(BitConverter.GetBytes(16), 0, wav, 16, 4);
+            Array.Copy(BitConverter.GetBytes((short)1), 0, wav, 20, 2);
+            Array.Copy(BitConverter.GetBytes((short)2), 0, wav, 22, 2);
+            Array.Copy(BitConverter.GetBytes(sampleRate), 0, wav, 24, 4);
+            Array.Copy(BitConverter.GetBytes(sampleRate * 4), 0, wav, 28, 4);
+            Array.Copy(BitConverter.GetBytes((short)4), 0, wav, 32, 2);
+            Array.Copy(BitConverter.GetBytes((short)16), 0, wav, 34, 2);
+
+            wav[36] = (byte)'d'; wav[37] = (byte)'a'; wav[38] = (byte)'t'; wav[39] = (byte)'a';
+            Array.Copy(BitConverter.GetBytes(dataBytes), 0, wav, 40, 4);
+
+            int p = 44;
+            double twoPi = 2.0 * Math.PI;
+            for (int i = 0; i < totalSamples; i++)
+            {
+                double t = (double)i / sampleRate;
+                double decay = Math.Exp(-50.0 * t);
+                double sample = Math.Sin(twoPi * freq * t) * decay * 0.5;
+                short val = (short)(sample * 28000.0);
+                byte lo = (byte)(val & 0xFF);
+                byte hi = (byte)((val >> 8) & 0xFF);
+                wav[p++] = lo; wav[p++] = hi;
+                wav[p++] = lo; wav[p++] = hi;
+            }
+            return wav;
+        }
+
+        public static byte[] CreateRustleWave(int durationMs = 350)
+        {
+            int sampleRate = 44100;
+            int totalSamples = (int)(sampleRate * (durationMs / 1000.0f));
+            int dataBytes = totalSamples * 4;
+            byte[] wav = new byte[44 + dataBytes];
+
+            wav[0] = (byte)'R'; wav[1] = (byte)'I'; wav[2] = (byte)'F'; wav[3] = (byte)'F';
+            int fileSizeMinus8 = 36 + dataBytes;
+            Array.Copy(BitConverter.GetBytes(fileSizeMinus8), 0, wav, 4, 4);
+            wav[8] = (byte)'W'; wav[9] = (byte)'A'; wav[10] = (byte)'V'; wav[11] = (byte)'E';
+
+            wav[12] = (byte)'f'; wav[13] = (byte)'m'; wav[14] = (byte)'t'; wav[15] = (byte)' ';
+            Array.Copy(BitConverter.GetBytes(16), 0, wav, 16, 4);
+            Array.Copy(BitConverter.GetBytes((short)1), 0, wav, 20, 2);
+            Array.Copy(BitConverter.GetBytes((short)2), 0, wav, 22, 2);
+            Array.Copy(BitConverter.GetBytes(sampleRate), 0, wav, 24, 4);
+            Array.Copy(BitConverter.GetBytes(sampleRate * 4), 0, wav, 28, 4);
+            Array.Copy(BitConverter.GetBytes((short)4), 0, wav, 32, 2);
+            Array.Copy(BitConverter.GetBytes((short)16), 0, wav, 34, 2);
+
+            wav[36] = (byte)'d'; wav[37] = (byte)'a'; wav[38] = (byte)'t'; wav[39] = (byte)'a';
+            Array.Copy(BitConverter.GetBytes(dataBytes), 0, wav, 40, 4);
+
+            int p = 44;
+            uint seed = 12345;
+            for (int i = 0; i < totalSamples; i++)
+            {
+                double t = (double)i / sampleRate;
+                double env = Math.Sin(Math.PI * (t / (durationMs / 1000.0f))) * Math.Exp(-3.0 * t);
+                seed = (seed * 1103515245 + 12345) & 0x7FFFFFFF;
+                double noise = ((seed & 0xFFFF) / 32768.0) - 1.0;
+                short val = (short)(noise * env * 22000.0);
+                byte lo = (byte)(val & 0xFF);
+                byte hi = (byte)((val >> 8) & 0xFF);
+                wav[p++] = lo; wav[p++] = hi;
+                wav[p++] = lo; wav[p++] = hi;
+            }
+            return wav;
+        }
     }
 }
+

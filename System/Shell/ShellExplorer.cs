@@ -27,7 +27,7 @@ public class Explorer : SingleThreadedProcess
         Canvas activeCanvas = canvas ?? Kernel.canvas;
         desktop = new Desktop(0, 0, activeCanvas.Width, activeCanvas.Height);
         taskbar = new Taskbar(0, Math.Max(0, activeCanvas.Height - taskbarHeight), activeCanvas.Width, taskbarHeight);
-        startMenu = new StartMenu(taskbar.X, taskbar.Y - 500, 360, 500, "Start Menu", false);
+        startMenu = new StartMenu(taskbar.X, taskbar.Y - 500, 420, 500, "Start Menu", false);
         LaunchTracker.Start(() => startMenu);
         WindowManager.RebuildTaskbarButtons();
     }

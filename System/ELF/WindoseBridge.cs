@@ -6,7 +6,10 @@ using System;
 using System.Drawing;
 using Cosmos.Kernel.System.FileSystem;
 using Cosmos.Kernel.System.Graphics;
+using Windose.Drivers;
+using Windose.Programs;
 using Windose.System.Kernel;
+using Windose.System.Media;
 using Windose.System.System_Calls;
 
 namespace Windose.System.Elf
@@ -1591,6 +1594,130 @@ namespace Windose.System.Elf
         {
             try { global::System.IO.File.WriteAllBytes(path, data); return true; }
             catch { return false; }
+        }
+
+        public bool PlaySound(string soundName)
+        {
+            try
+            {
+                if (string.Equals(soundName, "startup", StringComparison.OrdinalIgnoreCase))
+                {
+                    AudioEngine.Instance.PlayStartup();
+                    return true;
+                }
+                if (string.Equals(soundName, "click", StringComparison.OrdinalIgnoreCase))
+                {
+                    AudioEngine.Instance.PlayClick();
+                    return true;
+                }
+                if (string.Equals(soundName, "error", StringComparison.OrdinalIgnoreCase))
+                {
+                    AudioEngine.Instance.PlayError();
+                    return true;
+                }
+                if (string.Equals(soundName, "recycle", StringComparison.OrdinalIgnoreCase))
+                {
+                    AudioEngine.Instance.PlayTrash();
+                    return true;
+                }
+                return AudioEngine.Instance.PlayFile(soundName);
+            }
+            catch { return false; }
+        }
+
+        public bool PlayWave(byte[] waveData)
+        {
+            try
+            {
+                return AudioEngine.Instance.PlayWave(waveData);
+            }
+            catch { return false; }
+        }
+
+        public bool SetCursor(int cursorType)
+        {
+            try
+            {
+                CursorManager.SetCursor((CursorType)cursorType);
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public bool WindowMinimize(object window)
+        {
+            if (window is Window win)
+            {
+                WindowManager.RunOnUI(() => win.Minimize());
+                return true;
+            }
+            return false;
+        }
+
+        public bool WindowMaximize(object window)
+        {
+            if (window is Window win)
+            {
+                WindowManager.RunOnUI(() => win.Maximize());
+                return true;
+            }
+            return false;
+        }
+
+        public bool WindowRestore(object window)
+        {
+            if (window is Window win)
+            {
+                WindowManager.RunOnUI(() => win.Restore());
+                return true;
+            }
+            return false;
+        }
+
+        public int WindowGetState(object window)
+        {
+            if (window is Window win)
+            {
+                return (int)win.State;
+            }
+            return 0;
+        }
+
+        public bool ShellRunDialog()
+        {
+            try
+            {
+                WindowManager.RunOnUI(() => LaunchTracker.Start(() => new RunDialog()));
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public bool ShellAboutDialog()
+        {
+            try
+            {
+                WindowManager.RunOnUI(() => LaunchTracker.Start(() => new AboutWindows()));
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public int GetSystemMetrics(int metric)
+        {
+            int screenW = Global.screenWidth > 0 ? Global.screenWidth : 1024;
+            int screenH = Global.screenHeight > 0 ? Global.screenHeight : 768;
+            return metric switch
+            {
+                0 => screenW,               // SM_CXSCREEN
+                1 => screenH,               // SM_CYSCREEN
+                2 => 28,                    // SM_CYCAPTION
+                3 => 6,                     // SM_CXBORDER
+                4 => 36,                    // SM_CYTASKBAR
+                5 => screenW,               // SM_WORKWIDTH
+                6 => screenH - 36,          // SM_WORKHEIGHT
+                _ => 0
+            };
         }
 
         // Program coordinates are relative to the window's client area (inside frame + title bar).
