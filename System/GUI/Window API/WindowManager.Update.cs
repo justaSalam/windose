@@ -1,3 +1,4 @@
+using Windose.System.Shell;
 using Cosmos.Kernel.System.Input;
 using Windose;
 
@@ -74,10 +75,79 @@ public partial class WindowManager
                 HandleWindowCapture();
         }
 
+        if (!DragDropManager.IsDragging && capturedWindow == null && capturedComponent == null)
+        {
+            UpdateHoverCursor();
+        }
+
         DispatchMessages();
         ComposeDirtyRegions();
         DrawPreviewRect();
         PerformanceMetrics.AddWindowManager(updateStartedAt);
+    }
+
+
+    private void UpdateHoverCursor()
+    {
+        if (Windose.Drivers.CursorManager.IsBusy) return;
+
+        lock (windows)
+        {
+            for (int i = windows.Count - 1; i >= 0; i--)
+            {
+                Window win = windows[i];
+                if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
+                if (win.desktop >= 0 && win.desktop != CurrentDesktop) continue;
+
+                Window.ResizeBorder border = win.HitTestResizeBorder(mx, my);
+                if (border != Window.ResizeBorder.None)
+                {
+                    Windose.Drivers.CursorManager.SetCursor(Window.GetCursorForBorder(border));
+                    return;
+                }
+
+                if (win.HitTest(mx, my))
+                {
+                    Component? hit = win.GetChildAt(mx, my);
+                    if (hit is TextField)
+                    {
+                        Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.IBeam);
+                        return;
+                    }
+                    if (hit is Button || hit is MenuItem || hit is Checkbox || hit is RadioButton)
+                    {
+                        Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.Hand);
+                        return;
+                    }
+
+                    Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.Arrow);
+                    return;
+                }
+            }
+        }
+
+        for (int i = components.Count - 1; i >= 0; i--)
+        {
+            Component root = components[i];
+            if (root == null || !root.Visible || root is Window) continue;
+            if (root.IsInsideAbsolute(mx, my))
+            {
+                Component? hit = root.GetChildAt(mx, my);
+                if (hit is Button || hit is MenuItem || hit is DesktopIcon)
+                {
+                    Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.Hand);
+                    return;
+                }
+                if (hit is TextField)
+                {
+                    Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.IBeam);
+                    return;
+                }
+                break;
+            }
+        }
+
+        Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.Arrow);
     }
 
     private void HandleCapturedInput()

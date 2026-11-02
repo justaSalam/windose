@@ -57,6 +57,25 @@ public class Window : Component
     private const int WindowFrameInset = 2;
     public int resizeMargin = 10;
 
+    [Flags]
+    public enum ResizeBorder
+    {
+        None = 0,
+        Left = 1,
+        Right = 2,
+        Top = 4,
+        Bottom = 8,
+        TopLeft = Top | Left,
+        TopRight = Top | Right,
+        BottomLeft = Bottom | Left,
+        BottomRight = Bottom | Right
+    }
+
+    private ResizeBorder activeResizeBorder = ResizeBorder.None;
+    public bool isSnapped { get; private set; }
+    public int snapMode { get; private set; }
+    private Rectangle snapRestoreBounds;
+
     private Point offset;
     private Point resizeStart;
     private Rectangle original;
@@ -581,7 +600,37 @@ public class Window : Component
             lastTitlePress = tick;
         }
 
-        if (resizing || !canMove || isMaximized) return;
+        if (resizing || !canMove) return;
+
+        // If maximized or snapped, dragging titlebar down un-maximizes/un-snaps to floating geometry!
+        if ((isMaximized || isSnapped) && mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY))
+        {
+            Rectangle rest = isMaximized ? (restoreBounds.Width > 0 ? restoreBounds : bounds)
+                                         : (snapRestoreBounds.Width > 0 ? snapRestoreBounds : bounds);
+            if (isMaximized)
+            {
+                WindowManager.ToggleMaximize(this);
+            }
+            else if (isSnapped)
+            {
+                isSnapped = false;
+                snapMode = 0;
+                ApplyBounds(rest);
+            }
+
+            int targetW = rest.Width > 0 ? rest.Width : Width;
+            int targetH = rest.Height > 0 ? rest.Height : Height;
+            int newX = Math.Clamp(mouseX - targetW / 2, 0, Math.Max(0, Global.screenWidth - targetW));
+            int newY = Math.Max(0, mouseY - 10);
+            Move(newX, newY);
+            dragging = true;
+            offset = new Point(mouseX - bounds.X, mouseY - bounds.Y);
+            previewBounds = bounds;
+            WindowManager.ShowPreviewRect(previewBounds);
+            return;
+        }
+
+        if (isMaximized) return;
 
         if (mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY))
         {
@@ -590,12 +639,11 @@ public class Window : Component
             previewBounds = bounds;
             WindowManager.ShowPreviewRect(previewBounds);
         }
-
         else if (mouse.left == MouseEvents.Release && dragging)
         {
             dragging = false;
             WindowManager.ClearPreviewRect();
-            if (!TrySnapToEdge(previewBounds))
+            if (!TrySnapToEdge(previewBounds, mouseX, mouseY))
                 Move(previewBounds.X, previewBounds.Y);
         }
         else if (mouse.left == MouseEvents.None && dragging)
@@ -606,7 +654,29 @@ public class Window : Component
 
         if (dragging && (mouse.left == MouseEvents.Hold || mouse.left == MouseEvents.Press))
         {
-            previewBounds = new Rectangle(mouseX - offset.X, mouseY - offset.Y, Width, Height);
+            const int zone = 8;
+            Rectangle work = WorkArea();
+
+            if (mouseY <= work.Y + zone && canMaximize)
+            {
+                // Top snap: maximize preview
+                previewBounds = work;
+            }
+            else if (mouseX <= work.X + zone && canResize)
+            {
+                // Left snap: 50% left half preview
+                previewBounds = new Rectangle(work.X, work.Y, work.Width / 2, work.Height);
+            }
+            else if (mouseX >= work.Right - zone && canResize)
+            {
+                // Right snap: 50% right half preview
+                previewBounds = new Rectangle(work.X + work.Width / 2, work.Y, work.Width - work.Width / 2, work.Height);
+            }
+            else
+            {
+                previewBounds = new Rectangle(mouseX - offset.X, mouseY - offset.Y, Width, Height);
+            }
+
             WindowManager.ShowPreviewRect(previewBounds);
         }
     }
@@ -618,26 +688,38 @@ public class Window : Component
     }
 
     /// <summary>Snap a dropped window to a screen edge. True when snapped.</summary>
-    private bool TrySnapToEdge(Rectangle dropped)
+    private bool TrySnapToEdge(Rectangle dropped, int mouseX, int mouseY)
     {
         if (!canResize && !canMaximize) return false;
         const int zone = 8;
         Rectangle work = WorkArea();
-        if (dropped.Y <= work.Y + zone && canMaximize)
+
+        if (mouseY <= work.Y + zone && canMaximize)
         {
             WindowManager.ToggleMaximize(this);
             return true;
         }
-        if (dropped.X <= work.X + zone && canResize)
+
+        if (mouseX <= work.X + zone && canResize)
         {
+            if (!isSnapped) snapRestoreBounds = bounds;
+            isSnapped = true;
+            snapMode = 2; // Left
             ApplyBounds(new Rectangle(work.X, work.Y, work.Width / 2, work.Height));
             return true;
         }
-        if (dropped.X + dropped.Width >= work.Right - zone && canResize)
+
+        if (mouseX >= work.Right - zone && canResize)
         {
+            if (!isSnapped) snapRestoreBounds = bounds;
+            isSnapped = true;
+            snapMode = 3; // Right
             ApplyBounds(new Rectangle(work.X + work.Width / 2, work.Y, work.Width - work.Width / 2, work.Height));
             return true;
         }
+
+        isSnapped = false;
+        snapMode = 0;
         return false;
     }
 
@@ -652,69 +734,152 @@ public class Window : Component
         }
         if (!canResize) return;
         if (isMaximized) ToggleMaximized(restoreBounds);
+        if (!isSnapped) snapRestoreBounds = bounds;
+
         Rectangle work = WorkArea();
         if (mode == 0)
+        {
+            isSnapped = true;
+            snapMode = 2; // Left
             ApplyBounds(new Rectangle(work.X, work.Y, work.Width / 2, work.Height));
-        else
+        }
+        else if (mode == 1)
+        {
+            isSnapped = true;
+            snapMode = 3; // Right
             ApplyBounds(new Rectangle(work.X + work.Width / 2, work.Y, work.Width - work.Width / 2, work.Height));
+        }
     }
 
     private void ResizeWindow(MouseState mouseState, int mouseX, int mouseY)
     {
         if (dragging || !canResize || isMaximized) return;
 
-        if (mouseState.left == MouseEvents.Press && ResizeHitTest(mouseX, mouseY))
+        if (mouseState.left == MouseEvents.Press)
         {
-            resizing = true;
-            resizeStart = new Point(mouseX, mouseY);
-            original = bounds;
-            previewBounds = bounds;
-            WindowManager.ShowPreviewRect(previewBounds);
+            ResizeBorder border = HitTestResizeBorder(mouseX, mouseY);
+            if (border != ResizeBorder.None)
+            {
+                resizing = true;
+                activeResizeBorder = border;
+                resizeStart = new Point(mouseX, mouseY);
+                original = bounds;
+                previewBounds = bounds;
+                WindowManager.ShowPreviewRect(previewBounds);
+            }
         }
         else if (mouseState.left == MouseEvents.Release && resizing)
         {
             resizing = false;
+            activeResizeBorder = ResizeBorder.None;
             WindowManager.ClearPreviewRect();
             Resize(previewBounds.X, previewBounds.Y, previewBounds.Width, previewBounds.Height);
         }
         else if (mouseState.left == MouseEvents.None && resizing)
         {
             resizing = false;
+            activeResizeBorder = ResizeBorder.None;
             WindowManager.ClearPreviewRect();
         }
 
         if (resizing && (mouseState.left == MouseEvents.Hold || mouseState.left == MouseEvents.Press))
         {
-            int newWidth = original.Width + (mouseX - resizeStart.X);
-            int newHeight = original.Height + (mouseY - resizeStart.Y);
+            int dx = mouseX - resizeStart.X;
+            int dy = mouseY - resizeStart.Y;
 
-            if (newWidth > 2 && newHeight > 2)
+            int newX = original.X;
+            int newY = original.Y;
+            int newWidth = original.Width;
+            int newHeight = original.Height;
+
+            const int minW = 120;
+            const int minH = 60;
+
+            if ((activeResizeBorder & ResizeBorder.Left) != 0)
             {
-                previewBounds = new Rectangle(original.X, original.Y, newWidth, newHeight);
-
-                WindowManager.ShowPreviewRect(previewBounds);
+                int candidateW = original.Width - dx;
+                if (candidateW >= minW)
+                {
+                    newX = original.X + dx;
+                    newWidth = candidateW;
+                }
+                else
+                {
+                    newX = original.Right - minW;
+                    newWidth = minW;
+                }
             }
+            else if ((activeResizeBorder & ResizeBorder.Right) != 0)
+            {
+                newWidth = Math.Max(minW, original.Width + dx);
+            }
+
+            if ((activeResizeBorder & ResizeBorder.Top) != 0)
+            {
+                int candidateH = original.Height - dy;
+                if (candidateH >= minH)
+                {
+                    newY = original.Y + dy;
+                    newHeight = candidateH;
+                }
+                else
+                {
+                    newY = original.Bottom - minH;
+                    newHeight = minH;
+                }
+            }
+            else if ((activeResizeBorder & ResizeBorder.Bottom) != 0)
+            {
+                newHeight = Math.Max(minH, original.Height + dy);
+            }
+
+            previewBounds = new Rectangle(newX, newY, newWidth, newHeight);
+            WindowManager.ShowPreviewRect(previewBounds);
         }
     }
 
-    private void ShowSystemMenu(int mouseX, int mouseY)
+    public void ShowSystemMenu(int mouseX, int mouseY)
     {
-        MenuPopup menu = new MenuPopup(180, 24);
+        MenuPopup menu = new MenuPopup(160, 22)
+        {
+            itemHeight = 22
+        };
+
+        bool canRestore = isMaximized || isSnapped;
+        MenuItem restore = menu.AddItem("Restore", () =>
+        {
+            if (isMaximized) WindowManager.ToggleMaximize(this);
+            else if (isSnapped)
+            {
+                isSnapped = false;
+                snapMode = 0;
+                ApplyBounds(snapRestoreBounds.Width > 0 ? snapRestoreBounds : bounds);
+            }
+        });
+        restore.enabled = canRestore;
+
+        MenuItem move = menu.AddItem("Move", () => { });
+        move.enabled = canMove && !isMaximized;
+
+        MenuItem size = menu.AddItem("Size", () => { });
+        size.enabled = canResize && !isMaximized;
+
         if (canMinimize)
         {
-            MenuItem min = menu.AddItem("Minimize");
-            min.click = () => WindowManager.Minimize(this);
-            MenuItem trayMin = menu.AddItem("Minimize to Tray");
-            trayMin.click = () => HideToTray();
+            MenuItem min = menu.AddItem("Minimize", () => WindowManager.Minimize(this));
+            min.enabled = !isMinimized;
         }
+
         if (canMaximize)
         {
-            MenuItem max = menu.AddItem(isMaximized ? "Restore" : "Maximize");
-            max.click = () => WindowManager.ToggleMaximize(this);
+            MenuItem max = menu.AddItem("Maximize", () => WindowManager.ToggleMaximize(this));
+            max.enabled = !isMaximized;
         }
-        MenuItem close = menu.AddItem("Close");
-        close.click = () => RequestClose();
-        menu.ShowAt(mouseX, Math.Min(mouseY, Global.screenHeight - 120));
+
+        menu.AddSeparator();
+        menu.AddItem("Close\tAlt+F4", () => RequestClose());
+
+        menu.ShowAt(mouseX, Math.Min(mouseY, Global.screenHeight - 160));
     }
 
     public virtual bool HitTest(int mouseX, int mouseY)
@@ -729,9 +894,51 @@ public class Window : Component
         int titleHeight = hasTitleBar && titlebar != null ? titlebar.Height : Palette.TitleBarHeight;
         return mouseX >= bounds.X && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y && mouseY < bounds.Y + titleHeight;
     }
+
+    public ResizeBorder HitTestResizeBorder(int mouseX, int mouseY)
+    {
+        if (!canResize || isMaximized || isMinimized) return ResizeBorder.None;
+
+        int margin = Math.Max(6, resizeMargin);
+        int left = bounds.X;
+        int right = bounds.Right;
+        int top = bounds.Y;
+        int bottom = bounds.Bottom;
+
+        if (mouseX < left - margin || mouseX > right + margin ||
+            mouseY < top - margin || mouseY > bottom + margin)
+            return ResizeBorder.None;
+
+        bool nearLeft = Math.Abs(mouseX - left) <= margin;
+        bool nearRight = Math.Abs(mouseX - right) <= margin;
+        bool nearTop = Math.Abs(mouseX - top) <= margin;
+        bool nearBottom = Math.Abs(mouseX - bottom) <= margin;
+
+        ResizeBorder border = ResizeBorder.None;
+        if (nearLeft) border |= ResizeBorder.Left;
+        else if (nearRight) border |= ResizeBorder.Right;
+
+        if (nearTop) border |= ResizeBorder.Top;
+        else if (nearBottom) border |= ResizeBorder.Bottom;
+
+        return border;
+    }
+
     public bool ResizeHitTest(int mouseX, int mouseY)
     {
-        return mouseX >= bounds.X + bounds.Width - resizeMargin && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y + bounds.Height - resizeMargin && mouseY < bounds.Y + bounds.Height;
+        return HitTestResizeBorder(mouseX, mouseY) != ResizeBorder.None;
+    }
+
+    public static Windose.Drivers.CursorType GetCursorForBorder(ResizeBorder border)
+    {
+        return border switch
+        {
+            ResizeBorder.Left or ResizeBorder.Right => Windose.Drivers.CursorType.SizeWE,
+            ResizeBorder.Top or ResizeBorder.Bottom => Windose.Drivers.CursorType.SizeNS,
+            ResizeBorder.TopLeft or ResizeBorder.BottomRight => Windose.Drivers.CursorType.SizeNWSE,
+            ResizeBorder.TopRight or ResizeBorder.BottomLeft => Windose.Drivers.CursorType.SizeNESW,
+            _ => Windose.Drivers.CursorType.Arrow
+        };
     }
 
 

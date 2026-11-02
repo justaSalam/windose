@@ -461,7 +461,21 @@ public partial class WindowManager : SingleThreadedProcess
     {
         if (!hasPreviewRect || focusedWindow == null) return;
 
-        Kernel.mainBuffer.DrawDottedRectangle(Color.White, previewRect.X, previewRect.Y, previewRect.Width, previewRect.Height);
+        int x = previewRect.X;
+        int y = previewRect.Y;
+        int w = previewRect.Width;
+        int h = previewRect.Height;
+        if (w <= 0 || h <= 0) return;
+
+        // Authentic Windows 7 Aero Snap docking preview: translucent glass blue fill with crisp bright borders
+        Color fillColor = Color.FromArgb(45, 0, 120, 215);
+        Color borderColor = Color.FromArgb(180, 0, 140, 255);
+        Color innerBorder = Color.FromArgb(80, 255, 255, 255);
+
+        Kernel.mainBuffer.DrawFilledRectangle(fillColor, x, y, w, h);
+        Kernel.mainBuffer.DrawRectangle(borderColor, x, y, w, h);
+        if (w > 2 && h > 2)
+            Kernel.mainBuffer.DrawRectangle(innerBorder, x + 1, y + 1, w - 2, h - 2);
     }
 
 
