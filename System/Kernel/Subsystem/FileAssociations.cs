@@ -3,9 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Reflection;
+using Cosmos.Kernel.System.Graphics;
+using Cosmos.Executable.Lua;
 using Windose.Programs;
+using Windose.System.Elf;
 using Windose.System.Kernel;
 using Windose.System.Kernel.Attributes;
+using Windose.System.Lua;
 using Windose.System.System_Calls;
 
 namespace Windose.System.Kernel.Subsystem
@@ -35,9 +39,6 @@ namespace Windose.System.Kernel.Subsystem
             Register(".flv", mp);
             Register(".gif", mp);
             Register(".wav", mp);
-            Register(".mp3", mp);
-            Register(".ogg", mp);
-            Register(".wma", mp);
 
             Type breeze = typeof(BreezeEditor);
             Register(".breeze", breeze);
@@ -135,6 +136,119 @@ namespace Windose.System.Kernel.Subsystem
             if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
 
             string ext = Path.GetExtension(path);
+
+            // 0. Shortcut resolution (.lnk)
+            if (string.Equals(ext, ".lnk", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ShortcutFile.TryRead(path, out ShortcutInfo info) && !string.IsNullOrEmpty(info.Target))
+                {
+                    if (string.Equals(info.Target, "program::BreezeEditor", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(info.Target, "BreezeEditor", StringComparison.OrdinalIgnoreCase))
+                    {
+                        LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, ""));
+                        return true;
+                    }
+                    if (string.Equals(info.Target, "program::MediaPlayer", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(info.Target, "MediaPlayer", StringComparison.OrdinalIgnoreCase))
+                    {
+                        LaunchTracker.Start(() => new MediaPlayer("", 120, 100, 720, 520));
+                        return true;
+                    }
+                    if (string.Equals(info.Target, "program::CommandPrompt", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(info.Target, "CommandPrompt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        LaunchTracker.Start(() => new CommandPrompt(100, 100, 720, 480));
+                        return true;
+                    }
+
+                    string resolvedTarget = info.Target;
+                    if (!File.Exists(resolvedTarget) && File.Exists("/mnt/Programs/" + Path.GetFileName(resolvedTarget)))
+                    {
+                        resolvedTarget = "/mnt/Programs/" + Path.GetFileName(resolvedTarget);
+                    }
+
+                    if (File.Exists(resolvedTarget))
+                    {
+                        string targetExt = Path.GetExtension(resolvedTarget);
+                        if (string.Equals(targetExt, ".elf", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try
+                            {
+                                byte[] data = File.ReadAllBytes(resolvedTarget);
+                                string progName = Path.GetFileName(resolvedTarget);
+                                List<string> argsList = new List<string> { progName };
+                                if (!string.IsNullOrWhiteSpace(info.Arguments))
+                                {
+                                    argsList.AddRange(info.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries));
+                                }
+                                ElfProgram p = ElfRunner.Spawn(data, progName, argsList.ToArray(), out string error);
+                                if (p != null)
+                                {
+                                    if (!string.IsNullOrEmpty(info.WorkingDir)) p.Env["PWD"] = info.WorkingDir;
+                                    return true;
+                                }
+                                SystemLogger.WriteLine("Shortcut", $"Failed to launch ELF target {resolvedTarget}: {error}", ConsoleMessageType.Error);
+                                return false;
+                            }
+                            catch (Exception ex)
+                            {
+                                SystemLogger.WriteLine("Shortcut", $"Error launching {resolvedTarget}: {ex.Message}", ConsoleMessageType.Error);
+                                return false;
+                            }
+                        }
+                        return Launch(resolvedTarget);
+                    }
+                    else if (Directory.Exists(info.Target))
+                    {
+                        LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, info.Name, info.Target));
+                        return true;
+                    }
+                    else
+                    {
+                        SystemLogger.WriteLine("Shortcut", $"Shortcut target does not exist: {info.Target}", ConsoleMessageType.Warning);
+                        return false;
+                    }
+                }
+                return false;
+            }
+
+            // 1. Direct ELF execution
+            if (string.Equals(ext, ".elf", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    byte[] data = File.ReadAllBytes(path);
+                    if (ElfRunner.Spawn(data, Path.GetFileName(path), new string[] { path }, out string error) == null)
+                    {
+                        SystemLogger.WriteLine("ELF", $"Failed to launch {path}: {error}", ConsoleMessageType.Error);
+                        return false;
+                    }
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    SystemLogger.WriteLine("ELF", $"Error launching {path}: {ex.Message}", ConsoleMessageType.Error);
+                    return false;
+                }
+            }
+
+            // 2. Direct Lua execution
+            if (string.Equals(ext, ".lua", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var lua = LuaAPI.NewState();
+                    lua.L_OpenLibs();
+                    new LuaWindoseLib(path, new[] { "fs.read", "fs.write", "ui.window", "reg.read", "reg.write" }).Install(lua);
+                    lua.L_DoFile(path);
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    SystemLogger.WriteLine("Lua", $"Failed to run Lua script {path}: {ex.Message}", ConsoleMessageType.Error);
+                }
+            }
+
             if (!TryGetApplication(ext, out Type program) || program == null)
             {
                 return false;
@@ -183,6 +297,100 @@ namespace Windose.System.Kernel.Subsystem
             }
         }
 
+        public static string GetIconPath(string pathOrExtension)
+        {
+            if (string.IsNullOrEmpty(pathOrExtension)) return "/mnt/System/Icons/file_lines.png";
+            string ext = Normalize(pathOrExtension.Contains('.') ? Path.GetExtension(pathOrExtension) : pathOrExtension);
+
+            if (string.Equals(ext, ".lnk", StringComparison.OrdinalIgnoreCase))
+            {
+                if (File.Exists(pathOrExtension) && ShortcutFile.TryRead(pathOrExtension, out ShortcutInfo info))
+                {
+                    if (!string.IsNullOrEmpty(info.Icon) && File.Exists(info.Icon))
+                        return info.Icon;
+                    if (!string.IsNullOrEmpty(info.Target))
+                    {
+                        if (info.Target.Contains("Breeze", StringComparison.OrdinalIgnoreCase))
+                            return "/mnt/System/Icons/write_wordpad.png";
+                        if (info.Target.Contains("Media", StringComparison.OrdinalIgnoreCase))
+                            return "/mnt/System/Icons/media_player.png";
+                        if (info.Target.Contains("terminal", StringComparison.OrdinalIgnoreCase) || info.Target.Contains("Command", StringComparison.OrdinalIgnoreCase))
+                            return "/mnt/System/Icons/console_prompt.png";
+                        return GetIconPath(info.Target);
+                    }
+                }
+                return "/mnt/System/Icons/appwiz_file.png";
+            }
+
+            string regIcon = Registry.GetString($"{StaticRegistry.FileAssociation}/{ext}", "");
+            if (!string.IsNullOrEmpty(regIcon) && File.Exists(regIcon))
+                return regIcon;
+
+            switch (ext)
+            {
+                case ".png":
+                case ".jpg":
+                case ".jpeg":
+                case ".bmp":
+                case ".gif":
+                case ".webp":
+                case ".tga":
+                case ".ico":
+                case ".ppm":
+                case ".qoi":
+                    return "/mnt/System/Icons/paint_file.png";
+
+                case ".avi":
+                case ".mp4":
+                case ".webm":
+                case ".mkv":
+                case ".mov":
+                case ".wmv":
+                case ".flv":
+                case ".wav":
+                    return "/mnt/System/Icons/media_player_file.png";
+
+                case ".txt":
+                case ".log":
+                case ".ini":
+                case ".cfg":
+                case ".json":
+                case ".xml":
+                case ".cs":
+                case ".c":
+                case ".h":
+                    return "/mnt/System/Icons/notepad_file.png";
+
+                case ".breeze":
+                    return "/mnt/System/Icons/write_wordpad.png";
+
+                case ".html":
+                case ".htm":
+                    return "/mnt/System/Icons/msie.png";
+
+                case ".elf":
+                    return "/mnt/System/Icons/application_hammer_grouppol.png";
+
+                case ".lua":
+                    return "/mnt/System/Icons/console_prompt.png";
+
+                default:
+                    return "/mnt/System/Icons/file_lines.png";
+            }
+        }
+
+        public static Image GetIcon(string pathOrExtension)
+        {
+            string iconPath = GetIconPath(pathOrExtension);
+            try
+            {
+                if (File.Exists(iconPath))
+                    return new Png(iconPath);
+            }
+            catch { }
+            return new Png("/mnt/System/Icons/file_lines.png");
+        }
+
         public static string GetFileTypeDescription(string pathOrExtension)
         {
             if (string.IsNullOrEmpty(pathOrExtension)) return "File";
@@ -213,10 +421,16 @@ namespace Windose.System.Kernel.Subsystem
                     return "Video Clip";
 
                 case ".wav":
+                    return "WAV Audio File";
+
                 case ".mp3":
+                    return "MP3 Audio (Cosmos plays WAV only)";
+
                 case ".ogg":
+                    return "OGG Audio (Cosmos plays WAV only)";
+
                 case ".wma":
-                    return "Audio File";
+                    return "WMA Audio (Cosmos plays WAV only)";
 
                 case ".txt":
                 case ".log":
@@ -231,6 +445,9 @@ namespace Windose.System.Kernel.Subsystem
 
                 case ".elf":
                     return "ELF Executable";
+
+                case ".lnk":
+                    return "Shortcut";
 
                 case ".lua":
                     return "Lua Script";

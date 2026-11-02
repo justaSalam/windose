@@ -107,7 +107,8 @@ public partial class WindowManager : SingleThreadedProcess
         foreach (KeyValuePair<Window, Button> entry in taskbarButtons)
         {
             bool onDesktop = entry.Key.desktop < 0 || entry.Key.desktop == CurrentDesktop;
-            entry.Value.Visible = onDesktop;
+            bool shouldShow = onDesktop && entry.Key.showInTaskbar && (!entry.Key.isInTray || entry.Key.Visible);
+            entry.Value.Visible = shouldShow;
             entry.Value.SetSelected(onDesktop && entry.Key == focusedWindow && entry.Key.Visible && !entry.Key.isMinimized);
         }
     }
@@ -502,6 +503,12 @@ public partial class WindowManager : SingleThreadedProcess
             window.ForceDirty();
             Invalidate(window.bounds);
 
+            if (window.openToTray)
+            {
+                window.closeToTray = true;
+                window.HideToTray();
+            }
+
             if (!window.showInTaskbar || Explorer.taskbar == null) return;
 
             int taskbarButtonWidth = Math.Clamp(window.text.Length * 7 + (window.Icon == null ? 18 : 38), 84, 180);
@@ -594,7 +601,30 @@ public partial class WindowManager : SingleThreadedProcess
 
     public static void Minimize(Window window)
     {
+        if (window != null && window.minimizeToTray)
+        {
+            window.HideToTray();
+            return;
+        }
         MinimizeImmediate(window);
+    }
+
+    public static void SetTaskbarButtonVisible(Window window, bool visible)
+    {
+        if (window == null) return;
+        lock (windows)
+        {
+            if (taskbarButtons.TryGetValue(window, out Button? btn) && btn != null)
+            {
+                btn.Visible = visible;
+                btn.MarkDirty();
+                if (Explorer.taskbar != null)
+                {
+                    Explorer.taskbar.ForceDirty();
+                    Invalidate(Explorer.taskbar.AbsoluteRectangle);
+                }
+            }
+        }
     }
 
     public static void MinimizeAllWindows()
@@ -727,14 +757,14 @@ public partial class WindowManager : SingleThreadedProcess
         Invalidate(window.bounds);
     }
 
-    private static void FocusTopVisibleWindow(Window excludedWindow)
+    public static void FocusTopVisibleWindow(Window? excludedWindow = null)
     {
         Window nextWindow = null;
 
         for (int i = 0; i < windows.Count; i++)
         {
             Window candidate = windows[i];
-            if (candidate == excludedWindow || !candidate.Visible) continue;
+            if (candidate == excludedWindow || !candidate.Visible || candidate.isInTray) continue;
             if (!IsOnCurrentDesktop(candidate)) continue;
             if (nextWindow == null || candidate.zIndex > nextWindow.zIndex)
                 nextWindow = candidate;

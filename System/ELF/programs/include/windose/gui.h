@@ -4,6 +4,15 @@
 
 #include "core.h"
 
+// Window flags for win_create_ex:
+#define WIN_FLAG_NO_TITLEBAR    1
+#define WIN_FLAG_NO_TASKBAR     2
+#define WIN_FLAG_POPUP          4
+#define WIN_FLAG_BORDERLESS     8
+#define WIN_FLAG_CLOSE_TO_TRAY  16
+#define WIN_FLAG_OPEN_TO_TRAY   32
+#define WIN_FLAG_MIN_TO_TRAY    64
+
 // ---- Windows ----
 static inline handle_t win_create(int w, int h, const char *title) {
     return __kchk(__k->create_window(__k->pid, w, h, title));

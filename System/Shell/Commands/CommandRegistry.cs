@@ -164,6 +164,75 @@ public static class CommandRegistry
     {
         if (context == null) throw new ArgumentNullException(nameof(context));
 
+        string trimmed = (commandLine ?? "").Trim();
+        if (string.IsNullOrEmpty(trimmed)) return;
+
+        // Check for redirection > or >>
+        int redirIndex = -1;
+        bool append = false;
+        int appendIdx = trimmed.IndexOf(">>", StringComparison.Ordinal);
+        if (appendIdx >= 0)
+        {
+            redirIndex = appendIdx;
+            append = true;
+        }
+        else
+        {
+            int singleIdx = trimmed.IndexOf('>');
+            if (singleIdx >= 0)
+            {
+                redirIndex = singleIdx;
+                append = false;
+            }
+        }
+
+        if (redirIndex >= 0)
+        {
+            string cmdPart = trimmed.Substring(0, redirIndex).Trim();
+            string filePart = trimmed.Substring(redirIndex + (append ? 2 : 1)).Trim().Trim('"');
+
+            if (string.IsNullOrEmpty(filePart))
+            {
+                context.WriteLine("Syntax error: no output file specified for redirection.");
+                return;
+            }
+
+            string targetPath = context.ResolvePath(filePart);
+            try
+            {
+                if (!append)
+                {
+                    File.WriteAllText(targetPath, "");
+                }
+            }
+            catch (Exception ex)
+            {
+                context.WriteLine($"Redirection failed: {ex.Message}");
+                return;
+            }
+
+            Action<string> redirectAction = line =>
+            {
+                try
+                {
+                    File.AppendAllText(targetPath, line + "\n");
+                }
+                catch (Exception ex)
+                {
+                    context.WriteLine($"Error writing to {filePart}: {ex.Message}");
+                }
+            };
+
+            CommandContext redirectContext = new CommandContext(redirectAction, context.Clear, context.Close, context.ReadLine)
+            {
+                CurrentDirectory = context.CurrentDirectory
+            };
+
+            Execute(redirectContext, cmdPart);
+            context.CurrentDirectory = redirectContext.CurrentDirectory;
+            return;
+        }
+
         string[] parts = Parse(commandLine);
         if (parts.Length == 0) return;
 
@@ -321,6 +390,248 @@ public static class CommandRegistry
                 context.WriteLine($"Process '{target}' not found.");
             }
         }));
+
+        Register(new DelegateCommand("cat", "Displays the contents of a file.", "cat <file>", (context, args) =>
+        {
+            if (args.Length < 1)
+            {
+                context.WriteLine("Usage: cat <file>");
+                return;
+            }
+            string path = context.ResolvePath(args[0]);
+            if (!File.Exists(path))
+            {
+                context.WriteLine($"File not found: {args[0]}");
+                return;
+            }
+            try
+            {
+                string[] lines = File.ReadAllLines(path);
+                for (int i = 0; i < lines.Length; i++)
+                    context.WriteLine(lines[i]);
+            }
+            catch (Exception ex)
+            {
+                context.WriteLine($"Error reading {args[0]}: {ex.Message}");
+            }
+        }));
+        RegisterAlias("type", "cat");
+
+        Register(new DelegateCommand("copy", "Copies a file to a new location.", "copy <source> <destination>", (context, args) =>
+        {
+            if (args.Length < 2)
+            {
+                context.WriteLine("Usage: copy <source> <destination>");
+                return;
+            }
+            string src = context.ResolvePath(args[0]);
+            string dst = context.ResolvePath(args[1]);
+            if (!File.Exists(src))
+            {
+                context.WriteLine($"Source file not found: {args[0]}");
+                return;
+            }
+            try
+            {
+                if (Directory.Exists(dst))
+                    dst = Path.Combine(dst, Path.GetFileName(src));
+
+                File.Copy(src, dst, true);
+                context.WriteLine("1 file(s) copied.");
+            }
+            catch (Exception ex)
+            {
+                context.WriteLine($"Copy failed: {ex.Message}");
+            }
+        }));
+        RegisterAlias("cp", "copy");
+
+        Register(new DelegateCommand("move", "Moves or renames a file or directory.", "move <source> <destination>", (context, args) =>
+        {
+            if (args.Length < 2)
+            {
+                context.WriteLine("Usage: move <source> <destination>");
+                return;
+            }
+            string src = context.ResolvePath(args[0]);
+            string dst = context.ResolvePath(args[1]);
+            try
+            {
+                if (File.Exists(src))
+                {
+                    if (Directory.Exists(dst))
+                        dst = Path.Combine(dst, Path.GetFileName(src));
+                    File.Move(src, dst, true);
+                    context.WriteLine("1 file(s) moved.");
+                }
+                else if (Directory.Exists(src))
+                {
+                    Directory.Move(src, dst);
+                    context.WriteLine("1 directory moved.");
+                }
+                else
+                {
+                    context.WriteLine($"Source not found: {args[0]}");
+                }
+            }
+            catch (Exception ex)
+            {
+                context.WriteLine($"Move failed: {ex.Message}");
+            }
+        }));
+        RegisterAlias("mv", "move");
+
+        Register(new DelegateCommand("del", "Deletes a file or directory.", "del <path>", (context, args) =>
+        {
+            if (args.Length < 1)
+            {
+                context.WriteLine("Usage: del <path>");
+                return;
+            }
+            string target = context.ResolvePath(args[0]);
+            try
+            {
+                if (File.Exists(target))
+                {
+                    File.Delete(target);
+                    context.WriteLine($"Deleted {args[0]}.");
+                }
+                else if (Directory.Exists(target))
+                {
+                    Directory.Delete(target, true);
+                    context.WriteLine($"Deleted directory {args[0]}.");
+                }
+                else
+                {
+                    context.WriteLine($"File or directory not found: {args[0]}");
+                }
+            }
+            catch (Exception ex)
+            {
+                context.WriteLine($"Delete failed: {ex.Message}");
+            }
+        }));
+        RegisterAlias("rm", "del");
+
+        Register(new DelegateCommand("mkdir", "Creates a directory.", "mkdir <path>", (context, args) =>
+        {
+            if (args.Length < 1)
+            {
+                context.WriteLine("Usage: mkdir <path>");
+                return;
+            }
+            string target = context.ResolvePath(args[0]);
+            try
+            {
+                Directory.CreateDirectory(target);
+                context.WriteLine($"Created directory {args[0]}.");
+            }
+            catch (Exception ex)
+            {
+                context.WriteLine($"Failed to create directory: {ex.Message}");
+            }
+        }));
+        RegisterAlias("md", "mkdir");
+
+        Register(new DelegateCommand("ps", "Lists currently running processes.", "ps", (context, args) =>
+        {
+            context.WriteLine("PID    TYPE        STATUS     NAME");
+            context.WriteLine("--------------------------------------------------");
+            for (int i = 0; i < ProcessManager.ProcessCount; i++)
+            {
+                Process p = ProcessManager.GetProcessAt(i);
+                if (p != null)
+                {
+                    string status = p.Running ? "Running" : "Stopped";
+                    context.WriteLine($"{p.id,-6} {p.processType,-11} {status,-10} {p.name}");
+                }
+            }
+            try
+            {
+                ElfProgram[] elfs = Windose.System.Elf.ElfRunner.List();
+                if (elfs != null)
+                {
+                    for (int i = 0; i < elfs.Length; i++)
+                    {
+                        ElfProgram elf = elfs[i];
+                        if (elf != null)
+                        {
+                            context.WriteLine($"{elf.Pid,-6} {"ELF",-11} {"Running",-10} {elf.Name}");
+                        }
+                    }
+                }
+            }
+            catch { }
+        }));
+        RegisterAlias("tasklist", "ps");
+
+        Register(new DelegateCommand("kill", "Terminates a process by PID or name.", "kill <pid|name>", (context, args) =>
+        {
+            if (args.Length < 1)
+            {
+                context.WriteLine("Usage: kill <pid|name>");
+                return;
+            }
+            string target = args[0];
+            if (int.TryParse(target, out int pid))
+            {
+                if (Windose.System.Elf.ElfRunner.Kill(pid))
+                {
+                    context.WriteLine($"Terminated ELF process {pid}.");
+                    return;
+                }
+                for (int i = 0; i < ProcessManager.ProcessCount; i++)
+                {
+                    Process p = ProcessManager.GetProcessAt(i);
+                    if (p != null && p.id == pid)
+                    {
+                        ProcessManager.QueueStop(p);
+                        context.WriteLine($"Terminated process '{p.name}' (PID {pid}).");
+                        return;
+                    }
+                }
+                context.WriteLine($"Process PID {pid} not found.");
+            }
+            else
+            {
+                bool found = false;
+                for (int i = 0; i < ProcessManager.ProcessCount; i++)
+                {
+                    Process p = ProcessManager.GetProcessAt(i);
+                    if (p != null && string.Equals(p.name, target, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ProcessManager.QueueStop(p);
+                        context.WriteLine($"Terminated process '{p.name}' (PID {p.id}).");
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    try
+                    {
+                        ElfProgram[] elfs = Windose.System.Elf.ElfRunner.List();
+                        if (elfs != null)
+                        {
+                            for (int i = 0; i < elfs.Length; i++)
+                            {
+                                ElfProgram elf = elfs[i];
+                                if (elf != null && string.Equals(elf.Name, target, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    Windose.System.Elf.ElfRunner.Kill(elf.Pid);
+                                    context.WriteLine($"Terminated ELF process '{elf.Name}' (PID {elf.Pid}).");
+                                    found = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    catch { }
+                }
+                if (!found) context.WriteLine($"Process '{target}' not found.");
+            }
+        }));
+        RegisterAlias("taskkill", "kill");
 
 
         // Register(new DiskManagerCommand());

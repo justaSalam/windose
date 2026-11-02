@@ -12,6 +12,7 @@ using Windose.System.Kernel;
 using Windose.System.Kernel.Attributes;
 using Windose.System.Kernel.Subsystem;
 using Windose.System.Media;
+using Windose.System.System_Calls;
 
 [FileAssociation(".avi")]
 [FileAssociation(".mp4")]
@@ -22,9 +23,6 @@ using Windose.System.Media;
 [FileAssociation(".flv")]
 [FileAssociation(".gif")]
 [FileAssociation(".wav")]
-[FileAssociation(".mp3")]
-[FileAssociation(".ogg")]
-[FileAssociation(".wma")]
 public class MediaPlayer : Window
 {
     private class MediaScreen : Component
@@ -184,6 +182,9 @@ public class MediaPlayer : Window
     public MediaPlayer(string? initialPath = null, int x = 140, int y = 100, int width = 720, int height = 520)
         : base(x, y, width, height, "Windows Media Player", true, new Png("/mnt/System/Icons/media_player.png"))
     {
+        closeToTray = true;
+        minimizeToTray = true;
+
         root = new DockPanel(0, 0, Width, Height)
         {
             verticalAlignment = VerticalAlignment.Stretch,
@@ -382,7 +383,7 @@ public class MediaPlayer : Window
                 CurrentMedia.TotalFrames = totalFrames;
                 CurrentMedia.DurationMs = totalFrames * 100;
             }
-            else if (ext == ".wav" || ext == ".mp3" || ext == ".ogg" || ext == ".wma")
+            else if (ext == ".wav")
             {
                 aviDecoder = null;
                 gifAnimation = null;
@@ -391,6 +392,13 @@ public class MediaPlayer : Window
                 CurrentMedia.HasVideo = false;
                 CurrentMedia.HasAudio = true;
                 AudioEngine.Instance.PlayFile(path);
+            }
+            else if (ext == ".mp3" || ext == ".ogg" || ext == ".wma")
+            {
+                SystemLogger.WriteLine("MediaPlayer", $"Format {ext} unsupported: Cosmos OS only supports uncompressed PCM .wav audio.", ConsoleMessageType.Warning);
+                statusFormatPanel.text = $"{ext.ToUpperInvariant().TrimStart('.')} - Unsupported (Cosmos plays .WAV only)";
+                statusFormatPanel.MarkDirty();
+                LoadDemoMedia(CurrentMedia?.Title ?? "Audio (WAV only)");
             }
             else
             {

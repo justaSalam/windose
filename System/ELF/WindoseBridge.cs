@@ -211,6 +211,9 @@ namespace Windose.System.Elf
             bool showInTaskbar = (flags & 2) == 0;
             bool isPopup = (flags & 4) != 0;
             bool borderless = (flags & 8) != 0;
+            bool closeToTray = (flags & 16) != 0;
+            bool openToTray = (flags & 32) != 0;
+            bool minimizeToTray = (flags & 64) != 0;
 
             int border = borderless ? 0 : Palette.BorderSize;
             int titleH = useTitleBar ? Palette.TitleBarHeight : 0;
@@ -228,6 +231,19 @@ namespace Windose.System.Elf
             if (isPopup)
             {
                 win.zLayer = DrawLayer.Popup;
+            }
+            if (closeToTray)
+            {
+                win.closeToTray = true;
+            }
+            if (minimizeToTray)
+            {
+                win.minimizeToTray = true;
+            }
+            if (openToTray)
+            {
+                win.openToTray = true;
+                win.closeToTray = true;
             }
 
             WindowManager.Register(win);
@@ -1243,15 +1259,7 @@ namespace Windose.System.Elf
             try
             {
                 if (string.IsNullOrEmpty(path)) return false;
-                if (path.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
-                {
-                    byte[] data = ReadFile(path);
-                    if (data == null) return false;
-                    string error;
-                    return ElfRunner.Spawn(data, path, new string[] { path }, out error) != null;
-                }
-                FileExplorer.OpenFilePath(path);
-                return true;
+                return Windose.System.Kernel.Subsystem.FileAssociations.Launch(path);
             }
             catch { return false; }
         }

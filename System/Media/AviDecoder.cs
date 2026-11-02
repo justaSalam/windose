@@ -265,13 +265,16 @@ namespace Windose.System.Media
             int total = 0;
             for (int i = 0; i < audioChunks.Count; i++) total += audioChunks[i].Length;
 
-            combinedAudio = new byte[total];
+            byte[] rawPcm = new byte[total];
             int pos = 0;
             for (int i = 0; i < audioChunks.Count; i++)
             {
-                Array.Copy(audioChunks[i], 0, combinedAudio, pos, audioChunks[i].Length);
+                Array.Copy(audioChunks[i], 0, rawPcm, pos, audioChunks[i].Length);
                 pos += audioChunks[i].Length;
             }
+
+            // Wrap raw PCM audio in a RIFF WAVE container so Cosmos audio engine can play it
+            combinedAudio = AudioEngine.WrapPcmInWave(rawPcm);
             return combinedAudio;
         }
     }

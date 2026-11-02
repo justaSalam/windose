@@ -161,6 +161,7 @@ public class Kernel : Sys.Kernel
 
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
         FileAssociations.DiscoverPrograms(typeof(Kernel).Assembly);
+        Windose.System.Media.AudioEngine.Instance.PlayStartupSound();
 
 
         ResourceLoader.SysRequired();

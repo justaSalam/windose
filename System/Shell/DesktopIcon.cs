@@ -12,7 +12,8 @@ namespace Windose.System.Shell
     {
         public const int DefaultWidth = 80;
         public const int DefaultHeight = 76;
-        private const int IconSize = 32;
+        public static int CurrentIconSize = 32;
+        public int IconSize = 32;
         private const int IconTop = 2;
         private const int LabelTop = 40;
         private const int LabelLineHeight = 12;
@@ -20,6 +21,7 @@ namespace Windose.System.Shell
 
         public FileEntry fileEntry;
         public Image icon;
+        public bool isShortcut;
 
         /// <summary>System icons (Recycle Bin) can't be renamed, deleted or saved to layout.</summary>
         public bool isSystemIcon;
@@ -41,39 +43,51 @@ namespace Windose.System.Shell
         public DesktopIcon(int x, int y, FileEntry fileEntry, Image ?icon = null) : base(x, y, DefaultWidth, DefaultHeight, default, default, HorizontalAlignment.Left, VerticalAlignment.Top)
         {
             this.fileEntry = fileEntry;
+            IconSize = CurrentIconSize;
 
-            if (icon != null)
+            string ext = Path.GetExtension(fileEntry.FileName ?? "");
+            if (string.Equals(ext, ".lnk", StringComparison.OrdinalIgnoreCase))
             {
-                this.icon = icon;
-            }
-            else
-            {
-                //TODO file associations through registry
-                switch(fileEntry.FileType)
+                isShortcut = true;
+                if (icon != null)
                 {
-                    case FileType.Directory:
-                        this.icon = new Png("/mnt/System/Icons/directory_closed.png");
-                        break;
+                    this.icon = icon;
+                }
+                else if (ShortcutFile.TryRead(fileEntry.AbsoluteLocation, out ShortcutInfo sInfo))
+                {
+                    if (!string.IsNullOrEmpty(sInfo.Icon) && File.Exists(sInfo.Icon))
+                    {
+                        try { this.icon = new Png(sInfo.Icon); } catch { }
+                    }
+                    if (this.icon == null && !string.IsNullOrEmpty(sInfo.Target))
+                    {
+                        this.icon = FileAssociations.GetIcon(sInfo.Target);
+                    }
+                }
+            }
 
-                    case FileType.File:
-                        string ext = Path.GetExtension(fileEntry.FileName ?? "");
-                        string iconPath = Registry.GetString($"{StaticRegistry.FileAssociation}/{ext}", "/mnt/System/Icons/file_lines.png");
-                        try
-                        {
-                            if (File.Exists(iconPath))
-                                this.icon = new Png(iconPath);
-                            else
-                                this.icon = new Png("/mnt/System/Icons/file_lines.png");
-                        }
-                        catch
-                        {
-                            this.icon = new Png("/mnt/System/Icons/file_lines.png");
-                        }
-                        break;
+            if (this.icon == null)
+            {
+                if (icon != null)
+                {
+                    this.icon = icon;
+                }
+                else
+                {
+                    switch (fileEntry.FileType)
+                    {
+                        case FileType.Directory:
+                            this.icon = new Png("/mnt/System/Icons/directory_closed.png");
+                            break;
 
-                    default:
-                        this.icon = new Png("/mnt/System/Icons/file_question.png");
-                        break;
+                        case FileType.File:
+                            this.icon = FileAssociations.GetIcon(fileEntry.FileName ?? "");
+                            break;
+
+                        default:
+                            this.icon = new Png("/mnt/System/Icons/file_question.png");
+                            break;
+                    }
                 }
             }
         }
@@ -88,7 +102,24 @@ namespace Windose.System.Shell
 
             DrawImage(icon, iconX, IconTop);
 
+            if (isShortcut)
+            {
+                DrawShortcutBadge(iconX, IconTop + IconSize - 11);
+            }
+
             DrawLabel();
+        }
+
+        private void DrawShortcutBadge(int x, int y)
+        {
+            DrawFilledRectangle(Color.White, x, y, 11, 11);
+            DrawRectangle(Color.FromArgb(128, 128, 128), x, y, 11, 11);
+
+            Color arrowColor = Palette.Highlight;
+            DrawLine(arrowColor, x + 2, y + 8, x + 6, y + 4);
+            DrawLine(arrowColor, x + 3, y + 8, x + 6, y + 5);
+            DrawLine(arrowColor, x + 6, y + 4, x + 8, y + 4);
+            DrawLine(arrowColor, x + 6, y + 4, x + 6, y + 6);
         }
 
         public void Set(bool selected)
@@ -279,7 +310,7 @@ namespace Windose.System.Shell
         private TrueTypeFont font = SystemFonts.msSansSerif;
         private void DrawLabel()
         {
-            string name = renaming ? renameText : fileEntry.FileName;
+            string name = renaming ? renameText : (isShortcut ? Path.GetFileNameWithoutExtension(fileEntry.FileName ?? "") : fileEntry.FileName);
             if (string.IsNullOrEmpty(name) && !renaming) return;
 
             string[] lines = BuildLabelLines(name);

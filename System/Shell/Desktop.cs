@@ -32,6 +32,14 @@ public class Desktop : Component
     private List<DesktopIcon> selectedIcons = new List<DesktopIcon>();
     private List<DesktopIcon> gridCollisionIgnoredIcons;
 
+    private bool isMarqueeDragging;
+    private Point marqueeStart;
+    private Point marqueeCurrent;
+
+    private DesktopIcon? thisPcIcon;
+    private DesktopIcon? userFilesIcon;
+    private DesktopIcon? trashIcon;
+
     public static List<DesktopIcon> Icons = new List<DesktopIcon>();
     public static bool SnapIconsToGrid { get; private set; } = true;
     public static bool ShowIconGrid { get; private set; }
@@ -83,26 +91,55 @@ public class Desktop : Component
         };
 
         CreateDesktopContextMenu();
+        LoadWallpaper();
+        EnsureDefaultShortcuts();
+        EnsureSystemIcons();
         LoadLayout();
-        EnsureTrashIcon();
         if (!trashSubscribed)
         {
             trashSubscribed = true;
             TrashManager.Changed += RefreshTrashIcon;
         }
     }
-    //TODO Load last wallpaper from a config file
-    public static Image wallpaper = new Png("/mnt/System/Wallpapers/Lithium.png");
+    private const string WallpaperRegKey = "Control Panel/Desktop/Wallpaper";
+    private const string DefaultWallpaper = "/mnt/System/Wallpapers/Lithium.png";
+    public static Image wallpaper;
 
     private ComponentBuffer scaledWallpaper;
     private Image scaledWallpaperSource;
     private int scaledWallpaperWidth;
     private int scaledWallpaperHeight;
 
-
     public static void SetWallpaper(string path)
     {
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
         wallpaper = ImageLoader.Load(path);
+        try
+        {
+            Registry.Set(WallpaperRegKey, path);
+        }
+        catch { }
+    }
+
+    public static void LoadWallpaper()
+    {
+        try
+        {
+            string saved = Registry.GetString(WallpaperRegKey, DefaultWallpaper);
+            if (!string.IsNullOrEmpty(saved) && File.Exists(saved))
+            {
+                wallpaper = ImageLoader.Load(saved);
+                return;
+            }
+        }
+        catch { }
+
+        try
+        {
+            if (File.Exists(DefaultWallpaper))
+                wallpaper = new Png(DefaultWallpaper);
+        }
+        catch { }
     }
     public override void DrawLocal()
     {
@@ -117,6 +154,15 @@ public class Desktop : Component
             DrawChild(icon);
         }
 
+        if (isMarqueeDragging)
+        {
+            Rectangle rect = GetMarqueeRectangle();
+            if (rect.Width > 0 && rect.Height > 0)
+            {
+                DrawFilledRectangle(Color.FromArgb(45, 51, 153, 255), rect.X, rect.Y, rect.Width, rect.Height);
+                DrawRectangle(Color.FromArgb(180, 51, 153, 255), rect.X, rect.Y, rect.Width, rect.Height);
+            }
+        }
     }
 
     private void DrawWallpaper()
@@ -139,14 +185,59 @@ public class Desktop : Component
         buffer.DrawArrayClipped(scaledWallpaper.GetBuffer(), scaledWallpaper.Width, 0, 0, 0, 0, Width, Height);
     }
 
-    private DesktopIcon trashIcon;
-
-    private void EnsureTrashIcon()
+    private void EnsureSystemIcons()
     {
+        // 1. This PC
+        thisPcIcon = FindIconByPath("shell::thispc");
+        if (thisPcIcon == null)
+        {
+            Image? pcImg = null;
+            try
+            {
+                if (File.Exists("/mnt/System/Icons/computermona.png"))
+                    pcImg = new Png("/mnt/System/Icons/computermona.png");
+            }
+            catch { }
+            thisPcIcon = new DesktopIcon(IconGridOffsetX, IconGridOffsetY,
+                new FileEntry("This PC", FileType.Directory, "shell::thispc", 0), pcImg)
+            {
+                isSystemIcon = true,
+            };
+            AddIcon(thisPcIcon);
+        }
+        else
+        {
+            thisPcIcon.isSystemIcon = true;
+        }
+
+        // 2. User Files
+        userFilesIcon = FindIconByPath("shell::userfiles");
+        if (userFilesIcon == null)
+        {
+            Image? userImg = null;
+            try
+            {
+                if (File.Exists("/mnt/System/Icons/directory_open_file_mydocs.png"))
+                    userImg = new Png("/mnt/System/Icons/directory_open_file_mydocs.png");
+            }
+            catch { }
+            userFilesIcon = new DesktopIcon(IconGridOffsetX, IconGridOffsetY + IconGridHeight,
+                new FileEntry("User Files", FileType.Directory, "shell::userfiles", 0), userImg)
+            {
+                isSystemIcon = true,
+            };
+            AddIcon(userFilesIcon);
+        }
+        else
+        {
+            userFilesIcon.isSystemIcon = true;
+        }
+
+        // 3. Recycle Bin
         trashIcon = FindIconByPath(TrashManager.TrashDir);
         if (trashIcon == null)
         {
-            trashIcon = new DesktopIcon(IconGridOffsetX, IconGridOffsetY,
+            trashIcon = new DesktopIcon(IconGridOffsetX, IconGridOffsetY + IconGridHeight * 2,
                 new FileEntry("Recycle Bin", FileType.Directory, TrashManager.TrashDir, 0))
             {
                 isSystemIcon = true,
@@ -158,6 +249,33 @@ public class Desktop : Component
             trashIcon.isSystemIcon = true;
         }
         RefreshTrashIcon();
+    }
+
+    private void EnsureDefaultShortcuts()
+    {
+        const string desktopDir = "/mnt/user/desktop";
+        if (!Directory.Exists(desktopDir))
+        {
+            try { Directory.CreateDirectory(desktopDir); } catch { }
+        }
+
+        string cmdShortcut = Path.Combine(desktopDir, "Command Prompt.lnk");
+        if (!File.Exists(cmdShortcut))
+        {
+            ShortcutFile.Create(cmdShortcut, "/mnt/Programs/terminal.elf", "Command Prompt", "/mnt/System/Icons/console_prompt.png");
+        }
+
+        string breezeShortcut = Path.Combine(desktopDir, "Breeze Editor.lnk");
+        if (!File.Exists(breezeShortcut))
+        {
+            ShortcutFile.Create(breezeShortcut, "program::BreezeEditor", "Breeze Editor", "/mnt/System/Icons/write_wordpad.png");
+        }
+
+        string mediaShortcut = Path.Combine(desktopDir, "Windows Media Player.lnk");
+        if (!File.Exists(mediaShortcut))
+        {
+            ShortcutFile.Create(mediaShortcut, "program::MediaPlayer", "Windows Media Player", "/mnt/System/Icons/media_player.png");
+        }
     }
 
     private void RefreshTrashIcon()
@@ -186,9 +304,9 @@ public class Desktop : Component
         contextMenu.AddItem("Refresh", RefreshDesktopIcons);
 
         MenuItem viewItem = contextMenu.AddItem("View");
-        viewItem.AddSubmenuItem("Large Icons");
-        viewItem.AddSubmenuItem("Medium Icons");
-        viewItem.AddSubmenuItem("Small Icons");
+        viewItem.AddSubmenuItem("Large Icons", () => SetDesktopIconSize(48));
+        viewItem.AddSubmenuItem("Medium Icons", () => SetDesktopIconSize(32));
+        viewItem.AddSubmenuItem("Small Icons", () => SetDesktopIconSize(16));
         viewItem.AddSubmenuSeparator();
         viewItem.AddSubmenuItem("Show Icon Grid", ToggleIconGrid);
         viewItem.AddSubmenuItem("Snap Icons to Grid", ToggleSnapToGrid);
@@ -205,6 +323,7 @@ public class Desktop : Component
         contextMenu.AddSeparator();
 
         MenuItem newItem = contextMenu.AddItem("New");
+        newItem.AddSubmenuItem("Shortcut", DesktopNewShortcut);
         newItem.AddSubmenuItem("File", () => DesktopNewFile("txt"));
         newItem.AddSubmenuItem("Folder", DesktopNewDirectory);
         newItem.AddSubmenuSeparator();
@@ -213,7 +332,7 @@ public class Desktop : Component
 
         contextMenu.AddSeparator();
         contextMenu.AddItem("Display Settings", () => LaunchTracker.Start(() => new DisplaySettings(contextX, contextY)));
-        contextMenu.AddItem("Personalise");
+        contextMenu.AddItem("Personalise", () => LaunchTracker.Start(() => new DisplaySettings(contextX, contextY)));
 
         iconContextMenu.AddItem("Open", OpenContextIcon);
         iconContextMenu.AddSeparator();
@@ -225,14 +344,95 @@ public class Desktop : Component
         iconEmptyItem = iconContextMenu.AddItem("Empty Recycle Bin", ConfirmEmptyTrash);
     }
 
+    private void SetDesktopIconSize(int size)
+    {
+        DesktopIcon.CurrentIconSize = size;
+        for (int i = 0; i < Icons.Count; i++)
+        {
+            Icons[i].IconSize = size;
+            Icons[i].MarkDirty();
+        }
+
+        if (size <= 16)
+            SetIconGridPreset(72, 64);
+        else if (size >= 48)
+            SetIconGridPreset(96, 96);
+        else
+            SetIconGridPreset(80, 80);
+
+        if (SnapIconsToGrid)
+            ArrangeIconsOnGrid();
+
+        MarkDirty();
+    }
+
+    private void DesktopNewShortcut()
+    {
+        const string desktopDir = "/mnt/user/desktop/";
+        if (!Directory.Exists(desktopDir))
+        {
+            try { Directory.CreateDirectory(desktopDir); } catch { }
+        }
+
+        string path = FileSystemManager.GetUniquePath(desktopDir, "New Shortcut", "lnk");
+        ShortcutFile.Create(path, "/mnt/Programs/terminal.elf", "Terminal", "/mnt/System/Icons/console_prompt.png");
+        FileInfo fileInfo = new FileInfo(path);
+        DesktopIcon icon = new DesktopIcon(contextX, contextY, new FileEntry(fileInfo.Name, FileType.File, path, fileInfo.Length));
+        AddIcon(icon);
+        SelectOnlyIcon(icon);
+        icon.BeginRename();
+    }
+
+    private Rectangle GetMarqueeRectangle()
+    {
+        int x1 = Math.Min(marqueeStart.X, marqueeCurrent.X);
+        int y1 = Math.Min(marqueeStart.Y, marqueeCurrent.Y);
+        int x2 = Math.Max(marqueeStart.X, marqueeCurrent.X);
+        int y2 = Math.Max(marqueeStart.Y, marqueeCurrent.Y);
+
+        int usableH = GetUsableHeight();
+        int clampedX1 = Math.Max(0, Math.Min(Width, x1));
+        int clampedY1 = Math.Max(0, Math.Min(usableH, y1));
+        int clampedX2 = Math.Max(0, Math.Min(Width, x2));
+        int clampedY2 = Math.Max(0, Math.Min(usableH, y2));
+
+        return new Rectangle(clampedX1, clampedY1, Math.Max(0, clampedX2 - clampedX1), Math.Max(0, clampedY2 - clampedY1));
+    }
+
     private void DesktopNewDirectory()
     {
         string path = FileSystemManager.GetUniquePath("/mnt/user/desktop/", "New Directory");
 
         Directory.CreateDirectory(path);
         DirectoryInfo directoryInfo = new DirectoryInfo(path);
-        //TODO Calculate directory size by recursively summing the sizes of all files and subdirectories within it
-        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(directoryInfo.Name, FileType.Directory, path, 0)));
+        long size = GetDirectorySize(path);
+        AddIcon(new DesktopIcon(contextX, contextY, new FileEntry(directoryInfo.Name, FileType.Directory, path, size)));
+    }
+
+    public static long GetDirectorySize(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) return 0;
+        long total = 0;
+        try
+        {
+            string[] files = Directory.GetFiles(path);
+            for (int i = 0; i < files.Length; i++)
+            {
+                try
+                {
+                    FileInfo fi = new FileInfo(files[i]);
+                    total += fi.Length;
+                }
+                catch { }
+            }
+            string[] dirs = Directory.GetDirectories(path);
+            for (int i = 0; i < dirs.Length; i++)
+            {
+                total += GetDirectorySize(dirs[i]);
+            }
+        }
+        catch { }
+        return total;
     }
 
 
@@ -331,11 +531,48 @@ public class Desktop : Component
 
         if (mouse.right == MouseEvents.Release)
         {
+            if (isMarqueeDragging)
+            {
+                isMarqueeDragging = false;
+                MarkDirty();
+            }
+
             DesktopIcon icon = FindIconAt(mouseX, mouseY);
             if (icon != null)
             {
                 SelectOnlyIcon(icon);
                 ShowIconContextMenu(mouseX, mouseY, icon);
+                return true;
+            }
+        }
+
+        if (isMarqueeDragging)
+        {
+            if (mouse.left == MouseEvents.Hold)
+            {
+                marqueeCurrent = new Point(mouseX, mouseY);
+                Rectangle marqueeRect = GetMarqueeRectangle();
+                for (int i = 0; i < Icons.Count; i++)
+                {
+                    DesktopIcon icon = Icons[i];
+                    if (!icon.Visible) continue;
+                    Rectangle iconRect = new Rectangle(icon.X, icon.Y, icon.Width, icon.Height);
+                    if (marqueeRect.IntersectsWith(iconRect))
+                    {
+                        AddIconSelection(icon);
+                    }
+                    else
+                    {
+                        RemoveIconSelection(icon);
+                    }
+                }
+                MarkDirty();
+                return true;
+            }
+            else if (mouse.left == MouseEvents.Release || mouse.left == MouseEvents.None)
+            {
+                isMarqueeDragging = false;
+                MarkDirty();
                 return true;
             }
         }
@@ -403,6 +640,11 @@ public class Desktop : Component
             }
 
             ClearIconSelection();
+            isMarqueeDragging = true;
+            marqueeStart = new Point(mouseX, mouseY);
+            marqueeCurrent = marqueeStart;
+            MarkDirty();
+            return true;
         }
 
         return base.HandleInput(mouseX, mouseY, mouse);
@@ -580,6 +822,36 @@ public class Desktop : Component
         if (icon == null) return;
 
         string path = icon.fileEntry.AbsoluteLocation;
+
+        if (path == "shell::thispc" || path == "/mnt")
+        {
+            if (File.Exists("/mnt/Programs/explorer.elf"))
+            {
+                byte[] data = File.ReadAllBytes("/mnt/Programs/explorer.elf");
+                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { "/mnt" }, out _);
+            }
+            else
+            {
+                LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "This PC", "/mnt"));
+            }
+            return;
+        }
+
+        if (path == "shell::userfiles" || path == "/mnt/user" || path == "/mnt/user/documents")
+        {
+            string userPath = Directory.Exists("/mnt/user/documents") ? "/mnt/user/documents" : (Directory.Exists("/mnt/user") ? "/mnt/user" : "/mnt");
+            if (File.Exists("/mnt/Programs/explorer.elf"))
+            {
+                byte[] data = File.ReadAllBytes("/mnt/Programs/explorer.elf");
+                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { userPath }, out _);
+            }
+            else
+            {
+                LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "User Files", userPath));
+            }
+            return;
+        }
+
         if (Directory.Exists(path))
         {
             if (File.Exists("/mnt/Programs/explorer.elf"))
@@ -594,7 +866,10 @@ public class Desktop : Component
         }
         else if (File.Exists(path))
         {
-            FileExplorer.OpenFilePath(path);
+            if (!FileAssociations.Launch(path))
+            {
+                FileExplorer.OpenFilePath(path);
+            }
         }
     }
 
@@ -621,7 +896,8 @@ public class Desktop : Component
         if (icon == null) return;
         if (icon.isSystemIcon)
         {
-            ConfirmEmptyTrash();
+            if (icon == trashIcon)
+                ConfirmEmptyTrash();
             return;
         }
 
@@ -650,6 +926,12 @@ public class Desktop : Component
         DesktopIcon icon = contextIcon;
         if (icon == null) return;
 
+        if (icon.isSystemIcon && icon == thisPcIcon)
+        {
+            LaunchTracker.Start(() => new DeviceManager(contextX + 40, contextY + 40, 400, 600));
+            return;
+        }
+
         LaunchTracker.Start(() => new FileProperties(contextX + 40, contextY + 40, icon.fileEntry));
     }
 
@@ -659,7 +941,7 @@ public class Desktop : Component
         bool system = icon != null && icon.isSystemIcon;
         if (iconRenameItem != null) iconRenameItem.Visible = !system;
         if (iconDeleteItem != null) iconDeleteItem.Visible = !system;
-        if (iconEmptyItem != null) iconEmptyItem.Visible = system;
+        if (iconEmptyItem != null) iconEmptyItem.Visible = system && icon == trashIcon;
         contextX = Math.Min(mouseX, Math.Max(0, Global.screenWidth - iconContextMenu.Width));
         contextY = Math.Min(mouseY, Math.Max(0, Global.screenHeight - iconContextMenu.Height));
         iconContextMenu.ShowAt(contextX, contextY);
@@ -673,6 +955,7 @@ public class Desktop : Component
 
         for (int i = Icons.Count - 1; i >= 0; i--)
         {
+            if (Icons[i].isSystemIcon) continue;
             string path = Icons[i].fileEntry.AbsoluteLocation;
             if (!File.Exists(path) && !Directory.Exists(path))
                 RemoveDesktopIcon(Icons[i]);

@@ -23,6 +23,21 @@ public class Window : Component
     public bool canMove = true;
     public bool showInTaskbar = true;
 
+    /// <summary>When true, requesting window close hides the window to the system tray instead of terminating.</summary>
+    public bool closeToTray;
+
+    /// <summary>When true, minimizing the window hides it to the system tray instead of the taskbar.</summary>
+    public bool minimizeToTray;
+
+    /// <summary>When true, the window is created directly in the system tray without showing on screen or taskbar.</summary>
+    public bool openToTray;
+
+    /// <summary>True if the window is currently docked/hidden in the system tray.</summary>
+    public bool isInTray { get; internal set; }
+
+    protected Component? trayIconComponent;
+    protected MenuPopup? trayIconMenu;
+
     /// <summary>
     /// Draws a Windows-7-style glass frame (blurred, tinted backdrop showing through the
     /// border and title bar) instead of the plain raised one. Opt-in per window.
@@ -134,6 +149,11 @@ public class Window : Component
         //process.onStart += () => WindowManager.PostRegister(this);
         process.onDispose += () => 
         {
+            if (trayIconComponent != null)
+            {
+                Tray.RemoveTrayIcon(trayIconComponent);
+                trayIconComponent = null;
+            }
             if (!disposed)
             {
                 WindowManager.PostClose(this);
@@ -684,6 +704,8 @@ public class Window : Component
         {
             MenuItem min = menu.AddItem("Minimize");
             min.click = () => WindowManager.Minimize(this);
+            MenuItem trayMin = menu.AddItem("Minimize to Tray");
+            trayMin.click = () => HideToTray();
         }
         if (canMaximize)
         {
@@ -869,8 +891,92 @@ public class Window : Component
 
     public void RequestClose()
     {
+        if (closeToTray)
+        {
+            HideToTray();
+            return;
+        }
         if (closeRequested) return;
         closeRequested = true;
+        if (trayIconComponent != null)
+        {
+            Tray.RemoveTrayIcon(trayIconComponent);
+            trayIconComponent = null;
+        }
         ProcessManager.QueueStop(process);
+    }
+
+    public void HideToTray(string? tooltip = null, Image? customIcon = null)
+    {
+        isInTray = true;
+
+        if (trayIconComponent == null)
+        {
+            Image iconImg = customIcon ?? Icon ?? new Png("/mnt/System/Icons/application_hammer_grouppol.png");
+            Button trayBtn = new Button(iconImg, 0, 0, 32, 32);
+
+            trayIconMenu = new MenuPopup(130, 72);
+            trayIconMenu.AddItem("Restore", () => RestoreFromTray());
+            trayIconMenu.AddItem("Hide", () => HideToTray());
+            trayIconMenu.AddSeparator();
+            trayIconMenu.AddItem("Exit", () => ForceClose());
+
+            trayBtn.leftClickAction = () =>
+            {
+                if (Visible && !isMinimized && WindowManager.focusedWindow == this)
+                {
+                    HideToTray();
+                }
+                else
+                {
+                    RestoreFromTray();
+                }
+            };
+
+            string tip = tooltip ?? text ?? "Application";
+            Tray.AddTrayIcon(trayBtn, trayIconMenu, null, tip);
+            trayIconComponent = trayBtn;
+        }
+
+        Visible = false;
+        WindowManager.Invalidate(bounds);
+        WindowManager.SetTaskbarButtonVisible(this, false);
+
+        if (WindowManager.focusedWindow == this)
+        {
+            WindowManager.ClearFocusedWindow();
+            WindowManager.FocusTopVisibleWindow(this);
+        }
+    }
+
+    public void RestoreFromTray()
+    {
+        isInTray = false;
+        Visible = true;
+
+        if (isMinimized)
+        {
+            RestoreFromTaskbar();
+        }
+
+        if (showInTaskbar)
+        {
+            WindowManager.SetTaskbarButtonVisible(this, true);
+        }
+
+        WindowManager.Activate(this);
+        WindowManager.Invalidate(bounds);
+        MarkDirty();
+    }
+
+    public void ForceClose()
+    {
+        closeToTray = false;
+        if (trayIconComponent != null)
+        {
+            Tray.RemoveTrayIcon(trayIconComponent);
+            trayIconComponent = null;
+        }
+        RequestClose();
     }
 }

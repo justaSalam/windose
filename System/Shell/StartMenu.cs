@@ -1,3 +1,4 @@
+using Cosmos.Executable.Lua;
 using Cosmos.Kernel.System;
 using Windose.System.Elf;
 using Cosmos.Kernel.System.Graphics;
@@ -5,6 +6,7 @@ using System.Drawing;
 using Windose.Programs;
 using Windose.System.Kernel;
 using Windose.System.Kernel.Subsystem;
+using Windose.System.Lua;
 using Windose.System.System_Calls;
 
 public class StartMenu : Window
@@ -65,6 +67,70 @@ public class StartMenu : Window
         {
             if (programsMenu != null && programsMenu.submenu != null)
                 programsMenu.submenu.FilterItems(text);
+        };
+        searchField.EnterPressed += () =>
+        {
+            string query = (searchField.text ?? "").Trim();
+            if (string.IsNullOrEmpty(query)) return;
+
+            HideMenuImmediate();
+
+            // 1. If it's a file path that exists, launch it directly
+            if (File.Exists(query))
+            {
+                FileAssociations.Launch(query);
+                return;
+            }
+
+            // 2. Try resolving an ELF program
+            string? elfPath = CommandRegistry.ResolveElfPath("/mnt", query);
+            if (elfPath != null)
+            {
+                FileAssociations.Launch(elfPath);
+                return;
+            }
+
+            // 3. Known quick aliases
+            string lower = query.ToLowerInvariant();
+            if (lower == "cmd" || lower == "terminal")
+            {
+                if (File.Exists("/mnt/Programs/terminal.elf"))
+                    FileAssociations.Launch("/mnt/Programs/terminal.elf");
+                else
+                    LaunchTracker.Start(() => new CommandPrompt());
+                return;
+            }
+            if (lower == "explorer" || lower == "files")
+            {
+                LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
+                return;
+            }
+            if (lower == "taskmgr" || lower == "perf")
+            {
+                LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+                return;
+            }
+            if (lower == "regedit" || lower == "registry")
+            {
+                LaunchTracker.Start(() => new RegistryEditor());
+                return;
+            }
+
+            // 4. Try matching any visible/matching item in programsMenu
+            if (programsMenu?.submenu != null)
+            {
+                foreach (Component child in programsMenu.submenu.children)
+                {
+                    if (child is MenuItem item && item.Visible)
+                    {
+                        if (item.text.Contains(query, StringComparison.OrdinalIgnoreCase))
+                        {
+                            item.leftClickAction?.Invoke();
+                            return;
+                        }
+                    }
+                }
+            }
         };
         panel.AddStackChild(searchField);
 
@@ -149,9 +215,23 @@ public class StartMenu : Window
 
         programs.AddSubmenuItem(new Png("/mnt/System/Icons/console_prompt.png"), "Lua", () =>
         {
-            string script = "local w = win.createWindow(\"Lua App\", 160, 120, 360, 220)\nlocal label = win.createLabel(\"Hello from Lua ABI\", 24, 48, 220, 28)\nlocal button = win.createButton(\"Close\", 24, 90, 90, 28)\n\nwin.addChild(w, label)\nwin.addChild(w, button)\n\nwin.setOnClick(button, function()\n  win.closeWindow(w)\nend)\n\nwin.showWindow(w)";
-            _ = script;
-
+            try
+            {
+                string demoPath = "/mnt/System/Lua/demo.lua";
+                if (!File.Exists(demoPath))
+                {
+                    Directory.CreateDirectory("/mnt/System/Lua");
+                    File.WriteAllText(demoPath, "windose.log(\"Running Lua demo\")\nwindose.open(\"explorer\")\n");
+                }
+                var lua = LuaAPI.NewState();
+                lua.L_OpenLibs();
+                new LuaWindoseLib(demoPath, new[] { "fs.read", "fs.write", "ui.window", "reg.read", "reg.write" }).Install(lua);
+                lua.L_DoFile(demoPath);
+            }
+            catch (Exception ex)
+            {
+                SystemLogger.WriteLine("Lua", $"Lua execution error: {ex.Message}", ConsoleMessageType.Error);
+            }
         });
 
         MenuItem systemTools = programs.AddSubmenuItem("System Tools");
@@ -168,6 +248,27 @@ public class StartMenu : Window
             clampSize = false,
             Margin = new Thickness(0)
         };
+        documents.AddSubmenuItem(new Png("/mnt/System/Icons/directory_open_file_mydocs.png"), "My Documents", () =>
+        {
+            Directory.CreateDirectory("/mnt/Documents");
+            LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "Documents", "/mnt/Documents"));
+        });
+        try
+        {
+            Directory.CreateDirectory("/mnt/Documents");
+            string[] docFiles = Directory.GetFiles("/mnt/Documents");
+            if (docFiles.Length > 0)
+            {
+                documents.AddSubmenuSeparator();
+                for (int i = 0; i < Math.Min(docFiles.Length, 8); i++)
+                {
+                    string filePath = docFiles[i];
+                    string fileName = Path.GetFileName(filePath);
+                    documents.AddSubmenuItem(fileName, () => FileAssociations.Launch(filePath));
+                }
+            }
+        }
+        catch { }
 
         MenuItem settings = new MenuItem(0, 0, width, 24)
         {

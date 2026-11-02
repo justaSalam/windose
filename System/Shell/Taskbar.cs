@@ -7,7 +7,7 @@ using Windose.System.Elf;
 
 public class Taskbar : Component
 {
-    private const int TrayWidth = 120;
+    private const int TrayWidth = 200;
     public Color borderColor = Color.White;
 
     public List<Button> windows = new List<Button>();
@@ -134,7 +134,31 @@ public class Taskbar : Component
         };
         trayPanel.AddStackChild(timeLabel);
 
-        trayButton = new Button(new Png("/mnt/System/Icons/computer_sound.png"), 0, 0, 24, Height - 8)
+        Button volumeButton = new Button(new Png("/mnt/System/Icons/computer_sound.png"), 0, 0, 24, Height - 8)
+        {
+            horizontalAlignment = HorizontalAlignment.Right,
+            verticalAlignment = VerticalAlignment.Center,
+            useBorders = !modern,
+            useBackground = !modern,
+            iconSize = 18,
+            leftClickAction = VolumeFlyout.Toggle
+        };
+        trayPanel.AddStackChild(volumeButton);
+        TooltipService.Attach(volumeButton, "Volume");
+
+        Button networkButton = new Button(new Png("/mnt/System/Icons/network_normal_two_pcs.png"), 0, 0, 24, Height - 8)
+        {
+            horizontalAlignment = HorizontalAlignment.Right,
+            verticalAlignment = VerticalAlignment.Center,
+            useBorders = !modern,
+            useBackground = !modern,
+            iconSize = 18,
+            leftClickAction = NetworkFlyout.Toggle
+        };
+        trayPanel.AddStackChild(networkButton);
+        TooltipService.Attach(networkButton, "Network");
+
+        trayButton = new Button(new Png("/mnt/System/Icons/appwizard.png"), 0, 0, 24, Height - 8)
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
@@ -143,8 +167,8 @@ public class Taskbar : Component
             iconSize = 18,
             leftClickAction = ToggleTray
         };
-
         trayPanel.AddStackChild(trayButton);
+        TooltipService.Attach(trayButton, "System Tray");
 
         Button notifyButton = new Button(new Png("/mnt/System/Icons/message_envelope_open.png"), 0, 0, 24, Height - 8)
         {
