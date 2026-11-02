@@ -25,6 +25,7 @@ public class Kernel : Sys.Kernel
     private WindowManager windowManager;
     public Drivers.DisplayManager displayDriver;
 
+    [global::System.Runtime.InteropServices.UnmanagedCallersOnly(EntryPoint = "RhDebugBreak")]
     public static void RhDebugBreak()
     {
     }

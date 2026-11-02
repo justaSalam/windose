@@ -300,7 +300,7 @@ namespace Windose.System.Media
             }
 
             // Wrap raw PCM audio in a RIFF WAVE container so Cosmos audio engine can play it
-            combinedAudio = AudioEngine.WrapPcmInWave(rawPcm, AudioSampleRate, AudioChannels, AudioBitsPerSample);
+            combinedAudio = AudioEngine.WrapPcmInWave(rawPcm, AudioSampleRate, (ushort)AudioChannels, (ushort)AudioBitsPerSample);
             return combinedAudio;
         }
     }
