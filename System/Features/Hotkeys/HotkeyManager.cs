@@ -16,6 +16,34 @@ public class HotkeyManager : SingleThreadedProcess
 
 
         RegisterHotkey(new KeyEvent { Key = Key.Tab, Modifiers = ConsoleModifiers.Alt }, TaskSwitcher.Cycle);
+        RegisterHotkey(new KeyEvent { Key = Key.F4, Modifiers = ConsoleModifiers.Alt }, () =>
+        {
+            WindowManager.focusedWindow?.RequestClose();
+        });
+        RegisterHotkey(new KeyEvent { Key = Key.Spacebar, Modifiers = ConsoleModifiers.Alt }, () =>
+        {
+            if (WindowManager.focusedWindow != null && WindowManager.focusedWindow.HasTitleBar)
+            {
+                WindowManager.focusedWindow.ShowSystemMenu(
+                    WindowManager.focusedWindow.bounds.X,
+                    WindowManager.focusedWindow.bounds.Y + Palette.TitleBarHeight);
+            }
+        });
+        RegisterHotkey(new KeyEvent { Key = Key.Escape, Modifiers = ConsoleModifiers.Control }, () =>
+        {
+            if (Explorer.startMenu != null)
+                Explorer.startMenu.Visible = !Explorer.startMenu.Visible;
+        });
+        RegisterHotkey(new KeyEvent { Key = Key.DownArrow, Modifiers = ConsoleModifiers.Alt }, () =>
+        {
+            if (WindowManager.focusedWindow != null)
+            {
+                if (WindowManager.focusedWindow.isMaximized)
+                    WindowManager.ToggleMaximize(WindowManager.focusedWindow);
+                else
+                    WindowManager.Minimize(WindowManager.focusedWindow);
+            }
+        });
         RegisterHotkey(new KeyEvent { Key = Key.LeftArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(0));
         RegisterHotkey(new KeyEvent { Key = Key.RightArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(1));
         RegisterHotkey(new KeyEvent { Key = Key.UpArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(2));

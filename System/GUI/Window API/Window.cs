@@ -471,6 +471,11 @@ public class Window : Component
             ShowSystemMenu(mouseX, mouseY);
             return true;
         }
+        if (mouseState.left == MouseEvents.Press && hasTitleBar && IconHitTest(mouseX, mouseY))
+        {
+            ShowSystemMenu(bounds.X, bounds.Y + Palette.TitleBarHeight);
+            return true;
+        }
         if (Mouse.scroll != 0)
         {
 
@@ -887,6 +892,15 @@ public class Window : Component
         if (isMinimized) return false;
 
         return mouseX >= bounds.X && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y && mouseY < bounds.Y + bounds.Height;
+    }
+
+
+    public bool IconHitTest(int mouseX, int mouseY)
+    {
+        if (!hasTitleBar || Icon == null) return false;
+        int iconX = bounds.X + Palette.BorderSize + 2;
+        int iconY = bounds.Y + Math.Max(2, (Palette.TitleBarHeight - 16) / 2);
+        return mouseX >= iconX && mouseX <= iconX + 22 && mouseY >= iconY && mouseY <= iconY + 22;
     }
 
     public bool TitleHitTest(int mouseX, int mouseY)
