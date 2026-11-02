@@ -131,9 +131,9 @@ namespace Windose.System.Kernel.Subsystem
             }
         }
 
-        public static bool Launch(string path)
+        public static bool Launch(string path, int maxHops = 4)
         {
-            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
+            if (maxHops <= 0 || string.IsNullOrEmpty(path) || !File.Exists(path)) return false;
 
             string ext = Path.GetExtension(path);
 
@@ -196,11 +196,18 @@ namespace Windose.System.Kernel.Subsystem
                                 return false;
                             }
                         }
-                        return Launch(resolvedTarget);
+                        return Launch(resolvedTarget, maxHops - 1);
                     }
                     else if (Directory.Exists(info.Target))
                     {
                         LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, info.Name, info.Target));
+                        return true;
+                    }
+                    else if (info.Target.EndsWith("terminal.elf", StringComparison.OrdinalIgnoreCase) ||
+                             info.Target.Contains("terminal", StringComparison.OrdinalIgnoreCase) ||
+                             info.Target.Contains("Command", StringComparison.OrdinalIgnoreCase))
+                    {
+                        LaunchTracker.Start(() => new CommandPrompt(100, 100, 720, 480));
                         return true;
                     }
                     else
@@ -297,9 +304,9 @@ namespace Windose.System.Kernel.Subsystem
             }
         }
 
-        public static string GetIconPath(string pathOrExtension)
+        public static string GetIconPath(string pathOrExtension, int maxHops = 4)
         {
-            if (string.IsNullOrEmpty(pathOrExtension)) return "/mnt/System/Icons/file_lines.png";
+            if (string.IsNullOrEmpty(pathOrExtension) || maxHops <= 0) return "/mnt/System/Icons/file_lines.png";
             string ext = Normalize(pathOrExtension.Contains('.') ? Path.GetExtension(pathOrExtension) : pathOrExtension);
 
             if (string.Equals(ext, ".lnk", StringComparison.OrdinalIgnoreCase))
@@ -316,7 +323,7 @@ namespace Windose.System.Kernel.Subsystem
                             return "/mnt/System/Icons/media_player.png";
                         if (info.Target.Contains("terminal", StringComparison.OrdinalIgnoreCase) || info.Target.Contains("Command", StringComparison.OrdinalIgnoreCase))
                             return "/mnt/System/Icons/console_prompt.png";
-                        return GetIconPath(info.Target);
+                        return GetIconPath(info.Target, maxHops - 1);
                     }
                 }
                 return "/mnt/System/Icons/appwiz_file.png";

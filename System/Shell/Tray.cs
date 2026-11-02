@@ -75,7 +75,10 @@ public class Tray : Window
         {
             component.rightClickAction += () =>
             {
-                context.ShowAt(MouseManager.X, MouseManager.Y);
+                int cx = Math.Min(MouseManager.X, Math.Max(0, Global.screenWidth - context.Width));
+                int maxY = Explorer.taskbar != null ? Explorer.taskbar.Y : Global.screenHeight;
+                int cy = Math.Min(MouseManager.Y, Math.Max(0, maxY - context.Height));
+                context.ShowAt(cx, cy);
             };
         }
 

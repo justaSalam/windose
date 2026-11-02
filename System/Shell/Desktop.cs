@@ -828,7 +828,7 @@ public class Desktop : Component
             if (File.Exists("/mnt/Programs/explorer.elf"))
             {
                 byte[] data = File.ReadAllBytes("/mnt/Programs/explorer.elf");
-                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { "/mnt" }, out _);
+                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { "explorer.elf", "/mnt" }, out _);
             }
             else
             {
@@ -843,7 +843,7 @@ public class Desktop : Component
             if (File.Exists("/mnt/Programs/explorer.elf"))
             {
                 byte[] data = File.ReadAllBytes("/mnt/Programs/explorer.elf");
-                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { userPath }, out _);
+                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { "explorer.elf", userPath }, out _);
             }
             else
             {
@@ -857,7 +857,7 @@ public class Desktop : Component
             if (File.Exists("/mnt/Programs/explorer.elf"))
             {
                 byte[] data = File.ReadAllBytes("/mnt/Programs/explorer.elf");
-                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { path }, out _);
+                Windose.System.Elf.ElfRunner.Spawn(data, "explorer.elf", new string[] { "explorer.elf", path }, out _);
             }
             else
             {

@@ -30,6 +30,9 @@ namespace Windose.System.Media
         public int FrameCount => frames.Count;
         public int DurationMs => (int)(frames.Count * (1000.0f / (Fps > 0 ? Fps : 30f)));
         public bool HasAudio => audioChunks.Count > 0;
+        public int AudioSampleRate { get; private set; } = 44100;
+        public int AudioChannels { get; private set; } = 2;
+        public int AudioBitsPerSample { get; private set; } = 16;
         public bool IsValid { get; private set; }
 
         // Small cache for decoded bitmaps to prevent repeated allocations during scrubbing
@@ -102,6 +105,7 @@ namespace Windose.System.Media
         private void ParseHeaderList(int start, int end)
         {
             int p = start;
+            string currentStreamType = "";
             while (p + 8 <= end)
             {
                 string tag = Encoding.ASCII.GetString(data, p, 4);
@@ -117,6 +121,28 @@ namespace Windose.System.Media
                     uint h = BitConverter.ToUInt32(data, p + 36);
                     if (w > 0 && w < 4096) Width = (int)w;
                     if (h > 0 && h < 4096) Height = (int)h;
+                }
+                else if (tag == "LIST" && p + 4 <= end)
+                {
+                    ParseHeaderList(p + 4, Math.Min(end, (int)(p + sz)));
+                }
+                else if (tag == "strh" && p + 4 <= end)
+                {
+                    currentStreamType = Encoding.ASCII.GetString(data, p, 4);
+                }
+                else if (tag == "strf" && currentStreamType == "auds" && p + 16 <= end)
+                {
+                    try
+                    {
+                        ushort channels = BitConverter.ToUInt16(data, p + 2);
+                        uint rate = BitConverter.ToUInt32(data, p + 4);
+                        ushort bits = BitConverter.ToUInt16(data, p + 14);
+
+                        if (rate > 0 && rate <= 192000) AudioSampleRate = (int)rate;
+                        if (channels > 0 && channels <= 8) AudioChannels = channels;
+                        if (bits == 8 || bits == 16) AudioBitsPerSample = bits;
+                    }
+                    catch { }
                 }
 
                 p += (int)sz;
@@ -274,7 +300,7 @@ namespace Windose.System.Media
             }
 
             // Wrap raw PCM audio in a RIFF WAVE container so Cosmos audio engine can play it
-            combinedAudio = AudioEngine.WrapPcmInWave(rawPcm);
+            combinedAudio = AudioEngine.WrapPcmInWave(rawPcm, AudioSampleRate, AudioChannels, AudioBitsPerSample);
             return combinedAudio;
         }
     }

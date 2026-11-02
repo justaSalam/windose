@@ -88,9 +88,9 @@ public class NetworkFlyout : Window
     {
         try
         {
-            IPConfig? config = NetworkManager.Primary.IPConfig;
-            if (config != null)
+            if (NetworkManager.Primary != null && NetworkManager.Primary.IPConfig != null)
             {
+                IPConfig config = NetworkManager.Primary.IPConfig;
                 statusLabel.text = "Status: Connected";
                 ipLabel.text = "IP: " + (config.Address?.ToString() ?? "Not assigned");
                 subnetLabel.text = "Subnet: " + (config.SubnetMask?.ToString() ?? "None");
@@ -98,7 +98,7 @@ public class NetworkFlyout : Window
             }
             else
             {
-                statusLabel.text = "Status: No IP Assigned";
+                statusLabel.text = NetworkManager.Primary == null ? "Status: No Network Adapter" : "Status: No IP Assigned";
                 ipLabel.text = "IP: 0.0.0.0";
                 subnetLabel.text = "Subnet: None";
                 gatewayLabel.text = "Gateway: None";

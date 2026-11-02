@@ -17,6 +17,7 @@ namespace Windose.System.Media
         private AudioPlayback? currentPlayback;
         private MemoryAudioStream? currentStream;
         private byte[]? currentWaveData;
+        private byte[]? currentScaledWaveData;
         private bool isPaused;
         private bool isMuted;
         private float volume = 1.0f;
@@ -102,13 +103,17 @@ namespace Windose.System.Media
             {
                 try
                 {
-                    playBytes = (byte[])waveBytes.Clone();
-                    for (int i = 44; i + 1 < playBytes.Length; i += 2)
+                    short bitsPerSample = BitConverter.ToInt16(waveBytes, 34);
+                    if (bitsPerSample == 16)
                     {
-                        short s = BitConverter.ToInt16(playBytes, i);
-                        short scaled = (short)(s * volume);
-                        playBytes[i] = (byte)(scaled & 0xFF);
-                        playBytes[i + 1] = (byte)((scaled >> 8) & 0xFF);
+                        playBytes = (byte[])waveBytes.Clone();
+                        for (int i = 44; i + 1 < playBytes.Length; i += 2)
+                        {
+                            short s = BitConverter.ToInt16(playBytes, i);
+                            short scaled = (short)(s * volume);
+                            playBytes[i] = (byte)(scaled & 0xFF);
+                            playBytes[i + 1] = (byte)((scaled >> 8) & 0xFF);
+                        }
                     }
                 }
                 catch
@@ -116,6 +121,7 @@ namespace Windose.System.Media
                     playBytes = waveBytes;
                 }
             }
+            currentScaledWaveData = playBytes;
 
             try
             {
@@ -270,11 +276,12 @@ namespace Windose.System.Media
             if (!isPaused) return;
             isPaused = false;
             startTimeTick = Environment.TickCount - pausedOffsetMs;
-            if (IsHardwareAvailable && currentWaveData != null)
+            byte[]? dataToPlay = currentScaledWaveData ?? currentWaveData;
+            if (IsHardwareAvailable && dataToPlay != null)
             {
                 try
                 {
-                    currentStream = MemoryAudioStream.FromWave(currentWaveData);
+                    currentStream = MemoryAudioStream.FromWave(dataToPlay);
                     if (currentStream != null)
                     {
                         AudioManager.TryStartPlayback(currentStream, null, out currentPlayback);
@@ -295,6 +302,7 @@ namespace Windose.System.Media
             catch { }
             currentPlayback = null;
             currentStream = null;
+            currentScaledWaveData = null;
         }
 
         public int GetPositionMs()

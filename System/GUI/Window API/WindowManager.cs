@@ -545,6 +545,10 @@ public partial class WindowManager : SingleThreadedProcess
             taskbarButtons[window] = taskbarButton;
             Explorer.taskbar.windows.Add(taskbarButton);
             Explorer.taskbar.bar.AddStackChild(taskbarButton);
+            if (window.isInTray)
+            {
+                taskbarButton.Visible = false;
+            }
             RefreshTaskbarButtons();
             Explorer.taskbar.ForceDirty();
             Invalidate(Explorer.taskbar.AbsoluteRectangle);

@@ -13,9 +13,18 @@ namespace Windose.System.Shell
         public const int DefaultWidth = 80;
         public const int DefaultHeight = 76;
         public static int CurrentIconSize = 32;
-        public int IconSize = 32;
+        private int _iconSize = 32;
+        public int IconSize
+        {
+            get => _iconSize;
+            set
+            {
+                _iconSize = value;
+                Height = Math.Max(DefaultHeight, LabelTop + MaxLabelLines * LabelLineHeight + 4);
+            }
+        }
         private const int IconTop = 2;
-        private const int LabelTop = 40;
+        private int LabelTop => IconTop + IconSize + 4;
         private const int LabelLineHeight = 12;
         private const int MaxLabelLines = 3;
 
@@ -100,7 +109,13 @@ namespace Windose.System.Shell
             if (isPressed)
                 DrawRectangle(Palette.Highlight, iconX - 2, IconTop - 2, IconSize + 4, IconSize + 4);
 
-            DrawImage(icon, iconX, IconTop);
+            if (icon != null)
+            {
+                if (icon.Width == IconSize && icon.Height == IconSize)
+                    DrawImage(icon, iconX, IconTop);
+                else
+                    DrawImageStretch(icon, new Rectangle(iconX, IconTop, IconSize, IconSize));
+            }
 
             if (isShortcut)
             {
@@ -166,7 +181,11 @@ namespace Windose.System.Shell
 
         public void BeginRename()
         {
-            renameOriginalText = fileEntry.FileName ?? "";
+            if (isSystemIcon) return;
+
+            renameOriginalText = isShortcut
+                ? Path.GetFileNameWithoutExtension(fileEntry.FileName ?? "")
+                : (fileEntry.FileName ?? "");
             renameText = renameOriginalText;
             renameAllSelected = true;
             renaming = true;
@@ -191,8 +210,14 @@ namespace Windose.System.Shell
                 return;
             }
 
+            string finalFileName = newName;
+            if (isShortcut && !finalFileName.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+            {
+                finalFileName += ".lnk";
+            }
+
             string oldPath = fileEntry.AbsoluteLocation;
-            string newPath = ReplacePathName(oldPath, newName);
+            string newPath = ReplacePathName(oldPath, finalFileName);
             if (!PathExists(oldPath) || PathExists(newPath))
             {
                 MarkDirty();
@@ -212,7 +237,7 @@ namespace Windose.System.Shell
                 return;
             }
 
-            fileEntry.FileName = newName;
+            fileEntry.FileName = finalFileName;
             fileEntry.AbsoluteLocation = newPath;
             Desktop.SaveLayout();
 

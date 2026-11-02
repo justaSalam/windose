@@ -912,7 +912,16 @@ public class Window : Component
 
         if (trayIconComponent == null)
         {
-            Image iconImg = customIcon ?? Icon ?? new Png("/mnt/System/Icons/application_hammer_grouppol.png");
+            Image? iconImg = customIcon ?? Icon;
+            if (iconImg == null)
+            {
+                try
+                {
+                    if (File.Exists("/mnt/System/Icons/application_hammer_grouppol.png"))
+                        iconImg = new Png("/mnt/System/Icons/application_hammer_grouppol.png");
+                }
+                catch { }
+            }
             Button trayBtn = new Button(iconImg, 0, 0, 32, 32);
 
             trayIconMenu = new MenuPopup(130, 72);

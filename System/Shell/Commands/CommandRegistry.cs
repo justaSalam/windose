@@ -167,22 +167,30 @@ public static class CommandRegistry
         string trimmed = (commandLine ?? "").Trim();
         if (string.IsNullOrEmpty(trimmed)) return;
 
-        // Check for redirection > or >>
+        // Check for redirection > or >> outside quotes
         int redirIndex = -1;
         bool append = false;
-        int appendIdx = trimmed.IndexOf(">>", StringComparison.Ordinal);
-        if (appendIdx >= 0)
+        bool inQuotes = false;
+        for (int i = 0; i < trimmed.Length; i++)
         {
-            redirIndex = appendIdx;
-            append = true;
-        }
-        else
-        {
-            int singleIdx = trimmed.IndexOf('>');
-            if (singleIdx >= 0)
+            if (trimmed[i] == '"')
             {
-                redirIndex = singleIdx;
-                append = false;
+                inQuotes = !inQuotes;
+            }
+            else if (!inQuotes && trimmed[i] == '>')
+            {
+                if (i + 1 < trimmed.Length && trimmed[i + 1] == '>')
+                {
+                    redirIndex = i;
+                    append = true;
+                    break;
+                }
+                else
+                {
+                    redirIndex = i;
+                    append = false;
+                    break;
+                }
             }
         }
 
