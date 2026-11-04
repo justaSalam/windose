@@ -466,6 +466,32 @@ public class Window : Component
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
     {
         if (!IsInputEnabled()) return false;
+
+        // Active resize capture takes top priority
+        if (resizing)
+        {
+            ResizeWindow(mouseState, mouseX, mouseY);
+            return true;
+        }
+
+        // Active drag capture takes priority
+        if (dragging)
+        {
+            DragWindow(mouseState, mouseX, mouseY);
+            return true;
+        }
+
+        // Check for resize start before titlebar drag, menus, or child components intercept it
+        if (mouseState.left == MouseEvents.Press && canResize && !isMaximized)
+        {
+            ResizeBorder border = HitTestResizeBorder(mouseX, mouseY);
+            if (border != ResizeBorder.None)
+            {
+                ResizeWindow(mouseState, mouseX, mouseY);
+                return true;
+            }
+        }
+
         if (mouseState.right == MouseEvents.Press && TitleHitTest(mouseX, mouseY) && !(GetChildAt(mouseX, mouseY) is Button))
         {
             ShowSystemMenu(mouseX, mouseY);
@@ -505,7 +531,7 @@ public class Window : Component
 
 
         DragWindow(mouseState, mouseX, mouseY);
-        ResizeWindow(mouseState, mouseX, mouseY);
+        if (dragging) return true;
 
         if (focusedComponent != null && focusedComponent.HandleInput(mouseX, mouseY, mouseState))
             return true;
@@ -528,7 +554,17 @@ public class Window : Component
 
     public virtual void OnLoseFocus()
     {
-
+        if (resizing)
+        {
+            resizing = false;
+            activeResizeBorder = ResizeBorder.None;
+            WindowManager.ClearPreviewRect();
+        }
+        if (dragging)
+        {
+            dragging = false;
+            WindowManager.ClearPreviewRect();
+        }
     }
 
     public override void HandleKeyboard(KeyEvent keyEvent)
@@ -591,6 +627,12 @@ public class Window : Component
 
     private void DragWindow(MouseState mouse, int mouseX, int mouseY)
     {
+        if (resizing || !canMove) return;
+
+        // If clicking on resize border, do not initiate dragging or double-click maximize
+        if (mouse.left == MouseEvents.Press && canResize && !isMaximized && HitTestResizeBorder(mouseX, mouseY) != ResizeBorder.None)
+            return;
+
         if (mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY) && canMaximize)
         {
             int tick = Environment.TickCount;
@@ -604,8 +646,6 @@ public class Window : Component
             }
             lastTitlePress = tick;
         }
-
-        if (resizing || !canMove) return;
 
         // If maximized or snapped, dragging titlebar down un-maximizes/un-snaps to floating geometry!
         if ((isMaximized || isSnapped) && mouse.left == MouseEvents.Press && TitleHitTest(mouseX, mouseY))
@@ -643,45 +683,44 @@ public class Window : Component
             offset = new Point(mouseX - bounds.X, mouseY - bounds.Y);
             previewBounds = bounds;
             WindowManager.ShowPreviewRect(previewBounds);
+            return;
         }
-        else if (mouse.left == MouseEvents.Release && dragging)
+
+        if (!dragging) return;
+
+        // Update previewBounds with current/final drag coordinates
+        const int zone = 8;
+        Rectangle work = WorkArea();
+
+        if (mouseY <= work.Y + zone && canMaximize)
+        {
+            // Top snap: maximize preview
+            previewBounds = work;
+        }
+        else if (mouseX <= work.X + zone && canResize)
+        {
+            // Left snap: 50% left half preview
+            previewBounds = new Rectangle(work.X, work.Y, work.Width / 2, work.Height);
+        }
+        else if (mouseX >= work.Right - zone && canResize)
+        {
+            // Right snap: 50% right half preview
+            previewBounds = new Rectangle(work.X + work.Width / 2, work.Y, work.Width - work.Width / 2, work.Height);
+        }
+        else
+        {
+            previewBounds = new Rectangle(mouseX - offset.X, mouseY - offset.Y, Width, Height);
+        }
+
+        if (mouse.left == MouseEvents.Release || mouse.left == MouseEvents.None)
         {
             dragging = false;
             WindowManager.ClearPreviewRect();
             if (!TrySnapToEdge(previewBounds, mouseX, mouseY))
                 Move(previewBounds.X, previewBounds.Y);
         }
-        else if (mouse.left == MouseEvents.None && dragging)
+        else
         {
-            dragging = false;
-            WindowManager.ClearPreviewRect();
-        }
-
-        if (dragging && (mouse.left == MouseEvents.Hold || mouse.left == MouseEvents.Press))
-        {
-            const int zone = 8;
-            Rectangle work = WorkArea();
-
-            if (mouseY <= work.Y + zone && canMaximize)
-            {
-                // Top snap: maximize preview
-                previewBounds = work;
-            }
-            else if (mouseX <= work.X + zone && canResize)
-            {
-                // Left snap: 50% left half preview
-                previewBounds = new Rectangle(work.X, work.Y, work.Width / 2, work.Height);
-            }
-            else if (mouseX >= work.Right - zone && canResize)
-            {
-                // Right snap: 50% right half preview
-                previewBounds = new Rectangle(work.X + work.Width / 2, work.Y, work.Width - work.Width / 2, work.Height);
-            }
-            else
-            {
-                previewBounds = new Rectangle(mouseX - offset.X, mouseY - offset.Y, Width, Height);
-            }
-
             WindowManager.ShowPreviewRect(previewBounds);
         }
     }
@@ -758,7 +797,7 @@ public class Window : Component
 
     private void ResizeWindow(MouseState mouseState, int mouseX, int mouseY)
     {
-        if (dragging || !canResize || isMaximized) return;
+        if (!canResize || isMaximized) return;
 
         if (mouseState.left == MouseEvents.Press)
         {
@@ -770,75 +809,79 @@ public class Window : Component
                 resizeStart = new Point(mouseX, mouseY);
                 original = bounds;
                 previewBounds = bounds;
+                if (isSnapped)
+                {
+                    isSnapped = false;
+                    snapMode = 0;
+                }
                 WindowManager.ShowPreviewRect(previewBounds);
+                Windose.Drivers.CursorManager.SetCursor(GetCursorForBorder(border));
+            }
+            return;
+        }
+
+        if (!resizing) return;
+
+        int dx = mouseX - resizeStart.X;
+        int dy = mouseY - resizeStart.Y;
+
+        int newX = original.X;
+        int newY = original.Y;
+        int newWidth = original.Width;
+        int newHeight = original.Height;
+
+        const int minW = 120;
+        const int minH = 60;
+
+        if ((activeResizeBorder & ResizeBorder.Left) != 0)
+        {
+            int candidateW = original.Width - dx;
+            if (candidateW >= minW)
+            {
+                newX = original.X + dx;
+                newWidth = candidateW;
+            }
+            else
+            {
+                newX = original.Right - minW;
+                newWidth = minW;
             }
         }
-        else if (mouseState.left == MouseEvents.Release && resizing)
+        else if ((activeResizeBorder & ResizeBorder.Right) != 0)
+        {
+            newWidth = Math.Max(minW, original.Width + dx);
+        }
+
+        if ((activeResizeBorder & ResizeBorder.Top) != 0)
+        {
+            int candidateH = original.Height - dy;
+            if (candidateH >= minH)
+            {
+                newY = original.Y + dy;
+                newHeight = candidateH;
+            }
+            else
+            {
+                newY = original.Bottom - minH;
+                newHeight = minH;
+            }
+        }
+        else if ((activeResizeBorder & ResizeBorder.Bottom) != 0)
+        {
+            newHeight = Math.Max(minH, original.Height + dy);
+        }
+
+        previewBounds = new Rectangle(newX, newY, newWidth, newHeight);
+
+        if (mouseState.left == MouseEvents.Release || mouseState.left == MouseEvents.None)
         {
             resizing = false;
             activeResizeBorder = ResizeBorder.None;
             WindowManager.ClearPreviewRect();
             Resize(previewBounds.X, previewBounds.Y, previewBounds.Width, previewBounds.Height);
         }
-        else if (mouseState.left == MouseEvents.None && resizing)
+        else
         {
-            resizing = false;
-            activeResizeBorder = ResizeBorder.None;
-            WindowManager.ClearPreviewRect();
-        }
-
-        if (resizing && (mouseState.left == MouseEvents.Hold || mouseState.left == MouseEvents.Press))
-        {
-            int dx = mouseX - resizeStart.X;
-            int dy = mouseY - resizeStart.Y;
-
-            int newX = original.X;
-            int newY = original.Y;
-            int newWidth = original.Width;
-            int newHeight = original.Height;
-
-            const int minW = 120;
-            const int minH = 60;
-
-            if ((activeResizeBorder & ResizeBorder.Left) != 0)
-            {
-                int candidateW = original.Width - dx;
-                if (candidateW >= minW)
-                {
-                    newX = original.X + dx;
-                    newWidth = candidateW;
-                }
-                else
-                {
-                    newX = original.Right - minW;
-                    newWidth = minW;
-                }
-            }
-            else if ((activeResizeBorder & ResizeBorder.Right) != 0)
-            {
-                newWidth = Math.Max(minW, original.Width + dx);
-            }
-
-            if ((activeResizeBorder & ResizeBorder.Top) != 0)
-            {
-                int candidateH = original.Height - dy;
-                if (candidateH >= minH)
-                {
-                    newY = original.Y + dy;
-                    newHeight = candidateH;
-                }
-                else
-                {
-                    newY = original.Bottom - minH;
-                    newHeight = minH;
-                }
-            }
-            else if ((activeResizeBorder & ResizeBorder.Bottom) != 0)
-            {
-                newHeight = Math.Max(minH, original.Height + dy);
-            }
-
-            previewBounds = new Rectangle(newX, newY, newWidth, newHeight);
             WindowManager.ShowPreviewRect(previewBounds);
         }
     }
@@ -889,7 +932,10 @@ public class Window : Component
 
     public virtual bool HitTest(int mouseX, int mouseY)
     {
-        if (isMinimized) return false;
+        if (isMinimized || !Visible) return false;
+
+        if (canResize && !isMaximized && HitTestResizeBorder(mouseX, mouseY) != ResizeBorder.None)
+            return true;
 
         return mouseX >= bounds.X && mouseX < bounds.X + bounds.Width && mouseY >= bounds.Y && mouseY < bounds.Y + bounds.Height;
     }
@@ -911,7 +957,7 @@ public class Window : Component
 
     public ResizeBorder HitTestResizeBorder(int mouseX, int mouseY)
     {
-        if (!canResize || isMaximized || isMinimized) return ResizeBorder.None;
+        if (!canResize || isMaximized || isMinimized || !Visible) return ResizeBorder.None;
 
         int margin = Math.Max(6, resizeMargin);
         int left = bounds.X;
