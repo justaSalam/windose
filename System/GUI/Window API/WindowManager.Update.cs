@@ -99,10 +99,9 @@ public partial class WindowManager
                 if (win == null || !win.Visible || failedWindows.Contains(win)) continue;
                 if (win.desktop >= 0 && win.desktop != CurrentDesktop) continue;
 
-                Window.ResizeBorder border = win.HitTestResizeBorder(mx, my);
-                if (border != Window.ResizeBorder.None)
+                if (win.canResize && !win.isMaximized && win.ResizeHitTest(mx, my))
                 {
-                    Windose.Drivers.CursorManager.SetCursor(Window.GetCursorForBorder(border));
+                    Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.SizeNWSE);
                     return;
                 }
 
