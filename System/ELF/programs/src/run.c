@@ -11,7 +11,7 @@ int main(int argc, char **argv)
     char cmd[256];
     (void)argc; (void)argv;
 
-    win = k_create_window(420, 140, "Run");
+    win = k_create_window_ex(100, 100, 420, 140, "Run", WIN_FLAG_NO_RESIZE);
     if (!win) { puts("window creation failed"); return 1; }
 
     k_create_label(win, 12, 12, "Program:");

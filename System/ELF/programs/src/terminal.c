@@ -18,6 +18,7 @@ int main(int argc, char **argv)
         k_close(win);
         return 1;
     }
+    k_widget_set_anchors(term, ANCHOR_LEFT | ANCHOR_TOP | ANCHOR_RIGHT | ANCHOR_BOTTOM);
 
     for (;;) {
         Event e;

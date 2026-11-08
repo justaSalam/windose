@@ -717,6 +717,14 @@ int main(int argc, char **argv)
     sbSel = k_status_add_panel(sb, "", 400);
     if (!tree || !files || !bar || !tb) { puts("component creation failed"); k_close(win); return 1; }
 
+    k_widget_set_anchors(addrField, ANCHOR_LEFT | ANCHOR_TOP);
+    k_widget_set_anchors(goBtn, ANCHOR_LEFT | ANCHOR_TOP);
+    k_widget_set_anchors(searchLab, ANCHOR_TOP | ANCHOR_RIGHT);
+    k_widget_set_anchors(searchField, ANCHOR_TOP | ANCHOR_RIGHT);
+    k_widget_set_anchors(tree, ANCHOR_LEFT | ANCHOR_TOP | ANCHOR_BOTTOM);
+    k_widget_set_anchors(files, ANCHOR_LEFT | ANCHOR_TOP | ANCHOR_RIGHT | ANCHOR_BOTTOM);
+    k_widget_set_anchors(sb, ANCHOR_LEFT | ANCHOR_RIGHT | ANCHOR_BOTTOM);
+
     vp = k_popup_create();
     vpRefresh = k_popup_add_item(vp, "Refresh");
     k_popup_add_item(vp, "-");

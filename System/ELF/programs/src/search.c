@@ -101,6 +101,12 @@ int main(int argc, char **argv)
     statusLab = k_create_label(win, 8, 348, "");
     if (!field || !list || !statusLab) { puts("component creation failed"); k_close(win); return 1; }
 
+    k_widget_set_anchors(goLab, ANCHOR_LEFT | ANCHOR_TOP);
+    k_widget_set_anchors(field, ANCHOR_LEFT | ANCHOR_TOP | ANCHOR_RIGHT);
+    k_widget_set_anchors(goBtn, ANCHOR_TOP | ANCHOR_RIGHT);
+    k_widget_set_anchors(list, ANCHOR_LEFT | ANCHOR_TOP | ANCHOR_RIGHT | ANCHOR_BOTTOM);
+    k_widget_set_anchors(statusLab, ANCHOR_LEFT | ANCHOR_BOTTOM | ANCHOR_RIGHT);
+
     if (start[0]) {
         k_set_text(field, start);
         do_search(start);
