@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Drawing;
-using Cosmos.Executable.Lua;
 using Cosmos.Kernel.System;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
@@ -10,7 +9,6 @@ using Windose.Programs;
 using Windose.System.Elf;
 using Windose.System.Kernel;
 using Windose.System.Kernel.Subsystem;
-using Windose.System.Lua;
 using Windose.System.Media;
 using Windose.System.System_Calls;
 

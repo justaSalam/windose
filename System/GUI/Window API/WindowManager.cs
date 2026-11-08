@@ -13,6 +13,7 @@ public partial class WindowManager : SingleThreadedProcess
 
     private static List<Rectangle> dirtyRects = new List<Rectangle>();
     private static readonly object dirtyRectsLock = new object();
+    private static readonly List<Rectangle> activeRects = new List<Rectangle>();
 
 
     private static readonly HashSet<Window> failedWindows = new HashSet<Window>();
@@ -258,12 +259,12 @@ public partial class WindowManager : SingleThreadedProcess
         lock (Component.components)
         {
             long startedAt = PerformanceMetrics.Now;
-            Rectangle region;
             lock (dirtyRectsLock)
             {
+                activeRects.Clear();
                 if (fullComposePending)
                 {
-                    region = new Rectangle(0, 0, Global.screenWidth, Global.screenHeight);
+                    activeRects.Add(new Rectangle(0, 0, Global.screenWidth, Global.screenHeight));
                     fullComposePending = false;
                 }
                 else if (dirtyRects.Count == 0)
@@ -273,64 +274,85 @@ public partial class WindowManager : SingleThreadedProcess
                 }
                 else
                 {
-                    region = dirtyRects[0];
-                    for (int i = 1; i < dirtyRects.Count; i++)
-                        region = Rectangle.Union(region, dirtyRects[i]);
+                    for (int i = 0; i < dirtyRects.Count; i++)
+                    {
+                        Rectangle r = dirtyRects[i];
+                        if (r.Width <= 0 || r.Height <= 0) continue;
+                        bool merged = false;
+                        for (int j = 0; j < activeRects.Count; j++)
+                        {
+                            Rectangle existing = activeRects[j];
+                            if (existing.IntersectsWith(r))
+                            {
+                                activeRects[j] = Rectangle.Union(existing, r);
+                                merged = true;
+                                break;
+                            }
+                        }
+                        if (!merged)
+                        {
+                            activeRects.Add(r);
+                        }
+                    }
                 }
                 dirtyRects.Clear();
             }
 
-            ExpandRegionForDirtyRoots(ref region);
-            if (drawingDebugEnabled)
-                TrackDrawingDebugRegion(region);
-            Kernel.mainBuffer.DrawFilledRectangle(Color.Black, region.X, region.Y, region.Width, region.Height);
-            frameComposed = true;
-
-            for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
+            for (int rIdx = 0; rIdx < activeRects.Count; rIdx++)
             {
-                Component component = components[componentIndex];
-                if (component == null || !component.Visible || !component.isRoot || !component.canRender) continue;
+                Rectangle region = activeRects[rIdx];
+                ExpandRegionForDirtyRoots(ref region);
+                if (drawingDebugEnabled)
+                    TrackDrawingDebugRegion(region);
+                Kernel.mainBuffer.DrawFilledRectangle(Color.Black, region.X, region.Y, region.Width, region.Height);
+                frameComposed = true;
 
-                if (component is Window rooto && (!IsOnCurrentDesktop(rooto) || rooto.isMinimized)) continue;
-
-                Rectangle componentBounds = component.AbsoluteRectangle;
-                Rectangle clipped = Rectangle.Intersect(componentBounds, region);
-                if (clipped.Width <= 0 || clipped.Height <= 0) continue;
-
-                Window owner = component.GetOwningWindow();
-                if (owner != null && failedWindows.Contains(owner)) continue;
-
-                try
+                for (int componentIndex = 0; componentIndex < components.Count; componentIndex++)
                 {
-                    if (component.HasDirtyTree())
-                    {
-                        component.DrawDirtyLocal(region);
-                        component.MarkCleaned();
-                    }
+                    Component component = components[componentIndex];
+                    if (component == null || !component.Visible || !component.isRoot || !component.canRender) continue;
 
-                    if (component.useGlass)
+                    if (component is Window rooto && (!IsOnCurrentDesktop(rooto) || rooto.isMinimized)) continue;
+
+                    Rectangle componentBounds = component.AbsoluteRectangle;
+                    Rectangle clipped = Rectangle.Intersect(componentBounds, region);
+                    if (clipped.Width <= 0 || clipped.Height <= 0) continue;
+
+                    Window owner = component.GetOwningWindow();
+                    if (owner != null && failedWindows.Contains(owner)) continue;
+
+                    try
                     {
-                        // Everything below the glass surface is already composited, so the
-                        // backbuffer now holds its real backdrop: blur it, then blit the
-                        // surface with alpha so its transparent pixels show through.
-                        ComposeGlassBackdrop(component, region);
-                        component.DrawToScreenAlpha(region);
+                        if (component.HasDirtyTree())
+                        {
+                            component.DrawDirtyLocal(region);
+                            component.MarkCleaned();
+                        }
+
+                        if (component.useGlass)
+                        {
+                            // Everything below the glass surface is already composited, so the
+                            // backbuffer now holds its real backdrop: blur it, then blit the
+                            // surface with alpha so its transparent pixels show through.
+                            ComposeGlassBackdrop(component, region);
+                            component.DrawToScreenAlpha(region);
+                        }
+                        else
+                        {
+                            component.DrawToScreen(region);
+                        }
                     }
-                    else
+                    catch (Exception exception)
                     {
-                        component.DrawToScreen(region);
+                        lock (dirtyRectsLock)
+                            fullComposePending = true;
+                        FailApplication(owner, "Drawing", exception);
                     }
                 }
-                catch (Exception exception)
-                {
-                    lock (dirtyRectsLock)
-                        fullComposePending = true;
-                    FailApplication(owner, "Drawing", exception);
-                }
+
+                if (drawingDebugEnabled)
+                    Kernel.mainBuffer.DrawRectangle(Color.Magenta, region.X, region.Y, region.Width, region.Height);
             }
-
-            if (drawingDebugEnabled)
-                Kernel.mainBuffer.DrawRectangle(Color.Magenta, region.X, region.Y, region.Width, region.Height);
 
             PerformanceMetrics.AddCompose(startedAt);
         }

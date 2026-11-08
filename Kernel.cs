@@ -8,7 +8,6 @@ using Windose.System.Features;
 using Windose.System.Kernel;
 using Windose.System.Kernel.FileSystem;
 using Windose.System.Kernel.Subsystem;
-using Windose.System.Scheduling;
 using Windose.System.System_Calls;
 using Sys = Cosmos.Kernel.System;
 namespace Windose;
@@ -33,7 +32,6 @@ public class Kernel : Sys.Kernel
     protected override void OnBoot()
     {
         base.OnBoot();
-        //SchedulerManager.SetScheduler(new MlfqScheduler());
     }
 
     protected override void BeforeRun()

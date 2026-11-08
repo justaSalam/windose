@@ -1,11 +1,8 @@
 using Cosmos.Kernel.Core.IO;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System.Drawing;
 using System.Globalization;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Xml.Serialization;
 using Windose;
 using Windose.System.Features;
 using Windose.System.Kernel;
