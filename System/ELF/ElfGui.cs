@@ -265,6 +265,7 @@ namespace Windose.System.Elf
                     case Key.DownArrow: ch = (char)18; break;
                     case Key.LeftArrow: ch = (char)19; break;
                     case Key.RightArrow: ch = (char)20; break;
+                    case Key.F5: ch = (char)132; break;
                 }
                 owner.PostEvent(ElfEvent.Key, ProgramHandle, (int)keyEvent.Key,
                     ((int)keyEvent.Modifiers << 16) | (ch & 0xFFFF));
