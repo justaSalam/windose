@@ -410,7 +410,7 @@ static void open_selected(void)
         if (pid < 0) { snprintf(s, sizeof s, "cannot run %s", entries[selected].name); set_sel(s); }
         return;
     }
-    if (k_open_file(path) <= 0) {
+    if (k_open_file(path) != 0) {
         open_viewer(path);
     }
 }

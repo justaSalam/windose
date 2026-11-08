@@ -137,7 +137,19 @@ namespace Windose.Programs
             }
             if (lower == "calc" || lower == "calculator")
             {
-                LaunchTracker.Start(() => new Calculator());
+                if (File.Exists("/mnt/Programs/calc.elf"))
+                    FileAssociations.Launch("/mnt/Programs/calc.elf");
+                else
+                    LaunchTracker.Start(() => new Calculator());
+                WindowManager.PostClose(this);
+                return;
+            }
+            if (lower == "notepad" || lower == "editor" || lower == "aeroeditor")
+            {
+                if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                    FileAssociations.Launch("/mnt/Programs/aeroeditor.elf");
+                else
+                    LaunchTracker.Start(() => new BreezeEditor());
                 WindowManager.PostClose(this);
                 return;
             }
@@ -149,25 +161,37 @@ namespace Windose.Programs
             }
             if (lower == "winver" || lower == "about")
             {
-                LaunchTracker.Start(() => new AboutWindows());
+                if (File.Exists("/mnt/Programs/winver.elf"))
+                    FileAssociations.Launch("/mnt/Programs/winver.elf");
+                else
+                    LaunchTracker.Start(() => new AboutWindows());
                 WindowManager.PostClose(this);
                 return;
             }
             if (lower == "explorer" || lower == "files")
             {
-                LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
+                if (File.Exists("/mnt/Programs/explorer.elf"))
+                    ElfRunner.RunFile("/mnt/Programs/explorer.elf", new string[] { "/mnt" });
+                else
+                    LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
                 WindowManager.PostClose(this);
                 return;
             }
-            if (lower == "taskmgr" || lower == "perf")
+            if (lower == "taskmgr" || lower == "perf" || lower == "taskmanager")
             {
-                LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+                if (File.Exists("/mnt/Programs/taskmgr.elf"))
+                    FileAssociations.Launch("/mnt/Programs/taskmgr.elf");
+                else
+                    LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
                 WindowManager.PostClose(this);
                 return;
             }
             if (lower == "regedit" || lower == "registry")
             {
-                LaunchTracker.Start(() => new RegistryEditor());
+                if (File.Exists("/mnt/Programs/regedit.elf"))
+                    FileAssociations.Launch("/mnt/Programs/regedit.elf");
+                else
+                    LaunchTracker.Start(() => new RegistryEditor());
                 WindowManager.PostClose(this);
                 return;
             }
