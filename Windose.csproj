@@ -52,6 +52,14 @@
       <None Remove="System\ELF\programs\bin\tcc.elf" />
       <None Remove="System\ELF\programs\src\tcc.c" />
       <None Remove="System\ELF\programs\include\stdint.h" />
+      <None Remove="System\ELF\programs\include\stdbool.h" />
+      <None Remove="System\ELF\programs\include\assert.h" />
+      <None Remove="System\ELF\programs\include\limits.h" />
+      <None Remove="System\ELF\programs\include\errno.h" />
+      <None Remove="System\ELF\programs\include\math.h" />
+      <None Remove="System\ELF\programs\include\time.h" />
+      <None Remove="System\ELF\programs\libc\math.c" />
+      <None Remove="System\ELF\programs\libc\time.c" />
   </ItemGroup>
 
   <!-- Core kernel packages -->
@@ -130,6 +138,14 @@
     <EmbeddedResource Include=".\System\ELF\programs\bin\paint.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\tcc.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\include\stdint.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\stdbool.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\assert.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\limits.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\errno.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\math.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\time.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\math.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\libc\time.c" />
   </ItemGroup>
 
     <ItemGroup>

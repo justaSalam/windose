@@ -115,6 +115,43 @@ void *calloc(size_t n, size_t sz)
     return p;
 }
 
+void *aligned_alloc(size_t alignment, size_t size)
+{
+    if (alignment == 0 || (alignment & (alignment - 1)) != 0) return NULL;
+    if (size % alignment != 0) return NULL;
+    if (alignment < 16) alignment = 16;
+    if (size == 0) size = alignment;
+    size = (size + 15) & ~(size_t)15;
+
+    for (int pass = 0; pass < 2; pass++) {
+        for (int c = 0; c < nchunks; c++) {
+            for (Hdr *h = chunks[c]; h; h = next_blk(h)) {
+                if (!(h->flags & F_FREE)) continue;
+                char *payload = (char *)h + HDR;
+                char *aligned = (char *)(((size_t)payload + alignment - 1) & ~(alignment - 1));
+                if (aligned == payload) {
+                    if (h->size >= size) {
+                        split(h, size);
+                        h->flags &= ~F_FREE;
+                        return payload;
+                    }
+                } else {
+                    size_t pre_payload = (size_t)(aligned - HDR - (char *)h - HDR);
+                    if (pre_payload >= 16 && h->size >= pre_payload + HDR + size) {
+                        split(h, pre_payload);
+                        Hdr *next = next_blk(h);
+                        split(next, size);
+                        next->flags &= ~F_FREE;
+                        return (char *)next + HDR;
+                    }
+                }
+            }
+        }
+        if (pass == 0 && !grow(size + alignment + HDR + 16)) return NULL;
+    }
+    return NULL;
+}
+
 void *realloc(void *p, size_t n)
 {
     if (!p) return malloc(n);

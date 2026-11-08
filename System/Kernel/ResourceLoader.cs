@@ -184,6 +184,12 @@ namespace Windose.System.Kernel
             WriteStorage("/mnt/System/include/string.h", "Windose.System.ELF.programs.include.string.h", true);
             WriteStorage("/mnt/System/include/stdint.h", "Windose.System.ELF.programs.include.stdint.h", true);
             WriteStorage("/mnt/System/include/ctype.h", "Windose.System.ELF.programs.include.ctype.h", true);
+            WriteStorage("/mnt/System/include/stdbool.h", "Windose.System.ELF.programs.include.stdbool.h", true);
+            WriteStorage("/mnt/System/include/assert.h", "Windose.System.ELF.programs.include.assert.h", true);
+            WriteStorage("/mnt/System/include/limits.h", "Windose.System.ELF.programs.include.limits.h", true);
+            WriteStorage("/mnt/System/include/errno.h", "Windose.System.ELF.programs.include.errno.h", true);
+            WriteStorage("/mnt/System/include/math.h", "Windose.System.ELF.programs.include.math.h", true);
+            WriteStorage("/mnt/System/include/time.h", "Windose.System.ELF.programs.include.time.h", true);
         }
     }
 }

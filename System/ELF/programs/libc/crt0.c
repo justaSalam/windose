@@ -10,8 +10,62 @@ static int exit_code;
 
 int main(int argc, char **argv);
 
-void exit(int code) { exit_code = code; __builtin_longjmp(exit_buf, 1); }
-void abort(void) { static const char m[] = "abort()\n"; k_write(m, (int)sizeof m - 1); exit(134); }
+#define MAX_ATEXIT 32
+static void (*atexit_handlers[MAX_ATEXIT])(void);
+static int n_atexit = 0;
+
+static void (*at_quick_exit_handlers[MAX_ATEXIT])(void);
+static int n_at_quick_exit = 0;
+
+int atexit(void (*func)(void))
+{
+    if (!func || n_atexit >= MAX_ATEXIT) return -1;
+    atexit_handlers[n_atexit++] = func;
+    return 0;
+}
+
+int at_quick_exit(void (*func)(void))
+{
+    if (!func || n_at_quick_exit >= MAX_ATEXIT) return -1;
+    at_quick_exit_handlers[n_at_quick_exit++] = func;
+    return 0;
+}
+
+void _Exit(int code)
+{
+    exit_code = code;
+    __builtin_longjmp(exit_buf, 1);
+}
+
+void quick_exit(int code)
+{
+    while (n_at_quick_exit > 0) {
+        void (*fn)(void) = at_quick_exit_handlers[--n_at_quick_exit];
+        if (fn) fn();
+    }
+    _Exit(code);
+}
+
+void __attribute__((weak)) __stdio_cleanup(void);
+
+void exit(int code)
+{
+    while (n_atexit > 0) {
+        void (*fn)(void) = atexit_handlers[--n_atexit];
+        if (fn) fn();
+    }
+    if (__stdio_cleanup) {
+        __stdio_cleanup();
+    }
+    _Exit(code);
+}
+
+void abort(void)
+{
+    static const char m[] = "abort()\n";
+    k_write(m, (int)sizeof m - 1);
+    _Exit(134);
+}
 
 KABI int _start(KernelApi *k)
 {
@@ -30,7 +84,8 @@ KABI int _start(KernelApi *k)
         char *p = buf;
         for (int i = 0; i < argc; i++) { argv[i] = p; p += strlen(p) + 1; }
         argv[argc] = NULL;
-        exit_code = main(argc, argv);
+        int ret = main(argc, argv);
+        exit(ret);
     }
     return exit_code;
 }
