@@ -247,5 +247,15 @@ namespace Windose.System.Elf
         bool ListSetItemIcon(object obj, int item, string iconPath);
         bool SysMem(out ulong total, out ulong used, out ulong free);
         bool RegDelete(string key);
+        bool CanvasClear(object canvas, uint argb);
+        bool CanvasFillRect(object canvas, int x, int y, int w, int h, uint argb);
+        bool CanvasDrawRect(object canvas, int x, int y, int w, int h, uint argb);
+        bool CanvasDrawLine(object canvas, int x1, int y1, int x2, int y2, uint argb);
+        bool CanvasDrawText(object canvas, int x, int y, string text, uint argb, int fontSize);
+        bool CanvasDrawGradient(object canvas, int x, int y, int w, int h, uint topColor, uint bottomColor);
+        bool CanvasDrawRounded(object canvas, int x, int y, int w, int h, int radius, uint argb, bool filled);
+        bool CanvasMeasureText(object canvas, string text, int fontSize, out int w, out int h);
+        bool TextFieldGetCaretPos(object obj, out int x, out int y);
+        bool WidgetSetVisible(object obj, bool visible);
     }
 }

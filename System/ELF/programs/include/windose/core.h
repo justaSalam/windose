@@ -7,7 +7,7 @@
 
 // Calling convention for host <-> guest boundary
 #define KABI __attribute__((sysv_abi))
-#define KAPI_VERSION 15
+#define KAPI_VERSION 16
 #define K_KILLED (-100)
 
 typedef int handle_t; // opaque kernel handle; 0 = invalid/none
@@ -228,6 +228,16 @@ typedef struct KernelApi {
     int      (KABI *list_set_item_icon)(int pid, handle_t obj, int item, const char *icon_path);
     int      (KABI *sys_mem)(int pid, uint64_t *out_total, uint64_t *out_used, uint64_t *out_free);
     int      (KABI *reg_delete)(int pid, const char *key);
+    int      (KABI *canvas_clear)(int pid, handle_t canvas, unsigned argb);
+    int      (KABI *canvas_fill_rect)(int pid, handle_t canvas, int x, int y, int w, int h, unsigned argb);
+    int      (KABI *canvas_draw_rect)(int pid, handle_t canvas, int x, int y, int w, int h, unsigned argb);
+    int      (KABI *canvas_draw_line)(int pid, handle_t canvas, int x1, int y1, int x2, int y2, unsigned argb);
+    int      (KABI *canvas_draw_text)(int pid, handle_t canvas, int x, int y, const char *text, unsigned argb, int font_size);
+    int      (KABI *canvas_draw_gradient)(int pid, handle_t canvas, int x, int y, int w, int h, unsigned top, unsigned bot);
+    int      (KABI *canvas_draw_rounded)(int pid, handle_t canvas, int x, int y, int w, int h, int radius, unsigned argb, int filled);
+    int      (KABI *canvas_measure_text)(int pid, handle_t canvas, const char *text, int font_size, int *out_w, int *out_h);
+    int      (KABI *textfield_get_caret_pos)(int pid, handle_t textfield, int *out_x, int *out_y);
+    int      (KABI *widget_set_visible)(int pid, handle_t obj, int visible);
 } KernelApi;
 
 extern KernelApi *__k;

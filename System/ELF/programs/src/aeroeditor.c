@@ -14,7 +14,12 @@
 #include "kernel.h"
 
 #define MAX_CODE_SIZE 65536
-#define MAX_SUGGESTIONS 5
+
+#define AC_WIDTH       280
+#define AC_HEIGHT      175
+#define AC_ITEM_HEIGHT 20
+#define AC_MAX_ITEMS   6
+#define MAX_MATCHES    24
 
 /* Component Handles */
 static handle_t main_win = 0;
@@ -49,10 +54,9 @@ static handle_t h_btn_build = 0;
 static handle_t h_btn_run = 0;
 static handle_t h_lbl_filename = 0;
 
-/* Editor, Suggestions and Output handles */
+/* Editor, Output, and Floating Autocomplete handles */
 static handle_t h_text_buffer = 0;
-static handle_t h_lbl_suggest = 0;
-static handle_t h_btn_sug[MAX_SUGGESTIONS];
+static handle_t h_ac_canvas = 0;
 static handle_t h_lbl_output = 0;
 static handle_t h_output_buffer = 0;
 static handle_t h_status_bar = 0;
@@ -61,9 +65,13 @@ static char current_file[256] = "/mnt/untitled.c";
 static int last_err_line = 0;
 static char last_err_msg[256] = "";
 
-/* Autocomplete suggestions state */
-static int active_sug_indices[MAX_SUGGESTIONS];
-static int num_active_sug = 0;
+/* Floating Autocomplete state */
+static int ac_visible = 0;
+static int ac_selected = 0;
+static int ac_match_count = 0;
+static int ac_matches[MAX_MATCHES];
+static int ac_x = 0;
+static int ac_y = 0;
 static int cur_prefix_start = 0;
 static int cur_prefix_end = 0;
 
@@ -97,6 +105,16 @@ static const SymbolEntry SYMBOL_DB[] = {
     { "k_create_tabs", "k_create_tabs(handle_t parent, int x, int y, int w, int h)", "Creates tab control" },
     { "k_create_canvas", "k_create_canvas(handle_t parent, int x, int y, int w, int h)", "Creates direct pixel canvas" },
     { "k_draw_pixels", "k_draw_pixels(handle_t canvas, int x, int y, int w, int h, const void *buf, int len)", "Draws ARGB pixel buffer" },
+    { "k_canvas_clear", "k_canvas_clear(handle_t canvas, unsigned argb)", "Clears canvas to solid color" },
+    { "k_canvas_fill_rect", "k_canvas_fill_rect(handle_t canvas, int x, int y, int w, int h, unsigned argb)", "Fills solid rectangle on canvas" },
+    { "k_canvas_draw_rect", "k_canvas_draw_rect(handle_t canvas, int x, int y, int w, int h, unsigned argb)", "Draws rectangle outline on canvas" },
+    { "k_canvas_draw_line", "k_canvas_draw_line(handle_t canvas, int x1, int y1, int x2, int y2, unsigned argb)", "Draws line between two points" },
+    { "k_canvas_draw_text", "k_canvas_draw_text(handle_t canvas, int x, int y, const char *text, unsigned argb, int font_size)", "Draws text on canvas" },
+    { "k_canvas_draw_gradient", "k_canvas_draw_gradient(handle_t canvas, int x, int y, int w, int h, unsigned top, unsigned bot)", "Draws vertical gradient rectangle" },
+    { "k_canvas_draw_rounded", "k_canvas_draw_rounded(handle_t canvas, int x, int y, int w, int h, int r, unsigned argb, int filled)", "Draws rounded rectangle" },
+    { "k_canvas_measure_text", "k_canvas_measure_text(handle_t canvas, const char *text, int font_size, int *out_w, int *out_h)", "Measures rendered text dimensions" },
+    { "k_textfield_get_caret_xy", "k_textfield_get_caret_xy(handle_t obj, int *out_x, int *out_y)", "Gets visual pixel coordinates of caret" },
+    { "k_widget_set_visible", "k_widget_set_visible(handle_t obj, int visible)", "Shows or hides a component" },
 
     // Widget Manipulation
     { "k_set_text", "k_set_text(handle_t obj, const char *text)", "Sets text of component" },
@@ -280,6 +298,87 @@ static void get_word_at_caret(const char *text, int caret, int *out_start, int *
     out_word[len] = '\0';
 }
 
+static void draw_autocomplete_popup(void) {
+    if (!ac_visible || !h_ac_canvas || ac_match_count <= 0) return;
+
+    // Dark sleek Aero window background
+    k_canvas_clear(h_ac_canvas, 0xF81E2228);
+
+    // Double border (outer subtle border + inner frame)
+    k_canvas_draw_rect(h_ac_canvas, 0, 0, AC_WIDTH, AC_HEIGHT, 0xFF3E4F65);
+    k_canvas_draw_rect(h_ac_canvas, 1, 1, AC_WIDTH - 2, AC_HEIGHT - 2, 0xFF2A3644);
+
+    // Header gradient banner
+    k_canvas_draw_gradient(h_ac_canvas, 2, 2, AC_WIDTH - 4, 18, 0xFF283444, 0xFF1D2633);
+    k_canvas_draw_text(h_ac_canvas, 8, 4, "IntelliSense", 0xFF8AA8CE, 11);
+
+    char count_str[32];
+    snprintf(count_str, sizeof(count_str), "%d/%d", ac_selected + 1, ac_match_count);
+    k_canvas_draw_text(h_ac_canvas, AC_WIDTH - 44, 4, count_str, 0xFF8AA8CE, 11);
+    k_canvas_draw_line(h_ac_canvas, 2, 20, AC_WIDTH - 2, 20, 0xFF3E4F65);
+
+    int max_draw = ac_match_count < AC_MAX_ITEMS ? ac_match_count : AC_MAX_ITEMS;
+    for (int i = 0; i < max_draw; i++) {
+        int row_y = 22 + i * AC_ITEM_HEIGHT;
+        int sym_idx = ac_matches[i];
+        const SymbolEntry *sym = &SYMBOL_DB[sym_idx];
+
+        if (i == ac_selected) {
+            k_canvas_draw_gradient(h_ac_canvas, 3, row_y, AC_WIDTH - 6, AC_ITEM_HEIGHT - 1, 0xFF2A6CB0, 0xFF184A80);
+            k_canvas_draw_rect(h_ac_canvas, 3, row_y, AC_WIDTH - 6, AC_ITEM_HEIGHT - 1, 0xFF4A90E2);
+        } else if (i % 2 == 1) {
+            k_canvas_fill_rect(h_ac_canvas, 3, row_y, AC_WIDTH - 6, AC_ITEM_HEIGHT - 1, 0xFF242932);
+        }
+
+        unsigned badge_col = 0xFF00D2FF;
+        char badge_char = 'f';
+        if (!strncmp(sym->name, "k_", 2)) {
+            badge_char = 'k';
+            badge_col = 0xFF00E5FF;
+        } else if (sym->sig[0] == '\0' || !strcmp(sym->sig, "keyword")) {
+            badge_char = 'k';
+            badge_col = 0xFFFFB300;
+        } else if (strstr(sym->sig, "struct") || strstr(sym->desc, "type")) {
+            badge_char = 't';
+            badge_col = 0xFF69F0AE;
+        } else if (strstr(sym->desc, "Macro") || strstr(sym->desc, "constant")) {
+            badge_char = 'm';
+            badge_col = 0xFFFF5252;
+        }
+
+        k_canvas_fill_rect(h_ac_canvas, 6, row_y + 2, 16, 15, 0xFF141820);
+        k_canvas_draw_rect(h_ac_canvas, 6, row_y + 2, 16, 15, badge_col);
+        char bstr[2] = { badge_char, '\0' };
+        k_canvas_draw_text(h_ac_canvas, 10, row_y + 3, bstr, badge_col, 11);
+
+        unsigned text_col = (i == ac_selected) ? 0xFFFFFFFF : 0xFFE0E6ED;
+        k_canvas_draw_text(h_ac_canvas, 26, row_y + 3, sym->name, text_col, 12);
+
+        const char *kind_label = (badge_char == 'k' && !strncmp(sym->name, "k_", 2)) ? "api" :
+                                 (badge_char == 'k') ? "key" :
+                                 (badge_char == 't') ? "type" : "fn";
+        k_canvas_draw_text(h_ac_canvas, AC_WIDTH - 34, row_y + 3, kind_label, 0xFF7E8C9F, 11);
+    }
+
+    // Bottom parameter hint footer
+    int footer_y = AC_HEIGHT - 24;
+    k_canvas_draw_line(h_ac_canvas, 2, footer_y, AC_WIDTH - 2, footer_y, 0xFF3E4F65);
+    k_canvas_draw_gradient(h_ac_canvas, 2, footer_y + 1, AC_WIDTH - 4, 21, 0xFF181C22, 0xFF12151A);
+
+    const SymbolEntry *sel_sym = &SYMBOL_DB[ac_matches[ac_selected]];
+    char preview_text[128];
+    if (sel_sym->sig[0]) {
+        snprintf(preview_text, sizeof(preview_text), "%.46s", sel_sym->sig);
+    } else {
+        snprintf(preview_text, sizeof(preview_text), "%.46s", sel_sym->desc);
+    }
+    k_canvas_draw_text(h_ac_canvas, 8, footer_y + 4, preview_text, 0xFF58D68D, 11);
+
+    char st[256];
+    snprintf(st, sizeof(st), "%s - %s", sel_sym->sig[0] ? sel_sym->sig : sel_sym->name, sel_sym->desc);
+    update_status(st);
+}
+
 static void update_suggestions(void) {
     char code[MAX_CODE_SIZE];
     int len = k_get_text(h_text_buffer, code, (int)sizeof(code) - 1);
@@ -292,38 +391,50 @@ static void update_suggestions(void) {
     char prefix[64] = "";
     get_word_at_caret(code, caret, &cur_prefix_start, &cur_prefix_end, prefix, sizeof(prefix));
 
-    num_active_sug = 0;
+    ac_match_count = 0;
     int plen = (int)strlen(prefix);
 
     if (plen >= 2) {
-        // Query database
-        for (int i = 0; i < NUM_SYMBOLS && num_active_sug < MAX_SUGGESTIONS; i++) {
+        for (int i = 0; i < NUM_SYMBOLS && ac_match_count < MAX_MATCHES; i++) {
             if (str_starts_with_ci(SYMBOL_DB[i].name, prefix)) {
-                active_sug_indices[num_active_sug++] = i;
+                ac_matches[ac_match_count++] = i;
             }
         }
     }
 
-    // Update suggestion pill buttons
-    for (int k = 0; k < MAX_SUGGESTIONS; k++) {
-        if (k < num_active_sug) {
-            int sym_idx = active_sug_indices[k];
-            k_set_text(h_btn_sug[k], SYMBOL_DB[sym_idx].name);
-        } else {
-            k_set_text(h_btn_sug[k], "-");
+    if (ac_match_count == 0) {
+        if (ac_visible) {
+            k_widget_set_visible(h_ac_canvas, 0);
+            ac_visible = 0;
         }
+        return;
     }
 
-    if (num_active_sug > 0) {
-        // Display function parameter hint in status bar
-        int top_idx = active_sug_indices[0];
-        k_status_set_text(h_status_bar, 0, SYMBOL_DB[top_idx].sig);
+    if (ac_selected >= ac_match_count) ac_selected = 0;
+
+    int cx = 20, cy = 60;
+    if (k_textfield_get_caret_xy(h_text_buffer, &cx, &cy) == 0) {
+        ac_x = cx;
+        ac_y = cy + 20;
+    } else {
+        ac_x = 20;
+        ac_y = 60;
     }
+
+    if (ac_x + AC_WIDTH > 860) ac_x = 860 - AC_WIDTH;
+    if (ac_x < 10) ac_x = 10;
+    if (ac_y + AC_HEIGHT > 390) ac_y = cy - AC_HEIGHT - 2;
+    if (ac_y < 42) ac_y = 42;
+
+    k_widget_set_bounds(h_ac_canvas, ac_x, ac_y, AC_WIDTH, AC_HEIGHT);
+    k_widget_set_visible(h_ac_canvas, 1);
+    ac_visible = 1;
+
+    draw_autocomplete_popup();
 }
 
-static void apply_completion(int sug_index) {
-    if (sug_index < 0 || sug_index >= num_active_sug) return;
-    int sym_idx = active_sug_indices[sug_index];
+static void apply_completion(int sym_idx) {
+    if (sym_idx < 0 || sym_idx >= NUM_SYMBOLS) return;
     const char *replacement = SYMBOL_DB[sym_idx].name;
 
     char code[MAX_CODE_SIZE];
@@ -352,8 +463,14 @@ static void apply_completion(int sug_index) {
     int new_caret = cur_prefix_start + repl_len;
     k_textfield_select(h_text_buffer, new_caret, 0);
 
-    update_suggestions();
-    update_status("Completion applied");
+    if (ac_visible) {
+        k_widget_set_visible(h_ac_canvas, 0);
+        ac_visible = 0;
+    }
+
+    char st[256];
+    snprintf(st, sizeof(st), "Applied %s", replacement);
+    update_status(st);
 }
 
 /* ---------------- Syntax Checking & Error Outlining ---------------- */
@@ -847,16 +964,11 @@ int main(int argc, char **argv) {
     k_textfield_setup(h_text_buffer, 32768, 0, 0);
     k_textfield_set_multiline(h_text_buffer, 1);
     k_widget_set_anchors(h_text_buffer, ANCHOR_LEFT | ANCHOR_TOP | ANCHOR_RIGHT | ANCHOR_BOTTOM);
-    k_widget_set_bounds(h_text_buffer, 10, 42, 860, 330);
+    k_widget_set_bounds(h_text_buffer, 10, 42, 860, 356);
 
-    /* Autocomplete Suggestion Strip */
-    h_lbl_suggest = k_create_label(main_win, 10, 378, "Suggest:");
-    k_widget_set_anchors(h_lbl_suggest, ANCHOR_LEFT | ANCHOR_BOTTOM);
-
-    for (int k = 0; k < MAX_SUGGESTIONS; k++) {
-        h_btn_sug[k] = k_create_button(main_win, 74 + k * 144, 375, 140, 24, "-");
-        k_widget_set_anchors(h_btn_sug[k], ANCHOR_LEFT | ANCHOR_BOTTOM);
-    }
+    /* Floating Autocomplete Canvas Component */
+    h_ac_canvas = k_create_canvas(main_win, 20, 60, AC_WIDTH, AC_HEIGHT);
+    k_widget_set_visible(h_ac_canvas, 0);
 
     /* Output Console Label */
     h_lbl_output = k_create_label(main_win, 10, 404, "Output & Error Diagnostics (Press F4 to jump to error):");
@@ -894,8 +1006,34 @@ int main(int argc, char **argv) {
             if (e.type == EV_KEY) {
                 unsigned char ch = (unsigned char)(e.b & 0xFFFF);
                 if (ch == 27) { // Escape
+                    if (ac_visible) {
+                        k_widget_set_visible(h_ac_canvas, 0);
+                        ac_visible = 0;
+                        continue;
+                    }
                     k_close(main_win);
                     return 0;
+                }
+                // Up Arrow: navigate autocomplete
+                if (ch == 17 && ac_visible) {
+                    if (ac_match_count > 0) {
+                        ac_selected = (ac_selected > 0) ? ac_selected - 1 : ac_match_count - 1;
+                        draw_autocomplete_popup();
+                    }
+                    continue;
+                }
+                // Down Arrow: navigate autocomplete
+                if (ch == 18 && ac_visible) {
+                    if (ac_match_count > 0) {
+                        ac_selected = (ac_selected < ac_match_count - 1) ? ac_selected + 1 : 0;
+                        draw_autocomplete_popup();
+                    }
+                    continue;
+                }
+                // Tab or Enter: Apply autocomplete selection
+                if ((ch == '\t' || (ch == '\r' && ac_visible)) && ac_visible && ac_match_count > 0) {
+                    apply_completion(ac_matches[ac_selected]);
+                    continue;
                 }
                 // F5: Build & Run
                 if (ch == 132) {
@@ -917,20 +1055,19 @@ int main(int argc, char **argv) {
                     on_save_file();
                     continue;
                 }
-                // Tab key (ch == '\t'): Complete top suggestion
-                if (ch == '\t') {
-                    if (num_active_sug > 0) {
-                        apply_completion(0);
-                        continue;
-                    }
-                }
 
                 // Any typing in editor: update suggestions and metrics
                 update_suggestions();
                 update_status(NULL);
             }
             if (e.type == EV_CLICK) {
-                if (e.handle == h_btn_new || e.handle == m_new) {
+                if (e.handle == h_ac_canvas) {
+                    int click_y = e.b;
+                    int row = (click_y - 22) / AC_ITEM_HEIGHT;
+                    if (row >= 0 && row < ac_match_count && row < AC_MAX_ITEMS) {
+                        apply_completion(ac_matches[row]);
+                    }
+                } else if (e.handle == h_btn_new || e.handle == m_new) {
                     on_new_file();
                 } else if (e.handle == m_tmpl_gui) {
                     on_new_file();
@@ -970,14 +1107,6 @@ int main(int argc, char **argv) {
                 } else if (e.handle == m_exit) {
                     k_close(main_win);
                     return 0;
-                } else {
-                    // Check suggestion pill button clicks
-                    for (int k = 0; k < MAX_SUGGESTIONS; k++) {
-                        if (e.handle == h_btn_sug[k]) {
-                            apply_completion(k);
-                            break;
-                        }
-                    }
                 }
             }
         }

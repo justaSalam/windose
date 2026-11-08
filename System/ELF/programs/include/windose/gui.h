@@ -74,6 +74,30 @@ static inline handle_t canvas_create(handle_t parent, int x, int y, int w, int h
 static inline int canvas_draw_pixels(handle_t canvas, int x, int y, int w, int h, const void *buf, int len) {
     return __kchk(__k->draw_pixels(__k->pid, canvas, x, y, w, h, buf, len));
 }
+static inline int canvas_clear(handle_t canvas, unsigned argb) {
+    return __kchk(__k->canvas_clear(__k->pid, canvas, argb));
+}
+static inline int canvas_fill_rect(handle_t canvas, int x, int y, int w, int h, unsigned argb) {
+    return __kchk(__k->canvas_fill_rect(__k->pid, canvas, x, y, w, h, argb));
+}
+static inline int canvas_draw_rect(handle_t canvas, int x, int y, int w, int h, unsigned argb) {
+    return __kchk(__k->canvas_draw_rect(__k->pid, canvas, x, y, w, h, argb));
+}
+static inline int canvas_draw_line(handle_t canvas, int x1, int y1, int x2, int y2, unsigned argb) {
+    return __kchk(__k->canvas_draw_line(__k->pid, canvas, x1, y1, x2, y2, argb));
+}
+static inline int canvas_draw_text(handle_t canvas, int x, int y, const char *text, unsigned argb, int font_size) {
+    return __kchk(__k->canvas_draw_text(__k->pid, canvas, x, y, text, argb, font_size));
+}
+static inline int canvas_draw_gradient(handle_t canvas, int x, int y, int w, int h, unsigned top, unsigned bot) {
+    return __kchk(__k->canvas_draw_gradient(__k->pid, canvas, x, y, w, h, top, bot));
+}
+static inline int canvas_draw_rounded(handle_t canvas, int x, int y, int w, int h, int radius, unsigned argb, int filled) {
+    return __kchk(__k->canvas_draw_rounded(__k->pid, canvas, x, y, w, h, radius, argb, filled));
+}
+static inline int canvas_measure_text(handle_t canvas, const char *text, int font_size, int *out_w, int *out_h) {
+    return __kchk(__k->canvas_measure_text(__k->pid, canvas, text, font_size, out_w, out_h));
+}
 
 // ---- Basic Controls ----
 static inline handle_t button_create(handle_t parent, int x, int y, int w, int h, const char *text) {
@@ -96,6 +120,9 @@ static inline int widget_get_enabled(handle_t obj) {
 }
 static inline int widget_focus(handle_t obj) {
     return __kchk(__k->widget_focus(__k->pid, obj));
+}
+static inline int widget_set_visible(handle_t obj, int visible) {
+    return __kchk(__k->widget_set_visible(__k->pid, obj, visible));
 }
 static inline int widget_screen_pos(handle_t obj) {
     return __kchk(__k->widget_screen_pos(__k->pid, obj));
@@ -150,6 +177,9 @@ static inline int textfield_get_caret(handle_t obj) {
 }
 static inline int textfield_set_multiline(handle_t obj, int multiline) {
     return __kchk(__k->textfield_set_multiline(__k->pid, obj, multiline));
+}
+static inline int textfield_get_caret_pos(handle_t obj, int *out_x, int *out_y) {
+    return __kchk(__k->textfield_get_caret_pos(__k->pid, obj, out_x, out_y));
 }
 
 // ---- Combo Boxes ----

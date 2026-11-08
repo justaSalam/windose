@@ -1959,6 +1959,120 @@ namespace Windose.System.Elf
             }
         }
 
+        public bool CanvasClear(object canvas, uint argb)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.Clear(argb);
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanvasFillRect(object canvas, int x, int y, int w, int h, uint argb)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.FillRect(x, y, w, h, argb);
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanvasDrawRect(object canvas, int x, int y, int w, int h, uint argb)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.DrawRect(x, y, w, h, argb);
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanvasDrawLine(object canvas, int x1, int y1, int x2, int y2, uint argb)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.DrawLine(x1, y1, x2, y2, argb);
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanvasDrawText(object canvas, int x, int y, string text, uint argb, int fontSize)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.DrawText(x, y, text, argb, fontSize);
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanvasDrawGradient(object canvas, int x, int y, int w, int h, uint topColor, uint bottomColor)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.DrawGradient(x, y, w, h, topColor, bottomColor);
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanvasDrawRounded(object canvas, int x, int y, int w, int h, int radius, uint argb, bool filled)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.DrawRounded(x, y, w, h, radius, argb, filled);
+                return true;
+            }
+            return false;
+        }
+
+        public bool CanvasMeasureText(object canvas, string text, int fontSize, out int w, out int h)
+        {
+            if (canvas is ElfCanvasComponent c)
+            {
+                c.MeasureText(text, fontSize, out w, out h);
+                return true;
+            }
+            w = 0; h = fontSize <= 0 ? 12 : fontSize;
+            return false;
+        }
+
+        public bool TextFieldGetCaretPos(object obj, out int x, out int y)
+        {
+            x = 0; y = 0;
+            if (obj is TextField t)
+            {
+                t.GetCaretPixel(out int px, out int py);
+                if (t.GetOwningWindow() is ElfWindow elfWin)
+                {
+                    x = (t.X - elfWin.ClientOriginX) + px;
+                    y = (t.Y - elfWin.ClientOriginY) + py;
+                }
+                else
+                {
+                    x = t.X + px;
+                    y = t.Y + py;
+                }
+                return true;
+            }
+            return false;
+        }
+
+        public bool WidgetSetVisible(object obj, bool visible)
+        {
+            if (obj is Component comp)
+            {
+                comp.Visible = visible;
+                comp.MarkDirty();
+                if (comp.Parent != null) comp.Parent.MarkDirty();
+                return true;
+            }
+            return false;
+        }
+
         // Program coordinates are relative to the window's client area (inside frame + title bar).
         private static int ClientX(Component parent, int x) { return (parent is Window win && win.HasTitleBar) ? x + Palette.BorderSize : x; }
         private static int ClientY(Component parent, int y) { return (parent is Window win && win.HasTitleBar) ? y + Palette.TitleBarHeight : y; }

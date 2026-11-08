@@ -30,6 +30,14 @@ static inline int      k_set_icon(handle_t win, const char *icon_path) { return 
 static inline handle_t k_create_window_with_icon(int w, int h, const char *title, const char *icon_path) { return win_create_with_icon(w, h, title, icon_path); }
 static inline handle_t k_create_canvas(handle_t parent, int x, int y, int w, int h) { return canvas_create(parent, x, y, w, h); }
 static inline int      k_draw_pixels(handle_t canvas, int x, int y, int w, int h, const void *buf, int len) { return canvas_draw_pixels(canvas, x, y, w, h, buf, len); }
+static inline int      k_canvas_clear(handle_t canvas, unsigned argb) { return canvas_clear(canvas, argb); }
+static inline int      k_canvas_fill_rect(handle_t canvas, int x, int y, int w, int h, unsigned argb) { return canvas_fill_rect(canvas, x, y, w, h, argb); }
+static inline int      k_canvas_draw_rect(handle_t canvas, int x, int y, int w, int h, unsigned argb) { return canvas_draw_rect(canvas, x, y, w, h, argb); }
+static inline int      k_canvas_draw_line(handle_t canvas, int x1, int y1, int x2, int y2, unsigned argb) { return canvas_draw_line(canvas, x1, y1, x2, y2, argb); }
+static inline int      k_canvas_draw_text(handle_t canvas, int x, int y, const char *text, unsigned argb, int font_size) { return canvas_draw_text(canvas, x, y, text, argb, font_size); }
+static inline int      k_canvas_draw_gradient(handle_t canvas, int x, int y, int w, int h, unsigned top, unsigned bot) { return canvas_draw_gradient(canvas, x, y, w, h, top, bot); }
+static inline int      k_canvas_draw_rounded(handle_t canvas, int x, int y, int w, int h, int r, unsigned argb, int filled) { return canvas_draw_rounded(canvas, x, y, w, h, r, argb, filled); }
+static inline int      k_canvas_measure_text(handle_t canvas, const char *text, int font_size, int *out_w, int *out_h) { return canvas_measure_text(canvas, text, font_size, out_w, out_h); }
 static inline int      k_resize_window(handle_t win, int w, int h) { return win_resize(win, w, h); }
 static inline int      k_list_dir(const char *path, char *buf, int max) { return dir_list(path, buf, max); }
 static inline int      k_stat_file(const char *path, FileStat *out) { return file_stat(path, out); }
@@ -73,9 +81,11 @@ static inline int      k_status_add_panel(handle_t obj, const char *text, int w)
 static inline int      k_status_set_text(handle_t obj, int i, const char *text) { return status_set_text(obj, i, text); }
 static inline int      k_widget_set_enabled(handle_t obj, int v) { return widget_set_enabled(obj, v); }
 static inline int      k_widget_get_enabled(handle_t obj) { return widget_get_enabled(obj); }
+static inline int      k_widget_set_visible(handle_t obj, int v) { return widget_set_visible(obj, v); }
 static inline int      k_widget_focus(handle_t obj)      { return widget_focus(obj); }
 static inline int      k_textfield_select(handle_t obj, int s, int n) { return textfield_select(obj, s, n); }
 static inline int      k_textfield_get_caret(handle_t obj) { return textfield_get_caret(obj); }
+static inline int      k_textfield_get_caret_xy(handle_t obj, int *out_x, int *out_y) { return textfield_get_caret_pos(obj, out_x, out_y); }
 static inline int      k_textfield_set_multiline(handle_t obj, int v) { return textfield_set_multiline(obj, v); }
 static inline handle_t k_colorpicker_create(handle_t parent, int x, int y) { return colorpicker_create(parent, x, y); }
 static inline int      k_colorpicker_get(handle_t obj)   { return colorpicker_get(obj); }

@@ -165,6 +165,16 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, int, int, byte*, int> ListSetItemIcon;                // (pid, handle, item, icon_path) -> 0 ok, -1 err
         public delegate* unmanaged<int, ulong*, ulong*, ulong*, int> SysMem;                  // (pid, total, used, free) -> 0 ok, -1 err
         public delegate* unmanaged<int, byte*, int> RegDelete;                                // (pid, key) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, uint, int> CanvasClear;                           // (pid, canvas, argb) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int, int, int, uint, int> CanvasFillRect;    // (pid, canvas, x, y, w, h, argb) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int, int, int, uint, int> CanvasDrawRect;    // (pid, canvas, x, y, w, h, argb) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int, int, int, uint, int> CanvasDrawLine;    // (pid, canvas, x1, y1, x2, y2, argb) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int, byte*, uint, int, int> CanvasDrawText;  // (pid, canvas, x, y, text, argb, fontSize) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int, int, int, uint, uint, int> CanvasDrawGradient; // (pid, canvas, x, y, w, h, topColor, botColor) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int, int, int, int, uint, int, int> CanvasDrawRounded; // (pid, canvas, x, y, w, h, radius, argb, filled) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, byte*, int, int*, int*, int> CanvasMeasureText;   // (pid, canvas, text, fontSize, out_w, out_h) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int*, int*, int> TextFieldGetCaretPos;            // (pid, textfield, out_x, out_y) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int> WidgetSetVisible;                       // (pid, handle, visible) -> 0 ok, -1 err
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -186,7 +196,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 15;
+        public const int ApiVersion = 16;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -574,6 +584,16 @@ namespace Windose.System.Elf
             api.ListSetItemIcon = &ApiListSetItemIcon;
             api.SysMem = &ApiSysMem;
             api.RegDelete = &ApiRegDelete;
+            api.CanvasClear = &ApiCanvasClear;
+            api.CanvasFillRect = &ApiCanvasFillRect;
+            api.CanvasDrawRect = &ApiCanvasDrawRect;
+            api.CanvasDrawLine = &ApiCanvasDrawLine;
+            api.CanvasDrawText = &ApiCanvasDrawText;
+            api.CanvasDrawGradient = &ApiCanvasDrawGradient;
+            api.CanvasDrawRounded = &ApiCanvasDrawRounded;
+            api.CanvasMeasureText = &ApiCanvasMeasureText;
+            api.TextFieldGetCaretPos = &ApiTextFieldGetCaretPos;
+            api.WidgetSetVisible = &ApiWidgetSetVisible;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -2903,6 +2923,148 @@ namespace Windose.System.Elf
                 ElfProgram p = Live(pid); if (p == null) return KKilled;
                 IElfHost host = Host; if (host == null) return -1;
                 return host.RegDelete(CStr(key)) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasClear(int pid, int canvasHandle, uint argb)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.CanvasClear(obj, argb) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasFillRect(int pid, int canvasHandle, int x, int y, int w, int h, uint argb)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.CanvasFillRect(obj, x, y, w, h, argb) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasDrawRect(int pid, int canvasHandle, int x, int y, int w, int h, uint argb)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.CanvasDrawRect(obj, x, y, w, h, argb) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasDrawLine(int pid, int canvasHandle, int x1, int y1, int x2, int y2, uint argb)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.CanvasDrawLine(obj, x1, y1, x2, y2, argb) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasDrawText(int pid, int canvasHandle, int x, int y, byte* text, uint argb, int fontSize)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.CanvasDrawText(obj, x, y, CStr(text), argb, fontSize) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasDrawGradient(int pid, int canvasHandle, int x, int y, int w, int h, uint topColor, uint botColor)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.CanvasDrawGradient(obj, x, y, w, h, topColor, botColor) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasDrawRounded(int pid, int canvasHandle, int x, int y, int w, int h, int radius, uint argb, int filled)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.CanvasDrawRounded(obj, x, y, w, h, radius, argb, filled != 0) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiCanvasMeasureText(int pid, int canvasHandle, byte* text, int fontSize, int* out_w, int* out_h)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(canvasHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                if (host.CanvasMeasureText(obj, CStr(text), fontSize, out int w, out int h))
+                {
+                    if (out_w != null) *out_w = w;
+                    if (out_h != null) *out_h = h;
+                    return 0;
+                }
+                return -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiTextFieldGetCaretPos(int pid, int textfieldHandle, int* out_x, int* out_y)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(textfieldHandle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                if (host.TextFieldGetCaretPos(obj, out int x, out int y))
+                {
+                    if (out_x != null) *out_x = x;
+                    if (out_y != null) *out_y = y;
+                    return 0;
+                }
+                return -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWidgetSetVisible(int pid, int handle, int visible)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(handle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.WidgetSetVisible(obj, visible != 0) ? 0 : -1;
             }
             catch { return -1; }
         }

@@ -190,6 +190,18 @@ public class TextField : Component
             DrawString("_", font, fontSize, Color.Black, x, y);
     }
 
+    public void GetCaretPixel(out int px, out int py)
+    {
+        Rectangle content = GetContentBounds();
+        int fontSize = font.SizePx > 0 ? font.SizePx : Math.Max(1, Height - Padding.top - Padding.bottom);
+        CaretLineCol(out int line, out int col);
+        string[] lines = VisualLines();
+        py = content.Y + line * (fontSize + 2);
+        string shown = line < lines.Length ? Masked(lines[line]) : "";
+        if (col > shown.Length) col = shown.Length;
+        px = content.X + (col == 0 ? 0 : font.MeasureString(shown.Substring(0, col), fontSize));
+    }
+
     private void CaretLineCol(out int line, out int col)
     {
         line = 0;

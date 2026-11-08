@@ -332,7 +332,11 @@ namespace Windose.System.Elf
             if (mouse.left == MouseEvents.Press) owner.PostEvent(ElfEvent.MouseDown, handle, lx | (1 << 28), ly);
             if (mouse.right == MouseEvents.Press) owner.PostEvent(ElfEvent.MouseDown, handle, lx | (2 << 28), ly);
             if (mouse.middle == MouseEvents.Press) owner.PostEvent(ElfEvent.MouseDown, handle, lx | (3 << 28), ly);
-            if (mouse.left == MouseEvents.Release) owner.PostEvent(ElfEvent.MouseUp, handle, lx | (1 << 28), ly);
+            if (mouse.left == MouseEvents.Release)
+            {
+                owner.PostEvent(ElfEvent.MouseUp, handle, lx | (1 << 28), ly);
+                owner.PostEvent(ElfEvent.Click, handle, lx, ly);
+            }
             if (mouse.right == MouseEvents.Release) owner.PostEvent(ElfEvent.MouseUp, handle, lx | (2 << 28), ly);
             if (mouse.middle == MouseEvents.Release) owner.PostEvent(ElfEvent.MouseUp, handle, lx | (3 << 28), ly);
 
@@ -346,23 +350,26 @@ namespace Windose.System.Elf
     }
 
     /// <summary>
-    /// Pixel buffer a program paints with draw_pixels. Redrawn by the compositor like any component;
-    /// per-frame animation just calls draw_pixels again (no Panel-per-rect accumulation).
+    /// Pixel buffer and 2D drawing canvas for ELF programs. Redrawn by the compositor like any component;
+    /// supports direct hardware/native 2D primitives as well as raw ARGB pixel blitting.
     /// </summary>
     public sealed class ElfCanvasComponent : Component
     {
-        private int[] pixels;
+        private ComponentBuffer canvasBuffer;
 
         public ElfCanvasComponent(int x, int y, int width, int height)
-            : base(x, y, width, height)
+            : base(x, y, Math.Max(1, width), Math.Max(1, height))
         {
-            pixels = new int[width * height];
-            for (int i = 0; i < pixels.Length; i++) pixels[i] = unchecked((int)0xFF000000);
+            canvasBuffer = new ComponentBuffer(Math.Max(1, width), Math.Max(1, height));
+            canvasBuffer.Clear(Color.Black);
         }
 
         public override void DrawLocal()
         {
-            buffer.DrawArrayAlphaClipped(pixels, Width, 0, 0, 0, 0, Width, Height);
+            if (canvasBuffer != null)
+            {
+                buffer.DrawArrayAlphaClipped(canvasBuffer.Buffer, Width, 0, 0, 0, 0, Width, Height);
+            }
         }
 
         public override void Resize(int width, int height)
@@ -373,18 +380,20 @@ namespace Windose.System.Elf
             base.Resize(width, height);
             if (width != oldW || height != oldH)
             {
-                int[] newPixels = new int[width * height];
-                for (int i = 0; i < newPixels.Length; i++) newPixels[i] = unchecked((int)0xFF000000);
-                if (pixels != null && oldW > 0 && oldH > 0)
+                ComponentBuffer newBuf = new ComponentBuffer(width, height);
+                newBuf.Clear(Color.Black);
+                if (canvasBuffer != null && oldW > 0 && oldH > 0)
                 {
                     int copyW = Math.Min(oldW, width);
                     int copyH = Math.Min(oldH, height);
+                    int[] oldPix = canvasBuffer.Buffer;
+                    int[] newPix = newBuf.Buffer;
                     for (int r = 0; r < copyH; r++)
                     {
-                        Array.Copy(pixels, r * oldW, newPixels, r * width, copyW);
+                        Array.Copy(oldPix, r * oldW, newPix, r * width, copyW);
                     }
                 }
-                pixels = newPixels;
+                canvasBuffer = newBuf;
             }
             MarkDirty();
         }
@@ -395,9 +404,10 @@ namespace Windose.System.Elf
             if (x < 0 || y < 0 || w <= 0 || h <= 0) return false;
             if ((long)x + w > Width || (long)y + h > Height) return false;
             if (len != w * h * 4) return false;
-            if (src == IntPtr.Zero) return false;
+            if (src == IntPtr.Zero || canvasBuffer == null) return false;
             try
             {
+                int[] pixels = canvasBuffer.Buffer;
                 int* s = (int*)src;
                 for (int row = 0; row < h; row++)
                 {
@@ -410,6 +420,71 @@ namespace Windose.System.Elf
             catch { return false; }
             MarkDirty();
             return true;
+        }
+
+        public void Clear(uint argb)
+        {
+            if (canvasBuffer == null) return;
+            canvasBuffer.Clear(Color.FromArgb((int)argb));
+            MarkDirty();
+        }
+
+        public void FillRect(int x, int y, int w, int h, uint argb)
+        {
+            if (canvasBuffer == null || w <= 0 || h <= 0) return;
+            canvasBuffer.DrawFilledRectangle(Color.FromArgb((int)argb), x, y, w, h);
+            MarkDirty();
+        }
+
+        public void DrawRect(int x, int y, int w, int h, uint argb)
+        {
+            if (canvasBuffer == null || w <= 0 || h <= 0) return;
+            canvasBuffer.DrawRectangle(Color.FromArgb((int)argb), x, y, w, h);
+            MarkDirty();
+        }
+
+        public void DrawLine(int x1, int y1, int x2, int y2, uint argb)
+        {
+            if (canvasBuffer == null) return;
+            canvasBuffer.DrawLine(Color.FromArgb((int)argb), x1, y1, x2, y2);
+            MarkDirty();
+        }
+
+        public void DrawText(int x, int y, string text, uint argb, int fontSize)
+        {
+            if (canvasBuffer == null || string.IsNullOrEmpty(text)) return;
+            int fs = fontSize <= 0 ? 12 : fontSize;
+            canvasBuffer.DrawString(text, SystemFonts.msSansSerif, fs, Color.FromArgb((int)argb), x, y);
+            MarkDirty();
+        }
+
+        public void DrawGradient(int x, int y, int w, int h, uint topColor, uint bottomColor)
+        {
+            if (canvasBuffer == null || w <= 0 || h <= 0) return;
+            canvasBuffer.DrawGradientVertical(Color.FromArgb((int)topColor), Color.FromArgb((int)bottomColor), x, y, w, h);
+            MarkDirty();
+        }
+
+        public void DrawRounded(int x, int y, int w, int h, int radius, uint argb, bool filled)
+        {
+            if (canvasBuffer == null || w <= 0 || h <= 0) return;
+            if (filled)
+                canvasBuffer.DrawFilledRoundedRectangle(Color.FromArgb((int)argb), x, y, w, h, radius);
+            else
+                canvasBuffer.DrawRoundedRectangle(Color.FromArgb((int)argb), x, y, w, h, radius);
+            MarkDirty();
+        }
+
+        public void MeasureText(string text, int fontSize, out int w, out int h)
+        {
+            int fs = fontSize <= 0 ? 12 : fontSize;
+            h = fs + 2;
+            if (string.IsNullOrEmpty(text))
+            {
+                w = 0;
+                return;
+            }
+            w = SystemFonts.msSansSerif.MeasureString(text, fs);
         }
 
         public override string GetComponentName() => "ElfCanvas";
