@@ -345,6 +345,10 @@ namespace Windose.System.Kernel.Subsystem
 
             switch (ext)
             {
+                case ".folder":
+                case ".directory":
+                    return "/mnt/System/Icons/directory_closed.png";
+
                 case ".png":
                 case ".jpg":
                 case ".jpeg":
@@ -415,6 +419,10 @@ namespace Windose.System.Kernel.Subsystem
 
             switch (ext)
             {
+                case ".folder":
+                case ".directory":
+                    return "File Folder";
+
                 case ".png":
                 case ".jpg":
                 case ".jpeg":

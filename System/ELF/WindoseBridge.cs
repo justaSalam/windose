@@ -828,7 +828,8 @@ namespace Windose.System.Elf
             Cosmos.Kernel.System.Graphics.Image? icon = null;
             try
             {
-                if (cells.Length >= 3 && string.Equals(cells[2], "File Folder", StringComparison.OrdinalIgnoreCase))
+                if ((cells.Length >= 3 && string.Equals(cells[2], "File Folder", StringComparison.OrdinalIgnoreCase)) ||
+                    (cells.Length >= 4 && string.Equals(cells[3], "File Folder", StringComparison.OrdinalIgnoreCase)))
                     icon = FileAssociations.GetIcon("folder");
                 else if (cells.Length > 0)
                     icon = FileAssociations.GetIcon(cells[0]);
