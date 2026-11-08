@@ -261,6 +261,10 @@ namespace Windose.System.Elf
                     case Key.Tab: ch = '\t'; break;
                     case Key.Escape: ch = (char)27; break;
                     case Key.Delete: ch = (char)127; break;
+                    case Key.UpArrow: ch = (char)17; break;
+                    case Key.DownArrow: ch = (char)18; break;
+                    case Key.LeftArrow: ch = (char)19; break;
+                    case Key.RightArrow: ch = (char)20; break;
                 }
                 owner.PostEvent(ElfEvent.Key, ProgramHandle, (int)keyEvent.Key,
                     ((int)keyEvent.Modifiers << 16) | (ch & 0xFFFF));
