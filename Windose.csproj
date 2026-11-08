@@ -46,6 +46,7 @@
       <None Remove="System\ELF\programs\src\startmenu.c" />
       <None Remove="System\ELF\programs\bin\taskmgr.elf" />
       <None Remove="System\ELF\programs\bin\regedit.elf" />
+      <None Remove="System\ELF\programs\bin\winver.elf" />
   </ItemGroup>
 
   <!-- Core kernel packages -->
@@ -120,6 +121,7 @@
     <EmbeddedResource Include=".\System\ELF\programs\bin\startmenu.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\taskmgr.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\regedit.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\winver.elf" />
   </ItemGroup>
 
     <ItemGroup>

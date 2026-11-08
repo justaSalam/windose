@@ -173,6 +173,7 @@ namespace Windose.System.Kernel
             WriteStorage("/mnt/Programs/startmenu.elf", "Windose.System.ELF.programs.bin.startmenu.elf", true);
             WriteStorage("/mnt/Programs/taskmgr.elf", "Windose.System.ELF.programs.bin.taskmgr.elf", true);
             WriteStorage("/mnt/Programs/regedit.elf", "Windose.System.ELF.programs.bin.regedit.elf", true);
+            WriteStorage("/mnt/Programs/winver.elf", "Windose.System.ELF.programs.bin.winver.elf", true);
         }
     }
 }

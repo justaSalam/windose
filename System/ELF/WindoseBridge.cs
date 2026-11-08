@@ -1260,6 +1260,13 @@ namespace Windose.System.Elf
                     else
                         LaunchTracker.Start(() => new Calculator());
                 }
+                else if (app == "winver" || app == "about")
+                {
+                    if (File.Exists("/mnt/Programs/winver.elf"))
+                        ElfRunner.RunFile("/mnt/Programs/winver.elf");
+                    else
+                        LaunchTracker.Start(() => new AboutWindows());
+                }
                 else if (app == "settings") LaunchTracker.Start(() => new DisplaySettings());
                 else if (app == "lock") LockManager.Lock();
                 else if (app == "shutdown") { Desktop.SaveLayout(); Cosmos.Kernel.System.Power.Shutdown(); }

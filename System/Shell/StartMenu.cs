@@ -364,7 +364,10 @@ public class StartMenu : Window
         }
         if (lower == "winver" || lower == "about")
         {
-            LaunchTracker.Start(() => new AboutWindows());
+            if (File.Exists("/mnt/Programs/winver.elf"))
+                ElfRunner.RunFile("/mnt/Programs/winver.elf");
+            else
+                LaunchTracker.Start(() => new AboutWindows());
             return;
         }
         if (lower == "run")
