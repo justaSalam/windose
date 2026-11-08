@@ -64,9 +64,9 @@ namespace Windose.System.Shell
                 }
                 else if (ShortcutFile.TryRead(fileEntry.AbsoluteLocation, out ShortcutInfo sInfo))
                 {
-                    if (!string.IsNullOrEmpty(sInfo.Icon) && File.Exists(sInfo.Icon))
+                    if (!string.IsNullOrEmpty(sInfo.Icon))
                     {
-                        try { this.icon = new Png(sInfo.Icon); } catch { }
+                        try { this.icon = Windose.System.Resources.IconResource.Load(sInfo.Icon, 48); } catch { }
                     }
                     if (this.icon == null && !string.IsNullOrEmpty(sInfo.Target))
                     {
@@ -86,7 +86,7 @@ namespace Windose.System.Shell
                     switch (fileEntry.FileType)
                     {
                         case FileType.Directory:
-                            this.icon = new Png("/mnt/System/Icons/directory_closed.png");
+                            this.icon = Windose.System.Resources.IconResource.Load("imageres.dll,-3", 48);
                             break;
 
                         case FileType.File:
@@ -94,7 +94,7 @@ namespace Windose.System.Shell
                             break;
 
                         default:
-                            this.icon = new Png("/mnt/System/Icons/file_question.png");
+                            this.icon = Windose.System.Resources.IconResource.Load("imageres.dll,-2", 48);
                             break;
                     }
                 }

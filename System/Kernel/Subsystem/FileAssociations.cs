@@ -318,19 +318,19 @@ namespace Windose.System.Kernel.Subsystem
                     if (!string.IsNullOrEmpty(info.Target))
                     {
                         if (info.Target.Contains("Breeze", StringComparison.OrdinalIgnoreCase))
-                            return "/mnt/System/Icons/write_wordpad.png";
+                            return "imageres.dll,-102";
                         if (info.Target.Contains("Media", StringComparison.OrdinalIgnoreCase))
-                            return "/mnt/System/Icons/media_player.png";
+                            return "wmploc.dll,-102";
                         if (info.Target.Contains("terminal", StringComparison.OrdinalIgnoreCase) || info.Target.Contains("Command", StringComparison.OrdinalIgnoreCase))
-                            return "/mnt/System/Icons/console_prompt.png";
+                            return "imageres.dll,-75";
                         return GetIconPath(info.Target, maxHops - 1);
                     }
                 }
-                return "/mnt/System/Icons/appwiz_file.png";
+                return "ddores.dll,-2001";
             }
 
             string regIcon = Registry.GetString($"{StaticRegistry.FileAssociation}/{ext}", "");
-            if (!string.IsNullOrEmpty(regIcon) && File.Exists(regIcon))
+            if (!string.IsNullOrEmpty(regIcon))
                 return regIcon;
 
             switch (ext)
@@ -345,7 +345,7 @@ namespace Windose.System.Kernel.Subsystem
                 case ".ico":
                 case ".ppm":
                 case ".qoi":
-                    return "/mnt/System/Icons/paint_file.png";
+                    return "imageres.dll,-99";
 
                 case ".avi":
                 case ".mp4":
@@ -355,7 +355,7 @@ namespace Windose.System.Kernel.Subsystem
                 case ".wmv":
                 case ".flv":
                 case ".wav":
-                    return "/mnt/System/Icons/media_player_file.png";
+                    return "wmploc.dll,-102";
 
                 case ".txt":
                 case ".log":
@@ -366,23 +366,23 @@ namespace Windose.System.Kernel.Subsystem
                 case ".cs":
                 case ".c":
                 case ".h":
-                    return "/mnt/System/Icons/notepad_file.png";
+                    return "imageres.dll,-102";
 
                 case ".breeze":
-                    return "/mnt/System/Icons/write_wordpad.png";
+                    return "imageres.dll,-102";
 
                 case ".html":
                 case ".htm":
-                    return "/mnt/System/Icons/msie.png";
+                    return "shell32.dll,-220";
 
                 case ".elf":
-                    return "/mnt/System/Icons/application_hammer_grouppol.png";
+                    return "imageres.dll,-75";
 
                 case ".lua":
-                    return "/mnt/System/Icons/console_prompt.png";
+                    return "imageres.dll,-75";
 
                 default:
-                    return "/mnt/System/Icons/file_lines.png";
+                    return "imageres.dll,-2";
             }
         }
 
@@ -391,11 +391,10 @@ namespace Windose.System.Kernel.Subsystem
             string iconPath = GetIconPath(pathOrExtension);
             try
             {
-                if (File.Exists(iconPath))
-                    return new Png(iconPath);
+                return Windose.System.Resources.IconResource.Load(iconPath, 32);
             }
             catch { }
-            return new Png("/mnt/System/Icons/file_lines.png");
+            return Windose.System.Resources.IconResource.GetFallbackIcon(32);
         }
 
         public static string GetFileTypeDescription(string pathOrExtension)

@@ -18,7 +18,7 @@ namespace Windose.Programs
     public class RunDialog : Window
     {
         private readonly TextField input;
-        private Png? dialogIcon;
+        private Cosmos.Kernel.System.Graphics.Image? dialogIcon;
 
         public RunDialog(int x = 80, int y = 380)
             : base(x, y, 420, 190, "Run", true)
@@ -28,10 +28,8 @@ namespace Windose.Programs
 
             try
             {
-                if (File.Exists("/mnt/System/Icons/search_file.png"))
-                    dialogIcon = new Png("/mnt/System/Icons/search_file.png");
-                else if (File.Exists("/mnt/System/Icons/executable.png"))
-                    dialogIcon = new Png("/mnt/System/Icons/executable.png");
+                dialogIcon = Windose.System.Resources.IconResource.Load("shell32.dll,-25", 32);
+                SetIcon("shell32.dll,-25");
             }
             catch { }
 

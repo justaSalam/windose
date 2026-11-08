@@ -27,11 +27,23 @@ namespace Cosmos.Kernel.System.Graphics
     {
         /// <summary>
         /// Loads an image from the filesystem, automatically detecting its format.
+        /// Also supports Windows PE resource strings (e.g. "imageres.dll,-1001" or "shell32.dll,4") and legacy icon paths.
         /// </summary>
         public static Image Load(string path)
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentNullException(nameof(path));
+
+            if (path.Contains(".dll,", StringComparison.OrdinalIgnoreCase) ||
+                path.Contains(".exe,", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWith("/mnt/System/Icons/", StringComparison.OrdinalIgnoreCase) ||
+                !File.Exists(path))
+            {
+                var icon = Windose.System.Resources.IconResource.Load(path);
+                if (icon != null)
+                    return icon;
+            }
+
             if (!File.Exists(path))
                 throw new FileNotFoundException("Image file not found", path);
 

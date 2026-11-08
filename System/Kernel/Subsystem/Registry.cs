@@ -76,45 +76,45 @@ public static class Registry
 
 
 
-            Define($"{StaticRegistry.FileAssociation}/fallback", "/mnt/System/Icons/file_question.png");
-            Define($"{StaticRegistry.FileAssociation}/.png", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.webp", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.jpg", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.jpeg", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.gif", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.bmp", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.qoi", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.tga", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.ico", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.ppm", "/mnt/System/Icons/paint_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.breeze", "/mnt/System/Icons/script_file_blue.png");
-            Define($"{StaticRegistry.FileAssociation}/.txt", "/mnt/System/Icons/notepad_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.html", "/mnt/System/Icons/html.png");
-            Define($"{StaticRegistry.FileAssociation}/.htm", "/mnt/System/Icons/html.png");
-            Define($"{StaticRegistry.FileAssociation}/.avi", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.mp4", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.webm", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.mkv", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.mov", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.wmv", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.flv", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.wav", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.mp3", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.ogg", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.wma", "/mnt/System/Icons/media_player_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.lua", "/mnt/System/Icons/executable_script.png");
-            Define($"{StaticRegistry.FileAssociation}/.db", "/mnt/System/Icons/regedit_file.png");
-            Define($"{StaticRegistry.FileAssociation}/.log", "/mnt/System/Icons/event_log.png");
+            Define($"{StaticRegistry.FileAssociation}/fallback", "imageres.dll,-2");
+            Define($"{StaticRegistry.FileAssociation}/.png", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.webp", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.jpg", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.jpeg", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.gif", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.bmp", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.qoi", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.tga", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.ico", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.ppm", "imageres.dll,-99");
+            Define($"{StaticRegistry.FileAssociation}/.breeze", "imageres.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.txt", "imageres.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.html", "shell32.dll,-220");
+            Define($"{StaticRegistry.FileAssociation}/.htm", "shell32.dll,-220");
+            Define($"{StaticRegistry.FileAssociation}/.avi", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.mp4", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.webm", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.mkv", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.mov", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.wmv", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.flv", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.wav", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.mp3", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.ogg", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.wma", "wmploc.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.lua", "imageres.dll,-75");
+            Define($"{StaticRegistry.FileAssociation}/.db", "imageres.dll,-74");
+            Define($"{StaticRegistry.FileAssociation}/.log", "imageres.dll,-102");
 
-            Define($"{StaticRegistry.FileAssociation}/.ttf", "/mnt/System/Icons/font_tt.png");
-            Define($"{StaticRegistry.FileAssociation}/.psf", "/mnt/System/Icons/font_bitmap.png");
-            Define($"{StaticRegistry.FileAssociation}/.psfu", "/mnt/System/Icons/font_bitmap.png");
+            Define($"{StaticRegistry.FileAssociation}/.ttf", "shell32.dll,-74");
+            Define($"{StaticRegistry.FileAssociation}/.psf", "shell32.dll,-74");
+            Define($"{StaticRegistry.FileAssociation}/.psfu", "shell32.dll,-74");
 
-            Define($"{StaticRegistry.FileAssociation}/.elf", "/mnt/System/Icons/file_cd.png");
-            Define($"{StaticRegistry.FileAssociation}/.efi", "/mnt/System/Icons/file_gears.png");
-            Define($"{StaticRegistry.FileAssociation}/.conf", "/mnt/System/Icons/file_gears.png");
-            Define($"{StaticRegistry.FileAssociation}/.sys", "/mnt/System/Icons/file_windows.png");
-            Define($"{StaticRegistry.FileAssociation}/.dat", "/mnt/System/Icons/file_gears.png");
+            Define($"{StaticRegistry.FileAssociation}/.elf", "imageres.dll,-75");
+            Define($"{StaticRegistry.FileAssociation}/.efi", "imageres.dll,-75");
+            Define($"{StaticRegistry.FileAssociation}/.conf", "imageres.dll,-102");
+            Define($"{StaticRegistry.FileAssociation}/.sys", "imageres.dll,-101");
+            Define($"{StaticRegistry.FileAssociation}/.dat", "imageres.dll,-74");
 
         }
 

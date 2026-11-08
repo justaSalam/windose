@@ -180,7 +180,7 @@ public class MediaPlayer : Window
 
 
     public MediaPlayer(string? initialPath = null, int x = 140, int y = 100, int width = 720, int height = 520)
-        : base(x, y, width, height, "Windows Media Player", true, new Png("/mnt/System/Icons/media_player.png"))
+        : base(x, y, width, height, "Windows Media Player", true, Windose.System.Resources.IconResource.Load("wmploc.dll,-102", 16))
     {
         closeToTray = true;
         minimizeToTray = true;

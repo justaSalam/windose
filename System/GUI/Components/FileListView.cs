@@ -32,9 +32,9 @@ public class FileListView : Component
     private int lastClickIndex = -1;
     private int lastClickTick;
     public int doubleClickInterval = 1200;
-    private Png itemIcon;
+    private Image itemIcon;
 
-    private Png folderIcon;
+    private Image folderIcon;
 
     public FileListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -44,9 +44,9 @@ public class FileListView : Component
         try
         {
             if (File.Exists("/mnt/System/Icons/file_lines.png"))
-                itemIcon = new Png("/mnt/System/Icons/file_lines.png");
+                itemIcon = Windose.System.Resources.IconResource.Load("imageres.dll,-2", 32);
             if (File.Exists("/mnt/System/Icons/directory_closed.png"))
-                folderIcon = new Png("/mnt/System/Icons/directory_closed.png");
+                folderIcon = Windose.System.Resources.IconResource.Load("imageres.dll,-3", 32);
         }
         catch
         {
@@ -350,13 +350,13 @@ public class FileListView : Component
         }
     }
 
-    private static readonly Dictionary<string, Png> iconCache = new Dictionary<string, Png>(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, Image> iconCache = new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
 
     private void DrawFileIcon(FileListViewItem item, int x, int y)
     {
         string name = item.hasFileEntry ? item.fileEntry.FileName : (item.text ?? "");
         string ext = !string.IsNullOrEmpty(name) ? Path.GetExtension(name) : "";
-        Png icon = GetCachedIcon(ext) ?? itemIcon;
+        Image icon = GetCachedIcon(ext) ?? itemIcon;
         if (icon == null) return;
 
         switch (viewMode)
@@ -375,17 +375,17 @@ public class FileListView : Component
         }
     }
 
-    private static Png GetCachedIcon(string extension)
+    private static Image GetCachedIcon(string extension)
     {
         if (string.IsNullOrEmpty(extension)) return null;
-        if (iconCache.TryGetValue(extension, out Png cached)) return cached;
+        if (iconCache.TryGetValue(extension, out Image cached)) return cached;
 
         try
         {
             string iconPath = Registry.GetString($"{StaticRegistry.FileAssociation}/{extension}", "/mnt/System/Icons/file_question.png");
             if (!string.IsNullOrEmpty(iconPath) && File.Exists(iconPath))
             {
-                Png icon = new Png(iconPath);
+                Image icon = Windose.System.Resources.IconResource.Load(iconPath, 32);
                 iconCache[extension] = icon;
                 return icon;
             }

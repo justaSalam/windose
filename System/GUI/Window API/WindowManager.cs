@@ -583,7 +583,7 @@ public partial class WindowManager : SingleThreadedProcess
         }
     }
 
-    public static void UpdateWindowIcon(Window window, Png? icon)
+    public static void UpdateWindowIcon(Window window, Image? icon)
     {
         if (window == null) return;
         lock (windows)

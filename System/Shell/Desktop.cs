@@ -191,13 +191,7 @@ public class Desktop : Component
         thisPcIcon = FindIconByPath("shell::thispc");
         if (thisPcIcon == null)
         {
-            Image? pcImg = null;
-            try
-            {
-                if (File.Exists("/mnt/System/Icons/computermona.png"))
-                    pcImg = new Png("/mnt/System/Icons/computermona.png");
-            }
-            catch { }
+            Image pcImg = Windose.System.Resources.IconResource.Load("imageres.dll,-109", 48);
             thisPcIcon = new DesktopIcon(IconGridOffsetX, IconGridOffsetY,
                 new FileEntry("This PC", FileType.Directory, "shell::thispc", 0), pcImg)
             {
@@ -214,13 +208,7 @@ public class Desktop : Component
         userFilesIcon = FindIconByPath("shell::userfiles");
         if (userFilesIcon == null)
         {
-            Image? userImg = null;
-            try
-            {
-                if (File.Exists("/mnt/System/Icons/directory_open_file_mydocs.png"))
-                    userImg = new Png("/mnt/System/Icons/directory_open_file_mydocs.png");
-            }
-            catch { }
+            Image userImg = Windose.System.Resources.IconResource.Load("imageres.dll,-1001", 48);
             userFilesIcon = new DesktopIcon(IconGridOffsetX, IconGridOffsetY + IconGridHeight,
                 new FileEntry("User Files", FileType.Directory, "shell::userfiles", 0), userImg)
             {
@@ -262,19 +250,19 @@ public class Desktop : Component
         string cmdShortcut = Path.Combine(desktopDir, "Command Prompt.lnk");
         if (!File.Exists(cmdShortcut))
         {
-            ShortcutFile.Create(cmdShortcut, "/mnt/Programs/terminal.elf", "Command Prompt", "/mnt/System/Icons/console_prompt.png");
+            ShortcutFile.Create(cmdShortcut, "/mnt/Programs/terminal.elf", "Command Prompt", "shell32.dll,-284");
         }
 
         string breezeShortcut = Path.Combine(desktopDir, "Breeze Editor.lnk");
         if (!File.Exists(breezeShortcut))
         {
-            ShortcutFile.Create(breezeShortcut, "program::BreezeEditor", "Breeze Editor", "/mnt/System/Icons/write_wordpad.png");
+            ShortcutFile.Create(breezeShortcut, "program::BreezeEditor", "Breeze Editor", "shell32.dll,-70");
         }
 
         string mediaShortcut = Path.Combine(desktopDir, "Windows Media Player.lnk");
         if (!File.Exists(mediaShortcut))
         {
-            ShortcutFile.Create(mediaShortcut, "program::MediaPlayer", "Windows Media Player", "/mnt/System/Icons/media_player.png");
+            ShortcutFile.Create(mediaShortcut, "program::MediaPlayer", "Windows Media Player", "wmploc.dll,-102");
         }
     }
 
@@ -283,9 +271,9 @@ public class Desktop : Component
         if (trashIcon == null) return;
         try
         {
-            trashIcon.icon = new Png(TrashManager.IsEmpty()
-                ? "/mnt/System/Icons/recycle_bin_empty.png"
-                : "/mnt/System/Icons/recycle_bin_full.png");
+            trashIcon.icon = Windose.System.Resources.IconResource.Load(TrashManager.IsEmpty()
+                ? "imageres.dll,-55"
+                : "imageres.dll,-54", 48);
         }
         catch { }
         trashIcon.MarkDirty();
@@ -379,7 +367,7 @@ public class Desktop : Component
         }
 
         string path = FileSystemManager.GetUniquePath(desktopDir, "New Shortcut", "lnk");
-        ShortcutFile.Create(path, "/mnt/Programs/terminal.elf", "Terminal", "/mnt/System/Icons/console_prompt.png");
+        ShortcutFile.Create(path, "/mnt/Programs/terminal.elf", "Terminal", "shell32.dll,-284");
         FileInfo fileInfo = new FileInfo(path);
         DesktopIcon icon = new DesktopIcon(contextX, contextY, new FileEntry(fileInfo.Name, FileType.File, path, fileInfo.Length));
         AddIcon(icon);

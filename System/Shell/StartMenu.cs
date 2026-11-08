@@ -19,7 +19,7 @@ public class StartMenu : Window
     private readonly TextField searchField;
     private readonly Label userTile;
     private readonly MenuItem allProgramsMenu;
-    private Png? userAvatar;
+    private Image? userAvatar;
 
     public StartMenu(int x, int y, int width, int height, string title, bool useTitleBar)
         : base(x, y, width, height, title, useTitleBar)
@@ -39,10 +39,10 @@ public class StartMenu : Window
 
         try
         {
-            if (File.Exists("/mnt/System/Icons/users.png"))
-                userAvatar = new Png("/mnt/System/Icons/users.png");
-            else if (File.Exists("/mnt/System/Icons/users_key.png"))
-                userAvatar = new Png("/mnt/System/Icons/users_key.png");
+            if (File.Exists("/mnt/System/UserPictures/Guest.png"))
+                userAvatar = ImageLoader.Load("/mnt/System/UserPictures/Guest.png");
+            else
+                userAvatar = Windose.System.Resources.IconResource.Load("imageres.dll,-1001", 36);
         }
         catch { }
 
@@ -54,27 +54,27 @@ public class StartMenu : Window
         int itemH = 34;
         int curY = 12;
 
-        AddLeftProgram("Internet Explorer", "/mnt/System/Icons/msie.png", leftX, curY, leftW, itemH,
+        AddLeftProgram("Internet Explorer", "shell32.dll,-512", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new InternetExplorer(200, 200)));
         curY += itemH;
 
-        AddLeftProgram("Windows Media Player", "/mnt/System/Icons/media_player.png", leftX, curY, leftW, itemH,
+        AddLeftProgram("Windows Media Player", "wmploc.dll,-102", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new MediaPlayer()));
         curY += itemH;
 
-        AddLeftProgram("Calculator", "/mnt/System/Icons/calculator.png", leftX, curY, leftW, itemH,
+        AddLeftProgram("Calculator", "accessibilitycpl.dll,-327", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new Calculator()));
         curY += itemH;
 
-        AddLeftProgram("Paint", "/mnt/System/Icons/paint_file.png", leftX, curY, leftW, itemH,
+        AddLeftProgram("Paint", "imageres.dll,-71", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new Paint()));
         curY += itemH;
 
-        AddLeftProgram("Breeze Editor", "/mnt/System/Icons/write_wordpad.png", leftX, curY, leftW, itemH,
+        AddLeftProgram("Breeze Editor", "shell32.dll,-70", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new BreezeEditor()));
         curY += itemH;
 
-        AddLeftProgram("Command Prompt", "/mnt/System/Icons/console_prompt.png", leftX, curY, leftW, itemH, () =>
+        AddLeftProgram("Command Prompt", "shell32.dll,-284", leftX, curY, leftW, itemH, () =>
         {
             if (File.Exists("/mnt/Programs/terminal.elf"))
                 ElfRunner.RunFile("/mnt/Programs/terminal.elf");
@@ -83,11 +83,11 @@ public class StartMenu : Window
         });
         curY += itemH;
 
-        AddLeftProgram("Task Manager", "/mnt/System/Icons/computer_taskmgr.png", leftX, curY, leftW, itemH,
+        AddLeftProgram("Task Manager", "shell32.dll,-171", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
         curY += itemH;
 
-        AddLeftProgram("Disk Management", "/mnt/System/Icons/hard_disk_drive_pie.png", leftX, curY, leftW, itemH,
+        AddLeftProgram("Disk Management", "imageres.dll,-32", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350)));
         curY += itemH;
 
@@ -99,7 +99,7 @@ public class StartMenu : Window
             drawSubmenuArrow = true
         };
 
-        allProgramsMenu.AddSubmenuItem(new Png("/mnt/System/Icons/search_directory.png"), "File Explorer", () =>
+        allProgramsMenu.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-4", 16), "File Explorer", () =>
         {
             if (File.Exists("/mnt/Programs/explorer.elf"))
             {
@@ -113,25 +113,25 @@ public class StartMenu : Window
         });
 
         MenuItem accessories = allProgramsMenu.AddSubmenuItem("Accessories");
-        accessories.AddSubmenuItem(new Png("/mnt/System/Icons/calculator.png"), "Calculator", () => LaunchTracker.Start(() => new Calculator()));
-        accessories.AddSubmenuItem(new Png("/mnt/System/Icons/paint_file.png"), "Paint", () => LaunchTracker.Start(() => new Paint()));
-        accessories.AddSubmenuItem(new Png("/mnt/System/Icons/write_wordpad.png"), "Breeze Editor", () => LaunchTracker.Start(() => new BreezeEditor()));
-        accessories.AddSubmenuItem(new Png("/mnt/System/Icons/console_prompt.png"), "Command Prompt", () => LaunchTracker.Start(() => new CommandPrompt()));
-        accessories.AddSubmenuItem(new Png("/mnt/System/Icons/search_file.png"), "Run...", () => LaunchTracker.Start(() => new RunDialog()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("accessibilitycpl.dll,-327", 16), "Calculator", () => LaunchTracker.Start(() => new Calculator()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-71", 16), "Paint", () => LaunchTracker.Start(() => new Paint()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-70", 16), "Breeze Editor", () => LaunchTracker.Start(() => new BreezeEditor()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16), "Command Prompt", () => LaunchTracker.Start(() => new CommandPrompt()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-25", 16), "Run...", () => LaunchTracker.Start(() => new RunDialog()));
 
         MenuItem systemTools = allProgramsMenu.AddSubmenuItem("System Tools");
-        systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/scanregw.png"), "Registry Editor", () => LaunchTracker.Start(() => new RegistryEditor()));
-        systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/computer_taskmgr.png"), "Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
-        systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/hard_disk_drive_pie.png"), "Disk Management", () => LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350)));
-        systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/mci_devices.png"), "Device Manager", () => LaunchTracker.Start(() => new DeviceManager(100, 100, 600, 350)));
-        systemTools.AddSubmenuItem(new Png("/mnt/System/Icons/gears_tweakui_a.png"), "SYSDUMP", SystemLogger.Dump);
+        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-68", 16), "Registry Editor", () => LaunchTracker.Start(() => new RegistryEditor()));
+        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-171", 16), "Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
+        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-32", 16), "Disk Management", () => LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350)));
+        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("ddores.dll,-2001", 16), "Device Manager", () => LaunchTracker.Start(() => new DeviceManager(100, 100, 600, 350)));
+        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-27", 16), "SYSDUMP", SystemLogger.Dump);
 
         MenuItem breeze = allProgramsMenu.AddSubmenuItem("Breeze Scripting");
-        breeze.AddSubmenuItem(new Png("/mnt/System/Icons/write_wordpad.png"), "Breeze Editor", () => LaunchTracker.Start(() => new BreezeEditor()));
-        breeze.AddSubmenuItem("Breeze API", () => LaunchTracker.Start(() => new BreezeApiBrowser()));
-        breeze.AddSubmenuItem("Breeze Demo", BreezeDemo.Run);
+        breeze.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-70", 16), "Breeze Editor", () => LaunchTracker.Start(() => new BreezeEditor()));
+        breeze.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16), "Breeze API", () => LaunchTracker.Start(() => new BreezeApiBrowser()));
+        breeze.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-71", 16), "Breeze Demo", BreezeDemo.Run);
 
-        allProgramsMenu.AddSubmenuItem(new Png("/mnt/System/Icons/directx.png"), "VMWare SVGA Test", () => LaunchTracker.Start(() => new GraphicsEngine()));
+        allProgramsMenu.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-27", 16), "VMWare SVGA Test", () => LaunchTracker.Start(() => new GraphicsEngine()));
 
         AddChild(allProgramsMenu);
 
@@ -172,34 +172,34 @@ public class StartMenu : Window
         AddRightLink("User Files", rightX, linkY, rightW, linkH, () =>
         {
             LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "User", "/mnt"));
-        }, true);
+        }, true, Windose.System.Resources.IconResource.Load("imageres.dll,-1001", 20));
         linkY += linkH;
 
         AddRightLink("Documents", rightX, linkY, rightW, linkH, () =>
         {
             Directory.CreateDirectory("/mnt/Documents");
             LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "Documents", "/mnt/Documents"));
-        }, true);
+        }, true, Windose.System.Resources.IconResource.Load("imageres.dll,-1002", 20));
         linkY += linkH;
 
         AddRightLink("Pictures", rightX, linkY, rightW, linkH, () =>
         {
             Directory.CreateDirectory("/mnt/Pictures");
             LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "Pictures", "/mnt/Pictures"));
-        }, true);
+        }, true, Windose.System.Resources.IconResource.Load("imageres.dll,-1003", 20));
         linkY += linkH;
 
         AddRightLink("Music", rightX, linkY, rightW, linkH, () =>
         {
             Directory.CreateDirectory("/mnt/Music");
             LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "Music", "/mnt/Music"));
-        }, true);
+        }, true, Windose.System.Resources.IconResource.Load("imageres.dll,-1005", 20));
         linkY += linkH;
 
         AddRightLink("Computer", rightX, linkY, rightW, linkH, () =>
         {
             LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "Computer", "/mnt"));
-        }, true);
+        }, true, Windose.System.Resources.IconResource.Load("imageres.dll,-109", 20));
         linkY += linkH + 12; // Gap for separator
 
         // System links
@@ -208,28 +208,30 @@ public class StartMenu : Window
             FileExplorer explorer = new FileExplorer(100, 100, 700, 480, "Control Panel");
             explorer.NavigateToPath("control");
             LaunchTracker.Start(() => explorer);
-        });
+        }, false, Windose.System.Resources.IconResource.Load("imageres.dll,-27", 20));
         linkY += linkH;
 
         AddRightLink("Devices and Printers", rightX, linkY, rightW, linkH, () =>
         {
             LaunchTracker.Start(() => new DeviceManager(100, 100, 600, 350));
-        });
+        }, false, Windose.System.Resources.IconResource.Load("ddores.dll,-2001", 20));
         linkY += linkH;
 
         AddRightLink("Default Programs", rightX, linkY, rightW, linkH, () =>
         {
             LaunchTracker.Start(() => new BreezeEditor());
-        });
+        }, false, Windose.System.Resources.IconResource.Load("imageres.dll,-88", 20));
         linkY += linkH + 12; // Gap for separator
 
         AddRightLink("Run...", rightX, linkY, rightW, linkH, () =>
         {
             LaunchTracker.Start(() => new RunDialog());
-        });
+        }, false, Windose.System.Resources.IconResource.Load("shell32.dll,-25", 20));
 
         // Bottom Right: Shut down Button & Flyout
-        Button shutdownBtn = new Button("Shut down", rightX, 458, 104, 26);
+        Button shutdownBtn = new Button(Windose.System.Resources.IconResource.Load("shell32.dll,-28", 16), "Shut down", rightX, 458, 104, 26);
+        shutdownBtn.iconSize = 16;
+        shutdownBtn.iconTextGap = 4;
         shutdownBtn.leftClickAction = () =>
         {
             AudioEngine.Instance.PlayClick();
@@ -267,9 +269,9 @@ public class StartMenu : Window
         AddChild(new StartMenuProgramItem(title, iconPath, x, y, w, h, click));
     }
 
-    private void AddRightLink(string title, int x, int y, int w, int h, Action click, bool bold = false)
+    private void AddRightLink(string title, int x, int y, int w, int h, Action click, bool bold = false, Cosmos.Kernel.System.Graphics.Image? icon = null)
     {
-        AddChild(new StartMenuRightLink(title, x, y, w, h, click, bold));
+        AddChild(new StartMenuRightLink(title, x, y, w, h, click, bold, icon));
     }
 
     private void ExecuteSearch()
@@ -440,7 +442,7 @@ public class StartMenu : Window
 /// </summary>
 public class StartMenuProgramItem : Component
 {
-    private readonly Png? icon;
+    private readonly Cosmos.Kernel.System.Graphics.Image? icon;
     public Action? clickAction;
     private bool isHovered;
     private bool isPressed;
@@ -452,8 +454,7 @@ public class StartMenuProgramItem : Component
         this.clickAction = click;
         try
         {
-            if (File.Exists(iconPath))
-                this.icon = new Png(iconPath);
+            this.icon = Windose.System.Resources.IconResource.Load(iconPath, 24);
         }
         catch { }
     }
@@ -474,8 +475,10 @@ public class StartMenuProgramItem : Component
         int textX = 8;
         if (icon != null)
         {
-            DrawImage(icon, 6, (Height - (int)icon.Height) / 2);
-            textX = (int)icon.Width + 12;
+            int iconSize = Math.Min(24, Height - 4);
+            int iconY = (Height - iconSize) / 2;
+            DrawImageStretch(icon, new Rectangle(6, iconY, iconSize, iconSize));
+            textX = iconSize + 12;
         }
 
         DrawString(text, Color.FromArgb(20, 20, 20), textX, (Height - 16) / 2);
@@ -526,13 +529,15 @@ public class StartMenuRightLink : Component
     private bool isHovered;
     private bool isPressed;
     public bool isBold;
+    public Cosmos.Kernel.System.Graphics.Image? icon;
 
-    public StartMenuRightLink(string title, int x, int y, int width, int height, Action click, bool bold = false)
+    public StartMenuRightLink(string title, int x, int y, int width, int height, Action click, bool bold = false, Cosmos.Kernel.System.Graphics.Image? icon = null)
         : base(x, y, width, height)
     {
         this.text = title;
         this.clickAction = click;
         this.isBold = bold;
+        this.icon = icon;
     }
 
     public override void DrawLocal()
@@ -548,7 +553,15 @@ public class StartMenuRightLink : Component
             DrawRoundedRectangle(Color.FromArgb(100, 200, 230, 255), 0, 0, Width, Height, 3);
         }
 
-        DrawString(text, Color.FromArgb(240, 248, 255), 6, (Height - 16) / 2);
+        int textX = 6;
+        if (icon != null)
+        {
+            int iconY = (Height - 18) / 2;
+            DrawImageStretch(icon, new Rectangle(6, iconY, 18, 18));
+            textX = 28;
+        }
+
+        DrawString(text, Color.FromArgb(240, 248, 255), textX, (Height - 16) / 2);
     }
 
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)

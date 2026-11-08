@@ -7,7 +7,7 @@ public sealed class CommandPrompt : Window
     private readonly TerminalView output;
     private readonly CommandContext context;
 
-    public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460): base(x, y, width, height, "Command Prompt", true, new Png("mnt/System/Icons/console_prompt.png"))
+    public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460): base(x, y, width, height, "Command Prompt", true, Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16))
     {
         CommandRegistry.EnsureBuiltIns();
         DockPanel root = new DockPanel(0, 0, Width, Height)

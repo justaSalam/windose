@@ -17,7 +17,7 @@ public class MenuItem : Component
 
     private bool isPressed;
 
-    private Png ?itemIcon;
+    private Image ?itemIcon;
     private int imageOffset;
     public MenuItem(int x, int y, int width, int height) : base(x, y, width, height)
     {
@@ -25,7 +25,7 @@ public class MenuItem : Component
         imageOffset = 0;
     }
 
-    public MenuItem(Png icon, int x, int y, int width, int height) : base(x, y, width, height)
+    public MenuItem(Image icon, int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
         itemIcon = icon;
@@ -168,7 +168,7 @@ public class MenuItem : Component
 
         return submenu.AddItem(text, click);
     }
-    public MenuItem AddSubmenuItem(Png icon, string text, Action click = null)
+    public MenuItem AddSubmenuItem(Image icon, string text, Action click = null)
     {
         if (submenu == null)
             CreateSubmenu();

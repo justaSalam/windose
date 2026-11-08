@@ -50,7 +50,7 @@ public class MenuPopup : Component
         ResizeToContent();
         return item;
     }
-    public MenuItem AddItem(Png icon, string text, Action click = null)
+    public MenuItem AddItem(Image icon, string text, Action click = null)
     {
         MenuItem item = new MenuItem(icon, 0, 0, itemWidth - 4, itemHeight)
         {

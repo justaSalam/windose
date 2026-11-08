@@ -13,7 +13,7 @@ public sealed class RegistryEditor : Window
     private string selectedPath = "";
 
     public RegistryEditor(int x = 150, int y = 100, int width = 850, int height = 540)
-        : base(x, y, width, height, "Registry Editor", true, new Png("/mnt/System/Icons/scanregw.png"))
+        : base(x, y, width, height, "Registry Editor", true, Windose.System.Resources.IconResource.Load("imageres.dll,-68", 16))
     {
         DockPanel root = new DockPanel(0, 0, Width, Height)
         {
@@ -132,7 +132,7 @@ public sealed class RegistryEditor : Window
     {
         string pathToRestore = selectedPath;
         keyTree.ClearItems();
-        TreeViewItem computer = keyTree.AddRoot("Computer", "/mnt/System/Icons/hard_disk_drive.png", "");
+        TreeViewItem computer = keyTree.AddRoot("Computer", "imageres.dll,-109", "");
         List<string> keys = Registry.GetKeys();
 
         for (int i = 0; i < keys.Count; i++)
@@ -171,7 +171,7 @@ public sealed class RegistryEditor : Window
             if (entry == null) continue;
 
             FileListViewItem item = valueList.AddItem(GetLeafName(entry.Key), tag: entry);
-            item.icon = new Png("/mnt/System/Icons/regedit_binary.png");
+            item.icon = Windose.System.Resources.IconResource.Load("imageres.dll,-74", 16);
             item.size = GetValueType(entry.Value);
             item.type = FormatValue(entry.Value);
             item.modified = entry.RequiresRestart ? "Yes" : "No";

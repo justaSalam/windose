@@ -82,7 +82,7 @@ public class Taskbar : Component
         string startText = modern ? "" : "Start";
         int startIconSize = modern ? 28 : 18;
 
-        startButton = new Button(new Png("/mnt/System/Icons/start_menu_xp.png"), startText, 0, 0, startBtnWidth, Height - 4)
+        startButton = new Button(Windose.System.Resources.IconResource.Load("imageres.dll,-24", 32), startText, 0, 0, startBtnWidth, Height - 4)
         {
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Left,
@@ -132,7 +132,7 @@ public class Taskbar : Component
         };
         trayPanel.AddStackChild(timeLabel);
 
-        Button volumeButton = new Button(new Png("/mnt/System/Icons/computer_sound.png"), 0, 0, 24, Height - 8)
+        Button volumeButton = new Button(Windose.System.Resources.IconResource.Load("mmres.dll,-3004", 18), 0, 0, 24, Height - 8)
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
@@ -144,7 +144,7 @@ public class Taskbar : Component
         trayPanel.AddStackChild(volumeButton);
         TooltipService.Attach(volumeButton, "Volume");
 
-        Button networkButton = new Button(new Png("/mnt/System/Icons/network_normal_two_pcs.png"), 0, 0, 24, Height - 8)
+        Button networkButton = new Button(Windose.System.Resources.IconResource.Load("netcenter.dll,-1", 18), 0, 0, 24, Height - 8)
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
@@ -156,7 +156,7 @@ public class Taskbar : Component
         trayPanel.AddStackChild(networkButton);
         TooltipService.Attach(networkButton, "Network");
 
-        trayButton = new Button(new Png("/mnt/System/Icons/appwizard.png"), 0, 0, 24, Height - 8)
+        trayButton = new Button(Windose.System.Resources.IconResource.Load("ddores.dll,-2001", 18), 0, 0, 24, Height - 8)
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,
@@ -168,7 +168,7 @@ public class Taskbar : Component
         trayPanel.AddStackChild(trayButton);
         TooltipService.Attach(trayButton, "System Tray");
 
-        Button notifyButton = new Button(new Png("/mnt/System/Icons/message_envelope_open.png"), 0, 0, 24, Height - 8)
+        Button notifyButton = new Button(Windose.System.Resources.IconResource.Load("imageres.dll,-111", 18), 0, 0, 24, Height - 8)
         {
             horizontalAlignment = HorizontalAlignment.Right,
             verticalAlignment = VerticalAlignment.Center,

@@ -46,7 +46,7 @@ public class TreeView : Component
     {
         TreeViewItem item = new TreeViewItem(text, tag)
         {
-            image = new Png(image)
+            image = Windose.System.Resources.IconResource.Load(image, 16)
         };
         roots.Add(item);
         MarkDirty();

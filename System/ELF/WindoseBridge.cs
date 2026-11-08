@@ -10,6 +10,7 @@ using Windose.Drivers;
 using Windose.Programs;
 using Windose.System.Kernel;
 using Windose.System.Media;
+using Windose.System.Resources;
 using Windose.System.System_Calls;
 
 namespace Windose.System.Elf
@@ -112,7 +113,7 @@ namespace Windose.System.Elf
 
         // ---------------------------------------------------------------- UI
 
-        public static Png? ResolveIcon(string? title, string? progName)
+        public static Image? ResolveIcon(string? title, string? progName)
         {
             try
             {
@@ -120,51 +121,54 @@ namespace Windose.System.Elf
                 {
                     string baseName = Path.GetFileNameWithoutExtension(progName).ToLowerInvariant();
                     string sidecar = $"/mnt/Programs/{baseName}.png";
-                    if (File.Exists(sidecar)) return new Png(sidecar);
+                    if (File.Exists(sidecar)) return IconResource.Load(sidecar, 16);
+
+                    string sidecarIco = $"/mnt/Programs/{baseName}.ico";
+                    if (File.Exists(sidecarIco)) return IconResource.Load(sidecarIco, 16);
 
                     string sysIcon = $"/mnt/System/Icons/{baseName}.png";
-                    if (File.Exists(sysIcon)) return new Png(sysIcon);
+                    if (File.Exists(sysIcon)) return IconResource.Load(sysIcon, 16);
                 }
 
                 string combined = ((title ?? "") + " " + (progName ?? "")).ToLowerInvariant();
 
                 if (combined.Contains("terminal") || combined.Contains("prompt") || combined.Contains("cmd") || combined.Contains("console"))
-                    return LoadPngIfExists("/mnt/System/Icons/console_prompt.png");
+                    return IconResource.Load("shell32.dll,-284", 16);
 
                 if (combined.Contains("calc"))
-                    return LoadPngIfExists("/mnt/System/Icons/calculator.png");
+                    return IconResource.Load("accessibilitycpl.dll,-327", 16);
 
                 if (combined.Contains("explorer") || combined.Contains("file"))
-                    return LoadPngIfExists("/mnt/System/Icons/search_directory.png") ?? LoadPngIfExists("/mnt/System/Icons/directory_explorer.png");
+                    return IconResource.Load("imageres.dll,-4", 16);
 
                 if (combined.Contains("editor") || combined.Contains("notepad") || combined.Contains("write") || combined.Contains("text"))
-                    return LoadPngIfExists("/mnt/System/Icons/write_wordpad.png");
+                    return IconResource.Load("shell32.dll,-70", 16);
 
                 if (combined.Contains("clock") || combined.Contains("time"))
-                    return LoadPngIfExists("/mnt/System/Icons/clock.png");
+                    return IconResource.Load("imageres.dll,-105", 16);
 
                 if (combined.Contains("paint") || combined.Contains("canvas") || combined.Contains("draw"))
-                    return LoadPngIfExists("/mnt/System/Icons/true_type_paint.png");
+                    return IconResource.Load("imageres.dll,-71", 16);
 
                 if (combined.Contains("task") || combined.Contains("perf") || combined.Contains("monitor") || combined.Contains("process"))
-                    return LoadPngIfExists("/mnt/System/Icons/computer_taskmgr.png");
+                    return IconResource.Load("shell32.dll,-171", 16);
 
                 if (combined.Contains("logon") || combined.Contains("login") || combined.Contains("user"))
-                    return LoadPngIfExists("/mnt/System/Icons/users_key.png") ?? LoadPngIfExists("/mnt/System/Icons/user_world.png");
+                    return IconResource.Load("imageres.dll,-1001", 16);
 
                 if (combined.Contains("search") || combined.Contains("find"))
-                    return LoadPngIfExists("/mnt/System/Icons/search_file.png");
+                    return IconResource.Load("imageres.dll,-74", 16);
 
                 if (combined.Contains("setting") || combined.Contains("config") || combined.Contains("gear"))
-                    return LoadPngIfExists("/mnt/System/Icons/settings_gear.png");
+                    return IconResource.Load("imageres.dll,-27", 16);
 
                 if (combined.Contains("disk") || combined.Contains("drive"))
-                    return LoadPngIfExists("/mnt/System/Icons/hard_disk_drive.png");
+                    return IconResource.Load("imageres.dll,-32", 16);
 
                 if (combined.Contains("media") || combined.Contains("player") || combined.Contains("audio") || combined.Contains("sound"))
-                    return LoadPngIfExists("/mnt/System/Icons/media_player.png");
+                    return IconResource.Load("wmploc.dll,-102", 16);
 
-                return LoadPngIfExists("/mnt/System/Icons/executable.png") ?? LoadPngIfExists("/mnt/System/Icons/shell_window.png");
+                return IconResource.Load("imageres.dll,-2", 16) ?? IconResource.GetFallbackIcon();
             }
             catch
             {
@@ -172,11 +176,11 @@ namespace Windose.System.Elf
             }
         }
 
-        private static Png? LoadPngIfExists(string path)
+        private static Image? LoadPngIfExists(string path)
         {
             try
             {
-                if (File.Exists(path)) return new Png(path);
+                return IconResource.Load(path, 16);
             }
             catch { }
             return null;
@@ -199,7 +203,7 @@ namespace Windose.System.Elf
             int border = Palette.BorderSize;
             int titleH = Palette.TitleBarHeight;
 
-            Png? icon = ResolveIcon(title, null);
+            Image? icon = ResolveIcon(title, null);
 
             ElfWindow win = new ElfWindow(80 + n * 30, 80 + n * 30,
                                           w + border * 2, h + titleH + border,
@@ -221,7 +225,7 @@ namespace Windose.System.Elf
             int border = borderless ? 0 : Palette.BorderSize;
             int titleH = useTitleBar ? Palette.TitleBarHeight : 0;
 
-            Png? icon = ResolveIcon(title, null);
+            Image? icon = ResolveIcon(title, null);
 
             ElfWindow win = new ElfWindow(x, y,
                                           w + (borderless ? 0 : border * 2),
@@ -410,9 +414,9 @@ namespace Windose.System.Elf
             {
                 ewin.Owner = owner;
                 ewin.ProgramHandle = h;
-                if (owner != null && (ewin.Icon == null || ewin.Icon == LoadPngIfExists("/mnt/System/Icons/executable.png")))
+                if (owner != null && (ewin.Icon == null || ewin.Icon == LoadPngIfExists("imageres.dll,-15")))
                 {
-                    Png? resolved = ResolveIcon(ewin.text, owner.Name);
+                    Image? resolved = ResolveIcon(ewin.text, owner.Name);
                     if (resolved != null) ewin.SetIcon(resolved);
                 }
                 ewin.DragDropped += delegate (DragData data)

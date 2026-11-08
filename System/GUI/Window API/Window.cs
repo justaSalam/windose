@@ -74,9 +74,9 @@ public class Window : Component
         c?.RequestFocus();
     }
 
-    public Png? Icon;
+    public Image? Icon;
 
-    public void SetIcon(Png? icon)
+    public void SetIcon(Image? icon)
     {
         Icon = icon;
         if (hasTitleBar && titlebar != null)
@@ -92,36 +92,14 @@ public class Window : Component
     {
         if (string.IsNullOrWhiteSpace(iconPath))
         {
-            SetIcon((Png?)null);
+            SetIcon((Image?)null);
             return;
         }
 
         try
         {
-            string p = iconPath.Trim();
-            if (File.Exists(p))
-            {
-                SetIcon(new Png(p));
-                return;
-            }
-
-            string name = Path.GetFileName(p);
-            string sys = Path.Combine("/mnt/System/Icons", name);
-            if (File.Exists(sys))
-            {
-                SetIcon(new Png(sys));
-                return;
-            }
-
-            if (!sys.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-            {
-                sys += ".png";
-                if (File.Exists(sys))
-                {
-                    SetIcon(new Png(sys));
-                    return;
-                }
-            }
+            Image icon = Windose.System.Resources.IconResource.Load(iconPath, 16);
+            SetIcon(icon);
         }
         catch { }
     }
@@ -138,7 +116,7 @@ public class Window : Component
     public bool closeRequested;
 
     //TODO Process manager should be responsible for every update instead of window manager being a separate subsystem
-    public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Png? icon = null) : base(x, y, width, height)
+    public Window(int x, int y, int width, int height, string title, bool useTitleBar = false, Image? icon = null) : base(x, y, width, height)
     {
         canRender = true;
         isRoot = true;

@@ -8,7 +8,7 @@ public sealed class ControlTestWindow : Window
     private readonly Slider slider;
 
     public ControlTestWindow(int x = 100, int y = 70, int width = 760, int height = 560)
-        : base(x, y, width, height, "Control Test", true, new Png("/mnt/System/Icons/appwizard.png"))
+        : base(x, y, width, height, "Control Test", true, Windose.System.Resources.IconResource.Load("imageres.dll,-27", 16))
     {
         DockPanel root = new DockPanel(0, 0, Width, Height)
         {
@@ -46,7 +46,7 @@ public sealed class ControlTestWindow : Window
         });
 
         StackPanel buttonRow = CreateRow(basicStack);
-        Button iconButton = new Button(new Png("/mnt/System/Icons/settings_gear.png"), "Icon + Label", 0, 0, 150, 32)
+        Button iconButton = new Button(Windose.System.Resources.IconResource.Load("imageres.dll,-27", 16) ?? Windose.System.Resources.IconResource.GetFallbackIcon(), "Icon + Label", 0, 0, 150, 32)
         {
             Padding = new Thickness(6),
             Margin = new Thickness(2),

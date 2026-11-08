@@ -26,7 +26,7 @@ public class PerformanceMonitor : Window
     private const int SampleIntervalMs = 250;
 
     public PerformanceMonitor(int x, int y, int width = 720, int height = 560)
-        : base(x, y, width, height, "Process Manager", true, new Png("/mnt/System/Icons/computer_taskmgr.png"))
+        : base(x, y, width, height, "Process Manager", true, Windose.System.Resources.IconResource.Load("shell32.dll,-171", 16))
     {
         root = new DockPanel(0, 0, Width, Height)
         {

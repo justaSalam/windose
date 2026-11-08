@@ -35,7 +35,7 @@ public class TreeViewItem
         TreeViewItem item = new TreeViewItem(text, tag)
         {
             parent = this,
-            image = new Png(icon)
+            image = Windose.System.Resources.IconResource.Load(icon, 16)
         };
 
         children.Add(item);

@@ -16,7 +16,7 @@ namespace Windose.Programs
     /// </summary>
     public class AboutWindows : Window
     {
-        private Png? winLogo;
+        private Cosmos.Kernel.System.Graphics.Image? winLogo;
 
         public AboutWindows(int x = -1, int y = -1)
             : base(x > 0 ? x : Math.Max(20, (Global.screenWidth - 440) / 2),
@@ -28,10 +28,8 @@ namespace Windose.Programs
 
             try
             {
-                if (File.Exists("/mnt/System/Icons/file_windows.png"))
-                    winLogo = new Png("/mnt/System/Icons/file_windows.png");
-                else if (File.Exists("/mnt/System/Icons/computermona.png"))
-                    winLogo = new Png("/mnt/System/Icons/computermona.png");
+                winLogo = Windose.System.Resources.IconResource.Load("imageres.dll,-24", 64);
+                SetIcon("imageres.dll,-24");
             }
             catch { }
 

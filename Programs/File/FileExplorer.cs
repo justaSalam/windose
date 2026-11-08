@@ -276,7 +276,7 @@ public class FileExplorer : Window
 
     }
 
-    private const string DriveImage = "/mnt/System/Icons/hard_disk_drive.png";
+    private const string DriveImage = "imageres.dll,-32";
 
     private void BuildTree(in string path)
     {
@@ -327,7 +327,7 @@ public class FileExplorer : Window
             foreach (string dir in Directory.GetDirectories(path))
             {
                 if (Path.GetFileName(dir) == ".trash") continue;
-                TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), "/mnt/System/Icons/directory_closed.png", dir);
+                TreeViewItem childItem = item.AddChild(Path.GetFileName(dir), "imageres.dll,-3", dir);
                 PopulateTreeItem(childItem);
             }
         }

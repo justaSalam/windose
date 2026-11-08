@@ -19,7 +19,7 @@ public class DeviceManager : Window
     private readonly TreeView tree;
     private int deviceCount;
 
-    public DeviceManager(int x, int y, int width, int height) : base(x, y, width, height, "Device Manager", true, new Png("/mnt/System/Icons/mci_devices.png"))
+    public DeviceManager(int x, int y, int width, int height) : base(x, y, width, height, "Device Manager", true, Windose.System.Resources.IconResource.Load("ddores.dll,-2001", 16))
     {
         root = new DockPanel(0, 0, Width, Height)
         {
@@ -138,12 +138,12 @@ public class DeviceManager : Window
         tree.ClearItems();
         deviceCount = 0;
 
-        TreeViewItem keyboard = tree.AddRoot("Keyboard", "/mnt/System/Icons/keyboard.png");
-        TreeViewItem pointer = tree.AddRoot("Pointer", "/mnt/System/Icons/mouse_ms.png");
-        TreeViewItem network = tree.AddRoot("Network", "/mnt/System/Icons/network_drive.png");
-        TreeViewItem block = tree.AddRoot("Block", "/mnt/System/Icons/removable_disk_drive_alt.png");
-        TreeViewItem display = tree.AddRoot("Display", "/mnt/System/Icons/display_properties.png");
-        TreeViewItem other = tree.AddRoot("Other devices", "/mnt/System/Icons/hardware.png");
+        TreeViewItem keyboard = tree.AddRoot("Keyboards", "setupapi.dll,-10");
+        TreeViewItem pointer = tree.AddRoot("Mice and other pointing devices", "setupapi.dll,-11");
+        TreeViewItem network = tree.AddRoot("Network adapters", "netcenter.dll,-1");
+        TreeViewItem block = tree.AddRoot("Disk drives", "imageres.dll,-32");
+        TreeViewItem display = tree.AddRoot("Display adapters", "imageres.dll,-27");
+        TreeViewItem other = tree.AddRoot("Other devices", "setupapi.dll,-1");
 
         for (int i = 0; i < DriverDiagnostics.DeviceCount; i++)
         {

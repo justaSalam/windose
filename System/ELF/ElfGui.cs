@@ -39,7 +39,7 @@ namespace Windose.System.Elf
         private int lastMouseX = int.MinValue;
         private int lastMouseY = int.MinValue;
 
-        public ElfWindow(int x, int y, int width, int height, string title, Png? icon = null, bool useTitleBar = true, bool showInTaskbar = true)
+        public ElfWindow(int x, int y, int width, int height, string title, Image? icon = null, bool useTitleBar = true, bool showInTaskbar = true)
             : base(x, y, width, height, title, useTitleBar, icon)
         {
             this.showInTaskbar = showInTaskbar;

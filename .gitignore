@@ -6,11 +6,15 @@
 *.vs/
 bin/
 obj/
+docs/
+output-x64/
 BREEZE.md
 BREEZE_API.html
 COMMANDS.md
 win.wasm
 asm.wat
+.superpowers/
+
 .appdata/Nuget
 .dotnet-home/.dotnet/
 .github/

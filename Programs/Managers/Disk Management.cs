@@ -25,7 +25,7 @@ public sealed class DiskManagement : Window
     private readonly Panel freeDetail;
     private readonly Panel detailsHint;
 
-    private readonly Png partitionIcon = new Png("/mnt/System/Icons/hard_disk_drive_pie.png");
+    private readonly Image partitionIcon = Windose.System.Resources.IconResource.Load("imageres.dll,-32", 16);
 
     private readonly List<IBlockDevice> devices = new List<IBlockDevice>();
     private readonly List<PartitionDetails> partitionDetails = new List<PartitionDetails>();
@@ -49,7 +49,7 @@ public sealed class DiskManagement : Window
     }
 
     public DiskManagement(int x, int y, int width, int height)
-        : base(x, y, width, height, "Disk Management", true, new Png("/mnt/System/Icons/hard_disk_drive_pie.png"))
+        : base(x, y, width, height, "Disk Management", true, Windose.System.Resources.IconResource.Load("imageres.dll,-32", 16))
     {
         root = new DockPanel(0, 0, Width, Height)
         {

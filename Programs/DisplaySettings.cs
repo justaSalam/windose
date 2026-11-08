@@ -21,7 +21,7 @@ public sealed class DisplaySettings : Window
     private Label gridHeightValue;
 
     public DisplaySettings(int x = 150, int y = 110)
-        : base(x, y, 520, 390, "Display Properties", true, new Png("/mnt/System/Icons/display_properties.png"))
+        : base(x, y, 520, 390, "Display Properties", true, Windose.System.Resources.IconResource.Load("imageres.dll,-27", 16))
     {
         canResize = false;
         canMaximize = false;
