@@ -156,5 +156,8 @@ static inline int      k_reg_get(const char *key, char *buf, int max) { return _
 static inline int      k_reg_set(const char *key, const char *val) { return __k->reg_set(__k->pid, key, val); }
 static inline int      k_widget_set_anchors(handle_t obj, int flags) { return __k->widget_set_anchors(__k->pid, obj, flags); }
 static inline int      k_widget_set_bounds(handle_t obj, int x, int y, int w, int h) { return __k->widget_set_bounds(__k->pid, obj, x, y, w, h); }
+static inline int      k_list_set_item_icon(handle_t obj, int item, const char *icon_path) { return __k->list_set_item_icon(__k->pid, obj, item, icon_path); }
+static inline int      k_sys_mem(uint64_t *out_total, uint64_t *out_used, uint64_t *out_free) { return __k->sys_mem(__k->pid, out_total, out_used, out_free); }
+static inline int      k_reg_delete(const char *key) { return __k->reg_delete(__k->pid, key); }
 
 #endif // WINDOSE_KERNEL_H

@@ -162,6 +162,9 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, byte*, byte*, int> RegSet;                            // (pid, key, val) -> 0 ok, -1 err
         public delegate* unmanaged<int, int, int, int> WidgetSetAnchors;                      // (pid, handle, flags) -> 0 ok, -1 err
         public delegate* unmanaged<int, int, int, int, int, int, int> WidgetSetBounds;        // (pid, handle, x, y, w, h) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, byte*, int> ListSetItemIcon;                // (pid, handle, item, icon_path) -> 0 ok, -1 err
+        public delegate* unmanaged<int, ulong*, ulong*, ulong*, int> SysMem;                  // (pid, total, used, free) -> 0 ok, -1 err
+        public delegate* unmanaged<int, byte*, int> RegDelete;                                // (pid, key) -> 0 ok, -1 err
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -183,7 +186,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 14;
+        public const int ApiVersion = 15;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -568,6 +571,9 @@ namespace Windose.System.Elf
             api.RegSet = &ApiRegSet;
             api.WidgetSetAnchors = &ApiWidgetSetAnchors;
             api.WidgetSetBounds = &ApiWidgetSetBounds;
+            api.ListSetItemIcon = &ApiListSetItemIcon;
+            api.SysMem = &ApiSysMem;
+            api.RegDelete = &ApiRegDelete;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -2832,6 +2838,50 @@ namespace Windose.System.Elf
                 object obj = p.Objs.Get(handle); if (obj == null) return -1;
                 IElfHost host = Host; if (host == null) return -1;
                 return host.WidgetSetBounds(obj, x, y, w, h) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiListSetItemIcon(int pid, int handle, int item, byte* icon_path)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(handle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.ListSetItemIcon(obj, item, CStr(icon_path)) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiSysMem(int pid, ulong* out_total, ulong* out_used, ulong* out_free)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                if (host.SysMem(out ulong total, out ulong used, out ulong free))
+                {
+                    if (out_total != null) *out_total = total;
+                    if (out_used != null) *out_used = used;
+                    if (out_free != null) *out_free = free;
+                    return 0;
+                }
+                return -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiRegDelete(int pid, byte* key)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.RegDelete(CStr(key)) ? 0 : -1;
             }
             catch { return -1; }
         }

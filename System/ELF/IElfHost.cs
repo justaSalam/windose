@@ -244,5 +244,8 @@ namespace Windose.System.Elf
         bool RegSet(string key, string value);
         bool WidgetSetAnchors(object obj, int anchorFlags);
         bool WidgetSetBounds(object obj, int x, int y, int w, int h);
+        bool ListSetItemIcon(object obj, int item, string iconPath);
+        bool SysMem(out ulong total, out ulong used, out ulong free);
+        bool RegDelete(string key);
     }
 }

@@ -4,11 +4,13 @@
 // ProcessManager, SingleThreadedProcess). Expect to fix a name or two. Needs the two edits in README_WINDOW_PATCH.txt.
 using System;
 using System.Drawing;
+using Cosmos.Kernel.System.Diagnostics;
 using Cosmos.Kernel.System.FileSystem;
 using Cosmos.Kernel.System.Graphics;
 using Windose.Drivers;
 using Windose.Programs;
 using Windose.System.Kernel;
+using Windose.System.Kernel.Subsystem;
 using Windose.System.Media;
 using Windose.System.Resources;
 using Windose.System.System_Calls;
@@ -812,7 +814,9 @@ namespace Windose.System.Elf
         {
             ElfListBox box = obj as ElfListBox;
             if (box == null) return -1;
-            box.List.AddItem(new string[] { text ?? "" });
+            Cosmos.Kernel.System.Graphics.Image? icon = null;
+            try { icon = FileAssociations.GetIcon(text ?? ""); } catch { }
+            box.List.AddItem(new string[] { text ?? "" }, icon);
             box.Refresh();
             return box.List.items.Count - 1;
         }
@@ -821,9 +825,39 @@ namespace Windose.System.Elf
         {
             ElfListBox box = obj as ElfListBox;
             if (box == null || cells == null) return -1;
-            box.List.AddItem(cells);
+            Cosmos.Kernel.System.Graphics.Image? icon = null;
+            try
+            {
+                if (cells.Length >= 3 && string.Equals(cells[2], "File Folder", StringComparison.OrdinalIgnoreCase))
+                    icon = FileAssociations.GetIcon("folder");
+                else if (cells.Length > 0)
+                    icon = FileAssociations.GetIcon(cells[0]);
+            }
+            catch { }
+            box.List.AddItem(cells, icon);
             box.Refresh();
             return box.List.items.Count - 1;
+        }
+
+        public bool ListSetItemIcon(object obj, int item, string iconPath)
+        {
+            ElfListBox box = obj as ElfListBox;
+            if (box == null || item < 0 || item >= box.List.items.Count) return false;
+            try
+            {
+                Cosmos.Kernel.System.Graphics.Image? icon = null;
+                if (!string.IsNullOrEmpty(iconPath))
+                {
+                    if (iconPath.StartsWith("/") || iconPath.Contains(":\\") || iconPath.Contains(":/"))
+                        icon = IconResource.Load(iconPath, 16);
+                    else
+                        icon = FileAssociations.GetIcon(iconPath);
+                }
+                box.List.items[item].Icon = icon;
+                box.Refresh();
+                return true;
+            }
+            catch { return false; }
         }
 
         public bool ListRemoveItem(object obj, int index)
@@ -1399,7 +1433,16 @@ namespace Windose.System.Elf
             TreeViewItem item;
             if (!string.IsNullOrEmpty(icon))
             {
-                try { item = parentItem != null ? parentItem.AddChild(text ?? "", icon, null) : null; }
+                try
+                {
+                    if (parentItem != null)
+                        item = parentItem.AddChild(text ?? "", icon, null);
+                    else
+                    {
+                        item = new TreeViewItem(text ?? "");
+                        item.image = IconResource.Load(icon, 16);
+                    }
+                }
                 catch { item = null; }
                 if (item == null)
                     item = parentItem != null ? parentItem.AddChild(text ?? "") : new TreeViewItem(text ?? "");
@@ -1870,6 +1913,43 @@ namespace Windose.System.Elf
                 comp.SetBounds(x, y, w, h);
             }
             return true;
+        }
+
+        public bool SysMem(out ulong total, out ulong used, out ulong free)
+        {
+            try
+            {
+                total = (ulong)MemoryDiagnostics.RamSizeBytes;
+                free = (ulong)(MemoryDiagnostics.FreePages * MemoryDiagnostics.PageSizeBytes);
+                if (total > 0 && total >= free)
+                {
+                    used = total - free;
+                }
+                else
+                {
+                    used = (ulong)GC.GetTotalMemory(false);
+                    if (total < used) total = used + free;
+                }
+                return true;
+            }
+            catch
+            {
+                total = 0; used = 0; free = 0;
+                return false;
+            }
+        }
+
+        public bool RegDelete(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return false;
+            try
+            {
+                return Registry.Delete(key, persist: true);
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         // Program coordinates are relative to the window's client area (inside frame + title bar).

@@ -7,7 +7,7 @@
 
 // Calling convention for host <-> guest boundary
 #define KABI __attribute__((sysv_abi))
-#define KAPI_VERSION 14
+#define KAPI_VERSION 15
 #define K_KILLED (-100)
 
 typedef int handle_t; // opaque kernel handle; 0 = invalid/none
@@ -225,6 +225,9 @@ typedef struct KernelApi {
     int      (KABI *reg_set)(int pid, const char *key, const char *val);
     int      (KABI *widget_set_anchors)(int pid, handle_t obj, int anchor_flags);
     int      (KABI *widget_set_bounds)(int pid, handle_t obj, int x, int y, int w, int h);
+    int      (KABI *list_set_item_icon)(int pid, handle_t obj, int item, const char *icon_path);
+    int      (KABI *sys_mem)(int pid, uint64_t *out_total, uint64_t *out_used, uint64_t *out_free);
+    int      (KABI *reg_delete)(int pid, const char *key);
 } KernelApi;
 
 extern KernelApi *__k;
