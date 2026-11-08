@@ -60,16 +60,26 @@ public class StartMenu : Window
             () => LaunchTracker.Start(() => new MediaPlayer()));
         curY += itemH;
 
-        AddLeftProgram("Calculator", "accessibilitycpl.dll,-327", leftX, curY, leftW, itemH,
-            () => LaunchTracker.Start(() => new Calculator()));
+        AddLeftProgram("Calculator", "accessibilitycpl.dll,-327", leftX, curY, leftW, itemH, () =>
+        {
+            if (File.Exists("/mnt/Programs/calc.elf"))
+                ElfRunner.RunFile("/mnt/Programs/calc.elf");
+            else
+                LaunchTracker.Start(() => new Calculator());
+        });
         curY += itemH;
 
         AddLeftProgram("Paint", "imageres.dll,-71", leftX, curY, leftW, itemH,
             () => LaunchTracker.Start(() => new Paint()));
         curY += itemH;
 
-        AddLeftProgram("Breeze Editor", "shell32.dll,-70", leftX, curY, leftW, itemH,
-            () => LaunchTracker.Start(() => new BreezeEditor()));
+        AddLeftProgram("AeroEditor", "shell32.dll,-70", leftX, curY, leftW, itemH, () =>
+        {
+            if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                ElfRunner.RunFile("/mnt/Programs/aeroeditor.elf");
+            else
+                LaunchTracker.Start(() => new BreezeEditor());
+        });
         curY += itemH;
 
         AddLeftProgram("Command Prompt", "shell32.dll,-284", leftX, curY, leftW, itemH, () =>
@@ -81,8 +91,13 @@ public class StartMenu : Window
         });
         curY += itemH;
 
-        AddLeftProgram("Task Manager", "shell32.dll,-171", leftX, curY, leftW, itemH,
-            () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
+        AddLeftProgram("Task Manager", "shell32.dll,-171", leftX, curY, leftW, itemH, () =>
+        {
+            if (File.Exists("/mnt/Programs/taskmgr.elf"))
+                ElfRunner.RunFile("/mnt/Programs/taskmgr.elf");
+            else
+                LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+        });
         curY += itemH;
 
         AddLeftProgram("Disk Management", "imageres.dll,-32", leftX, curY, leftW, itemH,
@@ -111,15 +126,45 @@ public class StartMenu : Window
         });
 
         MenuItem accessories = allProgramsMenu.AddSubmenuItem("Accessories");
-        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("accessibilitycpl.dll,-327", 16), "Calculator", () => LaunchTracker.Start(() => new Calculator()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("accessibilitycpl.dll,-327", 16), "Calculator", () =>
+        {
+            if (File.Exists("/mnt/Programs/calc.elf"))
+                ElfRunner.RunFile("/mnt/Programs/calc.elf");
+            else
+                LaunchTracker.Start(() => new Calculator());
+        });
         accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-71", 16), "Paint", () => LaunchTracker.Start(() => new Paint()));
-        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-70", 16), "Breeze Editor", () => LaunchTracker.Start(() => new BreezeEditor()));
-        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16), "Command Prompt", () => LaunchTracker.Start(() => new CommandPrompt()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-70", 16), "AeroEditor", () =>
+        {
+            if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                ElfRunner.RunFile("/mnt/Programs/aeroeditor.elf");
+            else
+                LaunchTracker.Start(() => new BreezeEditor());
+        });
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16), "Command Prompt", () =>
+        {
+            if (File.Exists("/mnt/Programs/terminal.elf"))
+                ElfRunner.RunFile("/mnt/Programs/terminal.elf");
+            else
+                LaunchTracker.Start(() => new CommandPrompt());
+        });
         accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-25", 16), "Run...", () => LaunchTracker.Start(() => new RunDialog()));
 
         MenuItem systemTools = allProgramsMenu.AddSubmenuItem("System Tools");
-        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-68", 16), "Registry Editor", () => LaunchTracker.Start(() => new RegistryEditor()));
-        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-171", 16), "Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
+        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-68", 16), "Registry Editor", () =>
+        {
+            if (File.Exists("/mnt/Programs/regedit.elf"))
+                ElfRunner.RunFile("/mnt/Programs/regedit.elf");
+            else
+                LaunchTracker.Start(() => new RegistryEditor());
+        });
+        systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-171", 16), "Task Manager", () =>
+        {
+            if (File.Exists("/mnt/Programs/taskmgr.elf"))
+                ElfRunner.RunFile("/mnt/Programs/taskmgr.elf");
+            else
+                LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+        });
         systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-32", 16), "Disk Management", () => LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350)));
         systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("ddores.dll,-2001", 16), "Device Manager", () => LaunchTracker.Start(() => new DeviceManager(100, 100, 600, 350)));
         systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-27", 16), "SYSDUMP", SystemLogger.Dump);
@@ -306,7 +351,10 @@ public class StartMenu : Window
         }
         if (lower == "calc" || lower == "calculator")
         {
-            LaunchTracker.Start(() => new Calculator());
+            if (File.Exists("/mnt/Programs/calc.elf"))
+                ElfRunner.RunFile("/mnt/Programs/calc.elf");
+            else
+                LaunchTracker.Start(() => new Calculator());
             return;
         }
         if (lower == "paint" || lower == "mspaint")
@@ -326,17 +374,34 @@ public class StartMenu : Window
         }
         if (lower == "explorer" || lower == "files")
         {
-            LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
+            if (File.Exists("/mnt/Programs/explorer.elf"))
+                ElfRunner.RunFile("/mnt/Programs/explorer.elf", new string[] { "/mnt" });
+            else
+                LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
             return;
         }
-        if (lower == "taskmgr" || lower == "perf")
+        if (lower == "taskmgr" || lower == "perf" || lower == "taskmanager")
         {
-            LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+            if (File.Exists("/mnt/Programs/taskmgr.elf"))
+                ElfRunner.RunFile("/mnt/Programs/taskmgr.elf");
+            else
+                LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
             return;
         }
         if (lower == "regedit" || lower == "registry")
         {
-            LaunchTracker.Start(() => new RegistryEditor());
+            if (File.Exists("/mnt/Programs/regedit.elf"))
+                ElfRunner.RunFile("/mnt/Programs/regedit.elf");
+            else
+                LaunchTracker.Start(() => new RegistryEditor());
+            return;
+        }
+        if (lower == "notepad" || lower == "editor" || lower == "aeroeditor")
+        {
+            if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                ElfRunner.RunFile("/mnt/Programs/aeroeditor.elf");
+            else
+                LaunchTracker.Start(() => new BreezeEditor());
             return;
         }
 

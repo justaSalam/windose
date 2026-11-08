@@ -250,10 +250,22 @@ public class Desktop : Component
             ShortcutFile.Create(cmdShortcut, "/mnt/Programs/terminal.elf", "Command Prompt", "shell32.dll,-284");
         }
 
-        string breezeShortcut = Path.Combine(desktopDir, "Breeze Editor.lnk");
+        string breezeShortcut = Path.Combine(desktopDir, "AeroEditor.lnk");
         if (!File.Exists(breezeShortcut))
         {
-            ShortcutFile.Create(breezeShortcut, "program::BreezeEditor", "Breeze Editor", "shell32.dll,-70");
+            ShortcutFile.Create(breezeShortcut, "/mnt/Programs/aeroeditor.elf", "AeroEditor", "shell32.dll,-70");
+        }
+
+        string calcShortcut = Path.Combine(desktopDir, "Calculator.lnk");
+        if (!File.Exists(calcShortcut))
+        {
+            ShortcutFile.Create(calcShortcut, "/mnt/Programs/calc.elf", "Calculator", "accessibilitycpl.dll,-327");
+        }
+
+        string explorerShortcut = Path.Combine(desktopDir, "File Explorer.lnk");
+        if (!File.Exists(explorerShortcut))
+        {
+            ShortcutFile.Create(explorerShortcut, "/mnt/Programs/explorer.elf", "File Explorer", "imageres.dll,-4");
         }
 
         string mediaShortcut = Path.Combine(desktopDir, "Windows Media Player.lnk");

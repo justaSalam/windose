@@ -1232,13 +1232,34 @@ namespace Windose.System.Elf
                     else
                         LaunchTracker.Start(() => new CommandPrompt());
                 }
-                else if (app == "editor")
+                else if (app == "editor" || app == "notepad" || app == "aeroeditor")
                 {
-                    if (string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new BreezeEditor());
+                    if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                        ElfRunner.RunFile("/mnt/Programs/aeroeditor.elf", string.IsNullOrEmpty(arg) ? null : new string[] { arg });
+                    else if (string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new BreezeEditor());
                     else LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, arg));
                 }
-                else if (app == "taskmgr") LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
-                else if (app == "registry") LaunchTracker.Start(() => new RegistryEditor());
+                else if (app == "taskmgr" || app == "taskmanager")
+                {
+                    if (File.Exists("/mnt/Programs/taskmgr.elf"))
+                        ElfRunner.RunFile("/mnt/Programs/taskmgr.elf");
+                    else
+                        LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+                }
+                else if (app == "registry" || app == "regedit")
+                {
+                    if (File.Exists("/mnt/Programs/regedit.elf"))
+                        ElfRunner.RunFile("/mnt/Programs/regedit.elf");
+                    else
+                        LaunchTracker.Start(() => new RegistryEditor());
+                }
+                else if (app == "calc" || app == "calculator")
+                {
+                    if (File.Exists("/mnt/Programs/calc.elf"))
+                        ElfRunner.RunFile("/mnt/Programs/calc.elf");
+                    else
+                        LaunchTracker.Start(() => new Calculator());
+                }
                 else if (app == "settings") LaunchTracker.Start(() => new DisplaySettings());
                 else if (app == "lock") LockManager.Lock();
                 else if (app == "shutdown") { Desktop.SaveLayout(); Cosmos.Kernel.System.Power.Shutdown(); }

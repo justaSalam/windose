@@ -69,7 +69,13 @@ public class Taskbar : Component
         {
             itemHeight = 18
         };
-        contextMenu.AddItem("Task Manager", () => LaunchTracker.Start(() => new PerformanceMonitor(180, 120)));
+        contextMenu.AddItem("Task Manager", () =>
+        {
+            if (File.Exists("/mnt/Programs/taskmgr.elf"))
+                Windose.System.Elf.ElfRunner.RunFile("/mnt/Programs/taskmgr.elf");
+            else
+                LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
+        });
         contextMenu.AddSeparator();
         contextMenu.AddItem("Restart Shell", () => Explorer.RestartShell());
         contextMenu.AddItem("Minimize All Windows", WindowManager.MinimizeAllWindows);
