@@ -1,4 +1,4 @@
-﻿using Cosmos.Kernel.Core.Runtime;
+using Cosmos.Kernel.Core.Runtime;
 using System.Reflection;
 using Windose.System.System_Calls;
 
@@ -171,6 +171,8 @@ namespace Windose.System.Kernel
             WriteStorage("/mnt/Programs/touch.elf", "Windose.System.ELF.programs.bin.touch.elf", true);
             WriteStorage("/mnt/Programs/terminal.elf", "Windose.System.ELF.programs.bin.terminal.elf", true);
             WriteStorage("/mnt/Programs/startmenu.elf", "Windose.System.ELF.programs.bin.startmenu.elf", true);
+            WriteStorage("/mnt/Programs/taskmgr.elf", "Windose.System.ELF.programs.bin.taskmgr.elf", true);
+            WriteStorage("/mnt/Programs/regedit.elf", "Windose.System.ELF.programs.bin.regedit.elf", true);
         }
     }
 }
