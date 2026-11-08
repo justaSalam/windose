@@ -14,7 +14,7 @@ public class FileProperties : Window
     private Checkbox cbHidden;
     private FileEntry targetEntry;
 
-    public FileProperties(int x, int y, FileEntry fileEntry) : base(x, y, 350, 420, $"{fileEntry?.FileName ?? "File"} Properties", true)
+    public FileProperties(int x, int y, FileEntry fileEntry) : base(x, y, 350, 420, $"{fileEntry.FileName} Properties", true)
     {
         canResize = false;
         targetEntry = fileEntry;
@@ -114,16 +114,16 @@ public class FileProperties : Window
             horizontalAlignment = HorizontalAlignment.Stretch
         });
 
-        cbReadOnly = new Checkbox("Read-only", 0, 0);
-        cbHidden = new Checkbox("Hidden", 120, 0);
+        cbReadOnly = new Checkbox(0, 0) { text = "Read-only" };
+        cbHidden = new Checkbox(120, 0) { text = "Hidden" };
 
         try
         {
-            string attr = Registry.Get($"Software/Windose/Attributes{fileEntry.AbsoluteLocation}");
+            string attr = Registry.Get($"Software/Windose/Attributes{fileEntry.AbsoluteLocation}") as string;
             if (!string.IsNullOrEmpty(attr))
             {
-                if (attr.Contains("R")) cbReadOnly.isChecked = true;
-                if (attr.Contains("H")) cbHidden.isChecked = true;
+                if (attr.Contains("R")) cbReadOnly.Checked = true;
+                if (attr.Contains("H")) cbHidden.Checked = true;
             }
         }
         catch { }
@@ -173,7 +173,7 @@ public class FileProperties : Window
     {
         try
         {
-            if (targetEntry != null && !string.IsNullOrEmpty(fileNameField.text) && fileNameField.text != targetEntry.FileName)
+            if (!string.IsNullOrEmpty(targetEntry.AbsoluteLocation) && !string.IsNullOrEmpty(fileNameField.text) && fileNameField.text != targetEntry.FileName)
             {
                 string dir = Path.GetDirectoryName(targetEntry.AbsoluteLocation);
                 string newPath = Path.Combine(dir, fileNameField.text);
@@ -184,7 +184,7 @@ public class FileProperties : Window
                         Directory.Move(targetEntry.AbsoluteLocation, newPath);
                         targetEntry.FileName = fileNameField.text;
                         targetEntry.AbsoluteLocation = newPath;
-                        Title = $"{targetEntry.FileName} Properties";
+                        SetTitle($"{targetEntry.FileName} Properties");
                     }
                 }
                 else
@@ -194,14 +194,14 @@ public class FileProperties : Window
                         File.Move(targetEntry.AbsoluteLocation, newPath);
                         targetEntry.FileName = fileNameField.text;
                         targetEntry.AbsoluteLocation = newPath;
-                        Title = $"{targetEntry.FileName} Properties";
+                        SetTitle($"{targetEntry.FileName} Properties");
                     }
                 }
             }
 
-            if (targetEntry != null)
+            if (!string.IsNullOrEmpty(targetEntry.AbsoluteLocation))
             {
-                string attr = (cbReadOnly.isChecked ? "R" : "") + (cbHidden.isChecked ? "H" : "A");
+                string attr = (cbReadOnly.Checked ? "R" : "") + (cbHidden.Checked ? "H" : "A");
                 Registry.Set($"Software/Windose/Attributes{targetEntry.AbsoluteLocation}", attr);
                 NotificationManager.Notify("Properties", $"Updated properties for {targetEntry.FileName}");
             }
