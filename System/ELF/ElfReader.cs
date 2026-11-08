@@ -580,91 +580,93 @@ namespace Windose.System.Elf
             if (tableVaddr < low || tableVaddr - low + tableSize > size) { error = "relocation table outside image"; return false; }
             int tp = memOffset + (int)(tableVaddr - low);
             ulong count = tableSize / 24;
-            for (ulong i = 0; i < count; i++)
+            unsafe
             {
-                int e = tp + (int)(i * 24);
-                ulong rOff = Rd64(mem, e);
-                ulong info = Rd64(mem, e + 8);
-                long addend = (long)Rd64(mem, e + 16);
-                uint type = (uint)(info & 0xFFFFFFFF);
-                uint sym = (uint)(info >> 32);
-                if (type == ElfConst.R_X86_64_NONE) continue;
-
-                ulong reqSize = (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S || type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32) ? 4UL : 8UL;
-                if (rOff < low || rOff - low + reqSize > size) { error = "relocation target outside image"; return false; }
-
-                if (type == ElfConst.R_X86_64_RELATIVE)
+                fixed (byte* pMem = mem)
                 {
-                    ulong value = unchecked(bias + (ulong)addend);
-                    Wr64(mem, memOffset + (int)(rOff - low), value);
-                    continue;
-                }
-
-                if (type == ElfConst.R_X86_64_IRELATIVE)
-                {
-                    ulong resolverAddr = unchecked(bias + (ulong)addend);
-                    ulong value;
-                    unsafe
+                    for (ulong i = 0; i < count; i++)
                     {
-                        try
+                        int e = tp + (int)(i * 24);
+                        ulong rOff = *(ulong*)(pMem + e);
+                        ulong info = *(ulong*)(pMem + e + 8);
+                        long addend = *(long*)(pMem + e + 16);
+                        uint type = (uint)(info & 0xFFFFFFFF);
+                        uint sym = (uint)(info >> 32);
+                        if (type == ElfConst.R_X86_64_NONE) continue;
+
+                        ulong reqSize = (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S || type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32) ? 4UL : 8UL;
+                        if (rOff < low || rOff - low + reqSize > size) { error = "relocation target outside image"; return false; }
+
+                        int targetOffset = memOffset + (int)(rOff - low);
+
+                        if (type == ElfConst.R_X86_64_RELATIVE)
                         {
-                            var resolver = (delegate* unmanaged<ulong>)(byte*)resolverAddr;
-                            value = resolver();
+                            *(ulong*)(pMem + targetOffset) = unchecked(bias + (ulong)addend);
+                            continue;
                         }
-                        catch (global::System.Exception ex)
+
+                        if (type == ElfConst.R_X86_64_IRELATIVE)
                         {
-                            error = "IRELATIVE resolver failed: " + ex.Message;
+                            ulong resolverAddr = unchecked(bias + (ulong)addend);
+                            ulong value;
+                            try
+                            {
+                                var resolver = (delegate* unmanaged<ulong>)(byte*)resolverAddr;
+                                value = resolver();
+                            }
+                            catch (global::System.Exception ex)
+                            {
+                                error = "IRELATIVE resolver failed: " + ex.Message;
+                                return false;
+                            }
+                            *(ulong*)(pMem + targetOffset) = value;
+                            continue;
+                        }
+
+                        ulong s = 0;
+                        if (sym != 0)
+                        {
+                            if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
+                            ulong so = symtab - low + (ulong)sym * 24;
+                            if (so + 24 > size) { error = "symbol index out of range"; return false; }
+                            int sp = memOffset + (int)so;
+                            uint nameOff = *(uint*)(pMem + sp);
+                            byte stInfo = pMem[sp + 4];
+                            ushort shndx = *(ushort*)(pMem + sp + 6);
+                            ulong stValue = *(ulong*)(pMem + sp + 8);
+                            if (shndx == 0)
+                            {
+                                if ((stInfo >> 4) == 2) s = 0;   // weak undefined resolves to 0
+                                else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
+                            }
+                            else if (shndx == 0xFFF1) s = stValue;                 // SHN_ABS
+                            else s = unchecked(bias + stValue);
+                        }
+
+                        if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
+                        {
+                            *(ulong*)(pMem + targetOffset) = unchecked(s + (ulong)addend);
+                        }
+                        else if (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S)
+                        {
+                            *(uint*)(pMem + targetOffset) = (uint)unchecked(s + (ulong)addend);
+                        }
+                        else if (type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32)
+                        {
+                            ulong pAddr = unchecked(bias + rOff);
+                            ulong pcVal = unchecked(s + (ulong)addend - pAddr);
+                            *(uint*)(pMem + targetOffset) = (uint)pcVal;
+                        }
+                        else if (type == ElfConst.R_X86_64_COPY)
+                        {
+                            // Copy relocation in static/PIE is a no-op
+                        }
+                        else
+                        {
+                            error = "unsupported relocation type " + type;
                             return false;
                         }
                     }
-                    Wr64(mem, memOffset + (int)(rOff - low), value);
-                    continue;
-                }
-
-                ulong s = 0;
-                if (sym != 0)
-                {
-                    if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
-                    ulong so = symtab - low + (ulong)sym * 24;
-                    if (so + 24 > size) { error = "symbol index out of range"; return false; }
-                    int sp = memOffset + (int)so;
-                    uint nameOff = Rd32(mem, sp);
-                    byte stInfo = mem[sp + 4];
-                    ushort shndx = (ushort)(mem[sp + 6] | (mem[sp + 7] << 8));
-                    ulong stValue = Rd64(mem, sp + 8);
-                    if (shndx == 0)
-                    {
-                        if ((stInfo >> 4) == 2) s = 0;   // weak undefined resolves to 0
-                        else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
-                    }
-                    else if (shndx == 0xFFF1) s = stValue;                 // SHN_ABS
-                    else s = unchecked(bias + stValue);
-                }
-
-                if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
-                {
-                    ulong value = unchecked(s + (ulong)addend);
-                    Wr64(mem, memOffset + (int)(rOff - low), value);
-                }
-                else if (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S)
-                {
-                    ulong value = unchecked(s + (ulong)addend);
-                    Wr32(mem, memOffset + (int)(rOff - low), (uint)value);
-                }
-                else if (type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32)
-                {
-                    ulong pAddr = unchecked(bias + rOff);
-                    ulong pcVal = unchecked(s + (ulong)addend - pAddr);
-                    Wr32(mem, memOffset + (int)(rOff - low), (uint)pcVal);
-                }
-                else if (type == ElfConst.R_X86_64_COPY)
-                {
-                    // Copy relocation in static/PIE is a no-op
-                }
-                else
-                {
-                    error = "unsupported relocation type " + type;
-                    return false;
                 }
             }
             return true;

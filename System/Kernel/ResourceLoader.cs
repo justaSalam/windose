@@ -1,6 +1,7 @@
 using Cosmos.Kernel.Core.Runtime;
 using System.Reflection;
 using Windose.System.System_Calls;
+using Windose.System.Elf;
 
 
 namespace Windose.System.Kernel
@@ -61,6 +62,11 @@ namespace Windose.System.Kernel
                     return false;
                 }
 
+                if (path.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+                {
+                    ElfRunner.Preload(path, data);
+                }
+
                 if (File.Exists(path) && !overwrite)
                 {
                     return false;
@@ -86,6 +92,10 @@ namespace Windose.System.Kernel
         {
             try
             {
+                if (data != null && path.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+                {
+                    ElfRunner.Preload(path, data);
+                }
                 File.WriteAllBytes(path, data);
                 return true;
             }

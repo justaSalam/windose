@@ -72,7 +72,7 @@ public class Taskbar : Component
         contextMenu.AddItem("Task Manager", () =>
         {
             if (File.Exists("/mnt/Programs/taskmgr.elf"))
-                Windose.System.Elf.ElfRunner.RunFile("/mnt/Programs/taskmgr.elf");
+                LaunchTracker.StartElf("/mnt/Programs/taskmgr.elf");
             else
                 LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
         });

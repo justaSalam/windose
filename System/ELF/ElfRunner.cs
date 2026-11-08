@@ -5,8 +5,10 @@
 // KernelApi below MUST match KernelApi in programs/include/kernel.h: same fields, same order.
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Windose.System.Kernel;
 
 namespace Windose.System.Elf
 {
@@ -219,7 +221,75 @@ namespace Windose.System.Elf
         public static int MaxSingleAlloc = 16 * 1024 * 1024;
         public static ulong MaxImageSize = 16UL * 1024 * 1024;
         public static int MaxPrograms = 32;
-        public static int ThreadStackBytes = 512 * 1024;
+        public static int ThreadStackBytes = 256 * 1024;
+
+        // ---------------------------------------------------------------- binary cache
+
+        private static readonly Dictionary<string, byte[]> BinaryCache = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Preloads an ELF binary byte array into the in-memory cache to eliminate disk I/O on launch.</summary>
+        public static void Preload(string path, byte[] data)
+        {
+            if (string.IsNullOrEmpty(path) || data == null) return;
+            lock (BinaryCache)
+            {
+                BinaryCache[path] = data;
+                string fn = Path.GetFileName(path);
+                if (!string.IsNullOrEmpty(fn))
+                {
+                    BinaryCache[fn] = data;
+                }
+            }
+        }
+
+        /// <summary>Invalidates any cached binary data for a path or filename.</summary>
+        public static void InvalidateCache(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            lock (BinaryCache)
+            {
+                BinaryCache.Remove(path);
+                string fn = Path.GetFileName(path);
+                if (!string.IsNullOrEmpty(fn))
+                {
+                    BinaryCache.Remove(fn);
+                }
+            }
+        }
+
+        /// <summary>Loads binary bytes from the in-memory cache if available, falling back to disk and caching.</summary>
+        public static byte[]? LoadBinary(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+            lock (BinaryCache)
+            {
+                if (BinaryCache.TryGetValue(path, out byte[]? cached) && cached != null)
+                    return cached;
+                string fn = Path.GetFileName(path);
+                if (!string.IsNullOrEmpty(fn) && BinaryCache.TryGetValue(fn, out cached) && cached != null)
+                    return cached;
+            }
+
+            if (!File.Exists(path)) return null;
+            try
+            {
+                byte[] data = File.ReadAllBytes(path);
+                lock (BinaryCache)
+                {
+                    BinaryCache[path] = data;
+                    string fn = Path.GetFileName(path);
+                    if (!string.IsNullOrEmpty(fn))
+                    {
+                        BinaryCache[fn] = data;
+                    }
+                }
+                return data;
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         // ---------------------------------------------------------------- program table
 
@@ -305,11 +375,11 @@ namespace Windose.System.Elf
 
         // ---------------------------------------------------------------- start / run
 
-        /// <summary>Reads an ELF file from disk and spawns it on its own thread.</summary>
+        /// <summary>Reads an ELF file from cache/disk and spawns it on its own thread.</summary>
         public static ElfProgram RunFile(string path, string[]? args = null)
         {
-            if (!File.Exists(path)) return null;
-            byte[] data = File.ReadAllBytes(path);
+            byte[]? data = LoadBinary(path);
+            if (data == null) return null;
             string name = Path.GetFileName(path);
             string[] fullArgs = args != null && args.Length > 0 ? args : new string[] { name };
             ElfProgram p = Spawn(data, name, fullArgs, out _);
@@ -320,6 +390,12 @@ namespace Windose.System.Elf
                 RecordProgramInfo(p.Pid, name, path, data, fullArgs);
             }
             return p;
+        }
+
+        /// <summary>Asynchronously loads and spawns an ELF program on a background thread via LaunchTracker, avoiding UI freezes.</summary>
+        public static void RunFileAsync(string path, string[]? args = null, Action<ElfProgram?>? onStarted = null)
+        {
+            LaunchTracker.StartElf(path, args, onStarted);
         }
 
         /// <summary>Loads and starts a program on its own thread. Returns null on failure (reason in 'error').
@@ -803,7 +879,9 @@ namespace Windose.System.Elf
                 if (Host == null || buf == null || len < 0 || len > MaxIo) return -1;
                 byte[] data = new byte[len];
                 for (int i = 0; i < len; i++) data[i] = buf[i];
-                return Host.WriteFile(CStr(path), data) ? 0 : -3;
+                string targetPath = CStr(path);
+                InvalidateCache(targetPath);
+                return Host.WriteFile(targetPath, data) ? 0 : -3;
             }
             catch { return -2; }
         }

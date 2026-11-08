@@ -1,5 +1,6 @@
-﻿using Cosmos.Kernel.Core.Scheduler;
+using Cosmos.Kernel.Core.Scheduler;
 using Windose.System.System_Calls;
+using Windose.System.Elf;
 
 namespace Windose.System.Kernel
 {
@@ -34,6 +35,50 @@ namespace Windose.System.Kernel
                         try { win.Dispose(); } catch { }
                     }
 
+                    WindowManager.ReportLaunchCrash(ex);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref startingCount);
+                }
+            }).Start();
+        }
+
+        public static void StartElf(string path, string[]? args = null, Action<ElfProgram?>? onStarted = null)
+        {
+            Interlocked.Increment(ref startingCount);
+            new Thread(() =>
+            {
+                try
+                {
+                    ElfProgram? prog = ElfRunner.RunFile(path, args);
+                    onStarted?.Invoke(prog);
+                }
+                catch (Exception ex)
+                {
+                    SystemLogger.WriteLine("LaunchTracker", $"Error launching ELF {path}: {ex.Message}", ConsoleMessageType.Error, true);
+                    WindowManager.ReportLaunchCrash(ex);
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref startingCount);
+                }
+            }).Start();
+        }
+
+        public static void StartElfBytes(byte[] data, string name, string[] args, Action<ElfProgram?>? onStarted = null)
+        {
+            Interlocked.Increment(ref startingCount);
+            new Thread(() =>
+            {
+                try
+                {
+                    ElfProgram? prog = ElfRunner.Spawn(data, name, args, out _);
+                    onStarted?.Invoke(prog);
+                }
+                catch (Exception ex)
+                {
+                    SystemLogger.WriteLine("LaunchTracker", $"Error launching ELF {name}: {ex.Message}", ConsoleMessageType.Error, true);
                     WindowManager.ReportLaunchCrash(ex);
                 }
                 finally

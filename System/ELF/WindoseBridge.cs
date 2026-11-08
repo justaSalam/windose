@@ -115,67 +115,98 @@ namespace Windose.System.Elf
 
         // ---------------------------------------------------------------- UI
 
+        private static readonly Dictionary<string, Image> ResolvedIconCache = new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
+
         public static Image? ResolveIcon(string? title, string? progName)
         {
             try
             {
-                if (!string.IsNullOrEmpty(progName))
+                string cacheKey = (title ?? "") + "|" + (progName ?? "");
+                lock (ResolvedIconCache)
                 {
-                    string baseName = Path.GetFileNameWithoutExtension(progName).ToLowerInvariant();
-                    string sidecar = $"/mnt/Programs/{baseName}.png";
-                    if (File.Exists(sidecar)) return IconResource.Load(sidecar, 16);
-
-                    string sidecarIco = $"/mnt/Programs/{baseName}.ico";
-                    if (File.Exists(sidecarIco)) return IconResource.Load(sidecarIco, 16);
-
-                    string sysIcon = $"/mnt/System/Icons/{baseName}.png";
-                    if (File.Exists(sysIcon)) return IconResource.Load(sysIcon, 16);
+                    if (ResolvedIconCache.TryGetValue(cacheKey, out Image? cached) && cached != null)
+                        return cached;
                 }
 
-                string combined = ((title ?? "") + " " + (progName ?? "")).ToLowerInvariant();
-
-                if (combined.Contains("terminal") || combined.Contains("prompt") || combined.Contains("cmd") || combined.Contains("console"))
-                    return IconResource.Load("shell32.dll,-284", 16);
-
-                if (combined.Contains("calc"))
-                    return IconResource.Load("accessibilitycpl.dll,-327", 16);
-
-                if (combined.Contains("explorer") || combined.Contains("file"))
-                    return IconResource.Load("imageres.dll,-4", 16);
-
-                if (combined.Contains("editor") || combined.Contains("notepad") || combined.Contains("write") || combined.Contains("text"))
-                    return IconResource.Load("shell32.dll,-70", 16);
-
-                if (combined.Contains("clock") || combined.Contains("time"))
-                    return IconResource.Load("imageres.dll,-105", 16);
-
-                if (combined.Contains("paint") || combined.Contains("canvas") || combined.Contains("draw"))
-                    return IconResource.Load("imageres.dll,-71", 16);
-
-                if (combined.Contains("task") || combined.Contains("perf") || combined.Contains("monitor") || combined.Contains("process"))
-                    return IconResource.Load("shell32.dll,-171", 16);
-
-                if (combined.Contains("logon") || combined.Contains("login") || combined.Contains("user"))
-                    return IconResource.Load("imageres.dll,-1001", 16);
-
-                if (combined.Contains("search") || combined.Contains("find"))
-                    return IconResource.Load("imageres.dll,-74", 16);
-
-                if (combined.Contains("setting") || combined.Contains("config") || combined.Contains("gear"))
-                    return IconResource.Load("imageres.dll,-27", 16);
-
-                if (combined.Contains("disk") || combined.Contains("drive"))
-                    return IconResource.Load("imageres.dll,-32", 16);
-
-                if (combined.Contains("media") || combined.Contains("player") || combined.Contains("audio") || combined.Contains("sound"))
-                    return IconResource.Load("wmploc.dll,-102", 16);
-
-                return IconResource.Load("imageres.dll,-2", 16) ?? IconResource.GetFallbackIcon();
+                Image? result = ResolveIconCore(title, progName);
+                if (result != null)
+                {
+                    lock (ResolvedIconCache)
+                    {
+                        ResolvedIconCache[cacheKey] = result;
+                    }
+                }
+                return result;
             }
             catch
             {
                 return null;
             }
+        }
+
+        private static Image? ResolveIconCore(string? title, string? progName)
+        {
+            string combined = ((title ?? "") + " " + (progName ?? "")).ToLowerInvariant();
+
+            if (combined.Contains("terminal") || combined.Contains("prompt") || combined.Contains("cmd") || combined.Contains("console"))
+                return IconResource.Load("shell32.dll,-284", 16);
+
+            if (combined.Contains("calc"))
+                return IconResource.Load("accessibilitycpl.dll,-327", 16);
+
+            if (combined.Contains("explorer") || combined.Contains("file"))
+                return IconResource.Load("imageres.dll,-4", 16);
+
+            if (combined.Contains("properties") || combined.Contains("sysdm") || combined.Contains("system properties"))
+                return IconResource.Load("imageres.dll,-109", 16);
+
+            if (combined.Contains("regedit") || combined.Contains("registry"))
+                return IconResource.Load("imageres.dll,-68", 16);
+
+            if (combined.Contains("editor") || combined.Contains("notepad") || combined.Contains("write") || combined.Contains("text"))
+                return IconResource.Load("shell32.dll,-70", 16);
+
+            if (combined.Contains("clock") || combined.Contains("time"))
+                return IconResource.Load("imageres.dll,-105", 16);
+
+            if (combined.Contains("paint") || combined.Contains("canvas") || combined.Contains("draw"))
+                return IconResource.Load("imageres.dll,-71", 16);
+
+            if (combined.Contains("task") || combined.Contains("perf") || combined.Contains("monitor") || combined.Contains("process"))
+                return IconResource.Load("shell32.dll,-171", 16);
+
+            if (combined.Contains("logon") || combined.Contains("login") || combined.Contains("user"))
+                return IconResource.Load("imageres.dll,-1001", 16);
+
+            if (combined.Contains("search") || combined.Contains("find"))
+                return IconResource.Load("imageres.dll,-74", 16);
+
+            if (combined.Contains("setting") || combined.Contains("config") || combined.Contains("gear"))
+                return IconResource.Load("imageres.dll,-27", 16);
+
+            if (combined.Contains("disk") || combined.Contains("drive"))
+                return IconResource.Load("imageres.dll,-32", 16);
+
+            if (combined.Contains("media") || combined.Contains("player") || combined.Contains("audio") || combined.Contains("sound"))
+                return IconResource.Load("wmploc.dll,-102", 16);
+
+            if (combined.Contains("winver") || combined.Contains("about"))
+                return IconResource.Load("shell32.dll,-25", 16);
+
+            if (!string.IsNullOrEmpty(progName))
+            {
+                string baseName = Path.GetFileNameWithoutExtension(progName).ToLowerInvariant();
+                string sidecar = $"/mnt/Programs/{baseName}.png";
+                if (File.Exists(sidecar)) return IconResource.Load(sidecar, 16);
+
+                string sidecarIco = $"/mnt/Programs/{baseName}.ico";
+                if (File.Exists(sidecarIco)) return IconResource.Load(sidecarIco, 16);
+
+                string sysIcon = $"/mnt/System/Icons/{baseName}.png";
+                if (File.Exists(sysIcon)) return IconResource.Load(sysIcon, 16);
+            }
+
+            return IconResource.Load("imageres.dll,-2", 16) ?? IconResource.GetFallbackIcon();
         }
 
         private static Image? LoadPngIfExists(string path)
@@ -1256,49 +1287,49 @@ namespace Windose.System.Elf
                 if (app == "explorer")
                 {
                     if (File.Exists("/mnt/Programs/explorer.elf"))
-                        ElfRunner.RunFile("/mnt/Programs/explorer.elf", string.IsNullOrEmpty(arg) ? new string[] { "/mnt" } : new string[] { arg });
+                        LaunchTracker.StartElf("/mnt/Programs/explorer.elf", string.IsNullOrEmpty(arg) ? new string[] { "/mnt" } : new string[] { arg });
                     else
                         LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", arg ?? "/mnt"));
                 }
                 else if (app == "terminal")
                 {
                     if (File.Exists("/mnt/Programs/terminal.elf"))
-                        ElfRunner.RunFile("/mnt/Programs/terminal.elf");
+                        LaunchTracker.StartElf("/mnt/Programs/terminal.elf");
                     else
                         LaunchTracker.Start(() => new CommandPrompt());
                 }
                 else if (app == "editor" || app == "notepad" || app == "aeroeditor")
                 {
                     if (File.Exists("/mnt/Programs/aeroeditor.elf"))
-                        ElfRunner.RunFile("/mnt/Programs/aeroeditor.elf", string.IsNullOrEmpty(arg) ? null : new string[] { arg });
+                        LaunchTracker.StartElf("/mnt/Programs/aeroeditor.elf", string.IsNullOrEmpty(arg) ? null : new string[] { arg });
                     else if (string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new BreezeEditor());
                     else LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, arg));
                 }
                 else if (app == "taskmgr" || app == "taskmanager")
                 {
                     if (File.Exists("/mnt/Programs/taskmgr.elf"))
-                        ElfRunner.RunFile("/mnt/Programs/taskmgr.elf");
+                        LaunchTracker.StartElf("/mnt/Programs/taskmgr.elf");
                     else
                         LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
                 }
                 else if (app == "registry" || app == "regedit")
                 {
                     if (File.Exists("/mnt/Programs/regedit.elf"))
-                        ElfRunner.RunFile("/mnt/Programs/regedit.elf");
+                        LaunchTracker.StartElf("/mnt/Programs/regedit.elf");
                     else
                         LaunchTracker.Start(() => new RegistryEditor());
                 }
                 else if (app == "calc" || app == "calculator")
                 {
                     if (File.Exists("/mnt/Programs/calc.elf"))
-                        ElfRunner.RunFile("/mnt/Programs/calc.elf");
+                        LaunchTracker.StartElf("/mnt/Programs/calc.elf");
                     else
                         LaunchTracker.Start(() => new Calculator());
                 }
                 else if (app == "winver" || app == "about")
                 {
                     if (File.Exists("/mnt/Programs/winver.elf"))
-                        ElfRunner.RunFile("/mnt/Programs/winver.elf");
+                        LaunchTracker.StartElf("/mnt/Programs/winver.elf");
                     else
                         LaunchTracker.Start(() => new AboutWindows());
                 }
@@ -1319,14 +1350,14 @@ namespace Windose.System.Elf
                 else if (app == "imageviewer" && !string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new ImageViewer(arg, 120, 120, 640, 480));
                 else if (File.Exists(name))
                 {
-                    ElfRunner.RunFile(name, string.IsNullOrEmpty(arg) ? null : new string[] { arg });
+                    LaunchTracker.StartElf(name, string.IsNullOrEmpty(arg) ? null : new string[] { arg });
                 }
                 else
                 {
                     string candidate = "/mnt/Programs/" + (name.EndsWith(".elf", StringComparison.OrdinalIgnoreCase) ? name : name + ".elf");
                     if (File.Exists(candidate))
                     {
-                        ElfRunner.RunFile(candidate, string.IsNullOrEmpty(arg) ? null : new string[] { arg });
+                        LaunchTracker.StartElf(candidate, string.IsNullOrEmpty(arg) ? null : new string[] { arg });
                     }
                     else return false;
                 }

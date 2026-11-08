@@ -147,7 +147,7 @@ namespace Windose.System.Kernel.Subsystem
                     {
                         if (File.Exists("/mnt/Programs/aeroeditor.elf"))
                         {
-                            Windose.System.Elf.ElfRunner.RunFile("/mnt/Programs/aeroeditor.elf");
+                            LaunchTracker.StartElf("/mnt/Programs/aeroeditor.elf");
                             return true;
                         }
                         LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, ""));
@@ -179,21 +179,17 @@ namespace Windose.System.Kernel.Subsystem
                         {
                             try
                             {
-                                byte[] data = File.ReadAllBytes(resolvedTarget);
                                 string progName = Path.GetFileName(resolvedTarget);
                                 List<string> argsList = new List<string> { progName };
                                 if (!string.IsNullOrWhiteSpace(info.Arguments))
                                 {
                                     argsList.AddRange(info.Arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries));
                                 }
-                                ElfProgram p = ElfRunner.Spawn(data, progName, argsList.ToArray(), out string error);
-                                if (p != null)
+                                LaunchTracker.StartElf(resolvedTarget, argsList.ToArray(), p =>
                                 {
-                                    if (!string.IsNullOrEmpty(info.WorkingDir)) p.Env["PWD"] = info.WorkingDir;
-                                    return true;
-                                }
-                                SystemLogger.WriteLine("Shortcut", $"Failed to launch ELF target {resolvedTarget}: {error}", ConsoleMessageType.Error);
-                                return false;
+                                    if (p != null && !string.IsNullOrEmpty(info.WorkingDir)) p.Env["PWD"] = info.WorkingDir;
+                                });
+                                return true;
                             }
                             catch (Exception ex)
                             {
@@ -229,12 +225,7 @@ namespace Windose.System.Kernel.Subsystem
             {
                 try
                 {
-                    byte[] data = File.ReadAllBytes(path);
-                    if (ElfRunner.Spawn(data, Path.GetFileName(path), new string[] { path }, out string error) == null)
-                    {
-                        SystemLogger.WriteLine("ELF", $"Failed to launch {path}: {error}", ConsoleMessageType.Error);
-                        return false;
-                    }
+                    LaunchTracker.StartElf(path, new string[] { path });
                     return true;
                 }
                 catch (Exception ex)

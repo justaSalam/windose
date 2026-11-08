@@ -379,11 +379,7 @@ public class FileExplorer : Window
         {
             try
             {
-                byte[] data = File.ReadAllBytes(path);
-                if (Windose.System.Elf.ElfRunner.Spawn(data, Path.GetFileName(path), new string[] { path }, out string error) == null)
-                {
-                    SystemLogger.WriteLine("ELF", $" Failed to launch {path}: {error}", ConsoleMessageType.Error);
-                }
+                Windose.System.Kernel.LaunchTracker.StartElf(path, new string[] { path });
             }
             catch (Exception ex)
             {
