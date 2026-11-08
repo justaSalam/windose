@@ -153,6 +153,10 @@ public partial class WindowManager
     {
         if (capturedWindow != null)
         {
+            if (capturedWindow.resizing)
+            {
+                Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.SizeNWSE);
+            }
             if (!failedWindows.Contains(capturedWindow))
             {
                 try

@@ -12,7 +12,7 @@ public class Window : Component
     private bool inFocus;
 
     private bool dragging;
-    private bool resizing;
+    internal bool resizing;
     public bool isMinimized { get; private set; }
     public bool isMaximized { get; private set; }
     private Rectangle restoreBounds;
@@ -733,7 +733,13 @@ public class Window : Component
     {
         if (dragging || !canResize || isMaximized) return;
 
-        if (mouseState.left == MouseEvents.Press && ResizeHitTest(mouseX, mouseY))
+        bool hitGrip = ResizeHitTest(mouseX, mouseY);
+        if (hitGrip || resizing)
+        {
+            Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.SizeNWSE);
+        }
+
+        if (mouseState.left == MouseEvents.Press && hitGrip)
         {
             resizing = true;
             resizeStart = new Point(mouseX, mouseY);
@@ -746,11 +752,19 @@ public class Window : Component
             resizing = false;
             WindowManager.ClearPreviewRect();
             Resize(previewBounds.X, previewBounds.Y, previewBounds.Width, previewBounds.Height);
+            if (!hitGrip)
+            {
+                Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.Arrow);
+            }
         }
         else if (mouseState.left == MouseEvents.None && resizing)
         {
             resizing = false;
             WindowManager.ClearPreviewRect();
+            if (!hitGrip)
+            {
+                Windose.Drivers.CursorManager.SetCursor(Windose.Drivers.CursorType.Arrow);
+            }
         }
 
         if (resizing && (mouseState.left == MouseEvents.Hold || mouseState.left == MouseEvents.Press || mouseState.left == MouseEvents.Release))
