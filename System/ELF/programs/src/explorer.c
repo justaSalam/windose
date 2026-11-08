@@ -101,12 +101,25 @@ static void fmt_drive(unsigned lo, unsigned hi, char *out)
 
 static void file_type(const char *name, int is_dir, char *out)
 {
-    int n;
+    const char *ext;
     if (is_dir) { strcpy(out, "File Folder"); return; }
-    n = (int)strlen(name);
-    if (n > 4 && !strcmp(name + n - 4, ".elf")) strcpy(out, "ELF Program");
-    else if (n > 4 && !strcmp(name + n - 4, ".txt")) strcpy(out, "Text File");
-    else if (n > 7 && !strcmp(name + n - 7, ".breeze")) strcpy(out, "Breeze Script");
+    ext = strrchr(name, '.');
+    if (!ext) { strcpy(out, "File"); return; }
+    if (!strcmp(ext, ".elf")) strcpy(out, "Application");
+    else if (!strcmp(ext, ".txt") || !strcmp(ext, ".log")) strcpy(out, "Text Document");
+    else if (!strcmp(ext, ".breeze")) strcpy(out, "Breeze Script");
+    else if (!strcmp(ext, ".lua")) strcpy(out, "Lua Script");
+    else if (!strcmp(ext, ".c")) strcpy(out, "C Source File");
+    else if (!strcmp(ext, ".h")) strcpy(out, "C Header File");
+    else if (!strcmp(ext, ".cs")) strcpy(out, "C# Source File");
+    else if (!strcmp(ext, ".json")) strcpy(out, "JSON File");
+    else if (!strcmp(ext, ".ini") || !strcmp(ext, ".cfg")) strcpy(out, "Configuration File");
+    else if (!strcmp(ext, ".png") || !strcmp(ext, ".bmp") || !strcmp(ext, ".jpg") || !strcmp(ext, ".jpeg") || !strcmp(ext, ".gif")) strcpy(out, "Image File");
+    else if (!strcmp(ext, ".wav") || !strcmp(ext, ".mp3")) strcpy(out, "Audio File");
+    else if (!strcmp(ext, ".avi") || !strcmp(ext, ".mp4")) strcpy(out, "Video File");
+    else if (!strcmp(ext, ".iso")) strcpy(out, "Disc Image");
+    else if (!strcmp(ext, ".dll")) strcpy(out, "Application Extension");
+    else if (!strcmp(ext, ".bat") || !strcmp(ext, ".cmd")) strcpy(out, "Batch Script");
     else strcpy(out, "File");
 }
 
