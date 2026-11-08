@@ -155,7 +155,10 @@ namespace Windose.Programs
             }
             if (lower == "paint" || lower == "mspaint")
             {
-                LaunchTracker.Start(() => new Paint());
+                if (File.Exists("/mnt/Programs/paint.elf"))
+                    FileAssociations.Launch("/mnt/Programs/paint.elf");
+                else
+                    LaunchTracker.Start(() => new Paint());
                 WindowManager.PostClose(this);
                 return;
             }

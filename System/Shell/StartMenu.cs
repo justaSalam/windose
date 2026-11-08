@@ -69,8 +69,13 @@ public class StartMenu : Window
         });
         curY += itemH;
 
-        AddLeftProgram("Paint", "imageres.dll,-71", leftX, curY, leftW, itemH,
-            () => LaunchTracker.Start(() => new Paint()));
+        AddLeftProgram("Paint", "imageres.dll,-71", leftX, curY, leftW, itemH, () =>
+        {
+            if (File.Exists("/mnt/Programs/paint.elf"))
+                ElfRunner.RunFile("/mnt/Programs/paint.elf");
+            else
+                LaunchTracker.Start(() => new Paint());
+        });
         curY += itemH;
 
         AddLeftProgram("AeroEditor", "shell32.dll,-70", leftX, curY, leftW, itemH, () =>
@@ -133,7 +138,13 @@ public class StartMenu : Window
             else
                 LaunchTracker.Start(() => new Calculator());
         });
-        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-71", 16), "Paint", () => LaunchTracker.Start(() => new Paint()));
+        accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-71", 16), "Paint", () =>
+        {
+            if (File.Exists("/mnt/Programs/paint.elf"))
+                ElfRunner.RunFile("/mnt/Programs/paint.elf");
+            else
+                LaunchTracker.Start(() => new Paint());
+        });
         accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-70", 16), "AeroEditor", () =>
         {
             if (File.Exists("/mnt/Programs/aeroeditor.elf"))
@@ -359,7 +370,10 @@ public class StartMenu : Window
         }
         if (lower == "paint" || lower == "mspaint")
         {
-            LaunchTracker.Start(() => new Paint());
+            if (File.Exists("/mnt/Programs/paint.elf"))
+                ElfRunner.RunFile("/mnt/Programs/paint.elf");
+            else
+                LaunchTracker.Start(() => new Paint());
             return;
         }
         if (lower == "winver" || lower == "about")

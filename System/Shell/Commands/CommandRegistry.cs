@@ -662,7 +662,10 @@ public static class CommandRegistry
 
         Register(new DelegateCommand("mspaint", "Launches MS Paint.", "mspaint", (context, args) =>
         {
-            LaunchTracker.Start(() => new Paint());
+            if (File.Exists("/mnt/Programs/paint.elf"))
+                ElfRunner.RunFile("/mnt/Programs/paint.elf");
+            else
+                LaunchTracker.Start(() => new Paint());
         }));
         RegisterAlias("paint", "mspaint");
 
