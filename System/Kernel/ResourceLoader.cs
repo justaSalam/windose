@@ -175,6 +175,15 @@ namespace Windose.System.Kernel
             WriteStorage("/mnt/Programs/regedit.elf", "Windose.System.ELF.programs.bin.regedit.elf", true);
             WriteStorage("/mnt/Programs/winver.elf", "Windose.System.ELF.programs.bin.winver.elf", true);
             WriteStorage("/mnt/Programs/paint.elf", "Windose.System.ELF.programs.bin.paint.elf", true);
+            WriteStorage("/mnt/Programs/tcc.elf", "Windose.System.ELF.programs.bin.tcc.elf", true);
+
+            WriteStorage("/mnt/System/include/kernel.h", "Windose.System.ELF.programs.include.kernel.h", true);
+            WriteStorage("/mnt/System/include/windose.h", "Windose.System.ELF.programs.include.windose.h", true);
+            WriteStorage("/mnt/System/include/stdio.h", "Windose.System.ELF.programs.include.stdio.h", true);
+            WriteStorage("/mnt/System/include/stdlib.h", "Windose.System.ELF.programs.include.stdlib.h", true);
+            WriteStorage("/mnt/System/include/string.h", "Windose.System.ELF.programs.include.string.h", true);
+            WriteStorage("/mnt/System/include/stdint.h", "Windose.System.ELF.programs.include.stdint.h", true);
+            WriteStorage("/mnt/System/include/ctype.h", "Windose.System.ELF.programs.include.ctype.h", true);
         }
     }
 }

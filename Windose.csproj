@@ -49,6 +49,9 @@
       <None Remove="System\ELF\programs\bin\winver.elf" />
       <None Remove="System\ELF\programs\bin\paint.elf" />
       <None Remove="System\ELF\programs\src\paint.c" />
+      <None Remove="System\ELF\programs\bin\tcc.elf" />
+      <None Remove="System\ELF\programs\src\tcc.c" />
+      <None Remove="System\ELF\programs\include\stdint.h" />
   </ItemGroup>
 
   <!-- Core kernel packages -->
@@ -125,6 +128,8 @@
     <EmbeddedResource Include=".\System\ELF\programs\bin\regedit.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\winver.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\paint.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\tcc.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\stdint.h" />
   </ItemGroup>
 
     <ItemGroup>
