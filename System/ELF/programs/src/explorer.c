@@ -385,7 +385,12 @@ static void go_up_hist(void)
 static int ends_elf(const char *name)
 {
     int n = (int)strlen(name);
-    return n > 4 && !strcmp(name + n - 4, ".elf");
+    if (n <= 4) return 0;
+    const char *ext = name + n - 4;
+    return (ext[0] == '.' &&
+           (ext[1] == 'e' || ext[1] == 'E') &&
+           (ext[2] == 'l' || ext[2] == 'L') &&
+           (ext[3] == 'f' || ext[3] == 'F'));
 }
 
 static void open_selected(void)
@@ -405,7 +410,9 @@ static void open_selected(void)
         if (pid < 0) { snprintf(s, sizeof s, "cannot run %s", entries[selected].name); set_sel(s); }
         return;
     }
-    open_viewer(path);
+    if (k_open_file(path) <= 0) {
+        open_viewer(path);
+    }
 }
 
 static void on_row_selected(void)

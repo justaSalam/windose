@@ -208,6 +208,11 @@ namespace Windose.System.Elf
             ElfWindow win = new ElfWindow(80 + n * 30, 80 + n * 30,
                                           w + border * 2, h + titleH + border,
                                           title, icon);
+            if (title != null && title.Equals("Calculator", StringComparison.OrdinalIgnoreCase))
+            {
+                win.canResize = false;
+                win.canMaximize = false;
+            }
             WindowManager.Register(win);   // posts to the DWM: starts the process, z-order, focus, taskbar button
             return win;
         }
@@ -221,6 +226,7 @@ namespace Windose.System.Elf
             bool closeToTray = (flags & 16) != 0;
             bool openToTray = (flags & 32) != 0;
             bool minimizeToTray = (flags & 64) != 0;
+            bool noResize = (flags & 128) != 0;
 
             int border = borderless ? 0 : Palette.BorderSize;
             int titleH = useTitleBar ? Palette.TitleBarHeight : 0;
@@ -251,6 +257,11 @@ namespace Windose.System.Elf
             {
                 win.openToTray = true;
                 win.closeToTray = true;
+            }
+            if (noResize || (title != null && title.Equals("Calculator", StringComparison.OrdinalIgnoreCase)))
+            {
+                win.canResize = false;
+                win.canMaximize = false;
             }
 
             WindowManager.Register(win);

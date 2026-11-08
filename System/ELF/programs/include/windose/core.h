@@ -60,7 +60,8 @@ enum {
     WIN_FLAG_NO_TITLEBAR = 1 << 0,
     WIN_FLAG_NO_TASKBAR  = 1 << 1,
     WIN_FLAG_POPUP       = 1 << 2,
-    WIN_FLAG_BORDERLESS  = 1 << 3
+    WIN_FLAG_BORDERLESS  = 1 << 3,
+    WIN_FLAG_NO_RESIZE   = 1 << 7
 };
 
 // Event types

@@ -189,8 +189,9 @@ int main(int argc, char **argv)
     int i;
     (void)argc; (void)argv;
 
-    win = k_create_window_with_icon(280, 380, "Calculator", "/mnt/System/Icons/calculator.png");
+    win = k_create_window_ex(100, 100, 280, 380, "Calculator", WIN_FLAG_NO_RESIZE);
     if (!win) { puts("window creation failed"); return 1; }
+    k_set_icon(win, "/mnt/System/Icons/calculator.png");
     display = k_create_label(win, 8, 8, "");
     if (!display) { puts("label failed"); k_close(win); return 1; }
     for (i = 0; i < 20; i++) {
