@@ -149,5 +149,12 @@ static inline int      k_window_get_state(handle_t win) { return win_get_state(w
 static inline int      k_shell_run_dialog(void) { return shell_run_dialog(); }
 static inline int      k_shell_about_dialog(void) { return shell_about_dialog(); }
 static inline int      k_get_system_metrics(int metric) { return system_metrics(metric); }
+static inline int      k_ps_list(char *buf, int max) { return __k->ps_list(__k->pid, buf, max); }
+static inline int      k_ps_kill(int target_pid) { return __k->ps_kill(__k->pid, target_pid); }
+static inline int      k_reg_list(const char *prefix, char *buf, int max) { return __k->reg_list(__k->pid, prefix, buf, max); }
+static inline int      k_reg_get(const char *key, char *buf, int max) { return __k->reg_get(__k->pid, key, buf, max); }
+static inline int      k_reg_set(const char *key, const char *val) { return __k->reg_set(__k->pid, key, val); }
+static inline int      k_widget_set_anchors(handle_t obj, int flags) { return __k->widget_set_anchors(__k->pid, obj, flags); }
+static inline int      k_widget_set_bounds(handle_t obj, int x, int y, int w, int h) { return __k->widget_set_bounds(__k->pid, obj, x, y, w, h); }
 
 #endif // WINDOSE_KERNEL_H

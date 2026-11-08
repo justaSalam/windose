@@ -155,6 +155,13 @@ namespace Windose.System.Elf
         public delegate* unmanaged<int, int> ShellRunDialog;                                  // (pid) -> 0
         public delegate* unmanaged<int, int> ShellAboutDialog;                                // (pid) -> 0
         public delegate* unmanaged<int, int, int> GetSystemMetrics;                           // (pid, metric) -> val
+        public delegate* unmanaged<int, byte*, int, int> PsList;                              // (pid, buf, max) -> count
+        public delegate* unmanaged<int, int, int> PsKill;                                     // (pid, target_pid) -> 0 ok, -1 err
+        public delegate* unmanaged<int, byte*, byte*, int, int> RegList;                      // (pid, prefix, buf, max) -> count
+        public delegate* unmanaged<int, byte*, byte*, int, int> RegGet;                       // (pid, key, buf, max) -> len
+        public delegate* unmanaged<int, byte*, byte*, int> RegSet;                            // (pid, key, val) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int> WidgetSetAnchors;                      // (pid, handle, flags) -> 0 ok, -1 err
+        public delegate* unmanaged<int, int, int, int, int, int, int> WidgetSetBounds;        // (pid, handle, x, y, w, h) -> 0 ok, -1 err
     }
 
     /// <summary>Matches DriveStat in programs/include/kernel.h. int-only so it can cross the unmanaged boundary.</summary>
@@ -176,7 +183,7 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
-        public const int ApiVersion = 13;
+        public const int ApiVersion = 14;
         private const int KKilled = -100;
         private const int MaxStr = 260;
         private const int MaxIo = 1024 * 1024;
@@ -554,6 +561,13 @@ namespace Windose.System.Elf
             api.ShellRunDialog = &ApiShellRunDialog;
             api.ShellAboutDialog = &ApiShellAboutDialog;
             api.GetSystemMetrics = &ApiGetSystemMetrics;
+            api.PsList = &ApiPsList;
+            api.PsKill = &ApiPsKill;
+            api.RegList = &ApiRegList;
+            api.RegGet = &ApiRegGet;
+            api.RegSet = &ApiRegSet;
+            api.WidgetSetAnchors = &ApiWidgetSetAnchors;
+            api.WidgetSetBounds = &ApiWidgetSetBounds;
         }
 
         // ---------------------------------------------------------------- helpers
@@ -2709,6 +2723,117 @@ namespace Windose.System.Elf
                 return host.GetSystemMetrics(metric);
             }
             catch { return 0; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiPsList(int pid, byte* buf, int max)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                string data = host.PsList() ?? "";
+                byte[] raw = global::System.Text.Encoding.UTF8.GetBytes(data);
+                int copyLen = Math.Min(raw.Length, Math.Max(0, max - 1));
+                if (buf != null && copyLen > 0)
+                {
+                    Marshal.Copy(raw, 0, (IntPtr)buf, copyLen);
+                    buf[copyLen] = 0;
+                }
+                return raw.Length;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiPsKill(int pid, int targetPid)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.PsKill(targetPid) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiRegList(int pid, byte* prefix, byte* buf, int max)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                string[] keys = host.RegList(CStr(prefix)) ?? Array.Empty<string>();
+                string joined = string.Join("\n", keys);
+                byte[] raw = global::System.Text.Encoding.UTF8.GetBytes(joined);
+                int copyLen = Math.Min(raw.Length, Math.Max(0, max - 1));
+                if (buf != null && copyLen > 0)
+                {
+                    Marshal.Copy(raw, 0, (IntPtr)buf, copyLen);
+                    buf[copyLen] = 0;
+                }
+                return keys.Length;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiRegGet(int pid, byte* key, byte* valBuf, int max)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                string val = host.RegGet(CStr(key)) ?? "";
+                byte[] raw = global::System.Text.Encoding.UTF8.GetBytes(val);
+                int copyLen = Math.Min(raw.Length, Math.Max(0, max - 1));
+                if (valBuf != null && copyLen > 0)
+                {
+                    Marshal.Copy(raw, 0, (IntPtr)valBuf, copyLen);
+                    valBuf[copyLen] = 0;
+                }
+                return raw.Length;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiRegSet(int pid, byte* key, byte* val)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.RegSet(CStr(key), CStr(val)) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWidgetSetAnchors(int pid, int handle, int flags)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(handle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.WidgetSetAnchors(obj, flags) ? 0 : -1;
+            }
+            catch { return -1; }
+        }
+
+        [UnmanagedCallersOnly]
+        private static int ApiWidgetSetBounds(int pid, int handle, int x, int y, int w, int h)
+        {
+            try
+            {
+                ElfProgram p = Live(pid); if (p == null) return KKilled;
+                object obj = p.Objs.Get(handle); if (obj == null) return -1;
+                IElfHost host = Host; if (host == null) return -1;
+                return host.WidgetSetBounds(obj, x, y, w, h) ? 0 : -1;
+            }
+            catch { return -1; }
         }
 
         private static readonly Dictionary<int, (string Name, string? FilePath, byte[]? OriginalBytes, string[]? Args)> _recentProgramInfo =

@@ -237,5 +237,12 @@ namespace Windose.System.Elf
         bool ShellRunDialog();
         bool ShellAboutDialog();
         int GetSystemMetrics(int metric);
+        string PsList();
+        bool PsKill(int targetPid);
+        string[] RegList(string prefix);
+        string RegGet(string key);
+        bool RegSet(string key, string value);
+        bool WidgetSetAnchors(object obj, int anchorFlags);
+        bool WidgetSetBounds(object obj, int x, int y, int w, int h);
     }
 }

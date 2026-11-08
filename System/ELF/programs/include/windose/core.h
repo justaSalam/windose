@@ -7,10 +7,19 @@
 
 // Calling convention for host <-> guest boundary
 #define KABI __attribute__((sysv_abi))
-#define KAPI_VERSION 13
+#define KAPI_VERSION 14
 #define K_KILLED (-100)
 
 typedef int handle_t; // opaque kernel handle; 0 = invalid/none
+
+// Control anchor flags
+enum {
+    ANCHOR_NONE   = 0,
+    ANCHOR_LEFT   = 1 << 0,
+    ANCHOR_TOP    = 1 << 1,
+    ANCHOR_RIGHT  = 1 << 2,
+    ANCHOR_BOTTOM = 1 << 3
+};
 
 // System metrics (matches GetSystemMetrics)
 enum {
@@ -208,6 +217,13 @@ typedef struct KernelApi {
     int      (KABI *shell_run_dialog)(int pid);
     int      (KABI *shell_about_dialog)(int pid);
     int      (KABI *get_system_metrics)(int pid, int metric);
+    int      (KABI *ps_list)(int pid, char *buf, int max);
+    int      (KABI *ps_kill)(int pid, int target_pid);
+    int      (KABI *reg_list)(int pid, const char *prefix, char *buf, int max);
+    int      (KABI *reg_get)(int pid, const char *key, char *val_buf, int max);
+    int      (KABI *reg_set)(int pid, const char *key, const char *val);
+    int      (KABI *widget_set_anchors)(int pid, handle_t obj, int anchor_flags);
+    int      (KABI *widget_set_bounds)(int pid, handle_t obj, int x, int y, int w, int h);
 } KernelApi;
 
 extern KernelApi *__k;

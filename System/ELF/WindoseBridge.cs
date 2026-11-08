@@ -1724,6 +1724,115 @@ namespace Windose.System.Elf
             };
         }
 
+        public string PsList()
+        {
+            var sb = new global::System.Text.StringBuilder();
+            lock (ProcessManager.processes)
+            {
+                for (int i = 0; i < ProcessManager.processes.Count; i++)
+                {
+                    Process p = ProcessManager.processes[i];
+                    if (p == null || !p.Running) continue;
+                    long mem = 0;
+                    if (p.name != null && p.name.StartsWith("elf: "))
+                    {
+                        string elfName = p.name.Substring(5).Trim();
+                        ElfProgram? ep = ElfRunner.Find(elfName);
+                        if (ep != null) mem = ep.MemoryBytes;
+                    }
+                    sb.Append(p.id).Append(':')
+                      .Append(p.name ?? "unnamed").Append(':')
+                      .Append(p.processType.ToString()).Append(':')
+                      .Append(mem).Append('\n');
+                }
+            }
+            return sb.ToString();
+        }
+
+        public bool PsKill(int targetPid)
+        {
+            lock (ProcessManager.processes)
+            {
+                for (int i = 0; i < ProcessManager.processes.Count; i++)
+                {
+                    Process p = ProcessManager.processes[i];
+                    if (p != null && p.id == targetPid)
+                    {
+                        if (!p.canTerminate) return false;
+                        if (p.name != null && p.name.StartsWith("elf: "))
+                        {
+                            string elfName = p.name.Substring(5).Trim();
+                            ElfProgram? ep = ElfRunner.Find(elfName);
+                            if (ep != null) ElfRunner.Kill(ep.Pid);
+                        }
+                        ProcessManager.QueueStop(p);
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        public string[] RegList(string prefix)
+        {
+            RegistryEntry[] entries = Registry.GetEntries(prefix ?? "");
+            string[] keys = new string[entries.Length];
+            for (int i = 0; i < entries.Length; i++)
+            {
+                keys[i] = entries[i].Key;
+            }
+            return keys;
+        }
+
+        public string RegGet(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return "";
+            object val = Registry.Get(key);
+            return val?.ToString() ?? "";
+        }
+
+        public bool RegSet(string key, string value)
+        {
+            if (string.IsNullOrEmpty(key)) return false;
+            object existing = Registry.Get(key);
+            object valToSet = value;
+            if (existing is long)
+            {
+                if (long.TryParse(value, out long num)) valToSet = num;
+            }
+            else if (existing is bool)
+            {
+                if (bool.TryParse(value, out bool b)) valToSet = b;
+            }
+            return Registry.Set(key, valToSet);
+        }
+
+        public bool WidgetSetAnchors(object obj, int anchorFlags)
+        {
+            Component? comp = obj as Component;
+            if (comp == null) return false;
+            ElfWindow? win = comp.GetOwningWindow() as ElfWindow;
+            if (win == null) return false;
+            win.SetChildAnchors(comp, anchorFlags);
+            return true;
+        }
+
+        public bool WidgetSetBounds(object obj, int x, int y, int w, int h)
+        {
+            Component? comp = obj as Component;
+            if (comp == null) return false;
+            ElfWindow? win = comp.GetOwningWindow() as ElfWindow;
+            if (win != null)
+            {
+                win.SetChildBounds(comp, x, y, w, h);
+            }
+            else
+            {
+                comp.SetBounds(x, y, w, h);
+            }
+            return true;
+        }
+
         // Program coordinates are relative to the window's client area (inside frame + title bar).
         private static int ClientX(Component parent, int x) { return (parent is Window win && win.HasTitleBar) ? x + Palette.BorderSize : x; }
         private static int ClientY(Component parent, int y) { return (parent is Window win && win.HasTitleBar) ? y + Palette.TitleBarHeight : y; }

@@ -13,6 +13,7 @@ namespace Windose.System.Elf
         public int OrigClientY;
         public int OrigWidth;
         public int OrigHeight;
+        public int AnchorFlags = 1 | 2; // ANCHOR_LEFT (1) | ANCHOR_TOP (2)
     }
 
     /// <summary>
@@ -94,6 +95,27 @@ namespace Windose.System.Elf
                     };
                 }
             }
+        }
+
+        public void SetChildAnchors(Component child, int anchorFlags)
+        {
+            if (child == null) return;
+            RecordChildInitialLayout(child);
+            lock (childLayouts)
+            {
+                if (childLayouts.TryGetValue(child, out var info))
+                {
+                    info.AnchorFlags = anchorFlags;
+                }
+            }
+        }
+
+        public void SetChildBounds(Component child, int x, int y, int w, int h)
+        {
+            if (child == null) return;
+            child.SetBounds(ClientOriginX + x, ClientOriginY + y, w, h);
+            UpdateChildLayout(child, x, y, w, h);
+            MarkDirty();
         }
 
         public override Component AddChild(Component child)
