@@ -65,7 +65,8 @@ public class ScheduledProcess : Process
             {
                 Update();
 
-                Thread.Sleep(0);
+                int interval = GetNextUpdateIntervalMs();
+                Thread.Sleep(interval > 0 ? interval : 10);
             }
         }
         catch (Exception)

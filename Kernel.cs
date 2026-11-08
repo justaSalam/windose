@@ -139,27 +139,6 @@ public class Kernel : Sys.Kernel
 
         BreezeCapabilityPolicy.Grant("/mnt/Apps/main.breeze", "service.control");
 
-
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.Tab, Modifiers = ConsoleModifiers.Alt }, TaskSwitcher.Cycle);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.LeftArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(0));
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.RightArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(1));
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.UpArrow, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.SnapFocused(2));
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.D, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, WindowManager.ToggleShowDesktop);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.L, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, LockManager.Lock);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.LeftArrow, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, WindowManager.PrevDesktop);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.RightArrow, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Alt }, WindowManager.NextDesktop);
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.R, Modifiers = ConsoleModifiers.Alt }, () =>
-        {
-            // Never block here: this runs on the window manager's input thread.
-            // Spawn starts the program and returns; Run would wait for it to exit and freeze the desktop.
-            string error;
-            ElfProgram program = ElfRunner.Spawn(File.ReadAllBytes("/mnt/Programs/run.elf"), "Run", new string[] { "run" }, out error);
-            if (program == null)
-                SystemLogger.WriteLine("Hotkey", "Could not start Run: " + error, ConsoleMessageType.Error);
-        });
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.E, Modifiers = ConsoleModifiers.Alt }, () => WindowManager.PostRegister(new FileExplorer(100, 100, 800, 500, "File Explorer")));
-        HotkeyManager.RegisterHotkey(new KeyEvent { Key = Key.Escape, Modifiers = ConsoleModifiers.Control | ConsoleModifiers.Shift }, () => WindowManager.PostRegister(new PerformanceMonitor(100, 100)));
-
         SystemLogger.WriteLine("Kernel", "Boot completed successfully", ConsoleMessageType.Log);
         FileAssociations.DiscoverPrograms(typeof(Kernel).Assembly);
         Windose.System.Media.AudioEngine.Instance.PlayStartupSound();

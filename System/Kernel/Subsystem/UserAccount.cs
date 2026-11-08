@@ -1,4 +1,4 @@
-﻿using Windose.System.Kernel.Cryptography;
+using Windose.System.Kernel.Cryptography;
 
 namespace Windose.System.Kernel.Subsystem
 {
@@ -77,17 +77,14 @@ namespace Windose.System.Kernel.Subsystem
             UserAccount account = new UserAccount(username, hash, profilePath, role);
 
 
-            if (Directory.Exists(profilePath))
+            if (!Directory.Exists(profilePath))
             {
-                return null;
-                // Handle the case where the profile directory already exists (e.g., throw an exception or log a warning)
+                Directory.CreateDirectory(profilePath);
             }
-
-            Directory.CreateDirectory(profilePath);
 
             accounts.Add(account);
 
-            File.AppendAllText(Session.accountsFilePath, $"{account.username}:{account.password}:{account.privilege}");
+            File.AppendAllText(Session.accountsFilePath, $"{account.username}:{account.password}:{account.privilege}{Environment.NewLine}");
             Registry.Define($"User/{username}/Default", null);
 
             return account;

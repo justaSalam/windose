@@ -1,4 +1,4 @@
-﻿using Windose.System.Kernel.Cryptography;
+using Windose.System.Kernel.Cryptography;
 
 namespace Windose.System.Kernel.Subsystem
 {
@@ -7,10 +7,17 @@ namespace Windose.System.Kernel.Subsystem
         public static UserAccount? CurrentUser { get; set; }
         public const string accountsFilePath = "/mnt/System/Accounts.dat";
 
+        private static bool _isElevated;
+
         public static bool isElevated
         {
             get
             {
+                if (_isElevated)
+                {
+                    return true;
+                }
+
                 if (CurrentUser == null)
                 {
                     return false;
@@ -20,7 +27,7 @@ namespace Windose.System.Kernel.Subsystem
             }
             set
             {
-                isElevated = value;
+                _isElevated = value;
             }
         }
 
