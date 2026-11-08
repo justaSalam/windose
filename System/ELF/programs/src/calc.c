@@ -3,10 +3,12 @@
 #include <string.h>
 #include "kernel.h"
 
-// Calculator: buttons + keyboard, C-style precedence, doubles, no libc float printf.
+// Native Calculator: 5x5 grid, standard & memory operations, doubles, responsive layout
 static handle_t win, display;
 static char expr[128];
 static int fresh;
+static double mem_val = 0.0;
+static int has_mem = 0;
 
 // ---------- doubles without printf %f ----------
 static void fmt_double(double v, char *out)
@@ -149,6 +151,7 @@ static void press_key(char ch)
 {
     char s[64];
     double v;
+
     if (ch == 'C') { expr[0] = 0; fresh = 0; show(""); return; }
     if (ch == '<') {
         int n = (int)strlen(expr);
@@ -157,20 +160,105 @@ static void press_key(char ch)
         show(expr);
         return;
     }
+    if (ch == 'M') { // MC
+        mem_val = 0.0;
+        has_mem = 0;
+        show("Memory Cleared");
+        fresh = 1;
+        return;
+    }
+    if (ch == 'R') { // MR
+        fmt_double(mem_val, s);
+        strncpy(expr, s, sizeof(expr) - 1);
+        fresh = 1;
+        show(expr);
+        return;
+    }
+    if (ch == 'P') { // M+
+        if (expr[0] && eval(expr, &v)) {
+            mem_val += v;
+            has_mem = 1;
+            fresh = 1;
+            snprintf(s, sizeof(s), "M+ (Total: %s)", (fmt_double(mem_val, expr), expr));
+            show(s);
+        } else if (!expr[0] && has_mem) {
+            show("Memory Active");
+        } else {
+            show("Error");
+        }
+        return;
+    }
+    if (ch == 'N') { // +/-
+        if (expr[0] && eval(expr, &v)) {
+            v = -v;
+            fmt_double(v, s);
+            strncpy(expr, s, sizeof(expr) - 1);
+            fresh = 1;
+            show(expr);
+        }
+        return;
+    }
+    if (ch == 'Q') { // sqrt
+        if (expr[0] && eval(expr, &v)) {
+            if (v < 0) { show("Invalid Input"); return; }
+            double x = v;
+            if (x > 0) {
+                double g = x / 2.0;
+                if (g < 1.0) g = 1.0;
+                for (int it = 0; it < 30; it++) g = 0.5 * (g + x / g);
+                x = g;
+            }
+            fmt_double(x, s);
+            strncpy(expr, s, sizeof(expr) - 1);
+            fresh = 1;
+            show(expr);
+        } else {
+            show("Error");
+        }
+        return;
+    }
+    if (ch == 'X') { // 1/x
+        if (expr[0] && eval(expr, &v)) {
+            if (v == 0.0) { show("Cannot divide by 0"); return; }
+            v = 1.0 / v;
+            fmt_double(v, s);
+            strncpy(expr, s, sizeof(expr) - 1);
+            fresh = 1;
+            show(expr);
+        } else {
+            show("Error");
+        }
+        return;
+    }
+    if (ch == '%') { // percentage
+        if (expr[0] && eval(expr, &v)) {
+            v = v / 100.0;
+            fmt_double(v, s);
+            strncpy(expr, s, sizeof(expr) - 1);
+            fresh = 1;
+            show(expr);
+        } else {
+            show("Error");
+        }
+        return;
+    }
     if (ch == '=') {
         if (!expr[0]) return;
         if (eval(expr, &v)) {
             fmt_double(v, s);
-            strncpy(expr, s, sizeof expr - 1);
+            strncpy(expr, s, sizeof(expr) - 1);
             fresh = 1;
             show(expr);
-        } else show("Error");
+        } else {
+            show("Error");
+        }
         return;
     }
+
     if (fresh) { expr[0] = 0; fresh = 0; }
     {
         int n = (int)strlen(expr);
-        if (n < (int)sizeof expr - 2) { expr[n] = ch; expr[n + 1] = 0; }
+        if (n < (int)sizeof(expr) - 2) { expr[n] = ch; expr[n + 1] = 0; }
     }
     show(expr);
 }
@@ -178,25 +266,32 @@ static void press_key(char ch)
 int main(int argc, char **argv)
 {
     static const char *labels[] = {
-        "C", "(", ")", "/",
-        "7", "8", "9", "*",
-        "4", "5", "6", "-",
-        "1", "2", "3", "+",
-        "0", ".", "<", "="
+        "MC",   "MR",   "M+",   "C",   "<-",
+        "7",    "8",    "9",    "/",   "sqrt",
+        "4",    "5",    "6",    "*",   "%",
+        "1",    "2",    "3",    "-",   "1/x",
+        "0",    "+/-",  ".",    "+",   "="
     };
-    static const char keys[] = "C()/789*456-123+0.<=";
-    handle_t btns[20];
+    static const char keys[] = {
+        'M', 'R', 'P', 'C', '<',
+        '7', '8', '9', '/', 'Q',
+        '4', '5', '6', '*', '%',
+        '1', '2', '3', '-', 'X',
+        '0', 'N', '.', '+', '='
+    };
+    handle_t btns[25];
     int i;
     (void)argc; (void)argv;
 
-    win = k_create_window_ex(100, 100, 280, 380, "Calculator", WIN_FLAG_NO_RESIZE);
+    win = k_create_window_ex(100, 100, 320, 380, "Calculator", WIN_FLAG_NO_RESIZE);
     if (!win) { puts("window creation failed"); return 1; }
     k_set_icon(win, "/mnt/System/Icons/calculator.png");
-    display = k_create_label(win, 8, 8, "");
+    display = k_create_label(win, 10, 12, "0");
     if (!display) { puts("label failed"); k_close(win); return 1; }
-    for (i = 0; i < 20; i++) {
-        int col = i % 4, row = i / 4;
-        btns[i] = k_create_button(win, 8 + col * 66, 56 + row * 60, 60, 52, labels[i]);
+
+    for (i = 0; i < 25; i++) {
+        int col = i % 5, row = i / 5;
+        btns[i] = k_create_button(win, 10 + col * 59, 56 + row * 58, 54, 50, labels[i]);
         if (!btns[i]) { puts("button failed"); k_close(win); return 1; }
     }
 
@@ -211,12 +306,16 @@ int main(int argc, char **argv)
                 if (ch == '\r') ch = '=';
                 if ((ch >= '0' && ch <= '9') || ch == '.' || ch == '+' || ch == '-' ||
                     ch == '*' || ch == '/' || ch == '%' || ch == '(' || ch == ')' ||
-                    ch == '=' || ch == 'C' || ch == '\b')
-                    press_key(ch == '\b' ? '<' : ch);
+                    ch == '=' || ch == 'C' || ch == 'c' || ch == '\b')
+                    press_key(ch == '\b' ? '<' : (ch == 'c' ? 'C' : ch));
+                else if (ch == 's' || ch == 'S')
+                    press_key('Q');
+                else if (ch == 'n' || ch == 'N')
+                    press_key('N');
                 continue;
             }
             if (e.type != EV_CLICK) continue;
-            for (i = 0; i < 20; i++)
+            for (i = 0; i < 25; i++)
                 if (e.handle == btns[i]) { press_key(keys[i]); break; }
         }
         k_sleep(10);
