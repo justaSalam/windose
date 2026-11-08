@@ -176,6 +176,8 @@ namespace Windose.System.Kernel
             WriteStorage("/mnt/Programs/winver.elf", "Windose.System.ELF.programs.bin.winver.elf", true);
             WriteStorage("/mnt/Programs/paint.elf", "Windose.System.ELF.programs.bin.paint.elf", true);
             WriteStorage("/mnt/Programs/tcc.elf", "Windose.System.ELF.programs.bin.tcc.elf", true);
+            WriteStorage("/mnt/Programs/properties.elf", "Windose.System.ELF.programs.bin.properties.elf", true);
+            WriteStorage("/mnt/Programs/sysdm.elf", "Windose.System.ELF.programs.bin.sysdm.elf", true);
 
             WriteStorage("/mnt/System/include/kernel.h", "Windose.System.ELF.programs.include.kernel.h", true);
             WriteStorage("/mnt/System/include/windose.h", "Windose.System.ELF.programs.include.windose.h", true);

@@ -1,19 +1,27 @@
+using System;
+using System.IO;
+using Windose;
+using Windose.System.Kernel;
+
 public class FileProperties : Window
 {
     private DockPanel root;
     private MenuBar menuBar;
     private GroupBox group;
     private StackPanel buttons;
-    public FileProperties(int x, int y, FileEntry fileEntry) : base(x, y, 340, 380, "Properties", true)
+    private TextField fileNameField;
+    private Checkbox cbReadOnly;
+    private Checkbox cbHidden;
+    private FileEntry targetEntry;
+
+    public FileProperties(int x, int y, FileEntry fileEntry) : base(x, y, 350, 420, $"{fileEntry?.FileName ?? "File"} Properties", true)
     {
         canResize = false;
+        targetEntry = fileEntry;
+
         menuBar = new MenuBar(0, 0, Width);
-
-
-
-        MenuPage General = menuBar.AddMenuPage("General");
-
-        MenuPage Security = menuBar.AddMenuPage("Security");
+        MenuPage generalPage = menuBar.AddMenuPage("General");
+        MenuPage securityPage = menuBar.AddMenuPage("Security");
 
         root = new DockPanel(0, 0, Width, Height)
         {
@@ -31,8 +39,8 @@ public class FileProperties : Window
             horizontalAlignment = HorizontalAlignment.Stretch,
             useBackground = true,
             Margin = new Thickness(10, 35, 10, 10),
-
         };
+
         buttons = new StackPanel(Palette.ControlFace, 0, 0, Width, 28)
         {
             orientation = StackOrientation.Horizontal,
@@ -45,26 +53,23 @@ public class FileProperties : Window
             useBackground = false,
         };
 
-        group.AddGroupChild(new Label(0, 0, 200, 30)
+        fileNameField = new TextField(0, 0, 240, 26)
         {
-            text = $"{fileEntry.FileName}",
-            useBackground = false,
-            fontSize = 16
-        });
-
-
+            text = fileEntry.FileName,
+            useBackground = true,
+        };
+        group.AddGroupChild(fileNameField);
 
         group.AddGroupChild(new Separator(0, 0, Width, 1) { orientation = LayoutOrientation.Horizontal });
 
-        group.AddGroupChild(new Label(0, 0, Width, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 26)
         {
             text = $"Type: {fileEntry.FileType}",
-
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch
         });
 
-        group.AddGroupChild(new Label(0, 0, Width, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 26)
         {
             text = $"Location: {fileEntry.AbsoluteLocation}",
             useBackground = false,
@@ -73,43 +78,58 @@ public class FileProperties : Window
 
         if (fileEntry.FileType == FileType.Directory)
         {
-            DirectoryInfo directoryInfo = new DirectoryInfo(fileEntry.AbsoluteLocation);
-
-            foreach (FileInfo fileInfo in directoryInfo.GetFiles())
+            try
             {
-                fileEntry.SizeBytes += fileInfo.Length;
+                DirectoryInfo directoryInfo = new DirectoryInfo(fileEntry.AbsoluteLocation);
+                foreach (FileInfo fileInfo in directoryInfo.GetFiles())
+                {
+                    fileEntry.SizeBytes += fileInfo.Length;
+                }
+                fileEntry.directoryCount = directoryInfo.GetDirectories().Length;
+                fileEntry.fileCount = directoryInfo.GetFiles().Length;
+
+                group.AddGroupChild(new Label(0, 0, Width, 26)
+                {
+                    text = $"Contains: {fileEntry.directoryCount} dir(s), {fileEntry.fileCount} file(s)",
+                    useBackground = false,
+                    horizontalAlignment = HorizontalAlignment.Stretch
+                });
             }
-
-            fileEntry.directoryCount = directoryInfo.GetDirectories().Length;
-            fileEntry.fileCount = directoryInfo.GetFiles().Length;
-
-
-            group.AddGroupChild(new Label(0, 0, Width, 30)
-            {
-                text = $"Contains: {fileEntry.directoryCount} dir(s), {fileEntry.fileCount} file(s)",
-                useBackground = false,
-                horizontalAlignment = HorizontalAlignment.Stretch
-            });
+            catch { }
         }
 
-        group.AddGroupChild(new Label(0, 0, Width, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 26)
         {
             text = $"Size: {ByteSize.Format(fileEntry.SizeBytes)}",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch
         });
 
-        group.AddGroupChild(new Separator(0, 0, Width, 1)
-        {
-            orientation = LayoutOrientation.Horizontal
-        });
+        group.AddGroupChild(new Separator(0, 0, Width, 1) { orientation = LayoutOrientation.Horizontal });
 
-        group.AddGroupChild(new Label(0, 0, Width, 30)
+        group.AddGroupChild(new Label(0, 0, Width, 26)
         {
             text = $"Created at: {fileEntry.CreatedAt}",
             useBackground = false,
             horizontalAlignment = HorizontalAlignment.Stretch
         });
+
+        cbReadOnly = new Checkbox("Read-only", 0, 0);
+        cbHidden = new Checkbox("Hidden", 120, 0);
+
+        try
+        {
+            string attr = Registry.Get($"Software/Windose/Attributes{fileEntry.AbsoluteLocation}");
+            if (!string.IsNullOrEmpty(attr))
+            {
+                if (attr.Contains("R")) cbReadOnly.isChecked = true;
+                if (attr.Contains("H")) cbHidden.isChecked = true;
+            }
+        }
+        catch { }
+
+        group.AddGroupChild(cbReadOnly);
+        group.AddGroupChild(cbHidden);
 
         buttons.AddStackChild(new Button("Ok", 0, 0, 70, 24)
         {
@@ -129,7 +149,6 @@ public class FileProperties : Window
             Margin = new Thickness(0),
             leftClickAction = Close
         });
-
         buttons.AddStackChild(new Button("Apply", 0, 0, 70, 24)
         {
             useBorders = true,
@@ -138,13 +157,10 @@ public class FileProperties : Window
             leftClickAction = Apply
         });
 
-
         root.AddDockChild(menuBar, Dock.Top);
-
         root.AddDockChild(buttons, Dock.Bottom);
         root.AddDockChild(group, Dock.Fill);
 
-        //group.AddGroupChild(buttons);
         AddChild(root);
     }
 
@@ -152,8 +168,44 @@ public class FileProperties : Window
     {
         WindowManager.Close(this);
     }
+
     private void Apply()
     {
+        try
+        {
+            if (targetEntry != null && !string.IsNullOrEmpty(fileNameField.text) && fileNameField.text != targetEntry.FileName)
+            {
+                string dir = Path.GetDirectoryName(targetEntry.AbsoluteLocation);
+                string newPath = Path.Combine(dir, fileNameField.text);
+                if (targetEntry.FileType == FileType.Directory)
+                {
+                    if (Directory.Exists(targetEntry.AbsoluteLocation) && !Directory.Exists(newPath))
+                    {
+                        Directory.Move(targetEntry.AbsoluteLocation, newPath);
+                        targetEntry.FileName = fileNameField.text;
+                        targetEntry.AbsoluteLocation = newPath;
+                        Title = $"{targetEntry.FileName} Properties";
+                    }
+                }
+                else
+                {
+                    if (File.Exists(targetEntry.AbsoluteLocation) && !File.Exists(newPath))
+                    {
+                        File.Move(targetEntry.AbsoluteLocation, newPath);
+                        targetEntry.FileName = fileNameField.text;
+                        targetEntry.AbsoluteLocation = newPath;
+                        Title = $"{targetEntry.FileName} Properties";
+                    }
+                }
+            }
 
+            if (targetEntry != null)
+            {
+                string attr = (cbReadOnly.isChecked ? "R" : "") + (cbHidden.isChecked ? "H" : "A");
+                Registry.Set($"Software/Windose/Attributes{targetEntry.AbsoluteLocation}", attr);
+                NotificationManager.Notify("Properties", $"Updated properties for {targetEntry.FileName}");
+            }
+        }
+        catch { }
     }
 }

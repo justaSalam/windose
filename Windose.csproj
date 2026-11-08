@@ -60,6 +60,10 @@
       <None Remove="System\ELF\programs\include\time.h" />
       <None Remove="System\ELF\programs\libc\math.c" />
       <None Remove="System\ELF\programs\libc\time.c" />
+      <None Remove="System\ELF\programs\src\properties.c" />
+      <None Remove="System\ELF\programs\src\sysdm.c" />
+      <None Remove="System\ELF\programs\bin\properties.elf" />
+      <None Remove="System\ELF\programs\bin\sysdm.elf" />
   </ItemGroup>
 
   <!-- Core kernel packages -->
@@ -146,6 +150,10 @@
     <EmbeddedResource Include=".\System\ELF\programs\include\time.h" />
     <EmbeddedResource Include=".\System\ELF\programs\libc\math.c" />
     <EmbeddedResource Include=".\System\ELF\programs\libc\time.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\src\properties.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\src\sysdm.c" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\properties.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\sysdm.elf" />
   </ItemGroup>
 
     <ItemGroup>

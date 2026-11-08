@@ -25,8 +25,9 @@ static int sbObjs, sbSel;
 static handle_t tBack, tForward, tUp, tCut, tCopy, tPaste, tDelete, tRefresh;
 static handle_t mClose, mCut, mCopy, mPaste, mDelete, mRename;
 static handle_t mRefresh, mSortName, mSortSize, mUp, mRoot, mAbout;
-static handle_t vpPopup, vpRefresh, vpNewFile, vpNewFolder, vpEmpty;
-static handle_t itPopup, itOpen, itRename, itDelete;
+static handle_t vpPopup, vpRefresh, vpNewFile, vpNewFolder, vpEmpty, vpProps;
+static handle_t itPopup, itOpen, itRename, itDelete, itProps;
+static handle_t mProps;
 
 static char cwd[MAXPATH];
 static Entry *entries;
@@ -635,6 +636,29 @@ static void popup_at(handle_t widget, int lx, int ly, handle_t popup)
     k_popup_show_at(popup, sx, sy);
 }
 
+static void open_properties(const char *target_path)
+{
+    if (!target_path || !*target_path) return;
+    char argbuf[512];
+    int arglen = 0;
+    const char *prog = "properties";
+    int prog_len = (int)strlen(prog);
+    memcpy(argbuf + arglen, prog, prog_len + 1);
+    arglen += prog_len + 1;
+
+    int path_len = (int)strlen(target_path);
+    memcpy(argbuf + arglen, target_path, path_len + 1);
+    arglen += path_len + 1;
+
+    int child = k_spawn("/mnt/Programs/properties.elf", argbuf, arglen);
+    if (child < 0) {
+        child = k_spawn("/mnt/System/programs/properties.elf", argbuf, arglen);
+    }
+    if (child < 0) {
+        child = k_spawn("properties.elf", argbuf, arglen);
+    }
+}
+
 static void on_key(char ch)
 {
     char s[320];
@@ -686,6 +710,7 @@ int main(int argc, char **argv)
 
     bar = k_menubar_create(win);
     mClose = k_menu_add_item(bar, "File", "Close");
+    mProps = k_menu_add_item(bar, "File", "Properties");
     mCut = k_menu_add_item(bar, "Edit", "Cut");
     mCopy = k_menu_add_item(bar, "Edit", "Copy");
     mPaste = k_menu_add_item(bar, "Edit", "Paste");
@@ -745,6 +770,8 @@ int main(int argc, char **argv)
     vpNewFolder = k_popup_add_item(vp, "New Folder");
     k_popup_add_item(vp, "-");
     vpEmpty = k_popup_add_item(vp, "Empty Recycle Bin");
+    k_popup_add_item(vp, "-");
+    vpProps = k_popup_add_item(vp, "Properties");
     vpPopup = vp;
 
     it = k_popup_create();
@@ -752,6 +779,8 @@ int main(int argc, char **argv)
     itRename = k_popup_add_item(it, "Rename");
     k_popup_add_item(it, "-");
     itDelete = k_popup_add_item(it, "Delete");
+    k_popup_add_item(it, "-");
+    itProps = k_popup_add_item(it, "Properties");
     itPopup = it;
 
     rebuild_tree();
@@ -898,6 +927,17 @@ int main(int argc, char **argv)
                 refresh();
             }
             else if (e.handle == itOpen) open_selected();
+            else if (e.handle == itProps || e.handle == mProps) {
+                if (selected >= 0 && selected < nentries) {
+                    char full[520];
+                    if (strcmp(cwd, "/") == 0) snprintf(full, sizeof(full), "/%s", entries[selected].name);
+                    else snprintf(full, sizeof(full), "%s/%s", cwd, entries[selected].name);
+                    open_properties(full);
+                }
+            }
+            else if (e.handle == vpProps) {
+                open_properties(cwd);
+            }
             else if (e.handle == tree) {
                 TNode *tn = tnode_find(e.a);
                 if (tn) {
