@@ -170,264 +170,63 @@ namespace Windose.System.Elf
                 items = new List<KeyValuePair<Component, ChildLayoutInfo>>(childLayouts);
             }
 
-            int buttonCount = 0;
-            bool hasMajorContent = false;
-            int bottomBarHeight = 0;
-
-            foreach (var kvp in items)
-            {
-                Component c = kvp.Key;
-                if (c is Button) buttonCount++;
-                if (c is ElfListBox || c is ElfTree || c is TabControl || c is DataGrid || c is TerminalView || (c is TextField tf && tf.Multiline))
-                {
-                    hasMajorContent = true;
-                }
-                if (c is StatusBar)
-                {
-                    bottomBarHeight = Math.Max(bottomBarHeight, kvp.Value.OrigHeight);
-                }
-            }
-
-            // Case 1: Keypad / Calculator grid
-            if (!hasMajorContent && buttonCount >= 10)
-            {
-                foreach (var kvp in items)
-                {
-                    Component child = kvp.Key;
-                    ChildLayoutInfo info = kvp.Value;
-                    if (child.Parent != this || child == titlebar) continue;
-
-                    int newX = (int)Math.Round((double)info.OrigClientX * curW / initW);
-                    int newY = (int)Math.Round((double)info.OrigClientY * curH / initH);
-                    int newW = Math.Max(1, (int)Math.Round((double)info.OrigWidth * curW / initW));
-                    int newH = Math.Max(1, (int)Math.Round((double)info.OrigHeight * curH / initH));
-
-                    child.SetBounds(ClientOriginX + newX, ClientOriginY + newY, newW, newH);
-                }
-                MarkDirty();
-                return;
-            }
-
-            // Case 2: Centered card dialog (e.g. login / authentication dialogs)
-            bool isCenteredDialog = false;
-            int cardLeft = 0, cardRight = 0;
-            if (!hasMajorContent)
-            {
-                foreach (var kvp in items)
-                {
-                    if (kvp.Key is Panel)
-                    {
-                        int lm = kvp.Value.OrigClientX;
-                        int rm = initW - (kvp.Value.OrigClientX + kvp.Value.OrigWidth);
-                        int tm = kvp.Value.OrigClientY;
-                        int bm = initH - (kvp.Value.OrigClientY + kvp.Value.OrigHeight);
-                        if (lm >= 50 && rm >= 50 && Math.Abs(lm - rm) <= 40 && tm >= 30 && Math.Abs(tm - bm) <= 80)
-                        {
-                            isCenteredDialog = true;
-                            cardLeft = lm - 10;
-                            cardRight = kvp.Value.OrigClientX + kvp.Value.OrigWidth + 10;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (isCenteredDialog)
-            {
-                int shiftX = (curW - initW) / 2;
-                int shiftY = (curH - initH) / 2;
-
-                foreach (var kvp in items)
-                {
-                    Component child = kvp.Key;
-                    ChildLayoutInfo info = kvp.Value;
-                    if (child.Parent != this || child == titlebar) continue;
-
-                    if (child is StatusBar)
-                    {
-                        int newY = Math.Max(0, curH - info.OrigHeight);
-                        child.SetBounds(ClientOriginX, ClientOriginY + newY, curW, info.OrigHeight);
-                    }
-                    else if (info.OrigClientX >= cardLeft && info.OrigClientX + info.OrigWidth <= cardRight + 30)
-                    {
-                        int newX = info.OrigClientX + shiftX;
-                        int newY = info.OrigClientY + shiftY;
-                        child.SetBounds(ClientOriginX + newX, ClientOriginY + newY, info.OrigWidth, info.OrigHeight);
-                    }
-                }
-                MarkDirty();
-                return;
-            }
-
-            // Case 3: Workspace / Document / General Anchor Layout
             int deltaW = curW - initW;
+            int deltaH = curH - initH;
 
-            foreach (var kvp in items)
+            for (int i = 0; i < items.Count; i++)
             {
-                Component child = kvp.Key;
-                ChildLayoutInfo info = kvp.Value;
-                if (child.Parent != this || child == titlebar) continue;
+                Component child = items[i].Key;
+                ChildLayoutInfo info = items[i].Value;
+                if (child == null || child.Parent != this || child == titlebar) continue;
 
-                int origX = info.OrigClientX;
-                int origY = info.OrigClientY;
-                int origW = info.OrigWidth;
-                int origH = info.OrigHeight;
+                int flags = info.AnchorFlags;
+                bool anchorLeft = (flags & 1) != 0;
+                bool anchorTop = (flags & 2) != 0;
+                bool anchorRight = (flags & 4) != 0;
+                bool anchorBottom = (flags & 8) != 0;
 
-                int leftMargin = origX;
-                int rightMargin = initW - (origX + origW);
-                int topMargin = origY;
-                int bottomMargin = initH - (origY + origH);
+                // Standard top/bottom bar behavior for MenuBar, Toolbar, and StatusBar if left at defaults
+                if (flags == (1 | 2))
+                {
+                    if (child is MenuBar || child is Toolbar)
+                    {
+                        anchorLeft = true;
+                        anchorTop = true;
+                        anchorRight = true;
+                        anchorBottom = false;
+                    }
+                    else if (child is StatusBar)
+                    {
+                        anchorLeft = true;
+                        anchorTop = false;
+                        anchorRight = true;
+                        anchorBottom = true;
+                    }
+                }
 
-                int newX = origX;
-                int newY = origY;
-                int newW = origW;
-                int newH = origH;
+                int newX = info.OrigClientX;
+                int newY = info.OrigClientY;
+                int newW = info.OrigWidth;
+                int newH = info.OrigHeight;
 
-                if (child is MenuBar || child is Toolbar)
+                // Horizontal
+                if (anchorLeft && anchorRight)
                 {
-                    newX = 0;
-                    newY = origY;
-                    newW = curW;
-                    newH = origH;
+                    newW = Math.Max(10, info.OrigWidth + deltaW);
                 }
-                else if (child is StatusBar)
+                else if (anchorRight)
                 {
-                    newX = 0;
-                    newY = Math.Max(0, curH - origH);
-                    newW = curW;
-                    newH = origH;
+                    newX = info.OrigClientX + deltaW;
                 }
-                else if (child is Panel && origX == 0 && rightMargin <= 4 && origY == 0)
-                {
-                    // Top full-width panel (e.g. aeroeditor top toolbar background)
-                    newX = 0;
-                    newY = 0;
-                    newW = curW;
-                    newH = origH;
-                }
-                else if (child is Panel && origX == 0 && rightMargin <= 4 && bottomMargin <= 10)
-                {
-                    // Bottom full-width panel
-                    newX = 0;
-                    newY = Math.Max(0, curH - origH);
-                    newW = curW;
-                    newH = origH;
-                }
-                else if (leftMargin <= 16 && topMargin <= 16 && rightMargin <= 16 && bottomMargin <= 16)
-                {
-                    // Full-window component (terminal, canvas, etc.)
-                    newX = origX;
-                    newY = origY;
-                    newW = Math.Max(10, curW - leftMargin - Math.Max(0, rightMargin));
-                    newH = Math.Max(10, curH - topMargin - Math.Max(0, bottomMargin));
-                }
-                else if (child is ElfTree || (child is ElfListBox && leftMargin <= 30 && rightMargin > 100 && origW <= 300))
-                {
-                    // Left sidebar tree / nav list
-                    newX = origX;
-                    newY = origY;
-                    newW = origW;
-                    newH = Math.Max(20, curH - origY - Math.Max(0, bottomMargin));
-                }
-                else if (child is ElfListBox || child is TabControl || child is DataGrid || child is ElfCanvasComponent || child is TerminalView)
-                {
-                    // Main view control
-                    newX = origX;
-                    if (rightMargin <= 40)
-                    {
-                        newW = Math.Max(20, curW - origX - Math.Max(0, rightMargin));
-                    }
-                    else if (origW >= initW / 2)
-                    {
-                        newW = Math.Max(20, origW + deltaW);
-                    }
-                    else
-                    {
-                        newW = origW;
-                    }
 
-                    newY = origY;
-                    if (bottomMargin <= 50 || origH >= initH / 2)
-                    {
-                        newH = Math.Max(20, curH - origY - Math.Max(0, bottomMargin));
-                    }
-                    else
-                    {
-                        newH = origH;
-                    }
-                }
-                else if (child is TextField tf && tf.Multiline)
+                // Vertical
+                if (anchorTop && anchorBottom)
                 {
-                    // Multiline text editor (AeroEditor, ElfEditor, etc.)
-                    newX = origX;
-                    newW = Math.Max(20, curW - origX - Math.Max(12, rightMargin));
-                    newY = origY;
-                    int bH = bottomBarHeight > 0 ? bottomBarHeight + 6 : 28;
-                    int availH = curH - origY - (bottomMargin <= 50 ? Math.Max(bottomMargin, bH) : bH);
-                    newH = Math.Max(20, availH);
+                    newH = Math.Max(10, info.OrigHeight + deltaH);
                 }
-                else if (child is TextField || child is ComboBox)
+                else if (anchorBottom)
                 {
-                    // Single-line input field
-                    newY = origY;
-                    newH = origH;
-                    if (rightMargin <= 35)
-                    {
-                        newX = origX;
-                        newW = Math.Max(20, curW - origX - Math.Max(0, rightMargin));
-                    }
-                    else if (rightMargin > 35 && rightMargin <= 160 && origW >= 180)
-                    {
-                        // Right-flanked by a button (e.g. search.c, explorer.c)
-                        newX = origX;
-                        newW = Math.Max(20, curW - origX - rightMargin);
-                    }
-                    else
-                    {
-                        newX = origX;
-                        newW = origW;
-                    }
-                }
-                else if (rightMargin <= 40 && leftMargin > 40)
-                {
-                    // Right-anchored buttons / labels
-                    newX = Math.Max(origX, curW - rightMargin - origW);
-                    newW = origW;
-                    if (bottomMargin <= 40 && topMargin > 40)
-                    {
-                        newY = Math.Max(origY, curH - bottomMargin - origH);
-                    }
-                    else
-                    {
-                        newY = origY;
-                    }
-                    newH = origH;
-                }
-                else if (bottomMargin <= 40 && topMargin > 40)
-                {
-                    // Bottom-anchored buttons / labels
-                    newY = Math.Max(origY, curH - bottomMargin - origH);
-                    newH = origH;
-                    newX = origX;
-                    newW = origW;
-                }
-                else
-                {
-                    // Left-anchored or intermediate controls
-                    if (leftMargin <= 60)
-                    {
-                        newX = origX;
-                        newY = origY;
-                        newW = origW;
-                        newH = origH;
-                    }
-                    else
-                    {
-                        newX = (int)Math.Round((double)origX * curW / initW);
-                        newY = (int)Math.Round((double)origY * curH / initH);
-                        newW = origW;
-                        newH = origH;
-                    }
+                    newY = info.OrigClientY + deltaH;
                 }
 
                 child.SetBounds(ClientOriginX + newX, ClientOriginY + newY, newW, newH);
