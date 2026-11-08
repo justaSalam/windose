@@ -1547,6 +1547,10 @@ namespace Windose.System.Elf
         {
             ElfListBox box = obj as ElfListBox;
             if (box == null) return -1;
+            if (box.List.columns.Count == 1 && string.IsNullOrEmpty(box.List.columns[0].Header))
+            {
+                box.List.columns.Clear();
+            }
             box.List.AddColumn(title ?? "", Math.Max(20, width));
             box.Refresh();
             return box.List.columns.Count - 1;
@@ -1816,16 +1820,18 @@ namespace Windose.System.Elf
                     Process p = ProcessManager.processes[i];
                     if (p == null || !p.Running) continue;
                     long mem = 0;
-                    if (p.name != null && p.name.StartsWith("elf: "))
+                    string cleanName = p.name ?? "unnamed";
+                    if (cleanName.StartsWith("elf: "))
                     {
-                        string elfName = p.name.Substring(5).Trim();
+                        string elfName = cleanName.Substring(5).Trim();
                         ElfProgram? ep = ElfRunner.Find(elfName);
                         if (ep != null) mem = ep.MemoryBytes;
+                        cleanName = elfName;
                     }
-                    sb.Append(p.id).Append(':')
-                      .Append(p.name ?? "unnamed").Append(':')
-                      .Append(p.processType.ToString()).Append(':')
-                      .Append(mem).Append('\n');
+                    sb.Append(p.id).Append(',')
+                      .Append(cleanName).Append(',')
+                      .Append(mem).Append(',')
+                      .Append(p.processType.ToString()).Append('\n');
                 }
             }
             return sb.ToString();

@@ -47,14 +47,17 @@ static void refresh_processes(void) {
             char state[32] = {0};
 
             char *p1 = strchr(line, ',');
+            if (!p1) p1 = strchr(line, ':');
             if (p1) {
                 *p1 = '\0';
                 pid = atoi(line);
                 char *p2 = strchr(p1 + 1, ',');
+                if (!p2) p2 = strchr(p1 + 1, ':');
                 if (p2) {
                     *p2 = '\0';
                     strncpy(name, p1 + 1, sizeof(name) - 1);
                     char *p3 = strchr(p2 + 1, ',');
+                    if (!p3) p3 = strchr(p2 + 1, ':');
                     if (p3) {
                         *p3 = '\0';
                         mem_bytes = atol(p2 + 1);
@@ -63,16 +66,26 @@ static void refresh_processes(void) {
                 }
             }
 
+            if (strncmp(name, "elf: ", 5) == 0) {
+                memmove(name, name + 5, strlen(name + 5) + 1);
+            }
+            if (name[0] == '\0') {
+                strncpy(name, "System", sizeof(name) - 1);
+            }
+
             procs[proc_count].pid = pid;
             strncpy(procs[proc_count].name, name, sizeof(procs[proc_count].name) - 1);
-            procs[proc_count].mem_kb = mem_bytes / 1024;
+            procs[proc_count].mem_kb = mem_bytes > 0 ? (mem_bytes / 1024) : 0;
             strncpy(procs[proc_count].state, state, sizeof(procs[proc_count].state) - 1);
 
             char c_pid[16], c_mem[32];
             snprintf(c_pid, sizeof(c_pid), "%d", pid);
-            snprintf(c_mem, sizeof(c_mem), "%ld KB", procs[proc_count].mem_kb);
+            if (procs[proc_count].mem_kb > 0)
+                snprintf(c_mem, sizeof(c_mem), "%ld KB", procs[proc_count].mem_kb);
+            else
+                snprintf(c_mem, sizeof(c_mem), "< 1 KB");
 
-            const char *cells[4] = { name, c_pid, c_mem, state };
+            const char *cells[4] = { name, c_pid, c_mem, state[0] ? state : "Running" };
             char row[256];
             int p = 0;
             for (int k = 0; k < 4; k++) {
@@ -116,7 +129,7 @@ static void end_selected_process(void) {
             return;
         }
         int res = k_ps_kill(target);
-        if (res <= 0) {
+        if (res != 0) {
             static const char ok_btn[] = "OK";
             k_msgbox("Task Manager", "Failed to terminate process (protected or invalid).", ok_btn, (int)sizeof(ok_btn));
         }

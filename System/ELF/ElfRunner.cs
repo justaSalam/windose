@@ -1417,6 +1417,27 @@ namespace Windose.System.Elf
             catch { return -2; }
         }
 
+        private static string[] SplitRowCells(byte* buf, int len)
+        {
+            string[] tmp = new string[64];
+            int count = 0, start = 0;
+            for (int i = 0; i < len; i++)
+            {
+                if (buf[i] == 0)
+                {
+                    int slen = i - start;
+                    if (slen > MaxStr || count >= 64) return null;
+                    char[] c = new char[slen];
+                    for (int j = 0; j < slen; j++) c[j] = (char)buf[start + j];
+                    tmp[count++] = new string(c);
+                    start = i + 1;
+                }
+            }
+            string[] r = new string[count];
+            for (int i = 0; i < count; i++) r[i] = tmp[i];
+            return r;
+        }
+
         [UnmanagedCallersOnly]
         private static int ApiListAddRow(int pid, int handle, byte* buf, int len)
         {
@@ -1427,7 +1448,7 @@ namespace Windose.System.Elf
                 object o = p.Objs.Get(handle);
                 if (o == null) return -1;
                 if (buf == null || len < 0 || len > MaxIo) return -1;
-                string[] cells = SplitArgs(buf, len);
+                string[] cells = SplitRowCells(buf, len);
                 if (cells == null) return -1;
                 return Host.ListAddRow(o, cells);
             }
