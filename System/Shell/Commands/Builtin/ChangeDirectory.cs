@@ -1,4 +1,4 @@
-﻿
+using System.IO;
 
 public sealed class ChangeDirectoryCommand : IShellCommand
 {
@@ -12,20 +12,22 @@ public sealed class ChangeDirectoryCommand : IShellCommand
 
     public void Execute(CommandContext context, string[] args)
     {
-        if(args.Length < 1)
+        if (args.Length < 1)
         {
+            context.WriteLine(context.CurrentDirectory);
             return;
+        }
+
+        string destination = args[0];
+        string resolvedPath = context.ResolvePath(destination);
+
+        if (Directory.Exists(resolvedPath))
+        {
+            context.CurrentDirectory = resolvedPath;
         }
         else
         {
-            string destination = args[0];
-            string resolvedPath = context.ResolvePath(destination); 
-
-            if(Directory.Exists(resolvedPath))
-            {
-                context.CurrentDirectory = resolvedPath;
-            }
+            context.WriteLine($"The system cannot find the path specified: {destination}");
         }
     }
-
 }

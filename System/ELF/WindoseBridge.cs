@@ -348,33 +348,37 @@ namespace Windose.System.Elf
 
             CommandRegistry.EnsureBuiltIns();
 
-            Thickness rootMargin = p is Window
-                ? new Thickness(Palette.TitleBarHeight, Palette.BorderSize, Palette.BorderSize, Palette.BorderSize)
-                : new Thickness(0);
+            int clientX = ClientX(p, x);
+            int clientY = ClientY(p, y);
+            int clientW = (p is ElfWindow ew) ? ew.GetClientWidth() : (p is Window win ? Math.Max(1, win.Width - Palette.BorderSize * 2) : w);
+            int clientH = (p is ElfWindow eh) ? eh.GetClientHeight() : (p is Window winh ? Math.Max(1, winh.Height - Palette.TitleBarHeight - Palette.BorderSize) : h);
 
-            DockPanel root = new DockPanel(0, 0, p.Width, p.Height)
-            {
-                horizontalAlignment = HorizontalAlignment.Stretch,
-                verticalAlignment = VerticalAlignment.Stretch,
-                Margin = rootMargin,
-                Padding = new Thickness(0),
-                clampSize = false,
-                useBackground = true,
-                backgroundColor = Color.Black,
-            };
+            int finalW = (w <= 0 || (p is Window && w >= p.Width)) ? clientW : w;
+            int finalH = (h <= 0 || (p is Window && h >= p.Height)) ? clientH : h;
 
-            TerminalView output = new TerminalView(0, 0, p.Width, p.Height)
+            TerminalView output = new TerminalView(clientX, clientY, finalW, finalH)
             {
-                horizontalAlignment = HorizontalAlignment.Stretch,
-                verticalAlignment = VerticalAlignment.Stretch,
                 Margin = new Thickness(0),
             };
 
             CommandContext context = new CommandContext(
                 writeLine: output.WriteLine,
                 clear: output.Clear,
-                close: () => { },
-                readLine: output.ReadLineSync);
+                close: () =>
+                {
+                    if (p is ElfWindow elfw)
+                    {
+                        elfw.Owner?.PostEvent(ElfEvent.Close, elfw.ProgramHandle, 0, 0);
+                    }
+                    else if (p is Window win)
+                    {
+                        win.RequestClose();
+                    }
+                },
+                readLine: output.ReadLineSync)
+            {
+                CurrentDirectory = "/mnt"
+            };
 
             output.OnTopLevelSubmit = line =>
             {
@@ -387,16 +391,11 @@ namespace Windose.System.Elf
             output.WriteLine("Type help for available commands.");
             output.WriteLine();
 
-            root.AddDockChild(output, Dock.Fill);
+            Attach(p, output);
 
-            lock (Component.components)
+            if (p is Window window)
             {
-                p.AddChild(root);
-            }
-
-            if (p is Window win)
-            {
-                win.SetFocusedComponent(output);
+                window.SetFocusedComponent(output);
             }
             output.RequestFocus();
 

@@ -1,4 +1,5 @@
-﻿
+using System;
+using System.IO;
 
 public sealed class DirectoryCommand : IShellCommand
 {
@@ -6,22 +7,27 @@ public sealed class DirectoryCommand : IShellCommand
     public string Description => "Displays a list of files and subdirectories in a directory";
     public string Usage => "dir [path]";
 
-    private readonly SubcommandDispatcher dispatcher;
-
     public DirectoryCommand()
     {
-        dispatcher = new SubcommandDispatcher(Usage);
     }
 
     public void Execute(CommandContext context, string[] args)
     {
-        if(args.Length > 0)
+        string path = args.Length > 0 ? context.ResolvePath(args[0]) : context.CurrentDirectory;
+        if (!Directory.Exists(path))
         {
-            dispatcher.Dispatch(context, args);
+            if (File.Exists(path))
+            {
+                FileInfo fi = new FileInfo(path);
+                context.WriteLine($"^cyan{fi.CreationTime.ToString("yyyy-MM-dd HH:mm")} ^gray{ByteSize.Format(fi.Length)} ^white{fi.Name}");
+                return;
+            }
+            context.WriteLine($"Directory not found: {path}");
+            return;
         }
-        else
+
+        try
         {
-            string path = context.CurrentDirectory;
             FileInfo[] files = new DirectoryInfo(path).GetFiles();
             DirectoryInfo[] directories = new DirectoryInfo(path).GetDirectories();
             context.WriteLine($"Directory of {path}");
@@ -37,6 +43,9 @@ public sealed class DirectoryCommand : IShellCommand
                 context.WriteLine($"^cyan{file.CreationTime.ToString("yyyy-MM-dd HH:mm")} ^gray{ByteSize.Format(file.Length)} ^white{file.Name}");
             }
         }
+        catch (Exception ex)
+        {
+            context.WriteLine($"Error reading directory: {ex.Message}");
+        }
     }
-
 }

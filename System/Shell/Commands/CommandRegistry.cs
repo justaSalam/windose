@@ -49,36 +49,41 @@ public static class CommandRegistry
         if (string.IsNullOrWhiteSpace(target)) return null;
 
         // 1. Direct or rooted path
-        if (File.Exists(target)) return target;
+        if (ElfRunner.HasBinary(target)) return target;
+
+        if (!target.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+        {
+            if (ElfRunner.HasBinary(target + ".elf")) return target + ".elf";
+        }
 
         // 2. Relative to current directory
         string c1 = Path.Combine(currentDir, target);
-        if (File.Exists(c1)) return c1;
+        if (ElfRunner.HasBinary(c1)) return c1;
 
         if (!target.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
         {
             string c1e = Path.Combine(currentDir, target + ".elf");
-            if (File.Exists(c1e)) return c1e;
+            if (ElfRunner.HasBinary(c1e)) return c1e;
         }
 
         // 3. /mnt/Programs/
         string p1 = Path.Combine("/mnt/Programs", target);
-        if (File.Exists(p1)) return p1;
+        if (ElfRunner.HasBinary(p1)) return p1;
 
         if (!target.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
         {
             string p1e = Path.Combine("/mnt/Programs", target + ".elf");
-            if (File.Exists(p1e)) return p1e;
+            if (ElfRunner.HasBinary(p1e)) return p1e;
         }
 
         // 4. /mnt/Apps/
         string a1 = Path.Combine("/mnt/Apps", target);
-        if (File.Exists(a1)) return a1;
+        if (ElfRunner.HasBinary(a1)) return a1;
 
         if (!target.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
         {
             string a1e = Path.Combine("/mnt/Apps", target + ".elf");
-            if (File.Exists(a1e)) return a1e;
+            if (ElfRunner.HasBinary(a1e)) return a1e;
         }
 
         return null;
@@ -88,59 +93,69 @@ public static class CommandRegistry
     {
         try
         {
-            byte[] fileBytes = File.ReadAllBytes(elfPath);
-            string progName = Path.GetFileName(elfPath);
-            string[] fullArgs = new string[args.Length + 1];
-            fullArgs[0] = progName;
-            Array.Copy(args, 0, fullArgs, 1, args.Length);
+            byte[]? fileBytes = ElfRunner.LoadBinary(elfPath);
+            if (fileBytes == null)
+            {
+                context.WriteLine($"Failed to load ELF binary: {elfPath}");
+                return false;
+            }
 
-            ElfProgram program = ElfRunner.Spawn(fileBytes, progName, fullArgs, out string error);
+            string progName = Path.GetFileName(elfPath);
+            var lineBuf = new System.Text.StringBuilder();
+
+            ElfProgram program = ElfRunner.Spawn(fileBytes, progName, args, out string error, p =>
+            {
+                p.Env["PWD"] = context.CurrentDirectory;
+                p.OutputHandler = text =>
+                {
+                    if (text.Contains("\033[2J"))
+                    {
+                        context.Clear();
+                        text = text.Replace("\033[2J", "");
+                        if (string.IsNullOrEmpty(text)) return;
+                    }
+
+                    lock (lineBuf)
+                    {
+                        for (int i = 0; i < text.Length; i++)
+                        {
+                            char c = text[i];
+                            if (c == '\n')
+                            {
+                                string line = lineBuf.ToString();
+                                lineBuf.Clear();
+                                context.WriteLine(line);
+                            }
+                            else if (c != '\r')
+                            {
+                                lineBuf.Append(c);
+                            }
+                        }
+                    }
+                };
+            });
+
             if (program == null)
             {
                 context.WriteLine($"Failed to start ELF program {progName}: {error}");
                 return false;
             }
 
-            program.Env["PWD"] = context.CurrentDirectory;
-
-            var lineBuf = new System.Text.StringBuilder();
-            program.OutputHandler = text =>
-            {
-                if (text == "\033[2J")
-                {
-                    context.Clear();
-                    lock (lineBuf) { lineBuf.Clear(); }
-                    return;
-                }
-
-                lock (lineBuf)
-                {
-                    for (int i = 0; i < text.Length; i++)
-                    {
-                        char c = text[i];
-                        if (c == '\n')
-                        {
-                            string line = lineBuf.ToString();
-                            lineBuf.Clear();
-                            context.WriteLine(line);
-                        }
-                        else if (c != '\r')
-                        {
-                            lineBuf.Append(c);
-                        }
-                    }
-                }
-            };
-
             // If the program completes quickly (CLI commands like dir, cat, echo, mem),
             // wait for it so the prompt returns immediately after output.
             // If it creates a GUI window, unblock the terminal promptly.
-            bool exited = program.Wait(200);
+            bool exited = program.Wait(300);
             if (!exited)
             {
                 if (program.Objs.Count == 0)
                 {
-                    program.Wait();
+                    if (!program.Wait(200))
+                    {
+                        if (program.Objs.Count == 0)
+                        {
+                            program.Wait();
+                        }
+                    }
                 }
             }
 
@@ -320,13 +335,34 @@ public static class CommandRegistry
         // a thin adapter (see DelegateCommand below) if a full class is overkill.
         Register(new DelegateCommand("help", "Displays help information.", "help", (context, args) =>
         {
+            context.WriteLine("Built-in shell commands:");
             foreach (IShellCommand command in Commands)
             {
-                context.WriteLine($"{command.Name} - {command.Description}");
+                context.WriteLine($"  {command.Name,-12} {command.Description}");
             }
-
+            context.WriteLine("");
+            context.WriteLine("Installed programs (/mnt/Programs):");
+            try
+            {
+                if (Directory.Exists("/mnt/Programs"))
+                {
+                    string[] progs = Directory.GetFiles("/mnt/Programs");
+                    List<string> progNames = new List<string>();
+                    for (int i = 0; i < progs.Length; i++)
+                    {
+                        string name = Path.GetFileName(progs[i]);
+                        if (name.EndsWith(".elf", StringComparison.OrdinalIgnoreCase))
+                            name = name.Substring(0, name.Length - 4);
+                        if (!progNames.Contains(name))
+                            progNames.Add(name);
+                    }
+                    progNames.Sort();
+                    context.WriteLine("  " + string.Join("  ", progNames));
+                }
+            }
+            catch { }
         }));
-        Register(new DelegateCommand("echo", "Echoes the input arguments.", "echo <ars>", (context, args) =>
+        Register(new DelegateCommand("echo", "Echoes the input arguments.", "echo <args>", (context, args) =>
         {
             context.WriteLine(string.Join(" ", args));
         }));
@@ -334,6 +370,11 @@ public static class CommandRegistry
         {
             context.Clear();
         }));
+        Register(new DelegateCommand("exit", "Closes the command prompt.", "exit", (context, args) =>
+        {
+            context.Close();
+        }));
+        RegisterAlias("quit", "exit");
 
         Register(new ElfCommand());
         Register(new IpConfig());

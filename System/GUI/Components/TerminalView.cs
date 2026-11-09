@@ -226,6 +226,7 @@ public sealed class TerminalView : Component
     public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
     {
         if (!IsInsideAbsolute(mouseX, mouseY)) return false;
+        if (mouse.left == MouseEvents.Press) RequestFocus();
         if (Mouse.scroll != 0)
         {
             scrollLine = Math.Max(0, Math.Min(MaxScrollLine(), scrollLine + (int)Mouse.scroll * 3));

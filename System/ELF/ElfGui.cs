@@ -335,7 +335,10 @@ namespace Windose.System.Elf
             if (mouse.left == MouseEvents.Release)
             {
                 owner.PostEvent(ElfEvent.MouseUp, handle, lx | (1 << 28), ly);
-                owner.PostEvent(ElfEvent.Click, handle, lx, ly);
+                if (target is Window || target is ElfCanvasComponent)
+                {
+                    owner.PostEvent(ElfEvent.Click, handle, lx, ly);
+                }
             }
             if (mouse.right == MouseEvents.Release) owner.PostEvent(ElfEvent.MouseUp, handle, lx | (2 << 28), ly);
             if (mouse.middle == MouseEvents.Release) owner.PostEvent(ElfEvent.MouseUp, handle, lx | (3 << 28), ly);

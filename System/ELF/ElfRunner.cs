@@ -291,6 +291,19 @@ namespace Windose.System.Elf
             }
         }
 
+        /// <summary>Returns true if the binary exists in memory cache or on disk.</summary>
+        public static bool HasBinary(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            lock (BinaryCache)
+            {
+                if (BinaryCache.ContainsKey(path)) return true;
+                string fn = Path.GetFileName(path);
+                if (!string.IsNullOrEmpty(fn) && BinaryCache.ContainsKey(fn)) return true;
+            }
+            try { return File.Exists(path); } catch { return false; }
+        }
+
         // ---------------------------------------------------------------- program table
 
         private static readonly Dictionary<int, ElfProgram> Programs = new Dictionary<int, ElfProgram>();
@@ -381,13 +394,13 @@ namespace Windose.System.Elf
             byte[]? data = LoadBinary(path);
             if (data == null) return null;
             string name = Path.GetFileName(path);
-            string[] fullArgs = args != null && args.Length > 0 ? args : new string[] { name };
-            ElfProgram p = Spawn(data, name, fullArgs, out _);
+            string[] elfArgs = args ?? Array.Empty<string>();
+            ElfProgram p = Spawn(data, name, elfArgs, out _);
             if (p != null)
             {
                 p.FilePath = path;
                 p.OriginalBytes = data;
-                RecordProgramInfo(p.Pid, name, path, data, fullArgs);
+                RecordProgramInfo(p.Pid, name, path, data, elfArgs);
             }
             return p;
         }
@@ -400,7 +413,7 @@ namespace Windose.System.Elf
 
         /// <summary>Loads and starts a program on its own thread. Returns null on failure (reason in 'error').
         /// 'args' are the arguments after the program name.</summary>
-        public static ElfProgram Spawn(byte[] file, string name, string[] args, out string error)
+        public static ElfProgram Spawn(byte[] file, string name, string[] args, out string error, Action<ElfProgram>? configure = null)
         {
             ElfFile elf = ElfFile.Parse(file, out error);
             if (elf == null) return null;
@@ -470,11 +483,17 @@ namespace Windose.System.Elf
                 p.Env["PATH"] = "/mnt/Programs;/mnt/System";
                 p.Env["USER"] = "root";
                 p.Env["HOME"] = "/mnt";
+                p.Env["PWD"] = "/mnt";
                 p.Env["OS"] = "Windose";
                 p.Env["TERM"] = "windose";
 
                 if (MakeExecutable != null) MakeExecutable(aligned, size);
                 if (Host != null) Host.ProgramStarted(p);
+
+                if (configure != null)
+                {
+                    try { configure(p); } catch { }
+                }
 
                 Thread t = new Thread(p.ThreadMain, ThreadStackBytes);
                 t.Start();

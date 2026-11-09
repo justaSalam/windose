@@ -1,66 +1,63 @@
+using System;
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Input;
-
 
 public sealed class CommandPrompt : Window
 {
     private readonly TerminalView output;
     private readonly CommandContext context;
 
-    public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460): base(x, y, width, height, "Command Prompt", true, Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16))
+    public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460)
+        : base(x, y, width, height, "Command Prompt", true, Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16))
     {
         CommandRegistry.EnsureBuiltIns();
-        DockPanel root = new DockPanel(0, 0, Width, Height)
-        {
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Stretch,
-            Margin = new Thickness(28, 2, 2, 2),
-            Padding = new Thickness(0),
-            clampSize = false,
-            useBackground = true,
-            backgroundColor = System.Drawing.Color.Black,
-        };
 
+        int bx = Palette.BorderSize;
+        int by = Palette.TitleBarHeight;
+        int bw = Math.Max(1, Width - Palette.BorderSize * 2);
+        int bh = Math.Max(1, Height - Palette.TitleBarHeight - Palette.BorderSize);
 
-        output = new TerminalView(0, 0, Width, Height)
+        output = new TerminalView(bx, by, bw, bh)
         {
-            horizontalAlignment = HorizontalAlignment.Stretch,
-            verticalAlignment = VerticalAlignment.Stretch,
             Margin = new Thickness(0),
-
-            /* 
-            Every command call goes through here. Executing directly on this
-            callback would run on whatever thread delivers keyboard events —
-            fine for now ONLY if nothing here ever calls ReadLineSync (diskpart,
-            uac elevate). The moment one of those commands runs, this MUST move
-            onto a separate worker thread per invocation, or that command's
-            blocking read deadlocks this same input thread. Swap the body below
-            for whatever your existing per-window thread spawn call is.
-            */
         };
 
         context = new CommandContext(
-     writeLine: output.WriteLine,
-     clear: output.Clear,
-     close: () => { },
-     readLine: output.ReadLineSync);
+            writeLine: output.WriteLine,
+            clear: output.Clear,
+            close: () => RequestClose(),
+            readLine: output.ReadLineSync)
+        {
+            CurrentDirectory = "/mnt"
+        };
 
         output.OnTopLevelSubmit = line =>
         {
-            // TODO: replace with whatever Window already uses internally for
-            // its own per-window thread (you noted this is implemented and
-            // working elsewhere) — I don't have that API, so this is a stand-in.
             new Thread(() => CommandRegistry.Execute(context, line)).Start();
         };
 
         output.PromptProvider = () => $"windose@user: {context.CurrentDirectory} ";
 
-        root.AddDockChild(output, Dock.Fill);
-        AddChild(root);
+        AddChild(output);
+        SetFocusedComponent(output);
+        output.RequestFocus();
 
         output.WriteLine("Windose Command Prompt");
         output.WriteLine("Type help for available commands.");
         output.WriteLine();
+    }
+
+    protected override void OnWindowResized()
+    {
+        base.OnWindowResized();
+        if (output != null)
+        {
+            int bx = Palette.BorderSize;
+            int by = Palette.TitleBarHeight;
+            int bw = Math.Max(1, Width - Palette.BorderSize * 2);
+            int bh = Math.Max(1, Height - Palette.TitleBarHeight - Palette.BorderSize);
+            output.SetBounds(bx, by, bw, bh);
+        }
     }
 
     public override void HandleKeyboard(KeyEvent keyEvent) => output.HandleKeyboard(keyEvent);
