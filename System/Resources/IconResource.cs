@@ -115,6 +115,42 @@ namespace Windose.System.Resources
             { "world.png", "netcenter.dll,-1" }
         };
 
+        private static readonly Dictionary<string, string> PeToLegacyAliases;
+
+        static IconResource()
+        {
+            PeToLegacyAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kvp in LegacyIconAliases)
+            {
+                if (!PeToLegacyAliases.ContainsKey(kvp.Value))
+                {
+                    PeToLegacyAliases[kvp.Value] = kvp.Key;
+                }
+            }
+            PeToLegacyAliases["shell32.dll,-284"] = "console_prompt.png";
+            PeToLegacyAliases["shell32.dll,-25"] = "search_computer.png";
+        }
+
+        public static Image? LoadEmbeddedPng(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            string clean = Path.GetFileName(name).Trim();
+            if (!clean.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
+                clean += ".png";
+
+            string resName = "Windose.Resources.Icons." + clean;
+            byte[]? data = Windose.System.Kernel.ResourceLoader.FromStream(resName);
+            if (data != null && data.Length > 0)
+            {
+                try
+                {
+                    return ImageLoader.FromBytes(data, clean);
+                }
+                catch { }
+            }
+            return null;
+        }
+
         /// <summary>
         /// Loads an icon from a Windows resource specifier (e.g. "imageres.dll,-1001" or "shell32.dll,4"),
         /// a legacy icon alias path, or a direct file path. Never throws; returns a failsafe fallback if unresolvable.
@@ -136,18 +172,21 @@ namespace Windose.System.Resources
 
             // 2. Check legacy alias table (e.g. "/mnt/System/Icons/console_prompt.png" or "console_prompt.png")
             string cleanName = Path.GetFileName(key);
+            string? mappedPeKey = null;
             if (LegacyIconAliases.TryGetValue(key, out string? aliased) ||
                 LegacyIconAliases.TryGetValue(cleanName, out aliased))
             {
-                key = aliased;
+                mappedPeKey = aliased;
             }
 
+            string peLookupKey = mappedPeKey ?? key;
+
             // 3. Check if specifier is a standard PE resource string (e.g. "imageres.dll,-1001" or "imageres.dll,5")
-            int commaIdx = key.IndexOf(',');
-            if (commaIdx > 0 && commaIdx < key.Length - 1)
+            int commaIdx = peLookupKey.IndexOf(',');
+            if (commaIdx > 0 && commaIdx < peLookupKey.Length - 1)
             {
-                string dllPart = key.Substring(0, commaIdx).Trim();
-                string idPart = key.Substring(commaIdx + 1).Trim();
+                string dllPart = peLookupKey.Substring(0, commaIdx).Trim();
+                string idPart = peLookupKey.Substring(commaIdx + 1).Trim();
 
                 if (int.TryParse(idPart, out int parsedId))
                 {
@@ -165,7 +204,19 @@ namespace Windose.System.Resources
                 }
             }
 
-            // 4. Check if a physical image file exists on disk
+            // 4. Try loading from embedded resources:
+            Image? embedded = LoadEmbeddedPng(cleanName);
+            if (embedded == null && PeToLegacyAliases.TryGetValue(peLookupKey, out string? pngAlias))
+            {
+                embedded = LoadEmbeddedPng(pngAlias);
+            }
+            if (embedded != null)
+            {
+                lock (Cache) { Cache[cacheKey] = embedded; }
+                return embedded;
+            }
+
+            // 5. Check if a physical image file exists on disk
             if (File.Exists(key))
             {
                 try
@@ -180,7 +231,7 @@ namespace Windose.System.Resources
                 catch { }
             }
 
-            // 5. Fallback if not found
+            // 6. Fallback if not found
             Image fallback = GetFallbackIcon(targetSize);
             lock (Cache)
             {

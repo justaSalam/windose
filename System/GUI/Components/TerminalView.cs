@@ -12,9 +12,16 @@ public sealed class TerminalView : Component
         public Color[] Colors;
     }
 
+    private struct RawLine
+    {
+        public string Text;
+        public Color[] Colors;
+    }
+
     public override bool HandlesMouseWheel => true;
 
     private readonly List<Line> lines = new List<Line>();
+    private readonly List<RawLine> rawLines = new List<RawLine>();
 
     private static readonly Color DefaultColor = Palette.ControlWhite;
 
@@ -112,17 +119,137 @@ public sealed class TerminalView : Component
     private void EmitLines(char[] buf, Color[] col, int n)
     {
         int start = 0;
-        for (int i = 0; i <= n; i++)
+        for (int i = 0; i < n; i++)
         {
-            if (i == n || buf[i] == '\n')
+            if (buf[i] == '\n')
             {
-                AddWrappedLine(buf, col, start, i - start);
+                int len = i - start;
+                AddRawAndWrapped(buf, col, start, len);
                 start = i + 1;
             }
         }
-        while (lines.Count > maxLines) lines.RemoveAt(0);
+        if (start < n || n == 0)
+        {
+            int len = n - start;
+            AddRawAndWrapped(buf, col, start, len);
+        }
+
+        while (rawLines.Count > maxLines) rawLines.RemoveAt(0);
+        while (lines.Count > maxLines * 4) lines.RemoveAt(0);
         ScrollToBottom();
         MarkDirty();
+    }
+
+    private void AddRawAndWrapped(char[] buf, Color[] col, int start, int len)
+    {
+        string lineText = len > 0 ? new string(buf, start, len) : "";
+        Color[] lineCol = new Color[len];
+        if (len > 0)
+        {
+            Array.Copy(col, start, lineCol, 0, len);
+        }
+        rawLines.Add(new RawLine { Text = lineText, Colors = lineCol });
+        WrapAndAddLine(lineText, lineCol);
+    }
+
+    private void ReflowAllLines()
+    {
+        bool wasAtBottom = scrollLine >= MaxScrollLine();
+        lines.Clear();
+        for (int i = 0; i < rawLines.Count; i++)
+        {
+            WrapAndAddLine(rawLines[i].Text, rawLines[i].Colors);
+        }
+        if (wasAtBottom)
+        {
+            ScrollToBottom();
+        }
+        else
+        {
+            scrollLine = Math.Min(scrollLine, MaxScrollLine());
+        }
+        MarkDirty();
+    }
+
+    private void WrapAndAddLine(string text, Color[] colors)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            lines.Add(new Line { Text = "", Colors = new Color[0] });
+            return;
+        }
+
+        int availableWidth = Math.Max(40, Width - 14);
+        int pos = 0;
+        int len = text.Length;
+
+        while (pos < len)
+        {
+            int remLen = len - pos;
+            string remStr = text.Substring(pos, remLen);
+            if (font.MeasureString(remStr) <= availableWidth)
+            {
+                Color[] c = new Color[remLen];
+                if (colors != null && colors.Length >= pos + remLen)
+                    Array.Copy(colors, pos, c, 0, remLen);
+                else
+                {
+                    for (int k = 0; k < remLen; k++) c[k] = DefaultColor;
+                }
+                lines.Add(new Line { Text = remStr, Colors = c });
+                break;
+            }
+
+            int fitCount = 1;
+            int low = 1, high = remLen;
+            while (low <= high)
+            {
+                int mid = (low + high) / 2;
+                if (font.MeasureString(text.Substring(pos, mid)) <= availableWidth)
+                {
+                    fitCount = mid;
+                    low = mid + 1;
+                }
+                else
+                {
+                    high = mid - 1;
+                }
+            }
+
+            int breakAt = -1;
+            for (int k = pos + fitCount - 1; k >= pos; k--)
+            {
+                if (text[k] == ' ')
+                {
+                    breakAt = k;
+                    break;
+                }
+            }
+
+            int take;
+            int nextPos;
+            if (breakAt > pos)
+            {
+                take = breakAt - pos;
+                nextPos = breakAt + 1;
+            }
+            else
+            {
+                take = Math.Max(1, fitCount);
+                nextPos = pos + take;
+            }
+
+            Color[] lineColors = new Color[take];
+            if (colors != null && colors.Length >= pos + take)
+                Array.Copy(colors, pos, lineColors, 0, take);
+            else
+            {
+                for (int k = 0; k < take; k++) lineColors[k] = DefaultColor;
+            }
+
+            lines.Add(new Line { Text = text.Substring(pos, take), Colors = lineColors });
+            pos = nextPos;
+        }
     }
 
     private static bool TryColor(string s, int pos, out Color color, out int len)
@@ -138,8 +265,10 @@ public sealed class TerminalView : Component
         }
         color = DefaultColor; len = 0; return false;
     }
+
     public new void Clear()
     {
+        rawLines.Clear();
         lines.Clear();
         scrollLine = 0;
         MarkDirty();
@@ -161,7 +290,12 @@ public sealed class TerminalView : Component
 
     public override void Resize(int width, int height)
     {
+        int oldWidth = Width;
         base.Resize(width, height);
+        if (Width != oldWidth)
+        {
+            ReflowAllLines();
+        }
         scrollLine = Math.Min(scrollLine, MaxScrollLine());
     }
 
@@ -190,6 +324,7 @@ public sealed class TerminalView : Component
             DrawFilledRectangle(Palette.ControlShadow, Width - 4, barY, 4, barHeight);
         }
     }
+
     private void DrawColoredLine(Line line, int y)
     {
         int x = 4, runStart = 0;
@@ -205,6 +340,7 @@ public sealed class TerminalView : Component
             }
         }
     }
+
     private void DrawInputLine(int y)
     {
         string prefix = CurrentPrompt();
@@ -316,24 +452,6 @@ public sealed class TerminalView : Component
         }
 
         MarkDirty();
-    }
-
-    private void AddWrappedLine(char[] buf, Color[] col, int start, int len)
-    {
-        if (len == 0) { lines.Add(new Line { Text = "", Colors = new Color[0] }); return; }
-
-        int characterWidth = Math.Max(1, MeasureStringWidth("W", fontSize));
-        int maxCharacters = Math.Max(1, (Width - 10) / characterWidth);
-
-        int pos = 0;
-        while (pos < len)
-        {
-            int take = Math.Min(maxCharacters, len - pos);
-            Color[] c = new Color[take];
-            Array.Copy(col, start + pos, c, 0, take);
-            lines.Add(new Line { Text = new string(buf, start + pos, take), Colors = c });
-            pos += take;
-        }
     }
 
     private int LineHeight() => Math.Max(12, MeasureStringHeight(fontSize) + 2);

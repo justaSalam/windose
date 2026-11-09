@@ -189,6 +189,8 @@ namespace Windose.System.Kernel
             WriteStorage("/mnt/Programs/properties.elf", "Windose.System.ELF.programs.bin.properties.elf", true);
             WriteStorage("/mnt/Programs/sysdm.elf", "Windose.System.ELF.programs.bin.sysdm.elf", true);
 
+            WriteStorage("/mnt/System/Icons/console_prompt.png", "Windose.Resources.Icons.console_prompt.png", true);
+
             WriteStorage("/mnt/System/include/kernel.h", "Windose.System.ELF.programs.include.kernel.h", true);
             WriteStorage("/mnt/System/include/windose.h", "Windose.System.ELF.programs.include.windose.h", true);
             WriteStorage("/mnt/System/include/stdio.h", "Windose.System.ELF.programs.include.stdio.h", true);

@@ -108,11 +108,11 @@ public static class CommandRegistry
                 p.Env["PWD"] = context.CurrentDirectory;
                 p.OutputHandler = text =>
                 {
-                    if (text.Contains("\033[2J"))
+                    if (text.Contains("\x1b[2J") || text.Contains("\033[2J") || text.Contains("[2J"))
                     {
                         context.Clear();
-                        text = text.Replace("\033[2J", "");
-                        if (string.IsNullOrEmpty(text)) return;
+                        text = text.Replace("\x1b[2J", "").Replace("\033[2J", "").Replace("[2J", "");
+                        if (string.IsNullOrWhiteSpace(text)) return;
                     }
 
                     lock (lineBuf)
@@ -273,6 +273,20 @@ public static class CommandRegistry
                 cdCmd.Execute(context, arguments);
                 return;
             }
+        }
+
+        if (string.Equals(cmd, "cls", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(cmd, "clear", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Clear();
+            return;
+        }
+
+        if (string.Equals(cmd, "exit", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(cmd, "quit", StringComparison.OrdinalIgnoreCase))
+        {
+            context.Close();
+            return;
         }
 
         // 1. Try to resolve and execute an ELF binary first (e.g. dir, cat, echo, mem, calc, terminal, etc.)
