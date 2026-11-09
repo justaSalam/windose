@@ -115,98 +115,19 @@ namespace Windose.Programs
                 return;
             }
 
-            // 2. Try ELF resolution
-            string? elf = CommandRegistry.ResolveElfPath("/mnt", query);
-            if (elf != null)
+            // 2. Canonical aliases for LaunchApp
+            string app = query.ToLowerInvariant() switch
             {
-                FileAssociations.Launch(elf);
-                WindowManager.PostClose(this);
-                return;
-            }
+                "cmd" => "terminal",
+                "files" => "explorer",
+                "perf" => "taskmgr",
+                "diskmgmt" => "diskmanagement",
+                "devmgmt" => "devicemanager",
+                _ => query
+            };
 
-            // 3. Known system applets & tools
-            string lower = query.ToLowerInvariant();
-            if (lower == "cmd" || lower == "terminal")
+            if (ElfRunner.Host != null && ElfRunner.Host.LaunchApp(app, ""))
             {
-                if (File.Exists("/mnt/Programs/terminal.elf"))
-                    FileAssociations.Launch("/mnt/Programs/terminal.elf");
-                else
-                    LaunchTracker.Start(() => new CommandPrompt());
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "calc" || lower == "calculator")
-            {
-                if (File.Exists("/mnt/Programs/calc.elf"))
-                    FileAssociations.Launch("/mnt/Programs/calc.elf");
-                else
-                    LaunchTracker.Start(() => new Calculator());
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "notepad" || lower == "editor" || lower == "aeroeditor")
-            {
-                if (File.Exists("/mnt/Programs/aeroeditor.elf"))
-                    FileAssociations.Launch("/mnt/Programs/aeroeditor.elf");
-                else
-                    LaunchTracker.Start(() => new BreezeEditor());
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "paint" || lower == "mspaint")
-            {
-                if (File.Exists("/mnt/Programs/paint.elf"))
-                    FileAssociations.Launch("/mnt/Programs/paint.elf");
-                else
-                    LaunchTracker.Start(() => new Paint());
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "winver" || lower == "about")
-            {
-                if (File.Exists("/mnt/Programs/winver.elf"))
-                    FileAssociations.Launch("/mnt/Programs/winver.elf");
-                else
-                    LaunchTracker.Start(() => new AboutWindows());
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "explorer" || lower == "files")
-            {
-                if (File.Exists("/mnt/Programs/explorer.elf"))
-                    ElfRunner.RunFile("/mnt/Programs/explorer.elf", new string[] { "/mnt" });
-                else
-                    LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", "/mnt"));
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "taskmgr" || lower == "perf" || lower == "taskmanager")
-            {
-                if (File.Exists("/mnt/Programs/taskmgr.elf"))
-                    FileAssociations.Launch("/mnt/Programs/taskmgr.elf");
-                else
-                    LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "regedit" || lower == "registry")
-            {
-                if (File.Exists("/mnt/Programs/regedit.elf"))
-                    FileAssociations.Launch("/mnt/Programs/regedit.elf");
-                else
-                    LaunchTracker.Start(() => new RegistryEditor());
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "diskmgmt")
-            {
-                LaunchTracker.Start(() => new DiskManagement(100, 100, 600, 350));
-                WindowManager.PostClose(this);
-                return;
-            }
-            if (lower == "devmgmt")
-            {
-                LaunchTracker.Start(() => new DeviceManager(100, 100, 600, 350));
                 WindowManager.PostClose(this);
                 return;
             }

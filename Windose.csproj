@@ -17,7 +17,6 @@
     <None Remove="System\ELF\programs\bin\memhog.elf" />
     <None Remove="System\ELF\programs\bin\spin.elf" />
     <None Remove="System\ELF\programs\bin\window.elf" />
-    <None Remove="System\ELF\programs\hello.elf" />
     <None Remove="System\ELF\programs\include\ctype.h" />
     <None Remove="System\ELF\programs\include\kernel.h" />
     <None Remove="System\ELF\programs\include\windose.h" />
@@ -39,7 +38,6 @@
     <None Remove="System\ELF\programs\src\memhog.c" />
     <None Remove="System\ELF\programs\src\spin.c" />
     <None Remove="System\ELF\programs\src\window.c" />
-    <None Remove="System\ELF\programs\window.elf" />
       <None Remove="System\ELF\programs\bin\newelfapp.elf" />
       <None Remove="System\ELF\programs\bin\aeroeditor.elf" />
       <None Remove="System\ELF\programs\bin\startmenu.elf" />
@@ -89,8 +87,6 @@
     <EmbeddedResource Include=".\Resources\Wallpapers\Lithium.png" />
     <EmbeddedResource Include=".\Resources\Fonts\lucida-10x16.psf" />
     <EmbeddedResource Include=".\Resources\Wallpapers\WRAMW.png" />
-    <EmbeddedResource Include=".\System\ELF\programs\hello.elf" />
-    <EmbeddedResource Include=".\System\ELF\programs\window.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\hello.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\canvas.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\explorer.elf" />

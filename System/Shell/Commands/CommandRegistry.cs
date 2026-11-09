@@ -725,9 +725,6 @@ public static class CommandRegistry
         RegisterAlias("paint", "mspaint");
 
 
-        // Register(new DiskManagerCommand());
-        // Register(new SystemPropertiesCommand());
-        // ...
     }
 
     private static string[] Parse(string commandLine)
