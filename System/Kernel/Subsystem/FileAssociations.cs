@@ -17,6 +17,7 @@ namespace Windose.System.Kernel.Subsystem
     public static class FileAssociations
     {
         private static readonly Dictionary<string, Type> associations = new(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, string> elfAssociations = new(StringComparer.OrdinalIgnoreCase);
 
         static FileAssociations()
         {
@@ -73,6 +74,13 @@ namespace Windose.System.Kernel.Subsystem
             associations[extension] = applicationType;
         }
 
+        public static void RegisterElf(string extension, string elfPath)
+        {
+            if (string.IsNullOrWhiteSpace(extension) || string.IsNullOrWhiteSpace(elfPath)) return;
+            extension = Normalize(extension);
+            elfAssociations[extension] = elfPath;
+        }
+
         public static bool TryGetApplication(string extension, out Type applicationType)
         {
             if (string.IsNullOrWhiteSpace(extension))
@@ -82,6 +90,17 @@ namespace Windose.System.Kernel.Subsystem
             }
 
             return associations.TryGetValue(Normalize(extension), out applicationType);
+        }
+
+        public static bool TryGetElfApplication(string extension, out string elfPath)
+        {
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                elfPath = null;
+                return false;
+            }
+
+            return elfAssociations.TryGetValue(Normalize(extension), out elfPath);
         }
 
         public static string Normalize(string extension)
@@ -249,6 +268,19 @@ namespace Windose.System.Kernel.Subsystem
                 catch (Exception ex)
                 {
                     SystemLogger.WriteLine("Lua", $"Failed to run Lua script {path}: {ex.Message}", ConsoleMessageType.Error);
+                }
+            }
+
+            if (TryGetElfApplication(ext, out string associatedElf) && File.Exists(associatedElf))
+            {
+                try
+                {
+                    LaunchTracker.StartElf(associatedElf, new string[] { associatedElf, path });
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    SystemLogger.WriteLine("ELF", $"Error launching {associatedElf} for {path}: {ex.Message}", ConsoleMessageType.Error);
                 }
             }
 

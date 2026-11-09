@@ -28,6 +28,7 @@ public class FileExplorer : Window
     private readonly MenuPopup fileContextMenu;
     private readonly MenuPopup viewportContextMenu;
     private readonly MenuItem openContextItem;
+    private readonly MenuItem openWithContextItem;
     private readonly MenuItem editContextItem;
     private FileListViewItem? contextItem;
     private string currentLocation = "/mnt";
@@ -132,7 +133,7 @@ public class FileExplorer : Window
         viewportContextMenu.AddItem("Properties", ShowContextProperties);
 
         openContextItem = fileContextMenu.AddItem("Open", OpenContextItem);
-        openContextItem = fileContextMenu.AddItem("Open With", OpenContextItem);
+        openWithContextItem = fileContextMenu.AddItem("Open With...", OpenWithContextItem);
         editContextItem = fileContextMenu.AddItem("Edit", EditContextItem);
 
         fileContextMenu.AddSeparator();
@@ -400,6 +401,7 @@ public class FileExplorer : Window
     {
         contextItem = item;
         openContextItem.enabled = item != null;
+        openWithContextItem.enabled = item != null && !item.isFolder && item.hasFileEntry;
         editContextItem.enabled = item != null && !item.isFolder && item.hasFileEntry;
 
         int x = Math.Min(mouseX, Math.Max(0, Global.screenWidth - fileContextMenu.Width));
@@ -420,6 +422,17 @@ public class FileExplorer : Window
             OpenFolderItem(item);
         else
             OpenFileItem(item);
+    }
+
+    private void OpenWithContextItem()
+    {
+        FileListViewItem item = contextItem;
+        contextItem = null;
+        if (item == null || item.isFolder || !item.hasFileEntry) return;
+
+        string path = item.fileEntry.AbsoluteLocation;
+        if (string.IsNullOrEmpty(path)) return;
+        LaunchTracker.Start(() => new OpenWithDialog(X + 60, Y + 60, path));
     }
 
     private void EditContextItem()

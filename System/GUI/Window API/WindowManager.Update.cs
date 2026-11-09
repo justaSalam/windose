@@ -7,6 +7,8 @@ public partial class WindowManager
     private int lastMx = int.MinValue;
     private int lastMy = int.MinValue;
     private MouseState lastMouseButtons;
+    private int lastHoverMx = int.MinValue;
+    private int lastHoverMy = int.MinValue;
 
     private void UpdateDesktop()
     {
@@ -90,6 +92,14 @@ public partial class WindowManager
     private void UpdateHoverCursor()
     {
         if (Windose.Drivers.CursorManager.IsBusy) return;
+
+        // Skip hit-testing the entire component and window tree when neither the mouse moved
+        // nor any window content was dirtied/composed this frame.
+        if (mx == lastHoverMx && my == lastHoverMy && !frameComposed)
+            return;
+
+        lastHoverMx = mx;
+        lastHoverMy = my;
 
         lock (windows)
         {

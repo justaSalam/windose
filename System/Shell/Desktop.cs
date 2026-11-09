@@ -4,6 +4,7 @@ using Cosmos.Kernel.System.Input;
 using System.Drawing;
 using System.Globalization;
 using Windose;
+using Windose.Programs;
 using Windose.System.Features;
 using Windose.System.Kernel;
 using Windose.System.Kernel.Subsystem;
@@ -39,6 +40,7 @@ public class Desktop : Component
 
     public static List<DesktopIcon> Icons = new List<DesktopIcon>();
     public static bool SnapIconsToGrid { get; private set; } = true;
+    public static bool AutoArrangeIcons { get; private set; } = false;
     public static bool ShowIconGrid { get; private set; }
     public static int IconGridWidth { get; private set; } = 80;
     public static int IconGridHeight { get; private set; } = 80;
@@ -309,9 +311,10 @@ public class Desktop : Component
         viewItem.AddSubmenuItem("Medium Icons", () => SetDesktopIconSize(32));
         viewItem.AddSubmenuItem("Small Icons", () => SetDesktopIconSize(16));
         viewItem.AddSubmenuSeparator();
-        viewItem.AddSubmenuItem("Show Icon Grid", ToggleIconGrid);
+        viewItem.AddSubmenuItem("Auto Arrange Icons", ToggleAutoArrange);
+        viewItem.AddSubmenuItem("Align Icons to Grid", AlignIconsToGrid);
         viewItem.AddSubmenuItem("Snap Icons to Grid", ToggleSnapToGrid);
-        viewItem.AddSubmenuItem("Align Icons to Grid", ArrangeIconsOnGrid);
+        viewItem.AddSubmenuItem("Show Icon Grid", ToggleIconGrid);
         viewItem.AddSubmenuSeparator();
         viewItem.AddSubmenuItem("Compact Grid", () => SetIconGridPreset(80, 76));
         viewItem.AddSubmenuItem("Comfortable Grid", () => SetIconGridPreset(88, 84));
@@ -336,6 +339,7 @@ public class Desktop : Component
         contextMenu.AddItem("Personalise", () => LaunchTracker.Start(() => new DisplaySettings(contextX, contextY)));
 
         iconContextMenu.AddItem("Open", OpenContextIcon);
+        iconContextMenu.AddItem("Open With...", OpenWithContextIcon);
         iconContextMenu.AddSeparator();
         iconRenameItem = iconContextMenu.AddItem("Rename", BeginContextRename);
         iconDeleteItem = iconContextMenu.AddItem("Delete", DeleteContextIcon);
@@ -692,7 +696,8 @@ public class Desktop : Component
     {
         bool backgroundChanged = change.Key.Equals("System/Desktop/BackgroundColor", StringComparison.OrdinalIgnoreCase) ||
             change.Key.Equals("System/Theme/Name", StringComparison.OrdinalIgnoreCase);
-        bool gridChanged = change.Key.StartsWith("System/Desktop/IconGrid", StringComparison.OrdinalIgnoreCase);
+        bool gridChanged = change.Key.StartsWith("System/Desktop/IconGrid", StringComparison.OrdinalIgnoreCase) ||
+            change.Key.StartsWith("System/Desktop/AutoArrange", StringComparison.OrdinalIgnoreCase);
 
         if (!backgroundChanged && !gridChanged) return;
 
@@ -702,7 +707,9 @@ public class Desktop : Component
         if (gridChanged)
         {
             ApplyIconGridSettings();
-            if (SnapIconsToGrid)
+            if (AutoArrangeIcons)
+                ArrangeIconsInColumns();
+            else if (SnapIconsToGrid)
                 ArrangeIconsOnGrid();
         }
 
@@ -738,6 +745,7 @@ public class Desktop : Component
     private void ApplyIconGridSettings()
     {
         SnapIconsToGrid = Registry.GetBoolean("System/Desktop/IconGridEnabled", true);
+        AutoArrangeIcons = Registry.GetBoolean("System/Desktop/AutoArrange", false);
         ShowIconGrid = Registry.GetBoolean("System/Desktop/IconGridVisible", false);
         IconGridWidth = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridWidth", 80), DesktopIcon.DefaultWidth, 256);
         IconGridHeight = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridHeight", 80), DesktopIcon.DefaultHeight, 256);
@@ -760,6 +768,58 @@ public class Desktop : Component
     private void ToggleSnapToGrid()
     {
         Registry.Set("System/Desktop/IconGridEnabled", !SnapIconsToGrid);
+    }
+
+    private void ToggleAutoArrange()
+    {
+        bool next = !AutoArrangeIcons;
+        try { Registry.Set("System/Desktop/AutoArrange", next); } catch { }
+        AutoArrangeIcons = next;
+        if (next)
+        {
+            ArrangeIconsInColumns();
+        }
+    }
+
+    public void ArrangeIconsInColumns()
+    {
+        int usableH = GetUsableHeight();
+        int maxRow = Math.Max(1, (usableH - IconGridOffsetY) / IconGridHeight);
+
+        for (int i = 0; i < Icons.Count; i++)
+        {
+            DesktopIcon icon = Icons[i];
+            if (icon == null || !icon.Visible) continue;
+            int col = i / maxRow;
+            int row = i % maxRow;
+            int x = IconGridOffsetX + col * IconGridWidth;
+            int y = IconGridOffsetY + row * IconGridHeight;
+            icon.MoveTo(x, y);
+        }
+        SaveLayout();
+        MarkDirty();
+    }
+
+    public void AlignIconsToGrid()
+    {
+        gridCollisionIgnoredIcons = new List<DesktopIcon>();
+        try
+        {
+            for (int i = 0; i < Icons.Count; i++)
+            {
+                DesktopIcon icon = Icons[i];
+                if (icon == null || !icon.Visible) continue;
+                Point snapped = SnapToGrid(icon.X, icon.Y, icon);
+                Point available = FindNearestAvailableGridPosition(icon, snapped);
+                icon.MoveTo(available.X, available.Y);
+            }
+        }
+        finally
+        {
+            gridCollisionIgnoredIcons = null;
+        }
+        SaveLayout();
+        MarkDirty();
     }
 
     private void DrawIconGrid()
@@ -874,6 +934,14 @@ public class Desktop : Component
     private void OpenContextIcon()
     {
         OpenIcon(contextIcon);
+    }
+
+    private void OpenWithContextIcon()
+    {
+        if (contextIcon == null) return;
+        string path = contextIcon.fileEntry.AbsoluteLocation;
+        if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+        LaunchTracker.Start(() => new OpenWithDialog(contextIcon.X + 20, contextIcon.Y + 20, path));
     }
 
     private void DeleteContextIcon()
@@ -1102,7 +1170,13 @@ public class Desktop : Component
 
     private void PlaceIconOnGrid(DesktopIcon icon)
     {
-        if (icon == null || !SnapIconsToGrid) return;
+        if (icon == null) return;
+        if (AutoArrangeIcons)
+        {
+            ArrangeIconsInColumns();
+            return;
+        }
+        if (!SnapIconsToGrid) return;
 
         Point snapped = SnapToGrid(icon.X, icon.Y, icon);
         Point available = FindNearestAvailableGridPosition(icon, snapped);
