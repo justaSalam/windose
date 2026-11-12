@@ -89,8 +89,8 @@ public class Kernel : Sys.Kernel
         }
 
         displayDriver = new Drivers.DisplayManager();
-        
-        
+
+
 
         Console.WriteLine("Canvas:     " + canvas.Name);
         Console.WriteLine("Resolution: " + canvas.Width + "x" + canvas.Height);
@@ -102,6 +102,7 @@ public class Kernel : Sys.Kernel
         mainBuffer = displayDriver.BackBuffer;
 
         CompositorSelfTests.Run();
+        WebSelfTests.Run();
 
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
@@ -156,43 +157,38 @@ public class Kernel : Sys.Kernel
 
     protected override void Run()
     {
-        try
+
+        if (!MemoryCheck.Pass()) return;
+
+        int nowTick = Environment.TickCount;
+        if (FrameCount > 0)
         {
-            if (!MemoryCheck.Pass()) return;
-
-            int nowTick = Environment.TickCount;
-            if (FrameCount > 0)
-            {
-                DeltaTimeMs = Math.Max(0, unchecked(nowTick - lastFrameTick));
-                DeltaTimeSeconds = DeltaTimeMs / 1000.0;
-            }
-            lastFrameTick = nowTick;
-            FrameCount++;
-
-            fpsWindowFrames++;
-            if (unchecked(nowTick - fpsWindowTick) >= 1000)
-            {
-                Fps = fpsWindowFrames;
-                fpsWindowFrames = 0;
-                fpsWindowTick = nowTick;
-            }
-
-            Mouse.Update();
-
-            PerformanceMetrics.BeginFrame();
-
-            long processStartedAt = PerformanceMetrics.Now;
-
-            ProcessManager.Update();
-
-            PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
-
-            displayDriver.Present(MouseManager.X, MouseManager.Y, WindowManager.TakeFrameComposed());
+            DeltaTimeMs = Math.Max(0, unchecked(nowTick - lastFrameTick));
+            DeltaTimeSeconds = DeltaTimeMs / 1000.0;
         }
-        catch (Exception ex)
+        lastFrameTick = nowTick;
+        FrameCount++;
+
+        fpsWindowFrames++;
+        if (unchecked(nowTick - fpsWindowTick) >= 1000)
         {
-            Console.WriteLine(ex.Message);
+            Fps = fpsWindowFrames;
+            fpsWindowFrames = 0;
+            fpsWindowTick = nowTick;
         }
+
+        Mouse.Update();
+
+        PerformanceMetrics.BeginFrame();
+
+        long processStartedAt = PerformanceMetrics.Now;
+
+        ProcessManager.Update();
+
+        PerformanceMetrics.ProcessTicks = PerformanceMetrics.Now - processStartedAt;
+
+        displayDriver.Present(MouseManager.X, MouseManager.Y, WindowManager.TakeFrameComposed());
+
 
     }
 
