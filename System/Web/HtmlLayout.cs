@@ -1775,7 +1775,25 @@ public static class HtmlLayout
         y += style.MarginB;
     }
 
-    // ---- tables (approximate: each row merged into one line) -------------
+    // ---- tables (multi-pass column alignment & uniform row heights) ------
+
+    private static void CollectTableRows(DomNode node, List<DomNode> rows)
+    {
+        for (DomNode row = node.FirstElementChild(); row != null; row = row.NextElementSibling())
+        {
+            if (row.IsElement && row.Tag == "tr")
+            {
+                rows.Add(row);
+            }
+            else if (row.IsElement && (row.Tag == "thead" || row.Tag == "tbody" || row.Tag == "tfoot"))
+            {
+                for (DomNode r = row.FirstElementChild(); r != null; r = r.NextElementSibling())
+                {
+                    if (r.IsElement && r.Tag == "tr") rows.Add(r);
+                }
+            }
+        }
+    }
 
     private static void LayoutTable(DomNode node, CssComputed style, int availX, int availRight,
         ref int y, Ctx ctx)
@@ -1783,99 +1801,171 @@ public static class HtmlLayout
         y += style.MarginT;
         int x = availX + style.MarginL;
         int right = availRight - style.MarginR;
-
-        DomNode row = node.FirstElementChild();
-        while (row != null)
-        {
-            if (row.IsElement && (row.Tag == "tr"))
-            {
-                LayoutTableRow(row, x, right, ref y, ctx, style);
-            }
-            else if (row.IsElement && (row.Tag == "thead" || row.Tag == "tbody" || row.Tag == "tfoot"))
-            {
-                DomNode r = row.FirstElementChild();
-                while (r != null)
-                {
-                    if (r.IsElement && r.Tag == "tr") LayoutTableRow(r, x, right, ref y, ctx, style);
-                    r = r.NextElementSibling();
-                }
-            }
-            row = row.NextElementSibling();
-        }
-        y += style.MarginB;
-    }
-
-    private static void LayoutTableRow(DomNode tr, int x, int right, ref int y, Ctx ctx, CssComputed tableStyle)
-    {
-        List<DomNode> cells = new List<DomNode>();
-        DomNode cell = tr.FirstElementChild();
-        while (cell != null)
-        {
-            if (cell.IsElement && (cell.Tag == "td" || cell.Tag == "th")) cells.Add(cell);
-            cell = cell.NextElementSibling();
-        }
-        if (cells.Count == 0) return;
-
         int tableW = Math.Max(40, right - x);
-        int[] colW = new int[cells.Count];
-        int definedW = 0;
-        int autoCount = 0;
 
-        for (int i = 0; i < cells.Count; i++)
+        List<DomNode> rows = new List<DomNode>();
+        CollectTableRows(node, rows);
+        if (rows.Count == 0)
         {
-            DomNode c = cells[i];
-            CssComputed cs = ctx.Sheet.Compute(c, tableStyle, ctx.Vw, ctx.Vh);
-            string wAttr = c.GetAttr("width");
-            int cw = 0;
-            if (!string.IsNullOrEmpty(wAttr))
+            y += style.MarginB;
+            return;
+        }
+
+        // Determine column count and widths across the whole table
+        int maxCols = 0;
+        List<List<DomNode>> rowCells = new List<List<DomNode>>(rows.Count);
+        for (int r = 0; r < rows.Count; r++)
+        {
+            List<DomNode> cells = new List<DomNode>();
+            for (DomNode c = rows[r].FirstElementChild(); c != null; c = c.NextElementSibling())
             {
-                if (wAttr.EndsWith("%"))
+                if (c.IsElement && (c.Tag == "td" || c.Tag == "th")) cells.Add(c);
+            }
+            rowCells.Add(cells);
+            if (cells.Count > maxCols) maxCols = cells.Count;
+        }
+
+        if (maxCols == 0)
+        {
+            y += style.MarginB;
+            return;
+        }
+
+        int[] colW = new int[maxCols];
+        int[] colMinW = new int[maxCols];
+        bool[] isExplicit = new bool[maxCols];
+
+        for (int r = 0; r < rowCells.Count; r++)
+        {
+            List<DomNode> cells = rowCells[r];
+            for (int c = 0; c < cells.Count && c < maxCols; c++)
+            {
+                DomNode cell = cells[c];
+                CssComputed cs = ctx.Sheet.Compute(cell, style, ctx.Vw, ctx.Vh);
+                string wAttr = cell.GetAttr("width");
+                int cw = 0;
+                if (!string.IsNullOrEmpty(wAttr))
                 {
-                    int pct = ParseInt(wAttr.TrimEnd('%'), 0);
-                    if (pct > 0) cw = tableW * pct / 100;
+                    if (wAttr.EndsWith("%"))
+                    {
+                        int pct = ParseInt(wAttr.TrimEnd('%'), 0);
+                        if (pct > 0) cw = tableW * pct / 100;
+                    }
+                    else
+                    {
+                        cw = ParseInt(wAttr, 0);
+                    }
+                }
+                if (cw == 0 && cs.HasW && cs.W > 0) cw = cs.W;
+
+                if (cw > 0)
+                {
+                    if (cw > colW[c]) colW[c] = cw;
+                    isExplicit[c] = true;
                 }
                 else
                 {
-                    cw = ParseInt(wAttr, 0);
+                    int natW = MeasureContentWidth(cell, cs, ctx);
+                    if (natW > colMinW[c]) colMinW[c] = natW;
                 }
             }
-            if (cw == 0 && cs.HasW && cs.W > 0) cw = cs.W;
+        }
 
-            if (cw > 0)
+        int definedW = 0;
+        int autoCount = 0;
+        int totalMinW = 0;
+        for (int c = 0; c < maxCols; c++)
+        {
+            if (isExplicit[c])
             {
-                colW[i] = cw;
-                definedW += cw;
+                definedW += colW[c];
             }
             else
             {
                 autoCount++;
+                totalMinW += Math.Max(20, colMinW[c]);
             }
         }
 
         int remainingW = Math.Max(0, tableW - definedW);
         if (autoCount > 0)
         {
-            int autoEach = remainingW / autoCount;
-            for (int i = 0; i < cells.Count; i++)
+            if (remainingW >= totalMinW && totalMinW > 0)
             {
-                if (colW[i] == 0) colW[i] = Math.Max(20, autoEach);
+                for (int c = 0; c < maxCols; c++)
+                {
+                    if (!isExplicit[c])
+                    {
+                        colW[c] = remainingW * Math.Max(20, colMinW[c]) / totalMinW;
+                        if (colW[c] < 20) colW[c] = 20;
+                    }
+                }
+            }
+            else
+            {
+                int each = Math.Max(20, remainingW / autoCount);
+                for (int c = 0; c < maxCols; c++)
+                {
+                    if (!isExplicit[c]) colW[c] = each;
+                }
             }
         }
 
+        // Layout rows with unified column widths
+        for (int r = 0; r < rows.Count; r++)
+        {
+            LayoutTableRow(rows[r], rowCells[r], x, colW, ref y, ctx, style);
+        }
+
+        y += style.MarginB;
+    }
+
+    private static void LayoutTableRow(DomNode tr, List<DomNode> cells, int startX, int[] colW, ref int y, Ctx ctx, CssComputed tableStyle)
+    {
+        if (cells == null || cells.Count == 0) return;
+
         int startY = y;
         int maxY = startY;
-        int curX = x;
+        int curX = startX;
+
+        List<RenderBox> cellBoxes = new List<RenderBox>();
 
         for (int i = 0; i < cells.Count; i++)
         {
             DomNode c = cells[i];
-            int cellW = colW[i];
+            int cellW = i < colW.Length ? colW[i] : 40;
             int cellX = curX;
             int cellRight = curX + cellW;
             curX += cellW;
 
             CssComputed cs = ctx.Sheet.Compute(c, tableStyle, ctx.Vw, ctx.Vh);
             int cellY = startY;
+
+            // Box decoration for table cell
+            if (cs.HasBg || cs.BorderLW > 0 || cs.BorderRW > 0 || cs.BorderTW > 0 || cs.BorderBW > 0)
+            {
+                RenderBox cbox = new RenderBox
+                {
+                    X = cellX,
+                    Y = startY,
+                    W = cellW,
+                    H = 0, // updated to row height below
+                    HasBg = cs.HasBg,
+                    Bg = ToColor(cs.BgColor, cs.Opacity),
+                    BorderL = cs.BorderLW, BorderR = cs.BorderRW,
+                    BorderT = cs.BorderTW, BorderB = cs.BorderBW,
+                    BorderCL = ToColor(cs.BorderLC, cs.Opacity),
+                    BorderCR = ToColor(cs.BorderRC, cs.Opacity),
+                    BorderCT = ToColor(cs.BorderTC, cs.Opacity),
+                    BorderCB = ToColor(cs.BorderBC, cs.Opacity),
+                    StyleL = cs.BorderLL, StyleR = cs.BorderRR,
+                    StyleT = cs.BorderTT, StyleB = cs.BorderBB,
+                    Node = c,
+                    Hidden = cs.Visibility != CssVis.Visible
+                };
+                cellBoxes.Add(cbox);
+                ctx.Plan.Boxes.Add(cbox);
+            }
 
             bool hasBlockChild = false;
             DomNode ch = c.FirstChild;
@@ -1921,7 +2011,13 @@ public static class HtmlLayout
             if (cellY > maxY) maxY = cellY;
         }
 
-        y = maxY > startY ? maxY : startY + 20;
+        int rowH = Math.Max(20, maxY - startY);
+        for (int b = 0; b < cellBoxes.Count; b++)
+        {
+            cellBoxes[b].H = rowH;
+        }
+
+        y = startY + rowH;
     }
 
     // ---- images / rules --------------------------------------------------
