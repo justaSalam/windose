@@ -128,6 +128,8 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
         private string pendingStatus = "";
         private Dictionary<string, Image> pendingImages;
         private bool resultReady;
+        private Dictionary<string, Image> pendingImagesUpdate;
+        private bool imagesUpdateReady;
 
         // Progress handoff: the fetch worker writes these (0..100, or -1 for the
         // indeterminate "connecting" marquee) and the update thread reads them so
@@ -358,6 +360,23 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
                 }
                 if (!string.IsNullOrEmpty(status)) SetStatus(status);
             }
+
+            if (imagesUpdateReady)
+            {
+                imagesUpdateReady = false;
+                Dictionary<string, Image> imgs = pendingImagesUpdate;
+                pendingImagesUpdate = null;
+                string status = pendingStatus;
+
+                progressBar.Visible = false;
+                progressBar.Indeterminate = true;
+
+                if (imgs != null)
+                {
+                    webView.UpdateImages(imgs);
+                }
+                if (!string.IsNullOrEmpty(status)) SetStatus(status);
+            }
         }
 
         private void SetStatus(string text)
@@ -480,6 +499,8 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
         private void StopLoading()
         {
             cancelPendingFetch = true;
+            imagesUpdateReady = false;
+            pendingImagesUpdate = null;
             progressBar.Visible = false;
             progressBar.Indeterminate = false;
             SetStatus("Stopped.");
@@ -1208,13 +1229,13 @@ tr:hover { background-color: #f8f9fa; }
 
                 if (cancelPendingFetch) return;
 
-                // Progressive render: show page structure, text and styles immediately without waiting for images/scripts
-                Publish(page, finalUrl, page.Title, "Loading page…", new Dictionary<string, Image>());
-
-                PublishProgress(65, "Loading scripts…");
+                PublishProgress(60, "Loading scripts…");
                 FetchScripts(page, finalUrl);
 
                 if (cancelPendingFetch) return;
+
+                // Progressive render: show page structure, text and styles immediately without waiting for images
+                Publish(page, finalUrl, page.Title, "Loading images…", new Dictionary<string, Image>());
 
                 PublishProgress(80, "Loading images…");
                 Dictionary<string, Image> images = FetchImages(page, finalUrl);
@@ -1228,7 +1249,7 @@ tr:hover { background-color: #f8f9fa; }
                 else if (page.StyleSheetHrefs != null && page.StyleSheetHrefs.Count > 0 && cssErr != null)
                     status += " (CSS: " + cssErr + ")";
                 if (images.Count > 0) status += ", " + images.Count + " img";
-                Publish(page, finalUrl, page.Title, status, images);
+                PublishImages(status, images);
             }
             catch (Exception ex)
             {
@@ -1765,6 +1786,13 @@ a:hover { text-decoration: underline; }
             pendingStatus = status ?? "";
             pendingImages = images;
             resultReady = true;
+        }
+
+        private void PublishImages(string status, Dictionary<string, Image> images)
+        {
+            pendingImagesUpdate = images;
+            pendingStatus = status ?? "";
+            imagesUpdateReady = true;
         }
 
         private void PublishError(string url, string title, string message)

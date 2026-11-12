@@ -121,6 +121,18 @@ public class WebView : Component
         MarkDirty();
     }
 
+    /// <summary>Inject newly downloaded images without resetting scroll or restarting scripts.</summary>
+    public void UpdateImages(Dictionary<string, Image> newImages)
+    {
+        if (newImages == null) return;
+        if (this.images != null && this.images.Count == 0 && newImages.Count == 0) return;
+        this.images = newImages;
+        int prevScroll = scrollY;
+        RebuildLayout();
+        scrollY = Math.Max(0, Math.Min(prevScroll, MaxScroll()));
+        MarkDirty();
+    }
+
     /// <summary>Create a fresh interpreter + DOM for the page and run its scripts
     /// in document order, then fire DOMContentLoaded and load.</summary>
     private void StartEngine()
