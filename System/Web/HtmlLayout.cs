@@ -238,6 +238,9 @@ public static class HtmlLayout
         public bool IsWidget;   // form control flowing inline
         public byte WidgetKind;
         public int WidgetW, WidgetH;
+        public bool IsInlineBox; // atomic display:inline-block element
+        public int InlineBoxW, InlineBoxH;
+        public DomNode InlineNode;
         public DomNode Node;    // owning element for click targeting
     }
 
@@ -254,6 +257,9 @@ public static class HtmlLayout
         public bool IsWidget;
         public byte WidgetKind;
         public int WidgetW, WidgetH;
+        public bool IsInlineBox;
+        public int InlineBoxW, InlineBoxH;
+        public DomNode InlineNode;
         public DomNode Node;    // owning element for click targeting
     }
 
@@ -522,6 +528,10 @@ public static class HtmlLayout
                         {
                             FlushRuns(runs, baseStyle, contentX, contentRight, ref y, ctx, null, 0);
                             LayoutBlockNode(child, cs, contentX, contentRight, ref y, ctx, 0);
+                        }
+                        else if (cs.Display == CssDisplay.InlineBlock)
+                        {
+                            AddInlineBoxRun(child, cs, runs, ctx, href);
                         }
                         else
                         {
@@ -2506,6 +2516,40 @@ public static class HtmlLayout
         });
     }
 
+    private static void AddInlineBoxRun(DomNode child, CssComputed cs, List<Run> runs, Ctx ctx, string href)
+    {
+        int bw = cs.HasW && cs.W > 0 ? cs.W : MeasureContentWidth(child, cs, ctx);
+        int bh = cs.HasH && cs.H > 0 ? cs.H : MeasureInlineBoxHeight(child, cs, bw, ctx);
+        if (bw < 1) bw = 1;
+        if (bh < 1) bh = 1;
+        runs.Add(new Run
+        {
+            IsInlineBox = true,
+            InlineBoxW = bw,
+            InlineBoxH = bh,
+            InlineNode = child,
+            Style = cs,
+            Href = href,
+            Node = child
+        });
+    }
+
+    private static int MeasureInlineBoxHeight(DomNode node, CssComputed cs, int contentW, Ctx ctx)
+    {
+        if (cs.HasH && cs.H > 0) return cs.H;
+        RenderPlan saved = ctx.Plan;
+        RenderPlan scratch = new RenderPlan();
+        ctx.Plan = scratch;
+        int y = 0;
+        int padL = cs.PadL, padR = cs.PadR, bL = cs.BorderLW, bR = cs.BorderRW;
+        int innerX = 0;
+        int innerRight = Math.Max(20, contentW - padL - padR - bL - bR);
+        LayoutContainer(node, cs, cs, innerX, innerRight, ref y, ctx);
+        ctx.Plan = saved;
+        int totalH = y + cs.PadT + cs.PadB + cs.BorderTW + cs.BorderBW;
+        return Math.Max(16, totalH);
+    }
+
     // ---- inline collection -----------------------------------------------
 
     private static void CollectInline(DomNode node, CssComputed style, List<Run> runs, Ctx ctx, string href)
@@ -2580,6 +2624,10 @@ public static class HtmlLayout
                 else if (cs.Display == CssDisplay.Contents)
                 {
                     CollectInline(child, cs, runs, ctx, href);
+                }
+                else if (cs.Display == CssDisplay.InlineBlock)
+                {
+                    AddInlineBoxRun(child, cs, runs, ctx, href);
                 }
                 else if (IsBlockLevel(cs))
                 {
@@ -2668,6 +2716,11 @@ public static class HtmlLayout
             if (r.IsWidget)
             {
                 toks.Add(new Tok { IsWidget = true, WidgetKind = r.WidgetKind, WidgetW = r.WidgetW, WidgetH = r.WidgetH, Style = r.Style, Href = r.Href, Node = r.Node });
+                continue;
+            }
+            if (r.IsInlineBox)
+            {
+                toks.Add(new Tok { IsInlineBox = true, InlineBoxW = r.InlineBoxW, InlineBoxH = r.InlineBoxH, InlineNode = r.InlineNode, Style = r.Style, Href = r.Href, Node = r.Node });
                 continue;
             }
             TokenizeText(toks, r.Text, r.Style, r.Href, r.Node);
@@ -2799,6 +2852,30 @@ public static class HtmlLayout
                 if (wh > lineH) lineH = wh;
                 EmitWidget(ctx, tok, curX, lineTop, lineH);
                 curX += ww + 4;
+                hasContent = true;
+                continue;
+            }
+
+            if (tok.IsInlineBox)
+            {
+                int ibW = tok.InlineBoxW;
+                int ibH = tok.InlineBoxH;
+                if (!nowrap && hasContent && curX + ibW > contentRight)
+                {
+                    EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+                    lineTop += lineH;
+                    spans = new List<RenderSpan>();
+                    curX = contentX;
+                    hasContent = false;
+
+                    curBullet = null;
+                    lineH = LineHeightOf(baseStyle);
+                    lineWidStart = ctx.Plan.Widgets.Count;
+                }
+                if (ibH > lineH) lineH = ibH;
+
+                EmitInlineBox(ctx, tok, curX, lineTop, lineH);
+                curX += ibW + (tok.Style != null ? tok.Style.MarginR : 0) + 4;
                 hasContent = true;
                 continue;
             }
@@ -3160,6 +3237,64 @@ public static class HtmlLayout
         if (v != null) return v;
         string t = opt.TextContent;
         return t != null ? CollapseWs(t).Trim() : "";
+    }
+
+    private static void EmitInlineBox(Ctx ctx, Tok tok, int x, int lineTop, int lineH)
+    {
+        CssComputed st = tok.Style;
+        int bw = tok.InlineBoxW;
+        int bh = tok.InlineBoxH;
+        int by = lineTop;
+        if (st != null && st.VerticalAlign == CssVAlign.Middle && lineH > bh)
+            by += (lineH - bh) / 2;
+        else if (st != null && st.VerticalAlign == CssVAlign.Bottom && lineH > bh)
+            by += lineH - bh;
+
+        Image bgImg = null;
+        if (st != null && !string.IsNullOrEmpty(st.BgImage) && ctx.Images.ContainsKey(st.BgImage))
+            ctx.Images.TryGetValue(st.BgImage, out bgImg);
+
+        ctx.Plan.Boxes.Add(new RenderBox
+        {
+            X = x,
+            Y = by,
+            W = bw,
+            H = bh,
+            HasBg = st != null && st.HasBg,
+            Bg = st != null ? ToColor(st.BgColor, st.Opacity) : Color.Transparent,
+            BgImage = bgImg,
+            BgRepeat = st != null ? st.BgRepeat : CssRepeat.Repeat,
+            BorderRadius = st != null ? st.BorderRadius : 0,
+            BorderT = st != null ? st.BorderTW : 0,
+            BorderB = st != null ? st.BorderBW : 0,
+            BorderL = st != null ? st.BorderLW : 0,
+            BorderR = st != null ? st.BorderRW : 0,
+            BorderCT = st != null ? ToColor(st.BorderTC, st.Opacity) : Color.Transparent,
+            BorderCB = st != null ? ToColor(st.BorderBC, st.Opacity) : Color.Transparent,
+            BorderCL = st != null ? ToColor(st.BorderLC, st.Opacity) : Color.Transparent,
+            BorderCR = st != null ? ToColor(st.BorderRC, st.Opacity) : Color.Transparent,
+            StyleT = st != null ? st.BorderTT : CssBorder.None,
+            StyleB = st != null ? st.BorderBB : CssBorder.None,
+            StyleL = st != null ? st.BorderLL : CssBorder.None,
+            StyleR = st != null ? st.BorderRR : CssBorder.None,
+            Node = tok.InlineNode != null ? tok.InlineNode : tok.Node,
+            Hidden = st != null && st.Visibility != CssVis.Visible,
+            BoxShadow = st != null ? st.BoxShadow : null,
+        });
+
+        if (tok.InlineNode != null)
+        {
+            int padL = st != null ? st.PadL : 0;
+            int padR = st != null ? st.PadR : 0;
+            int padT = st != null ? st.PadT : 0;
+            int bL = st != null ? st.BorderLW : 0;
+            int bR = st != null ? st.BorderRW : 0;
+            int bT = st != null ? st.BorderTW : 0;
+            int innerX = x + padL + bL;
+            int innerRight = x + bw - padR - bR;
+            int innerY = by + padT + bT;
+            LayoutContainer(tok.InlineNode, st, st, innerX, innerRight, ref innerY, ctx);
+        }
     }
 
     /// <summary>Emit a form control as a positioned widget on the plan.</summary>
