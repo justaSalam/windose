@@ -300,13 +300,19 @@ public static class HtmlLayout
     public static RenderPlan Build(DomNode root, string cssText, int viewWidth, int viewHeight,
         int baseFont, TextMeasure measure, Dictionary<string, Image> images, string baseHref)
     {
+        return Build(root, CssSheet.Parse(cssText), viewWidth, viewHeight, baseFont, measure, images, baseHref);
+    }
+
+    public static RenderPlan Build(DomNode root, CssSheet sheet, int viewWidth, int viewHeight,
+        int baseFont, TextMeasure measure, Dictionary<string, Image> images, string baseHref)
+    {
         RenderPlan plan = new RenderPlan();
         if (root == null) return plan;
 
         Ctx ctx = new Ctx
         {
             Measure = measure,
-            Sheet = CssSheet.Parse(cssText),
+            Sheet = sheet != null ? sheet : new CssSheet(),
             Images = images != null ? images : new Dictionary<string, Image>(),
             BaseHref = baseHref ?? "",
             Vw = Math.Max(200, viewWidth),
@@ -1160,6 +1166,15 @@ public static class HtmlLayout
     // Measure a flex item's natural content-box width (no wrap).
     private static int MeasureNaturalWidth(FlexItem it, Ctx ctx)
     {
+        if (!it.IsAnonymous && it.Style.HasW && it.Style.W > 0)
+        {
+            int ew = it.Style.BoxSizing == CssBox.Border
+                ? it.Style.W - it.PadMain - it.BorderMain
+                : it.Style.W;
+            if (ew < 1) ew = 1;
+            return ew;
+        }
+
         int w;
         if (it.IsAnonymous)
         {
@@ -1217,6 +1232,13 @@ public static class HtmlLayout
     private static int MeasureBorderHeightAt(FlexItem it, int contentW, Ctx ctx)
     {
         CssComputed st = it.Style;
+        if (!it.IsAnonymous && st.HasH && st.H > 0)
+        {
+            return st.BoxSizing == CssBox.Border
+                ? st.H
+                : st.H + it.PadMain + it.BorderMain;
+        }
+
         if (it.IsAnonymous)
         {
             RenderPlan saved = ctx.Plan;

@@ -82,7 +82,9 @@ public static class WebSelfTests
         CssSheet sheet = CssSheet.Parse(css);
         DomNode doc = HtmlDom.Parse("<div class='card'>Card</div>");
         RenderPlan plan1 = HtmlLayout.Build(doc, css, 800, 600, 16, (s, sz) => s.Length * 8, null, "");
+        RenderPlan plan2 = HtmlLayout.Build(doc, sheet, 800, 600, 16, (s, sz) => s.Length * 8, null, "");
         Assert(plan1 != null, "Plan1 built with css");
+        Assert(plan2 != null, "Plan2 built with cached sheet");
     }
 
     public static void Assert(bool condition, string message)

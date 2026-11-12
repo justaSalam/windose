@@ -55,6 +55,8 @@ public class WebView : Component
     private int scrollY;
     private int layoutWidth = -1;
     private Dictionary<string, Image> images = new Dictionary<string, Image>();
+    private CssSheet cachedSheet;
+    private string cachedCssText;
 
     // Script engine: one interpreter + DOM per loaded page.
     private JsInterpreter js;
@@ -100,6 +102,8 @@ public class WebView : Component
         this.document = page;
         this.baseHref = baseHref ?? (page != null ? page.BaseHref : "");
         this.images = pageImages != null ? pageImages : new Dictionary<string, Image>();
+        this.cachedSheet = null;
+        this.cachedCssText = null;
         scrollY = 0;
 
         // form controls belong to the old document; drop focus/dropdown state
@@ -820,14 +824,21 @@ public class WebView : Component
     public void RebuildLayout()
     {
         layoutWidth = Width;
+        string cssText = document != null ? (document.CssText ?? "") : "";
+        if (cachedSheet == null || cachedCssText != cssText)
+        {
+            cachedCssText = cssText;
+            cachedSheet = CssSheet.Parse(cssText);
+        }
+
         if (js != null && js.Loop != null)
         {
             js.Loop.ViewportWidth = Width;
             js.Loop.ViewportHeight = Height;
-            if (dom != null) dom.SetStylesheet(document != null ? document.CssText : "", Width, Height);
+            if (dom != null) dom.SetStylesheet(cssText, Width, Height);
         }
         if (document == null) { plan = new RenderPlan(); return; }
-        plan = HtmlLayout.Build(document.Root, document.CssText, Width, Height, fontSize,
+        plan = HtmlLayout.Build(document.Root, cachedSheet, Width, Height, fontSize,
             (s, sz) => MeasureTextWidth(s, sz), images, baseHref);
         scrollY = Math.Max(0, Math.Min(scrollY, MaxScroll()));
     }
