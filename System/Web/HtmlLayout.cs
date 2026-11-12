@@ -224,6 +224,13 @@ public static class HtmlLayout
         // collapsing against a placeholder bound.
         public int CbL, CbT, CbR, CbB;
         public bool CbBValid;
+
+        public struct FloatBox
+        {
+            public int X, Y, W, H;
+            public bool IsLeft;
+        }
+        public List<FloatBox> ActiveFloats = new List<FloatBox>();
     }
 
     private sealed class Run
@@ -596,6 +603,25 @@ public static class HtmlLayout
                 return;
         }
 
+        // --- clearance for floats ---
+        if (style.Clear != CssClear.None && ctx.ActiveFloats != null && ctx.ActiveFloats.Count > 0)
+        {
+            int clearY = y;
+            for (int fi = 0; fi < ctx.ActiveFloats.Count; fi++)
+            {
+                Ctx.FloatBox fb = ctx.ActiveFloats[fi];
+                if ((style.Clear == CssClear.Left || style.Clear == CssClear.Both) && fb.IsLeft)
+                {
+                    if (fb.Y + fb.H > clearY) clearY = fb.Y + fb.H;
+                }
+                if ((style.Clear == CssClear.Right || style.Clear == CssClear.Both) && !fb.IsLeft)
+                {
+                    if (fb.Y + fb.H > clearY) clearY = fb.Y + fb.H;
+                }
+            }
+            if (clearY > y) y = clearY;
+        }
+
         // --- box model ---
         int marginLeft = style.MarginL, marginRight = style.MarginR;
         int marginTop = style.MarginT, marginBottom = style.MarginB;
@@ -951,13 +977,27 @@ public static class HtmlLayout
         // relative shifts rendering but must not move the flow position.
         if (!outOfFlow)
         {
-            int flowDy = 0;
-            if (style.Position == CssPos.Relative)
+            if (style.Float != CssFloat.None)
             {
-                if (style.PosT != CssComputed.Auto) flowDy = style.PosT;
-                else if (style.PosB != CssComputed.Auto) flowDy = -style.PosB;
+                ctx.ActiveFloats.Add(new Ctx.FloatBox
+                {
+                    X = boxX,
+                    Y = boxTop,
+                    W = boxW,
+                    H = boxHeight,
+                    IsLeft = style.Float == CssFloat.Left
+                });
             }
-            y = (boxBottom - flowDy) + marginBottom;
+            else
+            {
+                int flowDy = 0;
+                if (style.Position == CssPos.Relative)
+                {
+                    if (style.PosT != CssComputed.Auto) flowDy = style.PosT;
+                    else if (style.PosB != CssComputed.Auto) flowDy = -style.PosB;
+                }
+                y = (boxBottom - flowDy) + marginBottom;
+            }
         }
     }
 
@@ -2783,6 +2823,31 @@ public static class HtmlLayout
 
     // ---- flush + wrap a run list into lines ------------------------------
 
+    private static void GetLineBounds(Ctx ctx, int lineTop, int lineH, int contentX, int contentRight,
+        out int lineLeft, out int lineRight)
+    {
+        lineLeft = contentX;
+        lineRight = contentRight;
+        if (ctx.ActiveFloats == null || ctx.ActiveFloats.Count == 0) return;
+
+        for (int i = 0; i < ctx.ActiveFloats.Count; i++)
+        {
+            Ctx.FloatBox fb = ctx.ActiveFloats[i];
+            if (lineTop + lineH > fb.Y && lineTop < fb.Y + fb.H)
+            {
+                if (fb.IsLeft)
+                {
+                    if (fb.X + fb.W > lineLeft) lineLeft = fb.X + fb.W;
+                }
+                else
+                {
+                    if (fb.X < lineRight) lineRight = fb.X;
+                }
+            }
+        }
+        if (lineRight < lineLeft + 20) lineRight = lineLeft + 20;
+    }
+
     private static void FlushRuns(List<Run> runs, CssComputed baseStyle, int contentX, int contentRight,
         ref int y, Ctx ctx, string bullet, int bulletX)
     {
@@ -2826,7 +2891,9 @@ public static class HtmlLayout
         int align = (int)baseStyle.TextAlign;
         bool nowrap = baseStyle.WhiteSpace == CssWhite.Nowrap;
 
-        int curX = contentX + (bullet != null ? Math.Max(18, ctx.Measure(bullet, baseStyle.FontSize) + 8) : 0);
+        int lineLeft, lineRight;
+        GetLineBounds(ctx, y, LineHeightOf(baseStyle), contentX, contentRight, out lineLeft, out lineRight);
+        int curX = lineLeft + (bullet != null ? Math.Max(18, ctx.Measure(bullet, baseStyle.FontSize) + 8) : 0);
         int lineTop = y;
         List<RenderSpan> spans = new List<RenderSpan>();
         int lineH = LineHeightOf(baseStyle);
@@ -2842,10 +2909,11 @@ public static class HtmlLayout
 
             if (tok.Break)
             {
-                EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+                EmitLine(ctx, spans, lineTop, lineH, lineLeft, curBullet, curBulletX, align, lineRight - lineLeft, lineWidStart);
                 lineTop += lineH;
                 spans = new List<RenderSpan>();
-                curX = contentX;
+                GetLineBounds(ctx, lineTop, LineHeightOf(baseStyle), contentX, contentRight, out lineLeft, out lineRight);
+                curX = lineLeft;
                 hasContent = false;
 
                 curBullet = null;
@@ -2888,17 +2956,18 @@ public static class HtmlLayout
                 else if (natW > 0 && natH > 0) { iw = natW; ih = natH; }
                 else { iw = 32; ih = 32; }
 
-                int maxW = Math.Max(20, contentRight - contentX);
+                int maxW = Math.Max(20, lineRight - lineLeft);
                 if (iw > maxW) { ih = Math.Max(1, ih * maxW / Math.Max(1, iw)); iw = maxW; }
                 if (iw < 1) iw = 1;
                 if (ih < 1) ih = 1;
 
-                if (!nowrap && hasContent && curX + iw > contentRight)
+                if (!nowrap && hasContent && curX + iw > lineRight)
                 {
-                    EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+                    EmitLine(ctx, spans, lineTop, lineH, lineLeft, curBullet, curBulletX, align, lineRight - lineLeft, lineWidStart);
                     lineTop += lineH;
                     spans = new List<RenderSpan>();
-                    curX = contentX;
+                    GetLineBounds(ctx, lineTop, LineHeightOf(baseStyle), contentX, contentRight, out lineLeft, out lineRight);
+                    curX = lineLeft;
                     hasContent = false;
     
                     curBullet = null;
@@ -2933,12 +3002,13 @@ public static class HtmlLayout
                 // form controls flow inline (inline-block): wrap like a word,
                 // grow the line when the control is taller than the text.
                 int ww = tok.WidgetW, wh = tok.WidgetH;
-                if (!nowrap && hasContent && curX + ww > contentRight)
+                if (!nowrap && hasContent && curX + ww > lineRight)
                 {
-                    EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+                    EmitLine(ctx, spans, lineTop, lineH, lineLeft, curBullet, curBulletX, align, lineRight - lineLeft, lineWidStart);
                     lineTop += lineH;
                     spans = new List<RenderSpan>();
-                    curX = contentX;
+                    GetLineBounds(ctx, lineTop, LineHeightOf(baseStyle), contentX, contentRight, out lineLeft, out lineRight);
+                    curX = lineLeft;
                     hasContent = false;
     
                     curBullet = null;
@@ -2956,12 +3026,13 @@ public static class HtmlLayout
             {
                 int ibW = tok.InlineBoxW;
                 int ibH = tok.InlineBoxH;
-                if (!nowrap && hasContent && curX + ibW > contentRight)
+                if (!nowrap && hasContent && curX + ibW > lineRight)
                 {
-                    EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+                    EmitLine(ctx, spans, lineTop, lineH, lineLeft, curBullet, curBulletX, align, lineRight - lineLeft, lineWidStart);
                     lineTop += lineH;
                     spans = new List<RenderSpan>();
-                    curX = contentX;
+                    GetLineBounds(ctx, lineTop, LineHeightOf(baseStyle), contentX, contentRight, out lineLeft, out lineRight);
+                    curX = lineLeft;
                     hasContent = false;
 
                     curBullet = null;
@@ -2991,12 +3062,13 @@ public static class HtmlLayout
             if (st.PadT > 0 || st.PadB > 0) lh += st.PadT + st.PadB;
             if (lh > lineH) lineH = lh;
 
-            if (!nowrap && hasContent && curX + w > contentRight)
+            if (!nowrap && hasContent && curX + w > lineRight)
             {
-                EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+                EmitLine(ctx, spans, lineTop, lineH, lineLeft, curBullet, curBulletX, align, lineRight - lineLeft, lineWidStart);
                 lineTop += lineH;
                 spans = new List<RenderSpan>();
-                curX = contentX;
+                GetLineBounds(ctx, lineTop, LineHeightOf(baseStyle), contentX, contentRight, out lineLeft, out lineRight);
+                curX = lineLeft;
                 hasContent = false;
 
                 curBullet = null;
@@ -3005,23 +3077,24 @@ public static class HtmlLayout
             }
 
             // hard-break a single word wider than the line
-            bool allowBreakWord = st.WordBreak == "break-all" || (st.WordBreak == "break-word" && w > contentRight - curX) || tok.Text.Length > 25;
-            if (!hasContent && w > contentRight - curX && tok.Text.Length > 1 && !nowrap && allowBreakWord && (contentRight - curX >= 20))
+            bool allowBreakWord = st.WordBreak == "break-all" || (st.WordBreak == "break-word" && w > lineRight - curX) || tok.Text.Length > 25;
+            if (!hasContent && w > lineRight - curX && tok.Text.Length > 1 && !nowrap && allowBreakWord && (lineRight - curX >= 20))
             {
                 int cut = tok.Text.Length;
                 while (cut > 1)
                 {
                     int cw = ctx.Measure(tok.Text.Substring(0, cut), size);
-                    if (cw + curX <= contentRight) break;
+                    if (cw + curX <= lineRight) break;
                     cut--;
                 }
                 string head = tok.Text.Substring(0, cut);
                 string tail = tok.Text.Substring(cut);
                 AddSpan(ctx, spans, head, st, tok.Href, curX, lineTop, lineH, tok.Node);
-                EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+                EmitLine(ctx, spans, lineTop, lineH, lineLeft, curBullet, curBulletX, align, lineRight - lineLeft, lineWidStart);
                 lineTop += lineH;
                 spans = new List<RenderSpan>();
-                curX = contentX;
+                GetLineBounds(ctx, lineTop, LineHeightOf(baseStyle), contentX, contentRight, out lineLeft, out lineRight);
+                curX = lineLeft;
                 hasContent = false;
 
                 curBullet = null;
@@ -3038,7 +3111,7 @@ public static class HtmlLayout
             hasContent = true;
         }
 
-        EmitLine(ctx, spans, lineTop, lineH, contentX, curBullet, curBulletX, align, contentRight - contentX, lineWidStart);
+        EmitLine(ctx, spans, lineTop, lineH, lineLeft, curBullet, curBulletX, align, lineRight - lineLeft, lineWidStart);
         y = lineTop + lineH;
     }
 
