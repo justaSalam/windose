@@ -24,6 +24,7 @@ public class ScrollView : Component
     public ScrollView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        managesChildLayout = true;
     }
 
     public void SetContent(Component child, int width, int height)
@@ -92,14 +93,31 @@ public class ScrollView : Component
             int vScrollbarEnd = Height - (showHorizontalScrollbar ? scrollbarSize : 0);
             int downArrowY = Math.Max(scrollbarSize, vScrollbarEnd - scrollbarSize);
 
-            DrawFilledRectangle(Palette.ControlFace, x, 0, scrollbarSize, vScrollbarEnd);
-            DrawRaisedRectangle(x, 0, scrollbarSize, scrollbarSize);
-            DrawRaisedRectangle(x, downArrowY, scrollbarSize, scrollbarSize);
-            DrawArrowUp(x, 0);
-            DrawArrowDown(x, downArrowY);
+            if (Palette.FlatControls)
+            {
+                // Windows 7 Aero vertical scrollbar track
+                DrawFilledRectangle(Color.FromArgb(242, 244, 247), x, 0, scrollbarSize, vScrollbarEnd);
+                DrawLine(Color.FromArgb(220, 226, 234), x, 0, x, vScrollbarEnd - 1);
+                DrawArrowUp(x, 0);
+                DrawArrowDown(x, downArrowY);
 
-            Rectangle thumb = GetVerticalThumb();
-            DrawRaisedRectangle(thumb.X, thumb.Y, thumb.Width, thumb.Height);
+                Rectangle thumb = GetVerticalThumb();
+                int r = 3;
+                int thumbW = Math.Max(1, thumb.Width - 4);
+                DrawGradientVerticalRounded(Color.FromArgb(232, 238, 248), Color.FromArgb(208, 220, 235), thumb.X + 2, thumb.Y, thumbW, thumb.Height, r);
+                DrawRoundedRectangle(Color.FromArgb(175, 195, 218), thumb.X + 2, thumb.Y, thumbW, thumb.Height, r);
+            }
+            else
+            {
+                DrawFilledRectangle(Palette.ControlFace, x, 0, scrollbarSize, vScrollbarEnd);
+                DrawRaisedRectangle(x, 0, scrollbarSize, scrollbarSize);
+                DrawRaisedRectangle(x, downArrowY, scrollbarSize, scrollbarSize);
+                DrawArrowUp(x, 0);
+                DrawArrowDown(x, downArrowY);
+
+                Rectangle thumb = GetVerticalThumb();
+                DrawRaisedRectangle(thumb.X, thumb.Y, thumb.Width, thumb.Height);
+            }
         }
 
         if (showHorizontalScrollbar)
@@ -108,14 +126,31 @@ public class ScrollView : Component
             int hScrollbarEnd = Width - (showVerticalScrollbar ? scrollbarSize : 0);
             int rightArrowX = Math.Max(scrollbarSize, hScrollbarEnd - scrollbarSize);
 
-            DrawFilledRectangle(Palette.ControlFace, 0, y, hScrollbarEnd, scrollbarSize);
-            DrawRaisedRectangle(0, y, scrollbarSize, scrollbarSize);
-            DrawRaisedRectangle(rightArrowX, y, scrollbarSize, scrollbarSize);
-            DrawArrowLeft(0, y);
-            DrawArrowRight(rightArrowX, y);
+            if (Palette.FlatControls)
+            {
+                // Windows 7 Aero horizontal scrollbar track
+                DrawFilledRectangle(Color.FromArgb(242, 244, 247), 0, y, hScrollbarEnd, scrollbarSize);
+                DrawLine(Color.FromArgb(220, 226, 234), 0, y, hScrollbarEnd - 1, y);
+                DrawArrowLeft(0, y);
+                DrawArrowRight(rightArrowX, y);
 
-            Rectangle thumb = GetHorizontalThumb();
-            DrawRaisedRectangle(thumb.X, thumb.Y, thumb.Width, thumb.Height);
+                Rectangle thumb = GetHorizontalThumb();
+                int r = 3;
+                int thumbH = Math.Max(1, thumb.Height - 4);
+                DrawGradientVerticalRounded(Color.FromArgb(232, 238, 248), Color.FromArgb(208, 220, 235), thumb.X, thumb.Y + 2, thumb.Width, thumbH, r);
+                DrawRoundedRectangle(Color.FromArgb(175, 195, 218), thumb.X, thumb.Y + 2, thumb.Width, thumbH, r);
+            }
+            else
+            {
+                DrawFilledRectangle(Palette.ControlFace, 0, y, hScrollbarEnd, scrollbarSize);
+                DrawRaisedRectangle(0, y, scrollbarSize, scrollbarSize);
+                DrawRaisedRectangle(rightArrowX, y, scrollbarSize, scrollbarSize);
+                DrawArrowLeft(0, y);
+                DrawArrowRight(rightArrowX, y);
+
+                Rectangle thumb = GetHorizontalThumb();
+                DrawRaisedRectangle(thumb.X, thumb.Y, thumb.Width, thumb.Height);
+            }
         }
 
         if (showVerticalScrollbar && showHorizontalScrollbar)

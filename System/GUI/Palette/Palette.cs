@@ -233,7 +233,7 @@ public static class Palette
             TitleBarGlass = Color.FromArgb(120, 52, 100, 168),
             // Frame dimensions
             TitleBarHeight = 28,
-            BorderSize = 4,
+            BorderSize = 6,
             FlatControls = true,
             GlassEnabled = true,
         };

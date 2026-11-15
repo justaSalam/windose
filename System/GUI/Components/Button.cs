@@ -26,6 +26,8 @@ public class Button : Component
     public bool isCaptionButton;
     public bool isMaximizeButton;
     public bool isMinimizeButton;
+    public bool isStartOrb;
+    public bool isTaskbarButton;
 
     public Action leftMousePress;
     public Action leftMouseHold;
@@ -76,6 +78,18 @@ public class Button : Component
 
     public override void DrawLocal()
     {
+        if (isStartOrb)
+        {
+            DrawStartOrb();
+            return;
+        }
+
+        if (isTaskbarButton)
+        {
+            DrawTaskbarButton();
+            return;
+        }
+
         if (isCloseButton)
         {
             DrawCloseButton();
@@ -261,6 +275,155 @@ public class Button : Component
                 if (isMaximizeButton) DrawMaximizeGlyph(cx, cy, Palette.ControlBlack);
                 else DrawMinimizeGlyph(cx, cy, Palette.ControlBlack);
             }
+        }
+    }
+
+    private void DrawStartOrb()
+    {
+        int cx = Width / 2;
+        int cy = Height / 2;
+        int radius = Math.Min(Width, Height) / 2 - 2;
+        if (radius < 8) radius = 8;
+
+        bool hovered = state == State.Highlighted;
+
+        // 1. Ethereal cyan radial bloom on hover
+        if (hovered)
+        {
+            int glowR = radius + 3;
+            for (int y = -glowR; y <= glowR; y++)
+            {
+                int dy2 = y * y;
+                int maxDx = (int)Math.Sqrt(Math.Max(0, glowR * glowR - dy2));
+                for (int x = -maxDx; x <= maxDx; x++)
+                {
+                    double dist = Math.Sqrt(x * x + dy2) / glowR;
+                    if (dist > 0.65 && dist <= 1.0)
+                    {
+                        byte alpha = (byte)(80 * (1.0 - (dist - 0.65) / 0.35));
+                        buffer.SetPixelAlpha(cx + x, cy + y, Color.FromArgb(alpha, 60, 200, 255).ToArgb());
+                    }
+                }
+            }
+        }
+
+        // 2. 3D Spherical pearl fill with radiant sapphire blue gradient
+        int lightX = cx - 2;
+        int lightY = cy - 3;
+        if (isPressed) { lightX += 1; lightY += 1; }
+
+        for (int y = -radius; y <= radius; y++)
+        {
+            int py = cy + y;
+            int dy2 = y * y;
+            int maxDx = (int)Math.Sqrt(Math.Max(0, radius * radius - dy2));
+            for (int x = -maxDx; x <= maxDx; x++)
+            {
+                int px = cx + x;
+                double distFromLight = Math.Sqrt((px - lightX) * (px - lightX) + (py - lightY) * (py - lightY)) / (radius * 1.5);
+                distFromLight = Math.Clamp(distFromLight, 0.0, 1.0);
+
+                int rCol, gCol, bCol;
+                if (isPressed)
+                {
+                    rCol = (int)(20 + (1.0 - distFromLight) * 45);
+                    gCol = (int)(45 + (1.0 - distFromLight) * 75);
+                    bCol = (int)(110 + (1.0 - distFromLight) * 85);
+                }
+                else
+                {
+                    rCol = (int)(15 + (1.0 - distFromLight) * 65);
+                    gCol = (int)(55 + (1.0 - distFromLight) * 115);
+                    bCol = (int)(135 + (1.0 - distFromLight) * 120);
+                }
+
+                buffer.SetPixelAlpha(px, py, Color.FromArgb(255, (byte)rCol, (byte)gCol, (byte)bCol).ToArgb());
+            }
+        }
+
+        // 3. Inner bright rim and outer dark edge
+        Color outerEdge = Color.FromArgb(200, 15, 30, 55);
+        Color innerRing = hovered ? Color.FromArgb(170, 140, 220, 255) : Color.FromArgb(110, 100, 180, 245);
+        DrawCircle(outerEdge, cx, cy, radius);
+        if (radius > 2)
+            DrawCircle(innerRing, cx, cy, radius - 1);
+
+        // 4. Windows Logo / Emblem in center
+        if (image != null)
+        {
+            int emblemSize = Math.Min(22, radius * 2 - 8);
+            int embX = cx - emblemSize / 2 + (isPressed ? 1 : 0);
+            int embY = cy - emblemSize / 2 + (isPressed ? 1 : 0);
+            DrawImageStretch(image, new Rectangle(embX, embY, emblemSize, emblemSize));
+        }
+
+        // 5. Specular curved highlight arc across upper hemisphere
+        int specH = radius * 2 / 3;
+        for (int y = -radius + 2; y <= -radius + specH; y++)
+        {
+            int py = cy + y;
+            int dy2 = y * y;
+            int maxDx = (int)Math.Sqrt(Math.Max(0, (radius - 2) * (radius - 2) - dy2));
+            double yRatio = 1.0 - (double)(y + radius - 2) / specH;
+            byte specAlpha = (byte)(115 * yRatio);
+
+            for (int x = -maxDx; x <= maxDx; x++)
+            {
+                int px = cx + x;
+                buffer.SetPixelAlpha(px, py, Color.FromArgb(specAlpha, 255, 255, 255).ToArgb());
+            }
+        }
+    }
+
+    private void DrawTaskbarButton()
+    {
+        int r = 3;
+
+        if (isSelected)
+        {
+            // Windows 7 Aero focused taskbar button: vibrant glowing glass plate
+            DrawOverGradientVerticalRounded(Color.FromArgb(140, 90, 175, 250), Color.FromArgb(190, 40, 110, 195), 0, 0, Width, Height, r);
+            DrawRoundedRectangle(Color.FromArgb(160, 130, 200, 255), 0, 0, Width, Height, r);
+            if (Width > 4 && Height > 2)
+                DrawHorizontalSpan(Color.FromArgb(210, 255, 255, 255), 2, 1, Width - 4);
+            if (Width > 6 && Height > 2)
+                DrawHorizontalSpan(Color.FromArgb(240, 80, 215, 255), 3, Height - 2, Width - 6);
+        }
+        else if (state == State.Highlighted)
+        {
+            // Windows 7 Aero hovered taskbar button: soft frosted cyan glow
+            DrawOverGradientVerticalRounded(Color.FromArgb(80, 210, 235, 255), Color.FromArgb(45, 140, 195, 245), 0, 0, Width, Height, r);
+            DrawRoundedRectangle(Color.FromArgb(120, 150, 215, 255), 0, 0, Width, Height, r);
+            if (Width > 4 && Height > 2)
+                DrawHorizontalSpan(Color.FromArgb(160, 255, 255, 255), 2, 1, Width - 4);
+        }
+        else
+        {
+            // Subtle translucent dark glass plate
+            DrawOverGradientVerticalRounded(Color.FromArgb(45, 45, 65, 85), Color.FromArgb(70, 20, 32, 48), 0, 0, Width, Height, r);
+            DrawRoundedRectangle(Color.FromArgb(55, 100, 145, 185), 0, 0, Width, Height, r);
+        }
+
+        // Draw icon & text
+        if (image != null)
+        {
+            int imgY = Math.Max(0, (Height - iconSize) / 2);
+            DrawImageStretch(image, new Rectangle(6, imgY, iconSize, iconSize));
+        }
+
+        if (label != null && !string.IsNullOrEmpty(label.text))
+        {
+            int textX = image != null ? iconSize + 12 : 6;
+            int textW = Math.Max(0, Width - textX - 6);
+            Rectangle textRect = new Rectangle(textX, 0, textW, Height);
+
+            int fSize = label != null && label.fontSize > 0 ? label.fontSize : 13;
+            DrawAlignedText(label.text, Color.FromArgb(160, 0, 0, 0), fSize,
+                new Rectangle(textRect.X + 1, textRect.Y + 1, textRect.Width, textRect.Height),
+                HorizontalAlignment.Left, VerticalAlignment.Center);
+
+            DrawAlignedText(label.text, Color.White, fSize, textRect,
+                HorizontalAlignment.Left, VerticalAlignment.Center);
         }
     }
 

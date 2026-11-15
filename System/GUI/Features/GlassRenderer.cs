@@ -35,11 +35,11 @@ public struct GlassStyle
     {
         BlurRadius = 8,
         BlurPasses = 2,
-        Whiten = 150,
-        Desaturate = 90,
-        Tint = Color.FromArgb(90, tint.R, tint.G, tint.B),
-        BorderBright = Color.FromArgb(220, 255, 255, 255),
-        BorderDark = Color.FromArgb(160, 40, 56, 74),
+        Whiten = 30,
+        Desaturate = 15,
+        Tint = Color.FromArgb(0, 0, 0, 0),
+        BorderBright = Color.FromArgb(180, 255, 255, 255),
+        BorderDark = Color.FromArgb(140, 40, 56, 74),
     };
 
     /// <summary>Windows 7 Aero glass with signature translucent blue tint.</summary>
@@ -50,9 +50,9 @@ public struct GlassStyle
     {
         BlurRadius = 6,
         BlurPasses = 2,
-        Whiten = 50,
-        Desaturate = 40,
-        Tint = Color.FromArgb(190, 24, 38, 54),
+        Whiten = 20,
+        Desaturate = 15,
+        Tint = Color.FromArgb(0, 0, 0, 0),
         BorderBright = Color.FromArgb(130, 255, 255, 255),
         BorderDark = Color.FromArgb(200, 12, 18, 28),
     };
@@ -62,9 +62,9 @@ public struct GlassStyle
     {
         BlurRadius = 8,
         BlurPasses = 2,
-        Whiten = 70,
-        Desaturate = 50,
-        Tint = Color.FromArgb(210, 28, 44, 62),
+        Whiten = 25,
+        Desaturate = 20,
+        Tint = Color.FromArgb(0, 0, 0, 0),
         BorderBright = Color.FromArgb(140, 255, 255, 255),
         BorderDark = Color.FromArgb(220, 15, 22, 32),
     };

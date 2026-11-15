@@ -471,11 +471,14 @@ public class Component : IDisposable
     {
     }
 
-    protected static bool IsControlPressed(KeyEvent keyEvent)
+    public static bool IsControlPressed(KeyEvent keyEvent)
         => (keyEvent.Modifiers & ConsoleModifiers.Control) != 0 || KeyboardManager.ControlPressed;
 
-    protected static bool IsShiftPressed(KeyEvent keyEvent)
+    public static bool IsShiftPressed(KeyEvent keyEvent)
         => (keyEvent.Modifiers & ConsoleModifiers.Shift) != 0 || KeyboardManager.ShiftPressed;
+
+    public static bool IsAltPressed(KeyEvent keyEvent)
+        => (keyEvent.Modifiers & ConsoleModifiers.Alt) != 0 || KeyboardManager.AltPressed;
 
     protected static char GetPrintableCharacter(KeyEvent keyEvent)
     {
@@ -558,25 +561,34 @@ public class Component : IDisposable
 
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
 
+        int parentW = parent.Width;
+        int originX = 0;
+        if (parent is Window winH && this != winH.titlebar)
+        {
+            Rectangle c = winH.ClientRectangle;
+            originX = c.X;
+            parentW = c.Width;
+        }
+
         switch (horizontalAlignment)
         {
             case HorizontalAlignment.Left:
                 // Fixed-position controls keep the X supplied by their parent or constructor.
-                // Layout containers apply margins when they position their children.
                 break;
 
             case HorizontalAlignment.Center:
-                X = (parent.Width - Width) / 2;
+                X = originX + (parentW - Width) / 2;
                 break;
 
             case HorizontalAlignment.Right:
-                X = parent.Width - Width - Margin.right;
-
+                X = originX + parentW - Width - Margin.right;
                 break;
 
             case HorizontalAlignment.Stretch:
-                X = Margin.left;
-                Resize(Math.Max(1, parent.Width - Margin.left - Margin.right), Height);
+                int left = Margin.left;
+                int right = Margin.right;
+                X = originX + left;
+                Resize(Math.Max(1, parentW - left - right), Height);
                 break;
         }
 
@@ -591,26 +603,34 @@ public class Component : IDisposable
 
         Rectangle oldRectangle = ToAbsoluteRectangle(rectangle);
 
+        int parentH = parent.Height;
+        int originY = 0;
+        if (parent is Window winV && this != winV.titlebar)
+        {
+            Rectangle c = winV.ClientRectangle;
+            originY = c.Y;
+            parentH = c.Height;
+        }
+
         switch (verticalAlignment)
         {
             case VerticalAlignment.Top:
                 // Fixed-position controls keep the Y supplied by their parent or constructor.
-                // Layout containers apply margins when they position their children.
                 break;
 
             case VerticalAlignment.Center:
-                Y = (parent.Height - Height) / 2 + Margin.top;
-
+                Y = originY + (parentH - Height) / 2 + Margin.top;
                 break;
 
             case VerticalAlignment.Bottom:
-                Y = parent.Height - Height - Margin.bottom;
-
+                Y = originY + parentH - Height - Margin.bottom;
                 break;
 
             case VerticalAlignment.Stretch:
-                Y = Margin.top;
-                Resize(Width, Math.Max(1, parent.Height - Margin.top - Margin.bottom));
+                int top = Margin.top;
+                int bottom = Margin.bottom;
+                Y = originY + top;
+                Resize(Width, Math.Max(1, parentH - top - bottom));
                 break;
         }
 
@@ -823,8 +843,6 @@ public class Component : IDisposable
         child.isRoot = false;
         child.parent = this;
         child.InvalidateAbsolute();
-        zIndex++;
-        WindowManager.MarkZOrderDirty();
 
         child.BindRenderSurface(buffer, false);
         child.ResolveHorizontalAnchor();
@@ -1109,8 +1127,29 @@ public class Component : IDisposable
 
     public virtual bool HasDirtyTree() => dirty || childrenDirty;
 
+    private int _suspendLayoutCount;
+    public bool IsLayoutSuspended => _suspendLayoutCount > 0;
+
+    public void SuspendLayout()
+    {
+        _suspendLayoutCount++;
+    }
+
+    public void ResumeLayout(bool performLayout = true)
+    {
+        if (_suspendLayoutCount > 0)
+        {
+            _suspendLayoutCount--;
+            if (_suspendLayoutCount == 0 && performLayout)
+            {
+                MarkDirty();
+            }
+        }
+    }
+
     public virtual void MarkDirty(bool invalidate = true)
     {
+        if (IsLayoutSuspended) return;
         if (invalidate && IsEffectivelyVisible()) WindowManager.Invalidate(this);
         dirty = true;
         if (!isRoot && parent != null) parent.MarkChildDirty();

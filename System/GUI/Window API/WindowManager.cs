@@ -103,7 +103,7 @@ public partial class WindowManager : SingleThreadedProcess
         RefreshTaskbarButtons();
     }
 
-    private static void RefreshTaskbarButtons()
+    public static void RefreshTaskbarButtons()
     {
         foreach (KeyValuePair<Window, Button> entry in taskbarButtons)
         {
@@ -133,6 +133,7 @@ public partial class WindowManager : SingleThreadedProcess
                 Button? taskbarButton = null;
                 taskbarButton = new Button(window.text, 0, 0, taskbarButtonWidth, taskbarButtonHeight)
                 {
+                    isTaskbarButton = Palette.FlatControls || Palette.GlassEnabled,
                     verticalAlignment = VerticalAlignment.Center,
                     contentAlignment = HorizontalAlignment.Left,
                     iconSize = 16,
@@ -610,6 +611,8 @@ public partial class WindowManager : SingleThreadedProcess
         if (window == null) return;
         lock (windows)
         {
+            if (!windows.Contains(window)) return;
+
             if (taskbarButtons.TryGetValue(window, out Button? btn) && btn != null)
             {
                 btn.image = icon;
@@ -622,8 +625,8 @@ public partial class WindowManager : SingleThreadedProcess
                     Invalidate(Explorer.taskbar.AbsoluteRectangle);
                 }
             }
+            Invalidate(window.bounds);
         }
-        Invalidate(window.bounds);
     }
 
     public static void UpdateWindowTitle(Window window, string title)
@@ -631,6 +634,8 @@ public partial class WindowManager : SingleThreadedProcess
         if (window == null) return;
         lock (windows)
         {
+            if (!windows.Contains(window)) return;
+
             if (taskbarButtons.TryGetValue(window, out Button? btn) && btn != null)
             {
                 btn.text = title ?? "";
@@ -643,6 +648,7 @@ public partial class WindowManager : SingleThreadedProcess
                     Invalidate(Explorer.taskbar.AbsoluteRectangle);
                 }
             }
+            Invalidate(window.bounds);
         }
     }
 

@@ -33,6 +33,7 @@ public partial class WindowManager
         }
 
         DispatchMessages();
+        Windose.System.Elf.ElfRunner.FlushPendingWindowsFallback();
         ShowPendingFailures();
 
         ComponentZSort();
@@ -358,6 +359,12 @@ public partial class WindowManager
             }
 
             NoteInput();
+
+            if (MenuPopup.HasOpenMenus)
+            {
+                if (MenuPopup.HandleOpenMenuKeyboard(key))
+                    return;
+            }
 
             if (key.Key == Key.Escape)
             {

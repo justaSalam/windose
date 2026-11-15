@@ -14,8 +14,8 @@ public class ImageView : Component
     {
         Image = image;
         targetRect = new Rectangle(width / 2 - (int)image.Width / 2, height / 2 - (int)image.Height / 2, (int)image.Width, (int)image.Height);
-        horizontalAlignment = HorizontalAlignment.Center;
-        verticalAlignment = VerticalAlignment.Center;
+        horizontalAlignment = HorizontalAlignment.Left;
+        verticalAlignment = VerticalAlignment.Top;
     }
 
 

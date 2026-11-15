@@ -20,14 +20,14 @@ public class Panel : Component
     {
         this.color1 = color1;
         this.color2 = color2;
-
+        managesChildLayout = true;
         useGradient = true;
     }
 
     public Panel(Color color, int x, int y, int width, int height) : base(x, y, width, height)
     {
         color1 = color;
-
+        managesChildLayout = true;
         useGradient = false;
     }
 
@@ -64,9 +64,18 @@ public class Panel : Component
 
             for (int i = 0; i < lines.Count; i++)
             {
+                Rectangle lineRect = new Rectangle(content.X + textOffsetX, startY + i * lineHeight, availableWidth, lineHeight);
+
+                if (blendBackground)
+                {
+                    // Windows 7 Aero titlebar text halo for razor-sharp readability on glass
+                    DrawAlignedText(lines[i], Color.FromArgb(130, 0, 0, 0), effectiveFontSize,
+                        new Rectangle(lineRect.X + 1, lineRect.Y + 1, lineRect.Width, lineRect.Height),
+                        HorizontalAlignment.Left, VerticalAlignment.Center);
+                }
+
                 DrawAlignedText(lines[i], textColor, effectiveFontSize,
-                    new Rectangle(content.X + textOffsetX, startY + i * lineHeight, availableWidth, lineHeight),
-                    HorizontalAlignment.Left, VerticalAlignment.Center);
+                    lineRect, HorizontalAlignment.Left, VerticalAlignment.Center);
             }
         }
 

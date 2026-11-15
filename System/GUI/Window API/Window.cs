@@ -67,7 +67,7 @@ public class Window : Component
     private Rectangle previewBounds;
     private int lastTitlePress;
 
-    protected Component? focusedComponent;
+    public Component? focusedComponent;
     public void SetFocusedComponent(Component? c)
     {
         focusedComponent = c;
@@ -104,7 +104,7 @@ public class Window : Component
         catch { }
     }
 
-    protected StackPanel titlebar;
+    public StackPanel titlebar;
     private bool hasTitleBar;
     public bool HasTitleBar => hasTitleBar;
     private bool windowFocused;
@@ -185,6 +185,33 @@ public class Window : Component
     /// </summary>
     public bool drawFrame = true;
 
+    private Component? _content;
+    /// <summary>
+    /// The primary content component of the window. Automatically sized and constrained to the client area.
+    /// </summary>
+    public Component? Content
+    {
+        get => _content;
+        set
+        {
+            if (_content != null)
+            {
+                RemoveChild(_content);
+                _content = null;
+            }
+            _content = value;
+            if (_content != null)
+            {
+                Rectangle client = ClientRectangle;
+                _content.horizontalAlignment = HorizontalAlignment.Stretch;
+                _content.verticalAlignment = VerticalAlignment.Stretch;
+                _content.Margin = new Thickness(0);
+                _content.SetBounds(client.X, client.Y, client.Width, client.Height);
+                AddChild(_content);
+            }
+        }
+    }
+
     public override void DrawLocal()
     {
         if (drawFrame)
@@ -193,12 +220,19 @@ public class Window : Component
             else DrawRaisedRectangle(0, 0, Width, Height);
         }
 
-
+        Rectangle clientClip = ClientRectangle;
         foreach (Component child in children)
         {
             if (!child.Visible) continue;
 
-            DrawChild(child);
+            if (child == titlebar)
+            {
+                DrawChild(child, new Rectangle(0, 0, Width, Palette.TitleBarHeight));
+            }
+            else
+            {
+                DrawChild(child, clientClip);
+            }
         }
 
         if (Icon != null)
@@ -227,7 +261,11 @@ public class Window : Component
         frameBands.Clear();
         GetGlassRegions(frameBands);
 
-        Color tint = windowFocused ? glassStyle.Tint : Color.FromArgb(60, 110, 135, 160);
+        // Windows 7 Aero glass tinting: vibrant celestial blue when focused, desaturated slate when inactive
+        Color tint = windowFocused
+            ? Color.FromArgb(55, 60, 130, 215)
+            : Color.FromArgb(30, 110, 125, 140);
+
         for (int i = 0; i < frameBands.Count; i++)
         {
             Rectangle band = frameBands[i];
@@ -253,17 +291,30 @@ public class Window : Component
         int topHeight = Math.Min(Height, Palette.TitleBarHeight);
         if (topHeight > 4)
         {
-            DrawOverGradientVertical(Color.FromArgb(90, 255, 255, 255), Color.FromArgb(15, 255, 255, 255), r, 1, Math.Max(1, Width - r * 2), topHeight / 2);
+            if (windowFocused)
+            {
+                DrawOverGradientVertical(Color.FromArgb(65, 255, 255, 255), Color.FromArgb(10, 255, 255, 255), r, 1, Math.Max(1, Width - r * 2), topHeight / 2);
+                DrawOverRectangle(Color.FromArgb(90, 220, 245, 255), r, 1, Math.Max(1, Width - r * 2), 1);
+            }
+            else
+            {
+                DrawOverGradientVertical(Color.FromArgb(25, 255, 255, 255), Color.FromArgb(5, 255, 255, 255), r, 1, Math.Max(1, Width - r * 2), topHeight / 2);
+            }
         }
 
         // The client body stays opaque so content remains readable on top of the glass.
-        Rectangle client = ClientRectangle();
+        Rectangle client = ClientRectangle;
         FillRaw(Palette.WindowBackground, client.X, client.Y, client.Width, client.Height);
 
         // Crisp edges: dark outline outside, bright bevel inside, with rounded top corners
-        DrawRoundedTopOutline(glassStyle.BorderDark, 0, 0, Width, Height, r);
+        Color borderDark = Color.FromArgb(140, 30, 45, 65);
+        Color borderBright = windowFocused
+            ? Color.FromArgb(170, 210, 240, 255)
+            : Color.FromArgb(90, 180, 195, 210);
+
+        DrawRoundedTopOutline(borderDark, 0, 0, Width, Height, r);
         if (Width > 2 && Height > 2)
-            DrawRoundedTopOutline(glassStyle.BorderBright, 1, 1, Width - 2, Height - 2, r - 1);
+            DrawRoundedTopOutline(borderBright, 1, 1, Width - 2, Height - 2, r - 1);
 
         // Subtle 1px client area inner border separating client area from glass
         if (client.Width > 0 && client.Height > 0)
@@ -273,14 +324,24 @@ public class Window : Component
     }
 
     /// <summary>Opaque client area of a titled window, in window-local coordinates.</summary>
-    protected Rectangle ClientRectangle()
+    public Rectangle ClientRectangle
     {
-        int border = Palette.BorderSize;
-        int top = Math.Min(Height, Palette.TitleBarHeight);
-        return new Rectangle(border, top,
-            Math.Max(0, Width - border * 2),
-            Math.Max(0, Height - top - border));
+        get
+        {
+            int border = drawFrame ? Palette.BorderSize : 0;
+            int top = HasTitleBar ? Math.Min(Height, Palette.TitleBarHeight) : border;
+            return new Rectangle(border, top,
+                Math.Max(0, Width - border * 2),
+                Math.Max(0, Height - top - border));
+        }
     }
+
+    public int ClientX => ClientRectangle.X;
+    public int ClientY => ClientRectangle.Y;
+    public int ClientWidth => ClientRectangle.Width;
+    public int ClientHeight => ClientRectangle.Height;
+
+    public Rectangle GetClientRectangle() => ClientRectangle;
 
     /// <summary>Only the frame is see-through, so only the frame band gets the backdrop blur.</summary>
     public override void GetGlassRegions(List<Rectangle> regions)
@@ -880,6 +941,11 @@ public class Window : Component
         {
             int border = Palette.BorderSize;
             titlebar.SetBounds(border, 0, Math.Max(1, Width - border * 2), Palette.TitleBarHeight);
+        }
+        if (_content != null)
+        {
+            Rectangle client = ClientRectangle;
+            _content.SetBounds(client.X, client.Y, client.Width, client.Height);
         }
         OnWindowResized();
     }

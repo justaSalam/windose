@@ -29,7 +29,7 @@ public class LinkLabel : Component
         capturesInput = false;
         TabStop = true;
         horizontalAlignment = HorizontalAlignment.Left;
-        verticalAlignment = VerticalAlignment.Center;
+        verticalAlignment = VerticalAlignment.Top;
     }
 
     public override void DrawLocal()

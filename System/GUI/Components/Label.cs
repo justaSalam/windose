@@ -18,8 +18,8 @@ public class Label : Component
     public Label(int x, int y, int width, int height) : base(x, y, width, height)
     {
         capturesInput = false;
-        horizontalAlignment = HorizontalAlignment.Center;
-        verticalAlignment = VerticalAlignment.Center;
+        horizontalAlignment = HorizontalAlignment.Left;
+        verticalAlignment = VerticalAlignment.Top;
     }
 
 
