@@ -1,17 +1,18 @@
 using Cosmos.Kernel.System.Graphics;
 using Cosmos.Kernel.System.Graphics.Fonts;
 using Cosmos.Kernel.System.Input;
+using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using Windose.System.Kernel.Subsystem;
 
 namespace Windose.System.Shell
 {
-    
     public class DesktopIcon : Component
     {
-        public const int DefaultWidth = 80;
-        public const int DefaultHeight = 76;
+        public const int DefaultWidth = 96;
+        public const int DefaultHeight = 84;
         public static int CurrentIconSize = 32;
         private int _iconSize = 32;
         public int IconSize
@@ -24,8 +25,9 @@ namespace Windose.System.Shell
             }
         }
         private const int IconTop = 2;
-        private int LabelTop => IconTop + IconSize + 4;
-        private const int LabelLineHeight = 12;
+        public int LabelTop => IconTop + IconSize + 4;
+        private const int FontSize = 12;
+        private const int LabelLineHeight = 14;
         private const int MaxLabelLines = 3;
 
         public FileEntry fileEntry;
@@ -45,11 +47,13 @@ namespace Windose.System.Shell
         private string renameText = "";
         private string renameOriginalText = "";
         private bool renameAllSelected;
+        private int renameCaretIndex;
 
         public bool IsDragging => dragging;
         public bool IsRenaming => renaming;
 
-        public DesktopIcon(int x, int y, FileEntry fileEntry, Image ?icon = null) : base(x, y, DefaultWidth, DefaultHeight, default, default, HorizontalAlignment.Left, VerticalAlignment.Top)
+        public DesktopIcon(int x, int y, FileEntry fileEntry, Image? icon = null)
+            : base(x, y, DefaultWidth, DefaultHeight, default, default, HorizontalAlignment.Left, VerticalAlignment.Top)
         {
             this.fileEntry = fileEntry;
             IconSize = CurrentIconSize;
@@ -101,13 +105,24 @@ namespace Windose.System.Shell
             }
         }
 
-
         public override void DrawLocal()
         {
             int iconX = Math.Max(0, (Width - IconSize) / 2);
+            int r = 4;
+            bool hovered = state == State.Highlighted;
 
             if (isPressed)
-                DrawRectangle(Palette.Highlight, iconX - 2, IconTop - 2, IconSize + 4, IconSize + 4);
+            {
+                // Windows 7 Aero selected icon card: soft translucent cyan-blue rounded card
+                DrawOverGradientVerticalRounded(Color.FromArgb(70, 180, 220, 255), Color.FromArgb(110, 100, 165, 240), 0, 0, Width, Height, r);
+                DrawRoundedRectangle(Color.FromArgb(180, 70, 145, 230), 0, 0, Width, Height, r);
+            }
+            else if (hovered)
+            {
+                // Windows 7 Aero hover icon card: ethereal translucent glow
+                DrawOverGradientVerticalRounded(Color.FromArgb(40, 220, 240, 255), Color.FromArgb(70, 140, 200, 250), 0, 0, Width, Height, r);
+                DrawRoundedRectangle(Color.FromArgb(130, 120, 180, 240), 0, 0, Width, Height, r);
+            }
 
             if (icon != null)
             {
@@ -143,35 +158,68 @@ namespace Windose.System.Shell
             MarkDirty();
         }
 
-
-
+        public bool IsInsideLabel(int absX, int absY)
+        {
+            return absX >= AbsoluteX && absX <= AbsoluteX + Width &&
+                   absY >= AbsoluteY + LabelTop && absY <= AbsoluteY + Height;
+        }
 
         public override bool HandleInput(int mouseX, int mouseY, MouseState mouse)
         {
             if (renaming)
+            {
+                if (mouse.left == MouseEvents.Press && IsInsideLabel(mouseX, mouseY))
+                {
+                    // Click inside rename edit box: position caret
+                    int relX = mouseX - AbsoluteX;
+                    int textW = font.MeasureString(renameText, FontSize);
+                    int startX = Math.Max(4, (Width - textW) / 2);
+                    int clickOffset = relX - startX;
+                    renameAllSelected = false;
+
+                    if (clickOffset <= 0)
+                    {
+                        renameCaretIndex = 0;
+                    }
+                    else
+                    {
+                        int bestIndex = renameText.Length;
+                        int bestDist = int.MaxValue;
+                        for (int idx = 0; idx <= renameText.Length; idx++)
+                        {
+                            int w = font.MeasureString(renameText.Substring(0, idx), FontSize);
+                            int dist = Math.Abs(w - clickOffset);
+                            if (dist < bestDist)
+                            {
+                                bestDist = dist;
+                                bestIndex = idx;
+                            }
+                        }
+                        renameCaretIndex = bestIndex;
+                    }
+                    MarkDirty();
+                    return true;
+                }
                 return base.HandleInput(mouseX, mouseY, mouse);
+            }
 
             if (mouse.left == MouseEvents.Press)
             {
                 dragging = true;
                 offset = new Point(mouseX - X, mouseY - Y);
-
             }
-            else if (mouse.left == MouseEvents.Release && dragging) //On mouse release
+            else if (mouse.left == MouseEvents.Release && dragging)
             {
                 dragging = false;
             }
-            else if (mouse.left == MouseEvents.None && dragging)//If the mouse is released outside of the window, cancel the drag operation
+            else if (mouse.left == MouseEvents.None && dragging)
             {
                 dragging = false;
-
             }
 
-            if (dragging && (mouse.left == MouseEvents.Hold || mouse.left == MouseEvents.Press))//Dragging
+            if (dragging && (mouse.left == MouseEvents.Hold || mouse.left == MouseEvents.Press))
             {
                 MoveTo(mouseX - offset.X, mouseY - offset.Y);
-              
-
             }
 
             return base.HandleInput(mouseX, mouseY, mouse);
@@ -187,6 +235,7 @@ namespace Windose.System.Shell
                 ? Path.GetFileNameWithoutExtension(fileEntry.FileName ?? "")
                 : (fileEntry.FileName ?? "");
             renameText = renameOriginalText;
+            renameCaretIndex = renameText.Length;
             renameAllSelected = true;
             renaming = true;
             MarkDirty();
@@ -200,7 +249,7 @@ namespace Windose.System.Shell
             if (string.IsNullOrWhiteSpace(newName) || newName == "." || newName == ".." ||
                 newName.IndexOfAny(new[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|' }) >= 0)
             {
-                MarkDirty();
+                CancelRename();
                 return;
             }
 
@@ -211,16 +260,21 @@ namespace Windose.System.Shell
             }
 
             string finalFileName = newName;
-            if (isShortcut && !finalFileName.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+            if (isShortcut)
             {
+                if (finalFileName.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase))
+                    finalFileName = finalFileName.Substring(0, finalFileName.Length - 4).Trim();
+                else if (finalFileName.EndsWith("lnk", StringComparison.OrdinalIgnoreCase) && finalFileName.Length > 3)
+                    finalFileName = finalFileName.Substring(0, finalFileName.Length - 3).Trim();
+
                 finalFileName += ".lnk";
             }
 
             string oldPath = fileEntry.AbsoluteLocation;
             string newPath = ReplacePathName(oldPath, finalFileName);
-            if (!PathExists(oldPath) || PathExists(newPath))
+            if (!PathExists(oldPath) || (oldPath != newPath && PathExists(newPath)))
             {
-                MarkDirty();
+                CancelRename();
                 return;
             }
 
@@ -233,7 +287,7 @@ namespace Windose.System.Shell
             }
             catch
             {
-                MarkDirty();
+                CancelRename();
                 return;
             }
 
@@ -244,6 +298,7 @@ namespace Windose.System.Shell
             renameText = "";
             renameOriginalText = "";
             renameAllSelected = false;
+            renameCaretIndex = 0;
             renaming = false;
             MarkDirty();
         }
@@ -255,13 +310,14 @@ namespace Windose.System.Shell
             renameText = "";
             renameOriginalText = "";
             renameAllSelected = false;
+            renameCaretIndex = 0;
             renaming = false;
             MarkDirty();
         }
 
         public override void HandleKeyboard(KeyEvent keyEvent)
         {
-            if(keyEvent.Key == Key.F2)
+            if (keyEvent.Key == Key.F2)
             {
                 if (renaming)
                     CommitRename();
@@ -274,27 +330,80 @@ namespace Windose.System.Shell
             {
                 switch (keyEvent.Key)
                 {
+                    case Key.Enter:
+                        CommitRename();
+                        return;
+
+                    case Key.Escape:
+                        CancelRename();
+                        return;
+
+                    case Key.LeftArrow:
+                        if (renameAllSelected)
+                        {
+                            renameAllSelected = false;
+                            renameCaretIndex = 0;
+                        }
+                        else if (renameCaretIndex > 0)
+                        {
+                            renameCaretIndex--;
+                        }
+                        MarkDirty();
+                        return;
+
+                    case Key.RightArrow:
+                        if (renameAllSelected)
+                        {
+                            renameAllSelected = false;
+                            renameCaretIndex = renameText.Length;
+                        }
+                        else if (renameCaretIndex < renameText.Length)
+                        {
+                            renameCaretIndex++;
+                        }
+                        MarkDirty();
+                        return;
+
+                    case Key.Home:
+                        renameAllSelected = false;
+                        renameCaretIndex = 0;
+                        MarkDirty();
+                        return;
+
+                    case Key.End:
+                        renameAllSelected = false;
+                        renameCaretIndex = renameText.Length;
+                        MarkDirty();
+                        return;
+
                     case Key.Backspace:
                         if (renameAllSelected)
                         {
                             renameText = "";
+                            renameCaretIndex = 0;
                             renameAllSelected = false;
-                            MarkDirty();
                         }
-                        else if (renameText.Length > 0)
+                        else if (renameCaretIndex > 0 && renameText.Length > 0)
                         {
-                            renameText = renameText.Substring(0, renameText.Length - 1);
-                            MarkDirty();
+                            renameText = renameText.Remove(renameCaretIndex - 1, 1);
+                            renameCaretIndex--;
                         }
-                        break;
+                        MarkDirty();
+                        return;
 
-                    case Key.Enter:
-                        CommitRename();
-                        break;
-
-                    case Key.Escape:
-                        CancelRename();
-                        break;
+                    case Key.Delete:
+                        if (renameAllSelected)
+                        {
+                            renameText = "";
+                            renameCaretIndex = 0;
+                            renameAllSelected = false;
+                        }
+                        else if (renameCaretIndex < renameText.Length)
+                        {
+                            renameText = renameText.Remove(renameCaretIndex, 1);
+                        }
+                        MarkDirty();
+                        return;
 
                     default:
                         char printable = GetPrintableCharacter(keyEvent);
@@ -302,18 +411,19 @@ namespace Windose.System.Shell
                         {
                             if (renameAllSelected)
                             {
-                                renameText = "";
+                                renameText = printable.ToString();
+                                renameCaretIndex = 1;
                                 renameAllSelected = false;
                             }
-
-                            renameText += printable;
+                            else
+                            {
+                                renameText = renameText.Insert(renameCaretIndex, printable.ToString());
+                                renameCaretIndex++;
+                            }
                             MarkDirty();
                         }
-                        break;
-
+                        return;
                 }
-
-                return;
             }
 
             base.HandleKeyboard(keyEvent);
@@ -332,7 +442,9 @@ namespace Windose.System.Shell
             WindowManager.Invalidate(AbsoluteRectangle);
             MarkDirty(false);
         }
+
         private TrueTypeFont font = SystemFonts.msSansSerif;
+
         private void DrawLabel()
         {
             string name = renaming ? renameText : (isShortcut ? Path.GetFileNameWithoutExtension(fileEntry.FileName ?? "") : fileEntry.FileName);
@@ -340,120 +452,171 @@ namespace Windose.System.Shell
 
             string[] lines = BuildLabelLines(name);
             if (renaming && lines.Length == 0)
-                lines = [""];
-
-            int labelHeight = lines.Length * LabelLineHeight;
-
-            if (isPressed)
-                DrawFilledRectangle(Palette.Highlight, 0, LabelTop, Width, labelHeight);
+                lines = new string[] { "" };
 
             if (renaming)
             {
-                DrawFilledRectangle(Color.White, 0, LabelTop, Width, labelHeight);
-                DrawRectangle(Palette.Highlight, 0, LabelTop, Width - 1, labelHeight);
-            }
+                int boxW = Width - 4;
+                int boxX = 2;
+                int boxH = Math.Max(LabelLineHeight + 4, lines.Length * LabelLineHeight + 4);
 
-            for (int i = 0; i < lines.Length; i++)
+                // Edit box background and border
+                DrawFilledRectangle(Color.White, boxX, LabelTop - 2, boxW, boxH);
+                DrawRectangle(Palette.Highlight, boxX, LabelTop - 2, boxW - 1, boxH - 1);
+
+                if (renameAllSelected && !string.IsNullOrEmpty(renameText))
+                {
+                    int textW = font.MeasureString(renameText, FontSize);
+                    int selX = Math.Max(boxX + 2, (Width - textW) / 2);
+                    int selW = Math.Min(boxW - 4, textW + 4);
+                    DrawFilledRectangle(Palette.Highlight, selX - 2, LabelTop - 1, selW, LabelLineHeight + 2);
+                    DrawString(renameText, font, FontSize, Color.White, selX, LabelTop);
+                }
+                else
+                {
+                    for (int i = 0; i < lines.Length; i++)
+                    {
+                        int lineWidth = font.MeasureString(lines[i], FontSize);
+                        int x = Math.Max(boxX + 3, (Width - lineWidth) / 2);
+                        int y = LabelTop + i * LabelLineHeight;
+                        DrawString(lines[i], font, FontSize, Color.Black, x, y);
+                    }
+
+                    DrawRenameCaret(lines);
+                }
+            }
+            else
             {
-                int lineWidth = font.MeasureString(lines[i]);
-                int x = Math.Max(0, (Width - lineWidth) / 2);
-                DrawString(lines[i], renaming ? Color.Black : Color.White, x, LabelTop + i * LabelLineHeight);
-            }
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    int lineWidth = font.MeasureString(lines[i], FontSize);
+                    int x = Math.Max(2, (Width - lineWidth) / 2);
+                    int y = LabelTop + i * LabelLineHeight;
 
-            if (renaming)
-                DrawRenameCaret(lines);
+                    // Windows 7 Aero text drop-shadow for readability on wallpapers
+                    Color shadow = Color.FromArgb(140, 0, 0, 0);
+                    DrawString(lines[i], font, FontSize, shadow, x + 1, y + 1);
+                    DrawString(lines[i], font, FontSize, shadow, x, y + 1);
+
+                    DrawString(lines[i], font, FontSize, Color.White, x, y);
+                }
+            }
         }
 
         private string[] BuildLabelLines(string text)
         {
-            int maxCharsPerLine = Math.Max(1, Width / 6);
-            List<string> lines = new List<string>();
-            string current = "";
-            bool truncated = false;
+            if (string.IsNullOrEmpty(text)) return Array.Empty<string>();
 
+            int maxLineWidth = Math.Max(20, Width - 14);
+            List<string> lines = new List<string>();
             string[] words = text.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            string currentLine = "";
+
             for (int i = 0; i < words.Length; i++)
             {
-                if (lines.Count >= MaxLabelLines)
-                {
-                    truncated = true;
-                    break;
-                }
-
                 string word = words[i];
-                if (word.Length > maxCharsPerLine)
-                {
-                    if (!AddLabelLine(lines, current, maxCharsPerLine))
-                    {
-                        truncated = true;
-                        break;
-                    }
-                    current = "";
+                string candidate = string.IsNullOrEmpty(currentLine) ? word : currentLine + " " + word;
 
-                    int index = 0;
-                    while (index < word.Length && lines.Count < MaxLabelLines)
-                    {
-                        int length = Math.Min(maxCharsPerLine, word.Length - index);
-                        AddLabelLine(lines, word.Substring(index, length), maxCharsPerLine);
-                        index += length;
-                    }
-                    if (index < word.Length)
-                        truncated = true;
-                    continue;
-                }
-
-                string candidate = current == "" ? word : current + " " + word;
-                if (candidate.Length <= maxCharsPerLine)
+                if (font.MeasureString(candidate, FontSize) <= maxLineWidth)
                 {
-                    current = candidate;
+                    currentLine = candidate;
                 }
                 else
                 {
-                    if (!AddLabelLine(lines, current, maxCharsPerLine))
+                    if (!string.IsNullOrEmpty(currentLine))
                     {
-                        truncated = true;
-                        break;
+                        lines.Add(currentLine);
+                        currentLine = "";
+                        if (lines.Count >= MaxLabelLines) break;
                     }
-                    current = word;
+
+                    // Single word exceeds line width: split by characters
+                    if (font.MeasureString(word, FontSize) > maxLineWidth)
+                    {
+                        string partial = "";
+                        for (int c = 0; c < word.Length; c++)
+                        {
+                            string nextPartial = partial + word[c];
+                            if (font.MeasureString(nextPartial, FontSize) <= maxLineWidth)
+                            {
+                                partial = nextPartial;
+                            }
+                            else
+                            {
+                                if (!string.IsNullOrEmpty(partial))
+                                {
+                                    lines.Add(partial);
+                                    partial = "";
+                                    if (lines.Count >= MaxLabelLines) break;
+                                }
+                                partial = word[c].ToString();
+                            }
+                        }
+                        currentLine = partial;
+                    }
+                    else
+                    {
+                        currentLine = word;
+                    }
+
+                    if (lines.Count >= MaxLabelLines) break;
                 }
             }
 
-            if (!truncated && !AddLabelLine(lines, current, maxCharsPerLine))
-                truncated = true;
+            if (lines.Count < MaxLabelLines && !string.IsNullOrEmpty(currentLine))
+            {
+                lines.Add(currentLine);
+            }
 
-            if (truncated && lines.Count == MaxLabelLines)
-                lines[MaxLabelLines - 1] = Ellipsize(lines[MaxLabelLines - 1], maxCharsPerLine);
+            // Ellipsize the final line if content was truncated
+            if (lines.Count == MaxLabelLines)
+            {
+                string combined = string.Join(" ", lines);
+                if (combined.Replace(" ", "").Length < text.Replace(" ", "").Length)
+                {
+                    string last = lines[MaxLabelLines - 1];
+                    while (last.Length > 0 && font.MeasureString(last + "...", FontSize) > maxLineWidth)
+                    {
+                        last = last.Substring(0, last.Length - 1);
+                    }
+                    lines[MaxLabelLines - 1] = last + "...";
+                }
+            }
 
             return lines.ToArray();
-        }
-
-        private static bool AddLabelLine(List<string> lines, string line, int maxCharsPerLine)
-        {
-            if (string.IsNullOrEmpty(line)) return true;
-            if (lines.Count >= MaxLabelLines) return false;
-
-            lines.Add(line.Length <= maxCharsPerLine ? line : line.Substring(0, maxCharsPerLine));
-            return true;
-        }
-
-        private static string Ellipsize(string text, int maxCharsPerLine)
-        {
-            if (maxCharsPerLine <= 3) return text.Substring(0, Math.Min(text.Length, maxCharsPerLine));
-            if (text.Length >= maxCharsPerLine) return text.Substring(0, maxCharsPerLine - 3) + "...";
-            return text + "...";
         }
 
         private void DrawRenameCaret(string[] lines)
         {
             if (lines.Length == 0) return;
 
-            string lastLine = lines[lines.Length - 1];
-            int lineWidth = font.MeasureString(lastLine);
+            int charsCounted = 0;
+            int caretLine = 0;
+            int caretLineIndex = 0;
 
-            int x = Math.Min(Width - 1, Math.Max(0, (Width - lineWidth) / 2 + lineWidth + 1));
-            int y = LabelTop + (lines.Length - 1) * LabelLineHeight;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                int lineLen = lines[i].Length;
+                if (renameCaretIndex <= charsCounted + lineLen)
+                {
+                    caretLine = i;
+                    caretLineIndex = Math.Max(0, renameCaretIndex - charsCounted);
+                    break;
+                }
+                charsCounted += lineLen + 1;
+                caretLine = i;
+                caretLineIndex = lineLen;
+            }
 
-            DrawLine(Color.Black, x, y + 1, x, y + LabelLineHeight - 2);
+            string lineText = lines[caretLine];
+            string sub = caretLineIndex <= lineText.Length ? lineText.Substring(0, caretLineIndex) : lineText;
+            int caretOffset = font.MeasureString(sub, FontSize);
+            int lineW = font.MeasureString(lineText, FontSize);
+            int startX = Math.Max(5, (Width - lineW) / 2);
+            int caretX = Math.Min(Width - 4, startX + caretOffset);
+            int caretY = LabelTop + caretLine * LabelLineHeight;
+
+            DrawLine(Color.Black, caretX, caretY, caretX, caretY + LabelLineHeight - 1);
         }
 
         private static string ReplacePathName(string path, string newName)

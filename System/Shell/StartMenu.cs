@@ -62,7 +62,7 @@ public class StartMenu : Window
 
         AddLeftProgram("Calculator", "accessibilitycpl.dll,-327", leftX, curY, leftW, itemH, () =>
         {
-            if (File.Exists("/mnt/Programs/calc.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/calc.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/calc.elf");
             else
                 LaunchTracker.Start(() => new Calculator());
@@ -71,7 +71,7 @@ public class StartMenu : Window
 
         AddLeftProgram("Paint", "imageres.dll,-71", leftX, curY, leftW, itemH, () =>
         {
-            if (File.Exists("/mnt/Programs/paint.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/paint.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/paint.elf");
             else
                 LaunchTracker.Start(() => new Paint());
@@ -80,7 +80,7 @@ public class StartMenu : Window
 
         AddLeftProgram("AeroEditor", "shell32.dll,-70", leftX, curY, leftW, itemH, () =>
         {
-            if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/aeroeditor.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/aeroeditor.elf");
             else
                 LaunchTracker.Start(() => new BreezeEditor());
@@ -89,7 +89,7 @@ public class StartMenu : Window
 
         AddLeftProgram("Command Prompt", "shell32.dll,-284", leftX, curY, leftW, itemH, () =>
         {
-            if (File.Exists("/mnt/Programs/terminal.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/terminal.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/terminal.elf");
             else
                 LaunchTracker.Start(() => new CommandPrompt());
@@ -98,7 +98,7 @@ public class StartMenu : Window
 
         AddLeftProgram("Task Manager", "shell32.dll,-171", leftX, curY, leftW, itemH, () =>
         {
-            if (File.Exists("/mnt/Programs/taskmgr.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/taskmgr.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/taskmgr.elf");
             else
                 LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
@@ -119,7 +119,7 @@ public class StartMenu : Window
 
         allProgramsMenu.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-4", 16), "File Explorer", () =>
         {
-            if (File.Exists("/mnt/Programs/explorer.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/explorer.elf"))
             {
                 LaunchTracker.StartElf("/mnt/Programs/explorer.elf", new string[] { "/mnt" });
             }
@@ -132,28 +132,28 @@ public class StartMenu : Window
         MenuItem accessories = allProgramsMenu.AddSubmenuItem("Accessories");
         accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("accessibilitycpl.dll,-327", 16), "Calculator", () =>
         {
-            if (File.Exists("/mnt/Programs/calc.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/calc.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/calc.elf");
             else
                 LaunchTracker.Start(() => new Calculator());
         });
         accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-71", 16), "Paint", () =>
         {
-            if (File.Exists("/mnt/Programs/paint.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/paint.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/paint.elf");
             else
                 LaunchTracker.Start(() => new Paint());
         });
         accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-70", 16), "AeroEditor", () =>
         {
-            if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/aeroeditor.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/aeroeditor.elf");
             else
                 LaunchTracker.Start(() => new BreezeEditor());
         });
         accessories.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16), "Command Prompt", () =>
         {
-            if (File.Exists("/mnt/Programs/terminal.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/terminal.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/terminal.elf");
             else
                 LaunchTracker.Start(() => new CommandPrompt());
@@ -163,14 +163,14 @@ public class StartMenu : Window
         MenuItem systemTools = allProgramsMenu.AddSubmenuItem("System Tools");
         systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("imageres.dll,-68", 16), "Registry Editor", () =>
         {
-            if (File.Exists("/mnt/Programs/regedit.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/regedit.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/regedit.elf");
             else
                 LaunchTracker.Start(() => new RegistryEditor());
         });
         systemTools.AddSubmenuItem(Windose.System.Resources.IconResource.Load("shell32.dll,-171", 16), "Task Manager", () =>
         {
-            if (File.Exists("/mnt/Programs/taskmgr.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/taskmgr.elf"))
                 LaunchTracker.StartElf("/mnt/Programs/taskmgr.elf");
             else
                 LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
@@ -586,9 +586,9 @@ public class StartMenuProgramItem : Component
             MarkDirty();
             if (wasPressed && inside)
             {
+                Explorer.startMenu?.HideMenuImmediate();
                 AudioEngine.Instance.PlayClick();
                 clickAction?.Invoke();
-                Explorer.startMenu?.HideMenuImmediate();
                 return true;
             }
         }
@@ -666,9 +666,9 @@ public class StartMenuRightLink : Component
             MarkDirty();
             if (wasPressed && inside)
             {
+                Explorer.startMenu?.HideMenuImmediate();
                 AudioEngine.Instance.PlayClick();
                 clickAction?.Invoke();
-                Explorer.startMenu?.HideMenuImmediate();
                 return true;
             }
         }

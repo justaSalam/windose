@@ -90,6 +90,7 @@ public class Taskbar : Component
 
         startButton = new Button(Windose.System.Resources.IconResource.Load("imageres.dll,-24", 32), startText, 0, 0, startBtnWidth, Height - 4)
         {
+            isStartOrb = modern,
             verticalAlignment = VerticalAlignment.Center,
             horizontalAlignment = HorizontalAlignment.Left,
             contentAlignment = HorizontalAlignment.Center,
@@ -229,7 +230,7 @@ public class Taskbar : Component
         {
             // Windows 7 Aero glass Superbar: translucent dark slate blue with glossy top highlight
             FillRaw(Color.FromArgb(0, 0, 0, 0), 0, 0, Width, Height);
-            DrawOverGradientVertical(Color.FromArgb(185, 30, 46, 68), Color.FromArgb(235, 14, 22, 34), 0, 0, Width, Height);
+            DrawOverGradientVertical(Color.FromArgb(150, 28, 44, 64), Color.FromArgb(205, 14, 22, 32), 0, 0, Width, Height);
             DrawLine(Color.FromArgb(140, 255, 255, 255), 0, 0, Width - 1, 0);
             DrawLine(Color.FromArgb(50, 255, 255, 255), 0, 1, Width - 1, 1);
             DrawLine(Color.FromArgb(200, 10, 15, 22), 0, Height - 1, Width - 1, Height - 1);

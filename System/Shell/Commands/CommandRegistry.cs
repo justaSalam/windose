@@ -106,8 +106,24 @@ public static class CommandRegistry
             ElfProgram program = ElfRunner.Spawn(fileBytes, progName, args, out string error, p =>
             {
                 p.Env["PWD"] = context.CurrentDirectory;
+                p.InputHandler = () =>
+                {
+                    lock (lineBuf)
+                    {
+                        if (lineBuf.Length > 0)
+                        {
+                            context.WriteLine(lineBuf.ToString());
+                            lineBuf.Clear();
+                        }
+                    }
+                    return context.ReadLine("") ?? "";
+                };
                 p.OutputHandler = text =>
                 {
+                    if (text.Contains("\x1b[H") || text.Contains("\033[H") || text.Contains("[H"))
+                    {
+                        text = text.Replace("\x1b[H", "").Replace("\033[H", "").Replace("[H", "");
+                    }
                     if (text.Contains("\x1b[2J") || text.Contains("\033[2J") || text.Contains("[2J"))
                     {
                         context.Clear();

@@ -38,17 +38,18 @@ public class Desktop : Component
     private DesktopIcon? userFilesIcon;
     private DesktopIcon? trashIcon;
 
+    public static Desktop? Instance { get; private set; }
     public static List<DesktopIcon> Icons = new List<DesktopIcon>();
     public static bool SnapIconsToGrid { get; private set; } = true;
     public static bool AutoArrangeIcons { get; private set; } = false;
     public static bool ShowIconGrid { get; private set; }
-    public static int IconGridWidth { get; private set; } = 80;
-    public static int IconGridHeight { get; private set; } = 80;
+    public static int IconGridWidth { get; private set; } = 96;
+    public static int IconGridHeight { get; private set; } = 86;
     public static int IconGridOffsetX { get; private set; } = 8;
     public static int IconGridOffsetY { get; private set; } = 8;
     public int contextX { get; private set; }
     public int contextY { get; private set; }
-    public bool ConsumeKeyboardInput => selectedIcons.Count == 1 || FindRenamingIcon() != null;
+    public bool ConsumeKeyboardInput => true;
 
     /// <summary>True while an icon label is being edited. Rename input must keep the keyboard
     /// even if a window is focused (clicking elsewhere commits the rename first).</summary>
@@ -60,6 +61,7 @@ public class Desktop : Component
 
     public Desktop(int x, int y, int width, int height) : base(x, y, width, height)
     {
+        Instance = this;
 
         if (!File.Exists(layoutFilePath))
         {
@@ -323,7 +325,7 @@ public class Desktop : Component
         viewItem.AddSubmenuItem("Toggle Icons", ToggleDesktopIcons);
 
         contextMenu.AddSeparator();
-        contextMenu.AddItem("Paste");
+        contextMenu.AddItem("Paste", PasteDesktopClipboard);
         contextMenu.AddSeparator();
 
         MenuItem newItem = contextMenu.AddItem("New");
@@ -340,6 +342,9 @@ public class Desktop : Component
 
         iconContextMenu.AddItem("Open", OpenContextIcon);
         iconContextMenu.AddItem("Open With...", OpenWithContextIcon);
+        iconContextMenu.AddSeparator();
+        iconContextMenu.AddItem("Cut", CutSelectedDesktopIcons);
+        iconContextMenu.AddItem("Copy", CopySelectedDesktopIcons);
         iconContextMenu.AddSeparator();
         iconRenameItem = iconContextMenu.AddItem("Rename", BeginContextRename);
         iconDeleteItem = iconContextMenu.AddItem("Delete", DeleteContextIcon);
@@ -361,9 +366,9 @@ public class Desktop : Component
         if (size <= 16)
             SetIconGridPreset(72, 64);
         else if (size >= 48)
-            SetIconGridPreset(96, 96);
+            SetIconGridPreset(100, 96);
         else
-            SetIconGridPreset(80, 80);
+            SetIconGridPreset(88, 86);
 
         if (SnapIconsToGrid)
             ArrangeIconsOnGrid();
@@ -373,19 +378,7 @@ public class Desktop : Component
 
     private void DesktopNewShortcut()
     {
-        const string desktopDir = "/mnt/user/desktop/";
-        if (!Directory.Exists(desktopDir))
-        {
-            try { Directory.CreateDirectory(desktopDir); } catch { }
-        }
-
-        string path = FileSystemManager.GetUniquePath(desktopDir, "New Shortcut", "lnk");
-        ShortcutFile.Create(path, "/mnt/Programs/terminal.elf", "Terminal", "shell32.dll,-284");
-        FileInfo fileInfo = new FileInfo(path);
-        DesktopIcon icon = new DesktopIcon(contextX, contextY, new FileEntry(fileInfo.Name, FileType.File, path, fileInfo.Length));
-        AddIcon(icon);
-        SelectOnlyIcon(icon);
-        icon.BeginRename();
+        LaunchTracker.Start(() => new CreateShortcutDialog("/mnt/user/desktop", "", contextX, contextY));
     }
 
     private Rectangle GetMarqueeRectangle()
@@ -527,7 +520,7 @@ public class Desktop : Component
     {
         DesktopIcon renamingIcon = FindRenamingIcon();
 
-        if (renamingIcon != null && mouse.left == MouseEvents.Press && !renamingIcon.IsInsideAbsolute(mouseX, mouseY))
+        if (renamingIcon != null && mouse.left == MouseEvents.Press && !renamingIcon.IsInsideLabel(mouseX, mouseY))
         {
             renamingIcon.CommitRename();
             ClearIconSelection();
@@ -672,20 +665,107 @@ public class Desktop : Component
             return;
         }
 
-        if (keyEvent.Key == Key.Delete && selectedIcons.Count > 0)
+        if (Icons.Count == 0 && !Component.IsControlPressed(keyEvent)) return;
+
+        if (Component.IsControlPressed(keyEvent))
         {
-            DeleteSelectedIcons();
+            if (keyEvent.Key == Key.C)
+            {
+                CopySelectedDesktopIcons();
+                return;
+            }
+            if (keyEvent.Key == Key.X)
+            {
+                CutSelectedDesktopIcons();
+                return;
+            }
+            if (keyEvent.Key == Key.V)
+            {
+                PasteDesktopClipboard();
+                return;
+            }
+            if (keyEvent.Key == Key.A)
+            {
+                SelectAllIcons();
+                return;
+            }
+            if (keyEvent.Key == Key.N && Component.IsShiftPressed(keyEvent))
+            {
+                DesktopNewDirectory();
+                return;
+            }
+        }
+
+        if (Component.IsAltPressed(keyEvent) && keyEvent.Key == Key.Enter)
+        {
+            ShowContextProperties();
+            return;
+        }
+
+        if (keyEvent.Key == Key.F5)
+        {
+            RefreshDesktopIcons();
+            return;
+        }
+
+        switch (keyEvent.Key)
+        {
+            case Key.Delete:
+                if (selectedIcons.Count > 0)
+                {
+                    DeleteSelectedIcons();
+                }
+                return;
+
+            case Key.Enter:
+                if (selectedIcons.Count == 1)
+                {
+                    OpenIcon(selectedIcons[0]);
+                }
+                return;
+
+            case Key.F2:
+                if (selectedIcons.Count == 1)
+                {
+                    selectedIcons[0].BeginRename();
+                }
+                return;
+
+            case Key.UpArrow:
+                NavigateDesktopIcon(0, -1);
+                return;
+
+            case Key.DownArrow:
+                NavigateDesktopIcon(0, 1);
+                return;
+
+            case Key.LeftArrow:
+                NavigateDesktopIcon(-1, 0);
+                return;
+
+            case Key.RightArrow:
+                NavigateDesktopIcon(1, 0);
+                return;
+
+            case Key.Home:
+                SelectFirstDesktopIcon();
+                return;
+
+            case Key.End:
+                SelectLastDesktopIcon();
+                return;
+        }
+
+        // Type-to-select desktop icon
+        char printable = GetPrintableCharacter(keyEvent);
+        if (printable != '\0' && !char.IsControl(printable))
+        {
+            SelectDesktopIconStartingWith(char.ToUpperInvariant(printable));
             return;
         }
 
         if (selectedIcons.Count == 1)
         {
-            if (keyEvent.Key == Key.Enter)
-            {
-                OpenIcon(selectedIcons[0]);
-                return;
-            }
-
             selectedIcons[0].HandleKeyboard(keyEvent);
         }
     }
@@ -747,7 +827,7 @@ public class Desktop : Component
         SnapIconsToGrid = Registry.GetBoolean("System/Desktop/IconGridEnabled", true);
         AutoArrangeIcons = Registry.GetBoolean("System/Desktop/AutoArrange", false);
         ShowIconGrid = Registry.GetBoolean("System/Desktop/IconGridVisible", false);
-        IconGridWidth = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridWidth", 80), DesktopIcon.DefaultWidth, 256);
+        IconGridWidth = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridWidth", 96), DesktopIcon.DefaultWidth, 256);
         IconGridHeight = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridHeight", 80), DesktopIcon.DefaultHeight, 256);
         IconGridOffsetX = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridOffsetX", 8), 0, Math.Max(0, Width - 1));
         IconGridOffsetY = ClampGridValue(Registry.GetInteger("System/Desktop/IconGridOffsetY", 8), 0, Math.Max(0, Height - 1));
@@ -866,11 +946,24 @@ public class Desktop : Component
     {
         int tick = Environment.TickCount;
         int elapsed = unchecked(tick - lastClickTick);
-        if (icon == lastClickedIcon && elapsed >= 0 && elapsed <= 1200)
+
+        // Fast double click (< 500 ms) opens the icon
+        if (icon == lastClickedIcon && elapsed >= 0 && elapsed <= 500)
         {
             lastClickedIcon = null;
             lastClickTick = 0;
             OpenIcon(icon);
+            return;
+        }
+
+        // Slow click on an already-selected icon label initiates rename (between 500ms and 2500ms)
+        if (icon == lastClickedIcon && elapsed > 500 && elapsed <= 2500 &&
+            !icon.isSystemIcon && !icon.IsRenaming && IsIconSelected(icon) &&
+            icon.IsInsideLabel(pressPosition.X, pressPosition.Y))
+        {
+            lastClickedIcon = null;
+            lastClickTick = 0;
+            icon.BeginRename();
             return;
         }
 
@@ -886,7 +979,7 @@ public class Desktop : Component
 
         if (path == "shell::thispc" || path == "/mnt")
         {
-            if (File.Exists("/mnt/Programs/explorer.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/explorer.elf"))
             {
                 LaunchTracker.StartElf("/mnt/Programs/explorer.elf", new string[] { "explorer.elf", "/mnt" });
             }
@@ -900,7 +993,7 @@ public class Desktop : Component
         if (path == "shell::userfiles" || path == "/mnt/user" || path == "/mnt/user/documents")
         {
             string userPath = Directory.Exists("/mnt/user/documents") ? "/mnt/user/documents" : (Directory.Exists("/mnt/user") ? "/mnt/user" : "/mnt");
-            if (File.Exists("/mnt/Programs/explorer.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/explorer.elf"))
             {
                 LaunchTracker.StartElf("/mnt/Programs/explorer.elf", new string[] { "explorer.elf", userPath });
             }
@@ -913,7 +1006,7 @@ public class Desktop : Component
 
         if (Directory.Exists(path))
         {
-            if (File.Exists("/mnt/Programs/explorer.elf"))
+            if (ProgramCache.HasProgram("/mnt/Programs/explorer.elf"))
             {
                 LaunchTracker.StartElf("/mnt/Programs/explorer.elf", new string[] { "explorer.elf", path });
             }
@@ -987,9 +1080,79 @@ public class Desktop : Component
         if (contextIcon == icon) contextIcon = null;
     }
 
+    private void CutSelectedDesktopIcons()
+    {
+        List<string> paths = new List<string>();
+        if (selectedIcons.Count > 0)
+        {
+            for (int i = 0; i < selectedIcons.Count; i++)
+            {
+                if (!selectedIcons[i].isSystemIcon && !string.IsNullOrEmpty(selectedIcons[i].fileEntry.AbsoluteLocation))
+                    paths.Add(selectedIcons[i].fileEntry.AbsoluteLocation);
+            }
+        }
+        else if (contextIcon != null && !contextIcon.isSystemIcon && !string.IsNullOrEmpty(contextIcon.fileEntry.AbsoluteLocation))
+        {
+            paths.Add(contextIcon.fileEntry.AbsoluteLocation);
+        }
+
+        if (paths.Count > 0)
+        {
+            FileClipboard.SetCut(paths);
+        }
+    }
+
+    private void CopySelectedDesktopIcons()
+    {
+        List<string> paths = new List<string>();
+        if (selectedIcons.Count > 0)
+        {
+            for (int i = 0; i < selectedIcons.Count; i++)
+            {
+                if (!selectedIcons[i].isSystemIcon && !string.IsNullOrEmpty(selectedIcons[i].fileEntry.AbsoluteLocation))
+                    paths.Add(selectedIcons[i].fileEntry.AbsoluteLocation);
+            }
+        }
+        else if (contextIcon != null && !contextIcon.isSystemIcon && !string.IsNullOrEmpty(contextIcon.fileEntry.AbsoluteLocation))
+        {
+            paths.Add(contextIcon.fileEntry.AbsoluteLocation);
+        }
+
+        if (paths.Count > 0)
+        {
+            FileClipboard.SetCopy(paths);
+        }
+    }
+
+    private void PasteDesktopClipboard()
+    {
+        if (!FileClipboard.HasContent) return;
+        string dest = "/mnt/user/desktop";
+        if (!Directory.Exists(dest))
+            Directory.CreateDirectory(dest);
+        if (FileClipboard.PasteTo(dest))
+        {
+            RefreshDesktopIcons();
+        }
+    }
+
+    private void SelectAllIcons()
+    {
+        selectedIcons.Clear();
+        for (int i = 0; i < Icons.Count; i++)
+        {
+            if (Icons[i].Visible)
+            {
+                selectedIcons.Add(Icons[i]);
+                Icons[i].Set(true);
+            }
+        }
+        MarkDirty();
+    }
+
     private void ShowContextProperties()
     {
-        DesktopIcon icon = contextIcon;
+        DesktopIcon icon = contextIcon ?? (selectedIcons.Count > 0 ? selectedIcons[0] : null);
         if (icon == null) return;
 
         if (icon.isSystemIcon && icon == thisPcIcon)
@@ -1004,6 +1167,10 @@ public class Desktop : Component
     private void ShowIconContextMenu(int mouseX, int mouseY, DesktopIcon icon)
     {
         contextIcon = icon;
+        if (icon != null && !selectedIcons.Contains(icon))
+        {
+            SelectOnlyIcon(icon);
+        }
         bool system = icon != null && icon.isSystemIcon;
         if (iconRenameItem != null) iconRenameItem.Visible = !system;
         if (iconDeleteItem != null) iconDeleteItem.Visible = !system;
@@ -1014,7 +1181,7 @@ public class Desktop : Component
         MarkDirty();
     }
 
-    private void RefreshDesktopIcons()
+    public void RefreshDesktopIcons()
     {
         const string desktopPath = "/mnt/user/desktop";
         if (!Directory.Exists(desktopPath)) return;
@@ -1121,6 +1288,121 @@ public class Desktop : Component
             selectedIcons[i].Set(false);
 
         selectedIcons.Clear();
+    }
+
+    private void SelectFirstDesktopIcon()
+    {
+        for (int i = 0; i < Icons.Count; i++)
+        {
+            if (Icons[i].Visible)
+            {
+                SelectOnlyIcon(Icons[i]);
+                return;
+            }
+        }
+    }
+
+    private void SelectLastDesktopIcon()
+    {
+        for (int i = Icons.Count - 1; i >= 0; i--)
+        {
+            if (Icons[i].Visible)
+            {
+                SelectOnlyIcon(Icons[i]);
+                return;
+            }
+        }
+    }
+
+    private void SelectDesktopIconStartingWith(char target)
+    {
+        int startIndex = 0;
+        if (selectedIcons.Count > 0)
+        {
+            int idx = Icons.IndexOf(selectedIcons[0]);
+            if (idx >= 0) startIndex = idx + 1;
+        }
+
+        for (int offset = 0; offset < Icons.Count; offset++)
+        {
+            int check = (startIndex + offset) % Icons.Count;
+            DesktopIcon icon = Icons[check];
+            if (!icon.Visible) continue;
+            string name = icon.fileEntry.FileName ?? "";
+            if (name.Length > 0 && char.ToUpperInvariant(name[0]) == target)
+            {
+                SelectOnlyIcon(icon);
+                return;
+            }
+        }
+    }
+
+    private void NavigateDesktopIcon(int dirX, int dirY)
+    {
+        if (selectedIcons.Count == 0)
+        {
+            SelectFirstDesktopIcon();
+            return;
+        }
+
+        DesktopIcon current = selectedIcons[0];
+        DesktopIcon? best = null;
+        int bestScore = int.MaxValue;
+
+        for (int i = 0; i < Icons.Count; i++)
+        {
+            DesktopIcon other = Icons[i];
+            if (other == current || !other.Visible) continue;
+
+            int dx = other.X - current.X;
+            int dy = other.Y - current.Y;
+
+            if (dirY > 0) // Down
+            {
+                if (dy <= 10) continue;
+                int score = Math.Abs(dx) * 4 + dy;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = other;
+                }
+            }
+            else if (dirY < 0) // Up
+            {
+                if (dy >= -10) continue;
+                int score = Math.Abs(dx) * 4 + (-dy);
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = other;
+                }
+            }
+            else if (dirX > 0) // Right
+            {
+                if (dx <= 10) continue;
+                int score = dx + Math.Abs(dy) * 4;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = other;
+                }
+            }
+            else if (dirX < 0) // Left
+            {
+                if (dx >= -10) continue;
+                int score = (-dx) + Math.Abs(dy) * 4;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = other;
+                }
+            }
+        }
+
+        if (best != null)
+        {
+            SelectOnlyIcon(best);
+        }
     }
 
     private bool IsIconSelected(DesktopIcon icon)
