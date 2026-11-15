@@ -29,11 +29,6 @@ public class Kernel : Sys.Kernel
     {
     }
 
-    protected override void OnBoot()
-    {
-        base.OnBoot();
-    }
-
     protected override void BeforeRun()
     {
         try
@@ -103,6 +98,7 @@ public class Kernel : Sys.Kernel
 
         CompositorSelfTests.Run();
         WebSelfTests.Run();
+        ElfSelfTests.Run();
 
         Global.screenHeight = canvas.Height;
         Global.screenWidth = canvas.Width;
@@ -144,6 +140,7 @@ public class Kernel : Sys.Kernel
 
 
         ResourceLoader.SysRequired();
+        ProgramCache.Initialize();
     }
 
 

@@ -269,7 +269,8 @@ public static class FileSystemManager
     /// </summary>
     public static string GetUniquePath(string directory, string baseName, string extension = "")
     {
-        string path = Combine(directory, $"{baseName}{extension}");
+        string ext = string.IsNullOrEmpty(extension) ? "" : (extension.StartsWith('.') ? extension : "." + extension);
+        string path = Combine(directory, $"{baseName}{ext}");
 
         if (!File.Exists(path) && !Directory.Exists(path))
             return path;
@@ -277,7 +278,7 @@ public static class FileSystemManager
         int i = 2;
         while (true)
         {
-            path = Combine(directory, $"{baseName} ({i}){extension}");
+            path = Combine(directory, $"{baseName} ({i}){ext}");
 
             if (!File.Exists(path) && !Directory.Exists(path))
                 return path;

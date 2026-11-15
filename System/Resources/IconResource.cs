@@ -240,24 +240,40 @@ namespace Windose.System.Resources
             return fallback;
         }
 
+        private static readonly Dictionary<string, string> resolvedDllPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        private static string? FindDllPath(string dllPath)
+        {
+            if (File.Exists(dllPath)) return dllPath;
+            string fileName = Path.GetFileName(dllPath);
+            string p1 = Path.Combine(DefaultDllPath, fileName);
+            if (File.Exists(p1)) return p1;
+            string p2 = Path.Combine(DefaultDllPath, "Icons", fileName);
+            if (File.Exists(p2)) return p2;
+            string p3 = Path.Combine("/mnt/Icons/", fileName);
+            if (File.Exists(p3)) return p3;
+            return null;
+        }
+
         private static Image? LoadFromPe(string dllPath, int idOrIndex, bool isIndex, int targetSize)
         {
-            string resolvedPath = dllPath;
-            if (!File.Exists(resolvedPath))
+            string? resolvedPath;
+            lock (resolvedDllPaths)
             {
-                string fileName = Path.GetFileName(dllPath);
-                resolvedPath = Path.Combine(DefaultDllPath, fileName);
-                if (!File.Exists(resolvedPath))
+                if (!resolvedDllPaths.TryGetValue(dllPath, out resolvedPath))
                 {
-                    resolvedPath = Path.Combine(DefaultDllPath, "Icons", fileName);
-                    if (!File.Exists(resolvedPath))
+                    resolvedPath = FindDllPath(dllPath);
+                    if (resolvedPath != null)
                     {
-                        resolvedPath = Path.Combine("/mnt/Icons/", fileName);
-                        if (!File.Exists(resolvedPath))
-                            return null;
+                        resolvedDllPaths[dllPath] = resolvedPath;
+                        string fn = Path.GetFileName(dllPath);
+                        if (!string.IsNullOrEmpty(fn)) resolvedDllPaths[fn] = resolvedPath;
                     }
                 }
             }
+
+            if (resolvedPath == null)
+                return null;
 
             using var reader = PeResourceReader.Open(resolvedPath);
             if (reader == null)

@@ -164,7 +164,7 @@ namespace Windose.System.Kernel.Subsystem
                     if (string.Equals(info.Target, "program::BreezeEditor", StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(info.Target, "BreezeEditor", StringComparison.OrdinalIgnoreCase))
                     {
-                        if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                        if (ProgramCache.HasProgram("/mnt/Programs/aeroeditor.elf"))
                         {
                             LaunchTracker.StartElf("/mnt/Programs/aeroeditor.elf");
                             return true;
@@ -271,7 +271,7 @@ namespace Windose.System.Kernel.Subsystem
                 }
             }
 
-            if (TryGetElfApplication(ext, out string associatedElf) && File.Exists(associatedElf))
+            if (TryGetElfApplication(ext, out string associatedElf) && ProgramCache.HasProgram(associatedElf))
             {
                 try
                 {
@@ -297,9 +297,9 @@ namespace Windose.System.Kernel.Subsystem
 
             if (program == typeof(BreezeEditor))
             {
-                if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                if (ProgramCache.HasProgram("/mnt/Programs/aeroeditor.elf"))
                 {
-                    Windose.System.Elf.ElfRunner.RunFile("/mnt/Programs/aeroeditor.elf", new string[] { path });
+                    LaunchTracker.StartElf("/mnt/Programs/aeroeditor.elf", new string[] { "aeroeditor.elf", path });
                     return true;
                 }
                 LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, path));

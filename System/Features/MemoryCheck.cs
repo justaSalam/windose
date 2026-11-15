@@ -32,10 +32,8 @@ namespace Windose.System.Features
                 Console.BackgroundColor = ConsoleColor.Red;
                 Console.ForegroundColor = ConsoleColor.White;
                 SystemLogger.WriteLine("KERNEL", "Panic", ConsoleMessageType.Warning, true);
-                SystemLogger.WriteLine("KERNEL", "Low memory warning: " + freeMemoryMb + " MB free", ConsoleMessageType.Warning, true);
-                SystemLogger.WriteLine("KERNEL", "Insufficient memory available", ConsoleMessageType.Fatal, true);
-                Power.Halt();
-                return false;
+                SystemLogger.WriteLine("KERNEL", "Insufficient memory available" + freeMemoryMb + " MB free", ConsoleMessageType.Fatal, false);
+                throw new Exception("Insufficient memory available: " + freeMemoryMb + " MB free");
             }
 
             lastCheckResult = true;
