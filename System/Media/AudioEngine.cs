@@ -25,7 +25,20 @@ namespace Windose.System.Media
         private int pausedOffsetMs;
         private int audioDurationMs;
 
-        public bool IsHardwareAvailable { get; private set; }
+        public bool IsHardwareAvailable
+        {
+            get
+            {
+                try
+                {
+                    return AudioManager.IsEnabled && AudioManager.Count > 0;
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+        }
         public bool IsPlaying => currentPlayback != null && currentPlayback.IsPlaying && !isPaused;
         public bool IsMuted
         {
@@ -40,19 +53,10 @@ namespace Windose.System.Media
 
         public AudioEngine()
         {
-            CheckHardware();
         }
 
         private void CheckHardware()
         {
-            try
-            {
-                IsHardwareAvailable = AudioManager.IsEnabled && AudioManager.Count > 0;
-            }
-            catch
-            {
-                IsHardwareAvailable = false;
-            }
         }
 
         public bool PlayWave(byte[] waveBytes)
