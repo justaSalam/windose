@@ -184,6 +184,15 @@ int main(int argc, char **argv) {
                     end_selected_process();
                     last_refresh_tick = k_ticks();
                 }
+            } else if (e.type == EV_KEY) {
+                int keyChar = (e.b & 0xFFFF);
+                if (keyChar == 127 || e.a == 46) {
+                    end_selected_process();
+                    last_refresh_tick = k_ticks();
+                } else if (keyChar == 132 || e.a == 116) {
+                    refresh_processes();
+                    last_refresh_tick = k_ticks();
+                }
             }
         }
 

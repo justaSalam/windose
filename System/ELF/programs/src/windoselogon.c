@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
     k_fill_rect(main_win, 140, 80, 360, 320, 0xFFFFFFFF);
 
     /* lbl_logo (label) */
-    h_lbl_logo = k_create_label(main_win, 160, 105, "🪐 WINDOSE 7 AERO");
+    h_lbl_logo = k_create_label(main_win, 160, 105, "WINDOSE");
 
     /* lbl_sub (label) */
     h_lbl_sub = k_create_label(main_win, 160, 140, "Please authenticate to initialize desktop session");

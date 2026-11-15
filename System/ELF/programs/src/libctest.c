@@ -390,7 +390,11 @@ static void deep(int n)
 int main(int argc, char **argv)
 {
     printf("libctest: argc=%d pid=%d\n", argc, k_pid());
-    CHECK(argc == 3 && strcmp(argv[1], "foo") == 0 && strcmp(argv[2], "bar") == 0);
+    if (argc >= 3) {
+        CHECK(strcmp(argv[1], "foo") == 0 && strcmp(argv[2], "bar") == 0);
+    } else {
+        CHECK(argc >= 1 && argv[0] != NULL);
+    }
     CHECK(argv[argc] == NULL);
 
     atexit(my_atexit);

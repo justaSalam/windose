@@ -16,15 +16,22 @@
 #define MAXTNODES 200
 #define HISTMAX 32
 
-typedef struct { char name[256]; int is_dir; long size; } Entry;
+typedef struct {
+    char name[256];
+    char label[128];
+    char type_desc[64];
+    int is_dir;
+    long size;
+    long free_space;
+} Entry;
 typedef struct { handle_t h; char path[MAXPATH]; int loaded; } TNode;
 
 static handle_t win, tree, files, addrField, searchField;
 static handle_t sb;
 static int sbObjs, sbSel;
-static handle_t tBack, tForward, tUp, tCut, tCopy, tPaste, tDelete, tRefresh;
+static handle_t tBack, tForward, tUp, tComputer, tCut, tCopy, tPaste, tDelete, tRefresh;
 static handle_t mClose, mCut, mCopy, mPaste, mDelete, mRename;
-static handle_t mRefresh, mSortName, mSortSize, mUp, mRoot, mAbout;
+static handle_t mRefresh, mSortName, mSortSize, mUp, mComputer, mRoot, mAbout;
 static handle_t vpPopup, vpRefresh, vpNewFile, vpNewFolder, vpEmpty, vpProps;
 static handle_t itPopup, itOpen, itRename, itDelete, itProps;
 static handle_t mProps;
@@ -58,6 +65,7 @@ static int vlinecount, vpage, vpages;
 
 static const char *ICON_DIR = "/mnt/System/Icons/directory_closed.png";
 static const char *ICON_DRIVE = "/mnt/System/Icons/hard_disk_drive.png";
+static const char *ICON_COMPUTER = "/mnt/System/Icons/computerwil.png";
 
 static void refresh(void);
 static void navigate_push(const char *path);
@@ -71,6 +79,14 @@ static void refilter(void);
 
 static void set_objs(const char *s) { k_status_set_text(sb, sbObjs, s); }
 static void set_sel(const char *s) { k_status_set_text(sb, sbSel, s); }
+
+static int is_drives_view(void)
+{
+    return (!strcmp(cwd, "computer") || !strcmp(cwd, "drives") ||
+            !strcmp(cwd, "Computer") || !strcmp(cwd, "Drives") ||
+            !strcmp(cwd, "computer:") || !strcmp(cwd, "drives:") ||
+            !strcmp(cwd, "/"));
+}
 
 static void join_path(const char *dir, const char *name, char *out)
 {
@@ -88,10 +104,15 @@ static void base_name(const char *path, char *out)
 
 static void fmt_size(long size, char *out)
 {
+    if (size < 0) { strcpy(out, "0 B"); return; }
     if (size < 1024) snprintf(out, 16, "%ld B", size);
     else if (size < 1024L * 1024L) snprintf(out, 16, "%ld KB", size / 1024);
     else if (size < 1024L * 1024L * 1024L) snprintf(out, 16, "%ld MB", size / (1024L * 1024L));
-    else snprintf(out, 16, "%ld GB", size / (1024L * 1024L * 1024L));
+    else {
+        long gb = size / (1024L * 1024L * 1024L);
+        long rem = ((size % (1024L * 1024L * 1024L)) * 100) / (1024L * 1024L * 1024L);
+        snprintf(out, 16, "%ld.%02ld GB", gb, rem);
+    }
 }
 
 static void fmt_drive(unsigned lo, unsigned hi, char *out)
@@ -127,6 +148,10 @@ static void file_type(const char *name, int is_dir, char *out)
 static int cmp_entry(const void *a, const void *b)
 {
     const Entry *x = (const Entry *)a, *y = (const Entry *)b;
+    if (is_drives_view()) {
+        if (sortBySize && x->size != y->size) return x->size < y->size ? 1 : -1;
+        return strcmp(x->name, y->name);
+    }
     if (x->is_dir != y->is_dir) return y->is_dir - x->is_dir;
     if (sortBySize && !x->is_dir && !y->is_dir) {
         if (x->size != y->size) return x->size < y->size ? 1 : -1;
@@ -134,13 +159,14 @@ static int cmp_entry(const void *a, const void *b)
     return strcmp(x->name, y->name);
 }
 
-static int name_matches(const char *name)
+static int str_contains_icase(const char *name, const char *sub)
 {
     int i, j;
-    if (!searchbuf[0]) return 1;
+    if (!sub || !sub[0]) return 1;
+    if (!name) return 0;
     for (i = 0; name[i]; i++) {
         for (j = 0; ; j++) {
-            char a = name[i + j], b = searchbuf[j];
+            char a = name[i + j], b = sub[j];
             if (!b) return 1;
             if (!a) break;
             if (a >= 'A' && a <= 'Z') a += 32;
@@ -151,11 +177,19 @@ static int name_matches(const char *name)
     return 0;
 }
 
+static int name_matches(int entry_idx)
+{
+    if (!searchbuf[0]) return 1;
+    if (str_contains_icase(entries[entry_idx].name, searchbuf)) return 1;
+    if (entries[entry_idx].label[0] && str_contains_icase(entries[entry_idx].label, searchbuf)) return 1;
+    return 0;
+}
+
 static void refilter(void)
 {
     int i, k = 0;
     for (i = 0; i < nentries && k < MAXENT; i++)
-        if (name_matches(entries[i].name)) view[k++] = i;
+        if (name_matches(i)) view[k++] = i;
     vcount = k;
     // keep selection only if still visible
     {
@@ -167,36 +201,38 @@ static void refilter(void)
     paint_rows();
 }
 
-static int row_of(int entry_idx)
-{
-    int r;
-    for (r = 0; r < vcount; r++)
-        if (view[r] == entry_idx) return r;
-    return -1;
-}
-
 static void paint_rows(void)
 {
     k_list_clear(files);
     {
         int r, k;
-        char sz[16], tp[32];
-        char row[300];
+        char sz[48], tp[48];
+        char row[512];
         for (r = 0; r < vcount; r++) {
             int i = view[r], p = 0;
             const char *cells[3];
             char name[256];
-            strncpy(name, entries[i].name, sizeof name - 1);
-            name[sizeof name - 1] = 0;
-            cells[0] = name;
-            if (entries[i].is_dir) {
-                cells[1] = "";
-                cells[2] = "File Folder";
-            } else {
-                fmt_size(entries[i].size, sz);
-                file_type(entries[i].name, 0, tp);
+            if (is_drives_view()) {
+                cells[0] = entries[i].label[0] ? entries[i].label : entries[i].name;
+                char fsz[24], tsz[24];
+                fmt_size(entries[i].free_space, fsz);
+                fmt_size(entries[i].size, tsz);
+                snprintf(sz, sizeof sz, "%s free / %s", fsz, tsz);
                 cells[1] = sz;
-                cells[2] = tp;
+                cells[2] = entries[i].type_desc[0] ? entries[i].type_desc : "Local Disk";
+            } else {
+                strncpy(name, entries[i].name, sizeof name - 1);
+                name[sizeof name - 1] = 0;
+                cells[0] = name;
+                if (entries[i].is_dir) {
+                    cells[1] = "";
+                    cells[2] = "File Folder";
+                } else {
+                    fmt_size(entries[i].size, sz);
+                    file_type(entries[i].name, 0, tp);
+                    cells[1] = sz;
+                    cells[2] = tp;
+                }
             }
             for (k = 0; k < 3; k++) {
                 int l = (int)strlen(cells[k]) + 1;
@@ -230,6 +266,14 @@ static TNode *tnode_find(handle_t h)
     return NULL;
 }
 
+static int is_trash_junk(const char *dir, const char *name)
+{
+    int n = (int)strlen(name);
+    if (n > 9 && !strcmp(name + n - 9, ".origpath")) return 1;
+    if (!strcmp(name, ".trash") && !strcmp(dir, "/mnt")) return 1;
+    return 0;
+}
+
 static void tree_load_children(TNode *tn)
 {
     char buf[8192], path[MAXPATH];
@@ -238,12 +282,14 @@ static void tree_load_children(TNode *tn)
     handle_t ch;
     if (!tn || tn->loaded) return;
     tn->loaded = 1;
+    if (!strcmp(tn->path, "computer")) return;
     n = k_list_dir(tn->path, buf, (int)sizeof buf);
     if (n <= 0) return;
     off = 0;
     for (i = 0; i < n; i++) {
         char *nm = buf + off;
         off += (int)strlen(nm) + 1;
+        if (is_trash_junk(tn->path, nm)) continue;
         join_path(tn->path, nm, path);
         if (k_stat_file(path, &st) != 0 || !st.is_dir) continue;
         ch = k_tree_add_child(tree, tn->h, nm, ICON_DIR);
@@ -255,48 +301,47 @@ static void tree_load_children(TNode *tn)
 static void rebuild_tree(void)
 {
     char buf[4096];
-    handle_t r;
+    handle_t root_comp, r;
     int n, off, i;
     tncount = 0;
     k_tree_clear(tree);
+
+    root_comp = k_tree_add_root(tree, "Computer", ICON_COMPUTER);
+    if (root_comp) {
+        tnode_add(root_comp, "computer");
+        k_tree_set_expanded(tree, root_comp, 1);
+    }
+
     n = k_list_drives(buf, (int)sizeof buf);
     if (n <= 0) {
-        // no drive info: fall back to /mnt contents
-        n = k_list_dir("/mnt", buf, (int)sizeof buf);
-        if (n <= 0) return;
-        off = 0;
-        for (i = 0; i < n; i++) {
-            char *nm = buf + off;
-            char path[MAXPATH];
-            FileStat st;
-            off += (int)strlen(nm) + 1;
-            join_path("/mnt", nm, path);
-            if (k_stat_file(path, &st) != 0 || !st.is_dir) continue;
-            r = k_tree_add_root(tree, nm, ICON_DRIVE);
-            if (r && tnode_add(r, path)) tree_load_children(&tnodes[tncount - 1]);
-            if (tncount >= MAXTNODES) return;
-        }
+        // Fallback: at least show /mnt
+        char name[256];
+        strcpy(name, "Local Disk (/mnt)");
+        r = root_comp ? k_tree_add_child(tree, root_comp, name, ICON_DRIVE)
+                      : k_tree_add_root(tree, name, ICON_DRIVE);
+        if (r && tnode_add(r, "/mnt")) tree_load_children(&tnodes[tncount - 1]);
         return;
     }
+
     off = 0;
     for (i = 0; i < n; i++) {
         char *mp = buf + off;
         char name[256];
         off += (int)strlen(mp) + 1;
-        base_name(mp, name);
-        if (!name[0]) strncpy(name, mp, sizeof name - 1);
-        r = k_tree_add_root(tree, name, ICON_DRIVE);
-        if (r && tnode_add(r, mp)) tree_load_children(&tnodes[tncount - 1]);
+        if (!strcmp(mp, "/mnt")) {
+            snprintf(name, sizeof name, "Local Disk (%s)", mp);
+        } else if (!strcmp(mp, "/boot")) {
+            snprintf(name, sizeof name, "Boot Partition (%s)", mp);
+        } else {
+            snprintf(name, sizeof name, "Drive (%s)", mp);
+        }
+        r = root_comp ? k_tree_add_child(tree, root_comp, name, ICON_DRIVE)
+                      : k_tree_add_root(tree, name, ICON_DRIVE);
+        if (r && tnode_add(r, mp)) {
+            tree_load_children(&tnodes[tncount - 1]);
+        }
         if (tncount >= MAXTNODES) return;
     }
-}
-
-static int is_trash_junk(const char *dir, const char *name)
-{
-    int n = (int)strlen(name);
-    if (n > 9 && !strcmp(name + n - 9, ".origpath")) return 1;
-    if (!strcmp(name, ".trash") && !strcmp(dir, "/mnt")) return 1;
-    return 0;
 }
 
 // ---------------- listing ----------------
@@ -313,6 +358,56 @@ static void refresh(void)
     vcount = 0;
     selected = -1;
 
+    if (is_drives_view()) {
+        char buf[4096];
+        n = k_list_drives(buf, (int)sizeof buf);
+        if (n <= 0) {
+            strcpy(buf, "/mnt");
+            n = 1;
+        }
+        entries = malloc((size_t)n * sizeof(Entry));
+        if (!entries) { set_objs("out of memory"); return; }
+        memset(entries, 0, (size_t)n * sizeof(Entry));
+
+        off = 0;
+        for (i = 0; i < n; i++) {
+            char *mp = buf + off;
+            off += (int)strlen(mp) + 1;
+            strncpy(entries[i].name, mp, sizeof entries[i].name - 1);
+            entries[i].name[sizeof entries[i].name - 1] = 0;
+            entries[i].is_dir = 1;
+
+            if (!strcmp(mp, "/mnt")) {
+                strncpy(entries[i].label, "Local Disk (/mnt)", sizeof entries[i].label - 1);
+                strncpy(entries[i].type_desc, "Local Fixed Disk (FAT)", sizeof entries[i].type_desc - 1);
+            } else if (!strcmp(mp, "/boot")) {
+                strncpy(entries[i].label, "Boot Partition (/boot)", sizeof entries[i].label - 1);
+                strncpy(entries[i].type_desc, "System Partition (FAT)", sizeof entries[i].type_desc - 1);
+            } else {
+                snprintf(entries[i].label, sizeof entries[i].label, "Drive (%s)", mp);
+                strncpy(entries[i].type_desc, "Local Disk (FAT)", sizeof entries[i].type_desc - 1);
+            }
+
+            DriveStat ds;
+            if (k_drive_stat(mp, &ds) == 0) {
+                entries[i].size = ((long)(unsigned)ds.total_hi << 32) | (unsigned)ds.total_lo;
+                entries[i].free_space = ((long)(unsigned)ds.free_hi << 32) | (unsigned)ds.free_lo;
+            } else {
+                entries[i].size = 0;
+                entries[i].free_space = 0;
+            }
+        }
+        nentries = n;
+        qsort(entries, (size_t)n, sizeof(Entry), cmp_entry);
+
+        char s[64];
+        snprintf(s, sizeof s, "%d drive(s)%s", nentries, sortBySize ? " [by size]" : "");
+        set_objs(s);
+        set_sel("");
+        refilter();
+        return;
+    }
+
     n = k_list_dir(cwd, listbuf, (int)sizeof listbuf);
     if (n < 0) { set_objs("unavailable"); return; }
     if (n > MAXENT) n = MAXENT;
@@ -320,6 +415,7 @@ static void refresh(void)
     if (n > 0) {
         entries = malloc((size_t)n * sizeof(Entry));
         if (!entries) { set_objs("out of memory"); return; }
+        memset(entries, 0, (size_t)n * sizeof(Entry));
         off = 0;
         {
             int k = 0;
@@ -330,6 +426,9 @@ static void refresh(void)
                 if (is_trash_junk(cwd, nm)) continue;
                 strncpy(entries[k].name, nm, sizeof entries[k].name - 1);
                 entries[k].name[sizeof entries[k].name - 1] = 0;
+                entries[k].label[0] = 0;
+                entries[k].type_desc[0] = 0;
+                entries[k].free_space = -1;
                 join_path(cwd, entries[k].name, path);
                 if (k_stat_file(path, &st) == 0) {
                     entries[k].is_dir = st.is_dir;
@@ -358,13 +457,16 @@ static void refresh(void)
 static void hist_push(const char *path)
 {
     int i;
-    if (hlen > 0 && !strcmp(hist[hlen - 1], path) && hpos == hlen - 1) return;
+    const char *norm = (!path || !path[0] || !strcmp(path, "/") ||
+                        !strcmp(path, "Computer") || !strcmp(path, "drives") || !strcmp(path, "Drives"))
+                       ? "computer" : path;
+    if (hlen > 0 && !strcmp(hist[hlen - 1], norm) && hpos == hlen - 1) return;
     if (hpos < hlen - 1) hlen = hpos + 1;
     if (hlen >= HISTMAX) {
         for (i = 1; i < hlen; i++) strcpy(hist[i - 1], hist[i]);
         hlen--;
     }
-    strncpy(hist[hlen], path, MAXPATH - 1);
+    strncpy(hist[hlen], norm, MAXPATH - 1);
     hist[hlen][MAXPATH - 1] = 0;
     hlen++;
     hpos = hlen - 1;
@@ -372,9 +474,24 @@ static void hist_push(const char *path)
 
 static void navigate(const char *path)
 {
-    strncpy(cwd, path, sizeof cwd - 1);
+    if (!path || !path[0] || !strcmp(path, "/")) {
+        strncpy(cwd, "computer", sizeof cwd - 1);
+    } else {
+        strncpy(cwd, path, sizeof cwd - 1);
+    }
     cwd[sizeof cwd - 1] = 0;
-    k_set_text(addrField, cwd);
+    if (is_drives_view()) {
+        k_set_text(addrField, "Computer");
+        k_set_text(win, "Computer - Explorer");
+    } else {
+        k_set_text(addrField, cwd);
+        char title[300];
+        base_name(cwd, title);
+        if (!title[0]) strncpy(title, cwd, sizeof title - 1);
+        char wtitle[320];
+        snprintf(wtitle, sizeof wtitle, "%s - Explorer", title);
+        k_set_text(win, wtitle);
+    }
     inputMode = 0;
     refresh();
 }
@@ -387,12 +504,21 @@ static void navigate_push(const char *path)
 
 static void go_up_hist(void)
 {
-    int len = (int)strlen(cwd), i;
+    int len, i;
     char p[MAXPATH];
-    if (!strcmp(cwd, "/")) return;
+    if (is_drives_view()) return;
+    if (!strcmp(cwd, "/") || !strcmp(cwd, "/mnt") || !strcmp(cwd, "/boot")) {
+        navigate_push("computer");
+        return;
+    }
+    len = (int)strlen(cwd);
     for (i = len - 1; i > 0 && cwd[i] != '/'; i--) ;
-    if (i == 0) strcpy(p, "/");
-    else { strncpy(p, cwd, (size_t)i); p[i] = 0; }
+    if (i <= 0) {
+        navigate_push("computer");
+        return;
+    }
+    strncpy(p, cwd, (size_t)i);
+    p[i] = 0;
     navigate_push(p);
 }
 
@@ -412,6 +538,10 @@ static void open_selected(void)
     char path[MAXPATH], s[320];
     static const char noargs = 0;
     if (selected < 0 || selected >= nentries) return;
+    if (is_drives_view()) {
+        navigate_push(entries[selected].name);
+        return;
+    }
     if (!strcmp(cwd, "/mnt/.trash")) {
         if (k_trash_restore(entries[selected].name) != 0) set_sel("restore failed");
         else refresh();
@@ -431,8 +561,19 @@ static void open_selected(void)
 
 static void on_row_selected(void)
 {
-    char s[320], sz[16], tp[32];
+    char s[320], sz[24], tp[32];
     if (selected < 0 || selected >= nentries) return;
+    if (is_drives_view()) {
+        char fsz[24], tsz[24];
+        fmt_size(entries[selected].free_space, fsz);
+        fmt_size(entries[selected].size, tsz);
+        snprintf(s, sizeof s, "%s: %s free of %s (%s)",
+                 entries[selected].label[0] ? entries[selected].label : entries[selected].name,
+                 fsz, tsz,
+                 entries[selected].type_desc[0] ? entries[selected].type_desc : "Drive");
+        set_sel(s);
+        return;
+    }
     if (entries[selected].is_dir) {
         snprintf(s, sizeof s, "selected: %s", entries[selected].name);
     } else {
@@ -525,6 +666,12 @@ static void start_input(int mode, const char *preset, const char *prompt)
 static void commit_input(void)
 {
     char a[MAXPATH], b[MAXPATH];
+    if (is_drives_view()) {
+        inputMode = 0;
+        set_sel("operation not supported in Computer");
+        refresh();
+        return;
+    }
     if (inputMode == 1) {
         if (!input[0] || selected < 0 || selected >= nentries) { inputMode = 0; refresh(); return; }
         join_path(cwd, entries[selected].name, a);
@@ -584,6 +731,7 @@ static void do_paste(void)
     FileStat st;
     char *data;
     int n;
+    if (is_drives_view()) { set_sel("cannot paste into Computer"); return; }
     if (!clipPath[0]) return;
     if (k_stat_file(clipPath, &st) != 0) { set_sel("source gone"); clipPath[0] = 0; refresh(); return; }
     if (st.is_dir) { set_sel("folder paste: enter it and use New"); return; }
@@ -621,6 +769,7 @@ static void do_paste(void)
 static void on_clip(int cut)
 {
     char s[320];
+    if (is_drives_view()) { set_sel("cannot copy or cut drives"); return; }
     if (selected < 0 || selected >= nentries) return;
     join_path(cwd, entries[selected].name, clipPath);
     clipCut = cut;
@@ -667,7 +816,7 @@ static void on_key(char ch)
         if (ch == 'y' || ch == 'Y') {
             char path[MAXPATH];
             inputMode = 0;
-            if (selected < 0 || selected >= nentries) { refresh(); return; }
+            if (is_drives_view() || selected < 0 || selected >= nentries) { refresh(); return; }
             join_path(cwd, entries[selected].name, path);
             if (k_trash_delete(path) != 0) set_sel("delete failed");
             refresh();
@@ -693,7 +842,52 @@ static void on_key(char ch)
         set_sel(s);
         return;
     }
+    if (inputMode == 0) {
+        if (ch == '\r') {
+            open_selected();
+            return;
+        }
+        if (ch == '\b') {
+            go_up_hist();
+            return;
+        }
+        if (ch == 127) {
+            if (is_drives_view()) {
+                set_sel("cannot delete drives");
+            } else if (selected >= 0 && selected < nentries) {
+                char s[320];
+                snprintf(s, sizeof s, "Delete %s? (y/n)", entries[selected].name);
+                inputMode = 3;
+                set_sel(s);
+            }
+            return;
+        }
+    }
     if (ch == 27) { k_close(win); }
+}
+
+static void handle_address_go(void)
+{
+    char p[300];
+    if (k_get_text(addrField, p, (int)sizeof p) >= 0) {
+        int start = 0, end = (int)strlen(p);
+        while (p[start] == ' ') start++;
+        while (end > start && p[end - 1] == ' ') end--;
+        p[end] = 0;
+        char *target = p + start;
+        if (!target[0] || !strcmp(target, "computer") || !strcmp(target, "drives") ||
+            !strcmp(target, "Computer") || !strcmp(target, "Drives") ||
+            !strcmp(target, "/") || !strcmp(target, "computer:") || !strcmp(target, "drives:")) {
+            navigate_push("computer");
+            return;
+        }
+        FileStat st;
+        if (k_stat_file(target, &st) == 0 && st.is_dir) {
+            navigate_push(target);
+        } else {
+            set_sel("not a folder");
+        }
+    }
 }
 
 int main(int argc, char **argv)
@@ -721,13 +915,15 @@ int main(int argc, char **argv)
     mSortName = k_menu_add_item(bar, "View", "Sort by Name");
     mSortSize = k_menu_add_item(bar, "View", "Sort by Size");
     mUp = k_menu_add_item(bar, "Go", "Up");
-    mRoot = k_menu_add_item(bar, "Go", "Root");
+    mComputer = k_menu_add_item(bar, "Go", "Computer");
+    mRoot = k_menu_add_item(bar, "Go", "Root (/mnt)");
     mAbout = k_menu_add_item(bar, "Help", "About");
 
     tb = k_toolbar_create(win, 0, 22, 880);
     tBack = k_toolbar_add_button(tb, "Back");
     tForward = k_toolbar_add_button(tb, "Forward");
     tUp = k_toolbar_add_button(tb, "Up");
+    tComputer = k_toolbar_add_button(tb, "Computer");
     k_toolbar_add_separator(tb);
     tCut = k_toolbar_add_button(tb, "Cut");
     tCopy = k_toolbar_add_button(tb, "Copy");
@@ -746,9 +942,9 @@ int main(int argc, char **argv)
 
     tree = k_tree_create(win, 8, 86, 190, 336);
     files = k_create_listbox(win, 206, 86, 666, 336);
-    k_list_add_column(files, "Name", 340);
-    k_list_add_column(files, "Size", 110);
-    k_list_add_column(files, "Type", 150);
+    k_list_add_column(files, "Name", 300);
+    k_list_add_column(files, "Size", 180);
+    k_list_add_column(files, "Type", 160);
 
     sb = k_statusbar_create(win, 8, 430, 864);
     sbObjs = k_status_add_panel(sb, "", 220);
@@ -815,16 +1011,10 @@ int main(int argc, char **argv)
                 char ch = (char)(e.b & 0xFFFF);
                 if (inputMode != 0) { on_key(ch); continue; }
                 if (focusedH == addrField) {
-                    // typing is native; Enter navigates, Esc resyncs
                     if (ch == '\r') {
-                        char p[300];
-                        if (k_get_text(addrField, p, (int)sizeof p) >= 0) {
-                            FileStat st;
-                            if (k_stat_file(p, &st) == 0 && st.is_dir) navigate_push(p);
-                            else set_sel("not a folder");
-                        }
+                        handle_address_go();
                     } else if (ch == 27) {
-                        k_set_text(addrField, cwd);
+                        k_set_text(addrField, is_drives_view() ? "Computer" : cwd);
                     }
                     continue;
                 }
@@ -877,21 +1067,22 @@ int main(int argc, char **argv)
             }
             if (e.type != EV_CLICK) continue;
             if (e.handle == goBtn) {
-                char p[300];
-                if (k_get_text(addrField, p, (int)sizeof p) >= 0) {
-                    FileStat st;
-                    if (k_stat_file(p, &st) == 0 && st.is_dir) navigate_push(p);
-                    else set_sel("not a folder");
-                }
+                handle_address_go();
             }
             else if (e.handle == tBack || e.handle == tForward || e.handle == tUp ||
+                     e.handle == tComputer || e.handle == mComputer ||
                      e.handle == mUp || e.handle == mRoot) {
                 if (e.handle == tBack) {
                     if (hpos > 0) { hpos--; navigate(hist[hpos]); }
                 } else if (e.handle == tForward) {
                     if (hpos + 1 < hlen) { hpos++; navigate(hist[hpos]); }
-                } else if (e.handle == tUp || e.handle == mUp) go_up_hist();
-                else navigate_push("/mnt");
+                } else if (e.handle == tUp || e.handle == mUp) {
+                    go_up_hist();
+                } else if (e.handle == tComputer || e.handle == mComputer) {
+                    navigate_push("computer");
+                } else {
+                    navigate_push("/mnt");
+                }
             }
             else if (e.handle == tRefresh || e.handle == mRefresh || e.handle == vpRefresh) {
                 inputMode = 0;
@@ -909,7 +1100,9 @@ int main(int argc, char **argv)
             else if (e.handle == tCopy || e.handle == mCopy) on_clip(0);
             else if (e.handle == tPaste || e.handle == mPaste) do_paste();
             else if (e.handle == tDelete || e.handle == mDelete || e.handle == itDelete) {
-                if (selected >= 0 && selected < nentries) {
+                if (is_drives_view()) {
+                    set_sel("cannot delete drives");
+                } else if (selected >= 0 && selected < nentries) {
                     char s[320];
                     snprintf(s, sizeof s, "Delete %s? (y/n)", entries[selected].name);
                     inputMode = 3;
@@ -917,11 +1110,20 @@ int main(int argc, char **argv)
                 }
             }
             else if (e.handle == mRename || e.handle == itRename) {
-                if (selected >= 0 && selected < nentries)
+                if (is_drives_view()) {
+                    set_sel("cannot rename drives");
+                } else if (selected >= 0 && selected < nentries) {
                     start_input(1, entries[selected].name, "Rename to: ");
+                }
             }
-            else if (e.handle == vpNewFolder) start_input(2, NULL, "New folder: ");
-            else if (e.handle == vpNewFile) start_input(5, NULL, "New file: ");
+            else if (e.handle == vpNewFolder) {
+                if (is_drives_view()) set_sel("cannot create folder in Computer");
+                else start_input(2, NULL, "New folder: ");
+            }
+            else if (e.handle == vpNewFile) {
+                if (is_drives_view()) set_sel("cannot create file in Computer");
+                else start_input(5, NULL, "New file: ");
+            }
             else if (e.handle == vpEmpty) {
                 k_trash_empty();
                 refresh();
@@ -929,21 +1131,27 @@ int main(int argc, char **argv)
             else if (e.handle == itOpen) open_selected();
             else if (e.handle == itProps || e.handle == mProps) {
                 if (selected >= 0 && selected < nentries) {
-                    char full[520];
-                    if (strcmp(cwd, "/") == 0) snprintf(full, sizeof(full), "/%s", entries[selected].name);
-                    else snprintf(full, sizeof(full), "%s/%s", cwd, entries[selected].name);
-                    open_properties(full);
+                    if (is_drives_view()) {
+                        open_properties(entries[selected].name);
+                    } else {
+                        char full[520];
+                        if (strcmp(cwd, "/") == 0) snprintf(full, sizeof(full), "/%s", entries[selected].name);
+                        else snprintf(full, sizeof(full), "%s/%s", cwd, entries[selected].name);
+                        open_properties(full);
+                    }
                 }
             }
             else if (e.handle == vpProps) {
-                open_properties(cwd);
+                if (!is_drives_view()) {
+                    open_properties(cwd);
+                }
             }
             else if (e.handle == tree) {
                 TNode *tn = tnode_find(e.a);
                 if (tn) {
                     tree_load_children(tn);
                     navigate_push(tn->path);
-                    {
+                    if (!is_drives_view()) {
                         DriveStat ds;
                         if (k_drive_stat(tn->path, &ds) == 0) {
                             char f[16], t[16], s[96];
