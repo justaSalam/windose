@@ -21,6 +21,7 @@ public class TreeView : Component
     public Action<TreeViewItem> selectedChanged;
     public Action<TreeViewItem> itemDoubleClick;
     public Action<TreeViewItem> itemRightClick;
+    public Action<TreeViewItem>? itemDelete;
 
     private int pressedRow = -1;
     private TreeViewItem pressedItem;
@@ -327,6 +328,10 @@ public class TreeView : Component
                     MarkDirty();
                 }
                 break;
+            case Key.Delete:
+                if (selectedItem != null)
+                    itemDelete?.Invoke(selectedItem);
+                break;
             case Key.Enter:
                 if (selectedItem != null)
                 {
@@ -338,6 +343,23 @@ public class TreeView : Component
                     itemDoubleClick?.Invoke(selectedItem);
                 }
                 break;
+        }
+
+        char printable = GetPrintableCharacter(keyEvent);
+        if (printable != '\0' && !char.IsControl(printable))
+        {
+            char target = char.ToUpperInvariant(printable);
+            for (int i = 0; i < count; i++)
+            {
+                int check = (row + 1 + i) % count;
+                TreeViewItem item = GetVisibleItem(check);
+                if (item != null && (item.text ?? "").Length > 0 &&
+                    char.ToUpperInvariant(item.text[0]) == target)
+                {
+                    SelectItem(item);
+                    break;
+                }
+            }
         }
     }
 

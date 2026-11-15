@@ -14,6 +14,7 @@ public class MenuItem : Component
     public bool drawSubmenuArrow = true;
     public bool closeOtherMenusOnOpen;
     public MenuPopup submenu;
+    public bool isKeyboardSelected;
 
     private bool isPressed;
 
@@ -55,7 +56,7 @@ public class MenuItem : Component
         }
 
         bool hasSubmenu = submenu != null;
-        bool highlighted = enabled && (IsInsideAbsolute(Cosmos.Kernel.System.Input.MouseManager.X, Cosmos.Kernel.System.Input.MouseManager.Y) || (hasSubmenu && submenu.Visible));
+        bool highlighted = enabled && (isKeyboardSelected || IsInsideAbsolute(Cosmos.Kernel.System.Input.MouseManager.X, Cosmos.Kernel.System.Input.MouseManager.Y) || (hasSubmenu && submenu.Visible));
         int textX = isPressed ? 9 : 8;
         int textY = Math.Max(0, (Height - MeasureStringHeight(fontSize)) / 2);
         int rightInset = hasSubmenu && drawSubmenuArrow ? 18 : 4;
@@ -205,6 +206,19 @@ public class MenuItem : Component
             submenu.ShowAt(AbsoluteX + Width - 2, AbsoluteY - 2);
 
         MarkDirty();
+    }
+
+    public void Trigger()
+    {
+        if (!enabled || drawSeparator) return;
+        if (submenu != null)
+        {
+            ShowSubmenu();
+            return;
+        }
+        click?.Invoke();
+        if (closeParentOnClick)
+            CloseMenuChain();
     }
 
     private void CloseMenuChain()

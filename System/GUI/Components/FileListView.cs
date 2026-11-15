@@ -27,6 +27,11 @@ public class FileListView : Component
     public Action<FileListViewItem> itemDoubleClick;
     public Action<FileListViewItem, int, int> itemRightClick;
     public Action<int, int> viewportRightClick;
+    public Action<FileListViewItem>? itemDelete;
+    public Action<FileListViewItem>? itemRename;
+    public Action<FileListViewItem>? itemCopy;
+    public Action<FileListViewItem>? itemCut;
+    public Action? itemPaste;
 
     private int pressedIndex = -1;
     private int lastClickIndex = -1;
@@ -39,6 +44,8 @@ public class FileListView : Component
     public FileListView(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        TabStop = true;
+        capturesInput = true;
         headers = ["Name", "Size", "Type", "Modified"];
         headerWidths = [180, 80, 80, 120];
         try
@@ -408,6 +415,10 @@ public class FileListView : Component
         if (!IsInsideAbsolute(mouseX, mouseY))
             return false;
 
+        Window? owner = GetOwningWindow();
+        if (owner != null && (mouse.left == MouseEvents.Press || mouse.right == MouseEvents.Press))
+            owner.focusedComponent = this;
+
         int index = GetItemIndexAt(mouseX - AbsoluteX, mouseY - AbsoluteY);
 
         if (mouse.right == MouseEvents.Release)
@@ -457,6 +468,144 @@ public class FileListView : Component
 
         lastClickIndex = index;
         lastClickTick = tick;
+    }
+
+    public override void HandleKeyboard(Cosmos.Kernel.System.Input.KeyEvent keyEvent)
+    {
+        if (!IsInputEnabled() || items.Count == 0) return;
+
+        int index = selectedItem == null ? -1 : items.IndexOf(selectedItem);
+        int cols = 1;
+        if (viewMode == ListViewMode.LargeIcon)
+            cols = Math.Max(1, Width / Math.Max(1, largeCellWidth));
+        else if (viewMode == ListViewMode.SmallIcon)
+            cols = Math.Max(1, Width / 180);
+
+        int page = 1;
+        if (viewMode == ListViewMode.LargeIcon)
+            page = Math.Max(1, Height / Math.Max(1, largeCellHeight)) * cols;
+        else if (viewMode == ListViewMode.SmallIcon)
+            page = Math.Max(1, Height / Math.Max(1, smallRowHeight)) * cols;
+        else if (viewMode == ListViewMode.List)
+            page = Math.Max(1, Height / Math.Max(1, smallRowHeight));
+        else
+            page = Math.Max(1, (Height - headerHeight) / Math.Max(1, detailsRowHeight));
+
+        if (IsControlPressed(keyEvent))
+        {
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.A)
+            {
+                SelectAll();
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.C)
+            {
+                if (selectedItem != null) itemCopy?.Invoke(selectedItem);
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.X)
+            {
+                if (selectedItem != null) itemCut?.Invoke(selectedItem);
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.V)
+            {
+                itemPaste?.Invoke();
+                return;
+            }
+        }
+
+        switch (keyEvent.Key)
+        {
+            case Cosmos.Kernel.System.Input.Key.UpArrow:
+                if (index < 0) SelectIndex(0);
+                else if (cols > 1) SelectIndex(Math.Max(0, index - cols));
+                else SelectIndex(Math.Max(0, index - 1));
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.DownArrow:
+                if (index < 0) SelectIndex(0);
+                else if (cols > 1) SelectIndex(Math.Min(items.Count - 1, index + cols));
+                else SelectIndex(Math.Min(items.Count - 1, index + 1));
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.LeftArrow:
+                if (index < 0) SelectIndex(0);
+                else SelectIndex(Math.Max(0, index - 1));
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.RightArrow:
+                if (index < 0) SelectIndex(0);
+                else SelectIndex(Math.Min(items.Count - 1, index + 1));
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.Home:
+                SelectIndex(0);
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.End:
+                SelectIndex(items.Count - 1);
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.PageUp:
+                if (index < 0) SelectIndex(0);
+                else SelectIndex(Math.Max(0, index - page));
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.PageDown:
+                if (index < 0) SelectIndex(0);
+                else SelectIndex(Math.Min(items.Count - 1, index + page));
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.Enter:
+            case Cosmos.Kernel.System.Input.Key.Spacebar:
+                if (selectedItem != null)
+                    itemDoubleClick?.Invoke(selectedItem);
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.Delete:
+                if (selectedItem != null)
+                    itemDelete?.Invoke(selectedItem);
+                return;
+
+            case Cosmos.Kernel.System.Input.Key.F2:
+                if (selectedItem != null)
+                    itemRename?.Invoke(selectedItem);
+                return;
+        }
+
+        // Type-to-select: jump to item starting with typed letter
+        char printable = GetPrintableCharacter(keyEvent);
+        if (printable != '\0' && !char.IsControl(printable))
+        {
+            char target = char.ToUpperInvariant(printable);
+            int start = (index >= 0 ? index + 1 : 0);
+            for (int offset = 0; offset < items.Count; offset++)
+            {
+                int check = (start + offset) % items.Count;
+                string text = items[check].text ?? "";
+                if (text.Length > 0 && char.ToUpperInvariant(text[0]) == target)
+                {
+                    SelectIndex(check);
+                    break;
+                }
+            }
+        }
+    }
+
+    public void SelectAll()
+    {
+        for (int i = 0; i < items.Count; i++)
+            items[i].selected = true;
+        if (items.Count > 0)
+            selectedItem = items[0];
+        MarkDirty();
+    }
+
+    public void SelectIndex(int idx)
+    {
+        if (idx >= 0 && idx < items.Count)
+            SelectItem(items[idx]);
     }
 
     public void SelectItem(FileListViewItem item)

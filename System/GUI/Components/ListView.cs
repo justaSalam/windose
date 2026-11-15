@@ -22,6 +22,7 @@ public class ListView : Component
     public Action<ListViewItem> itemDoubleClick;
     public Action<ListViewItem, int, int> itemRightClick;
     public Action<int, int> viewportRightClick;
+    public Action<ListViewItem>? itemDelete;
 
     private int pressedIndex = -1;
     private int lastClickIndex = -1;
@@ -231,27 +232,52 @@ public class ListView : Component
         switch (keyEvent.Key)
         {
             case Key.UpArrow:
+            case Key.LeftArrow:
                 SelectItem(items[Math.Max(0, index <= 0 ? 0 : index - 1)]);
-                break;
+                return;
             case Key.DownArrow:
-                SelectItem(items[Math.Min(items.Count - 1, index + 1)]);
-                break;
+            case Key.RightArrow:
+                SelectItem(items[Math.Min(items.Count - 1, index < 0 ? 0 : index + 1)]);
+                return;
             case Key.Home:
                 SelectItem(items[0]);
-                break;
+                return;
             case Key.End:
                 SelectItem(items[items.Count - 1]);
-                break;
+                return;
             case Key.PageUp:
                 SelectItem(items[Math.Max(0, (index < 0 ? items.Count : index) - page)]);
-                break;
+                return;
             case Key.PageDown:
-                SelectItem(items[Math.Min(items.Count - 1, index + page)]);
-                break;
+                SelectItem(items[Math.Min(items.Count - 1, (index < 0 ? 0 : index) + page)]);
+                return;
             case Key.Enter:
+            case Key.Spacebar:
                 if (selectedItem != null)
                     itemDoubleClick?.Invoke(selectedItem);
-                break;
+                return;
+            case Key.Delete:
+                if (selectedItem != null)
+                    itemDelete?.Invoke(selectedItem);
+                return;
+        }
+
+        char printable = GetPrintableCharacter(keyEvent);
+        if (printable != '\0' && !char.IsControl(printable))
+        {
+            char target = char.ToUpperInvariant(printable);
+            int start = index >= 0 ? index + 1 : 0;
+            for (int offset = 0; offset < items.Count; offset++)
+            {
+                int check = (start + offset) % items.Count;
+                string[] cols = items[check].Text;
+                string text = cols != null && cols.Length > 0 ? cols[0] : "";
+                if (text.Length > 0 && char.ToUpperInvariant(text[0]) == target)
+                {
+                    SelectItem(items[check]);
+                    break;
+                }
+            }
         }
     }
 

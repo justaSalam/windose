@@ -25,6 +25,8 @@ public class ProcessPerformanceList : Component
     public ProcessPerformanceList(int x, int y, int width, int height) : base(x, y, width, height)
     {
         clampSize = false;
+        TabStop = true;
+        capturesInput = true;
         contextMenu = new MenuPopup(220, 28 * 8);
         endTaskItem = contextMenu.AddItem("End Task", EndSelectedProcess);
         restartTaskItem = contextMenu.AddItem("Restart Task", RestartSelectedProcess);
@@ -149,6 +151,10 @@ public class ProcessPerformanceList : Component
     {
         if (!IsInsideAbsolute(mouseX, mouseY)) return false;
 
+        Window? owner = GetOwningWindow();
+        if (owner != null && (mouse.left == MouseEvents.Press || mouse.right == MouseEvents.Press))
+            owner.focusedComponent = this;
+
         if (Mouse.scroll != 0)
         {
             int maxScroll = Math.Max(0, totalVisibleProcesses - (Height - 48) / (fontSize + 4));
@@ -195,21 +201,91 @@ public class ProcessPerformanceList : Component
             return;
         }
 
-        if (!showFilter) return;
-
-        if (keyEvent.Key == Key.Backspace && filterText.Length > 0)
+        if (showFilter && keyEvent.Key != Key.UpArrow && keyEvent.Key != Key.DownArrow && keyEvent.Key != Key.Delete && keyEvent.Key != Key.Enter)
         {
-            filterText = filterText.Substring(0, filterText.Length - 1);
-            MarkDirty();
-            return;
+            if (keyEvent.Key == Key.Backspace && filterText.Length > 0)
+            {
+                filterText = filterText.Substring(0, filterText.Length - 1);
+                MarkDirty();
+                return;
+            }
+
+            char c = printable;
+            if (c != 0 && c >= 32)
+            {
+                filterText += c;
+                MarkDirty();
+                return;
+            }
         }
 
-        char c = printable;
-        if (c != 0 && c >= 32)
+        List<Process> visible = GetVisibleProcesses();
+        if (visible.Count == 0) return;
+        int index = selectedProcess == null ? -1 : visible.IndexOf(selectedProcess);
+        int visibleRows = Math.Max(1, (Height - 28) / (fontSize + 4));
+
+        switch (keyEvent.Key)
         {
-            filterText += c;
-            MarkDirty();
+            case Key.UpArrow:
+                SelectProcessAt(visible, Math.Max(0, index <= 0 ? 0 : index - 1), visibleRows);
+                return;
+
+            case Key.DownArrow:
+                SelectProcessAt(visible, Math.Min(visible.Count - 1, index < 0 ? 0 : index + 1), visibleRows);
+                return;
+
+            case Key.Home:
+                SelectProcessAt(visible, 0, visibleRows);
+                return;
+
+            case Key.End:
+                SelectProcessAt(visible, visible.Count - 1, visibleRows);
+                return;
+
+            case Key.PageUp:
+                SelectProcessAt(visible, Math.Max(0, (index < 0 ? 0 : index) - visibleRows), visibleRows);
+                return;
+
+            case Key.PageDown:
+                SelectProcessAt(visible, Math.Min(visible.Count - 1, (index < 0 ? 0 : index) + visibleRows), visibleRows);
+                return;
+
+            case Key.Delete:
+                EndSelectedProcess();
+                return;
+
+            case Key.Enter:
+                OpenProcessProperties();
+                return;
         }
+    }
+
+    private void SelectProcessAt(List<Process> visible, int idx, int visibleRows)
+    {
+        if (idx < 0 || idx >= visible.Count) return;
+        selectedProcess = visible[idx];
+
+        if (idx < scrollOffset)
+            scrollOffset = idx;
+        else if (idx >= scrollOffset + visibleRows)
+            scrollOffset = Math.Max(0, idx - visibleRows + 1);
+
+        MarkDirty();
+    }
+
+    private List<Process> GetVisibleProcesses()
+    {
+        List<Process> list = new List<Process>();
+        for (int i = 0; i < ProcessManager.ProcessCount; i++)
+        {
+            Process process = ProcessManager.GetProcessAt(i);
+            if (programsOnly && process.processType != ProcessType.Program) continue;
+            if (!string.IsNullOrEmpty(filterText) &&
+                process.name.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            list.Add(process);
+        }
+        return list;
     }
 
     private Process GetProcessAt(int localY)

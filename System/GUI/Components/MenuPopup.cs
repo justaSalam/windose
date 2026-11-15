@@ -93,10 +93,15 @@ public class MenuPopup : Component
         MarkDirty();
     }
 
+    public int keyboardSelectedIndex = -1;
+
     public void Hide()
     {
         Visible = false;
         openMenus.Remove(this);
+        keyboardSelectedIndex = -1;
+        for (int i = 0; i < items.children.Count; i++)
+            if (items.children[i] is MenuItem mi) mi.isKeyboardSelected = false;
         MarkDirty();
     }
 
@@ -144,6 +149,99 @@ public class MenuPopup : Component
     }
 
     public static bool HasOpenMenus => openMenus.Count > 0;
+
+    public static bool HandleOpenMenuKeyboard(Cosmos.Kernel.System.Input.KeyEvent key)
+    {
+        if (openMenus.Count == 0) return false;
+        MenuPopup topMenu = openMenus[openMenus.Count - 1];
+        return topMenu.HandleMenuKey(key);
+    }
+
+    public bool HandleMenuKey(Cosmos.Kernel.System.Input.KeyEvent key)
+    {
+        List<MenuItem> visibleItems = new List<MenuItem>();
+        for (int i = 0; i < items.children.Count; i++)
+        {
+            if (items.children[i] is MenuItem mi && mi.Visible && !mi.drawSeparator)
+                visibleItems.Add(mi);
+        }
+
+        if (visibleItems.Count == 0) return false;
+
+        switch (key.Key)
+        {
+            case Cosmos.Kernel.System.Input.Key.UpArrow:
+                SelectMenuItem(visibleItems, keyboardSelectedIndex <= 0 ? visibleItems.Count - 1 : keyboardSelectedIndex - 1);
+                return true;
+
+            case Cosmos.Kernel.System.Input.Key.DownArrow:
+                SelectMenuItem(visibleItems, (keyboardSelectedIndex + 1) % visibleItems.Count);
+                return true;
+
+            case Cosmos.Kernel.System.Input.Key.Enter:
+            case Cosmos.Kernel.System.Input.Key.Spacebar:
+                if (keyboardSelectedIndex >= 0 && keyboardSelectedIndex < visibleItems.Count)
+                {
+                    visibleItems[keyboardSelectedIndex].Trigger();
+                    return true;
+                }
+                return false;
+
+            case Cosmos.Kernel.System.Input.Key.RightArrow:
+                if (keyboardSelectedIndex >= 0 && keyboardSelectedIndex < visibleItems.Count)
+                {
+                    MenuItem selected = visibleItems[keyboardSelectedIndex];
+                    if (selected.submenu != null)
+                    {
+                        selected.Trigger();
+                        return true;
+                    }
+                }
+                return false;
+
+            case Cosmos.Kernel.System.Input.Key.LeftArrow:
+                if (openMenus.Count > 1)
+                {
+                    Hide();
+                    return true;
+                }
+                return false;
+
+            case Cosmos.Kernel.System.Input.Key.Escape:
+                HideAll();
+                return true;
+        }
+
+        char printable = GetPrintableCharacter(key);
+        if (printable != '\0' && !char.IsControl(printable))
+        {
+            char target = char.ToUpperInvariant(printable);
+            int start = keyboardSelectedIndex >= 0 ? keyboardSelectedIndex + 1 : 0;
+            for (int offset = 0; offset < visibleItems.Count; offset++)
+            {
+                int check = (start + offset) % visibleItems.Count;
+                string t = visibleItems[check].text ?? "";
+                if (t.Length > 0 && char.ToUpperInvariant(t[0]) == target)
+                {
+                    SelectMenuItem(visibleItems, check);
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private void SelectMenuItem(List<MenuItem> visibleItems, int idx)
+    {
+        for (int i = 0; i < visibleItems.Count; i++)
+        {
+            visibleItems[i].isKeyboardSelected = (i == idx);
+            visibleItems[i].MarkDirty();
+        }
+        keyboardSelectedIndex = idx;
+        MarkDirty();
+    }
 
     public static bool HandleOpenMenuInput(int mouseX, int mouseY, MouseState mouse)
     {
