@@ -7,8 +7,8 @@ public sealed class CommandPrompt : Window
     private readonly TerminalView output;
     private readonly CommandContext context;
 
-    public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460)
-        : base(x, y, width, height, "Command Prompt", true, Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16))
+    public CommandPrompt(int x = 140, int y = 100, int width = 720, int height = 460, string? initialCommand = null, string title = "Command Prompt")
+        : base(x, y, width, height, title, true, Windose.System.Resources.IconResource.Load("shell32.dll,-284", 16))
     {
         CommandRegistry.EnsureBuiltIns();
 
@@ -45,6 +45,15 @@ public sealed class CommandPrompt : Window
         output.WriteLine("Windose Command Prompt");
         output.WriteLine("Type help for available commands.");
         output.WriteLine();
+
+        if (!string.IsNullOrEmpty(initialCommand))
+        {
+            new Thread(() =>
+            {
+                Thread.Sleep(60);
+                CommandRegistry.Execute(context, initialCommand);
+            }).Start();
+        }
     }
 
     protected override void OnWindowResized()

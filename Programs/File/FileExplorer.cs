@@ -37,11 +37,11 @@ public class FileExplorer : Window
 
     public FileExplorer(int x, int y, int width, int height, string title, string rootPath = "/mnt") : base(x, y, width, height, title, true)
     {
-        root = new DockPanel(0, 0, Width, Height)
+        root = new DockPanel(0, 0, ClientWidth, ClientHeight)
         {
             horizontalAlignment = HorizontalAlignment.Stretch,
             verticalAlignment = VerticalAlignment.Stretch,
-            Margin = new Thickness(28, 2, 2, 2),
+            Margin = new Thickness(0),
             Padding = new Thickness(0),
             useBackground = true,
         };
@@ -117,7 +117,7 @@ public class FileExplorer : Window
 
         viewportContextMenu.AddSeparator();
 
-        viewportContextMenu.AddItem("Paste");
+        viewportContextMenu.AddItem("Paste", PasteClipboard);
         viewportContextMenu.AddSeparator();
 
         viewportContextMenu.AddItem("Refresh", Refresh);
@@ -127,7 +127,7 @@ public class FileExplorer : Window
         newFileContext.AddSubmenuItem("File", NewFileFromContext);
         newFileContext.AddSubmenuItem("Folder", NewDirectoryFromContext);
         newFileContext.AddSubmenuSeparator();
-        newFileContext.AddSubmenuItem("Shortcut", NewFileFromContext);
+        newFileContext.AddSubmenuItem("Shortcut", NewShortcutFromContext);
 
         viewportContextMenu.AddSeparator();
         viewportContextMenu.AddItem("Properties", ShowContextProperties);
@@ -137,13 +137,13 @@ public class FileExplorer : Window
         editContextItem = fileContextMenu.AddItem("Edit", EditContextItem);
 
         fileContextMenu.AddSeparator();
-        fileContextMenu.AddItem("Cut", ShowContextProperties);
-        fileContextMenu.AddItem("Copy", ShowContextProperties);
+        fileContextMenu.AddItem("Cut", CutSelectedFile);
+        fileContextMenu.AddItem("Copy", CopySelectedFile);
 
         fileContextMenu.AddSeparator();
-        fileContextMenu.AddItem("Create Shortcut", ShowContextProperties);
+        fileContextMenu.AddItem("Create Shortcut", CreateShortcutForSelectedItem);
         fileContextMenu.AddItem("Delete", DeleteFile);
-        fileContextMenu.AddItem("Rename", ShowContextProperties);
+        fileContextMenu.AddItem("Rename", RenameSelectedItem);
 
         fileContextMenu.AddSeparator();
         fileContextMenu.AddItem("Properties", ShowContextProperties);
@@ -167,11 +167,12 @@ public class FileExplorer : Window
         fileMenu.AddItem("Close", () => WindowManager.PostClose(this));
 
         MenuPage editMenu = menuBar.AddMenuPage("Edit");
-        editMenu.AddItem("Cut").enabled = false;
-        editMenu.AddItem("Copy").enabled = false;
-        editMenu.AddItem("Paste").enabled = false;
+        editMenu.AddItem("Cut", CutSelectedFile);
+        editMenu.AddItem("Copy", CopySelectedFile);
+        editMenu.AddItem("Paste", PasteClipboard);
         editMenu.AddSeparator();
-        editMenu.AddItem("Delete").enabled = false;
+        editMenu.AddItem("Delete", DeleteFileForSelected);
+        editMenu.AddItem("Select All", () => files.SelectAll());
 
         MenuPage viewMenu = menuBar.AddMenuPage("View");
         viewMenu.AddItem("Large Icons", () => files.SetViewMode(ListViewMode.LargeIcon));
@@ -193,9 +194,9 @@ public class FileExplorer : Window
         toolbar.AddButton("Up", GoUp, "Up one level");
 
         toolbar.AddSeparator();
-        toolbar.AddButton("Cut", null, "Cut");
-        toolbar.AddButton("Copy", null, "Copy");
-        toolbar.AddButton("Paste", null, "Paste");
+        toolbar.AddButton("Cut", CutSelectedFile, "Cut");
+        toolbar.AddButton("Copy", CopySelectedFile, "Copy");
+        toolbar.AddButton("Paste", PasteClipboard, "Paste");
 
         toolbar.AddSeparator();
         toolbar.AddButton("Undo", null, "Undo");
@@ -237,9 +238,48 @@ public class FileExplorer : Window
 
         files.itemRightClick = ShowFileContextMenu;
         files.viewportRightClick = viewportContextMenu.ShowAt;
+        files.itemDelete = (item) => DeleteFileForSelected();
+        files.itemCopy = (item) => CopySelectedFile();
+        files.itemCut = (item) => CutSelectedFile();
+        files.itemPaste = () => PasteClipboard();
+        files.itemRename = (item) => RenameSelectedItem();
 
-        AddChild(root);
+        Content = root;
         files.SetViewMode(ListViewMode.LargeIcon);
+    }
+
+    private void CutSelectedFile()
+    {
+        if (files.selectedItem != null && files.selectedItem.hasFileEntry)
+        {
+            FileClipboard.SetCut(new[] { files.selectedItem.fileEntry.AbsoluteLocation });
+        }
+    }
+
+    private void CopySelectedFile()
+    {
+        if (files.selectedItem != null && files.selectedItem.hasFileEntry)
+        {
+            FileClipboard.SetCopy(new[] { files.selectedItem.fileEntry.AbsoluteLocation });
+        }
+    }
+
+    private void PasteClipboard()
+    {
+        if (FileClipboard.HasContent && Directory.Exists(currentLocation))
+        {
+            FileClipboard.PasteTo(currentLocation);
+            Refresh();
+        }
+    }
+
+    private void RenameSelectedItem()
+    {
+        if (files.selectedItem != null && files.selectedItem.hasFileEntry)
+        {
+            string path = files.selectedItem.fileEntry.AbsoluteLocation;
+            LaunchTracker.Start(() => new RenameDialog(path, Refresh));
+        }
     }
 
     private void NewFileFromContext()
@@ -247,6 +287,21 @@ public class FileExplorer : Window
         File.Create(FileSystemManager.GetUniquePath(currentLocation, "New File", ".txt"));
         Refresh();
     }
+
+    private void NewShortcutFromContext()
+    {
+        LaunchTracker.Start(() => new CreateShortcutDialog(currentLocation));
+    }
+
+    private void CreateShortcutForSelectedItem()
+    {
+        if (IsItemValid(out FileListViewItem item) && item.hasFileEntry)
+        {
+            string targetPath = item.fileEntry.AbsoluteLocation;
+            LaunchTracker.Start(() => new CreateShortcutDialog(currentLocation, targetPath));
+        }
+    }
+
     private void NewDirectoryFromContext()
     {
         Directory.CreateDirectory(FileSystemManager.GetUniquePath(currentLocation, "New Directory"));
@@ -665,6 +720,103 @@ public class FileExplorer : Window
                 PopulateFiles(currentLocation);
             }
         });
+    }
+
+    public override void HandleKeyboard(Cosmos.Kernel.System.Input.KeyEvent keyEvent)
+    {
+        if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.F5)
+        {
+            Refresh();
+            return;
+        }
+
+        if (IsControlPressed(keyEvent))
+        {
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.C) { CopySelectedFile(); return; }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.X) { CutSelectedFile(); return; }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.V) { PasteClipboard(); return; }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.A) { files.SelectAll(); return; }
+            if (IsShiftPressed(keyEvent) && keyEvent.Key == Cosmos.Kernel.System.Input.Key.N)
+            {
+                NewDirectoryFromContext();
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.L)
+            {
+                focusedComponent = addressBar;
+                addressBar.RequestFocus();
+                return;
+            }
+        }
+
+        if (IsAltPressed(keyEvent))
+        {
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.LeftArrow)
+            {
+                GoBack();
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.RightArrow)
+            {
+                GoForward();
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.UpArrow)
+            {
+                GoUp();
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.Enter)
+            {
+                ShowSelectedProperties();
+                return;
+            }
+            if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.D)
+            {
+                focusedComponent = addressBar;
+                addressBar.RequestFocus();
+                return;
+            }
+        }
+
+        if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.F2 && focusedComponent != addressBar)
+        {
+            RenameSelectedItem();
+            return;
+        }
+
+        if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.Backspace && focusedComponent != addressBar)
+        {
+            GoUp();
+            return;
+        }
+
+        if (keyEvent.Key == Cosmos.Kernel.System.Input.Key.Delete && focusedComponent != addressBar)
+        {
+            DeleteFileForSelected();
+            return;
+        }
+
+        if (focusedComponent != addressBar)
+        {
+            if (focusedComponent == files)
+            {
+                files.HandleKeyboard(keyEvent);
+                return;
+            }
+            else if (focusedComponent == tree)
+            {
+                tree.HandleKeyboard(keyEvent);
+                return;
+            }
+            else
+            {
+                files.HandleKeyboard(keyEvent);
+                return;
+            }
+        }
+
+        base.HandleKeyboard(keyEvent);
     }
 
     public override void Dispose()

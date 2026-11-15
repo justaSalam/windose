@@ -56,10 +56,10 @@ namespace Windose.Programs
 
             if (fileIcon != null)
             {
-                AddChild(new ImageView(fileIcon, 16, 12, 32, 32));
+                AddChild(new ImageView(fileIcon, 16, 36, 32, 32));
             }
 
-            AddChild(new Label(56, 10, 380, 20)
+            AddChild(new Label(56, 36, 380, 20)
             {
                 text = fileName,
                 fontSize = 14,
@@ -67,7 +67,7 @@ namespace Windose.Programs
                 useBackground = false
             });
 
-            AddChild(new Label(56, 30, 380, 20)
+            AddChild(new Label(56, 58, 380, 20)
             {
                 text = "Choose the program you want to use to open this file:",
                 fontSize = 12,
@@ -76,7 +76,7 @@ namespace Windose.Programs
             });
 
             // Program ListView
-            programList = new ListView(16, 58, 428, 240)
+            programList = new ListView(16, 84, 428, 214)
             {
                 detailsRowHeight = 26,
                 fontSize = 13,

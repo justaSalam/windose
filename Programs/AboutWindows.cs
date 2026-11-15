@@ -39,13 +39,13 @@ namespace Windose.Programs
             }
 
             // Separator between banner and details
-            AddChild(new Separator(14, 76, 412, 2)
+            AddChild(new Separator(14, 102, 412, 2)
             {
                 orientation = LayoutOrientation.Horizontal
             });
 
             // Details labels
-            AddChild(new Label(20, 90, 400, 20)
+            AddChild(new Label(20, 114, 400, 20)
             {
                 text = "Microsoft Windows [Version 6.1.7601]",
                 fontSize = 14,
@@ -53,7 +53,7 @@ namespace Windose.Programs
                 useBackground = false
             });
 
-            AddChild(new Label(20, 114, 400, 20)
+            AddChild(new Label(20, 138, 400, 20)
             {
                 text = $"Windose NativeAOT Edition - Kernel {Kernel.VersionString}",
                 fontSize = 14,
@@ -62,7 +62,7 @@ namespace Windose.Programs
             });
 
             long heapMb = GC.GetTotalMemory(false) / (1024 * 1024);
-            AddChild(new Label(20, 142, 400, 20)
+            AddChild(new Label(20, 164, 400, 20)
             {
                 text = $"Physical Memory in use: {heapMb} MB heap (Cosmos x86_64)",
                 fontSize = 12,
@@ -71,7 +71,7 @@ namespace Windose.Programs
             });
 
             string user = Session.CurrentUser != null ? Session.CurrentUser.username : "Guest";
-            AddChild(new Label(20, 166, 400, 20)
+            AddChild(new Label(20, 188, 400, 20)
             {
                 text = $"Registered to: {user}",
                 fontSize = 12,
@@ -79,7 +79,7 @@ namespace Windose.Programs
                 useBackground = false
             });
 
-            AddChild(new Label(20, 200, 400, 50)
+            AddChild(new Label(20, 218, 400, 50)
             {
                 text = "The Windose operating system and its user interface are protected by trademark and other pending or existing intellectual property rights in the United States and other countries/regions.",
                 fontSize = 11,
@@ -105,21 +105,21 @@ namespace Windose.Programs
             base.DrawLocal();
 
             // Header Aero banner
-            DrawGradientVerticalRounded(Color.FromArgb(24, 60, 110), Color.FromArgb(12, 30, 65), 14, 10, 412, 60, 4);
-            DrawRoundedRectangle(Color.FromArgb(40, 90, 160), 14, 10, 412, 60, 4);
-            DrawHorizontalSpan(Color.FromArgb(120, 255, 255, 255), 11, 16, 420);
+            DrawGradientVerticalRounded(Color.FromArgb(24, 60, 110), Color.FromArgb(12, 30, 65), 14, 34, 412, 60, 4);
+            DrawRoundedRectangle(Color.FromArgb(40, 90, 160), 14, 34, 412, 60, 4);
+            DrawHorizontalSpan(Color.FromArgb(120, 255, 255, 255), 14, 35, 412);
 
             if (winLogo != null)
             {
                 try
                 {
-                    DrawImage(winLogo, 24, 22);
+                    DrawImage(winLogo, 24, 46);
                 }
                 catch { }
             }
 
-            DrawString("Windows 7", Color.White, 70, 20);
-            DrawString("Ultimate", Color.FromArgb(200, 225, 255), 70, 40);
+            DrawString("Windows 7", Color.White, 70, 44);
+            DrawString("Ultimate", Color.FromArgb(200, 225, 255), 70, 64);
         }
 
         public override string GetComponentName() => "AboutWindows";

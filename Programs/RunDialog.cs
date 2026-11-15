@@ -38,68 +38,32 @@ namespace Windose.Programs
                 useGlass = true;
             }
 
-            // Prompt description
-            AddChild(new Label(58, 14, 344, 40)
-            {
-                text = "Type the name of a program, folder, document, or Internet resource, and Windose will open it for you.",
-                fontSize = 12,
-                textColor = Palette.ControlBlack,
-                useBackground = false,
-                clampSize = false
-            });
+            var layout = new Windose.System.GUI.Components.DialogLayout(this, showFooterSeparator: true);
+            layout.SetHeader("Type the name of a program, folder, document, or Internet resource, and Windose will open it for you.", dialogIcon);
 
-            // "Open:" label
-            AddChild(new Label(16, 68, 40, 20)
-            {
-                text = "Open:",
-                fontSize = 14,
-                textColor = Palette.ControlBlack,
-                useBackground = false
-            });
-
-            // Text input field
-            input = new TextField(60, 64, 342, 24)
+            input = new TextField(0, 0, 100, 24)
             {
                 PlaceholderText = "e.g. calc, notepad, cmd, /mnt"
             };
             input.RequestFocus();
             input.EnterPressed += ExecuteRun;
-            AddChild(input);
 
-            // Separator line above buttons
-            AddChild(new Separator(12, 106, 396, 2)
-            {
-                orientation = LayoutOrientation.Horizontal
-            });
-
-            // Action buttons
-            Button okBtn = new Button("OK", 158, 118, 76, 26);
-            okBtn.leftClickAction = ExecuteRun;
-            AddChild(okBtn);
-
-            Button cancelBtn = new Button("Cancel", 242, 118, 76, 26);
-            cancelBtn.leftClickAction = () => WindowManager.PostClose(this);
-            AddChild(cancelBtn);
-
-            Button browseBtn = new Button("Browse...", 326, 118, 76, 26);
+            Button browseBtn = new Button("Browse...", 0, 0, 78, 26);
             browseBtn.leftClickAction = () =>
             {
                 LaunchTracker.Start(() => new FileExplorer(100, 100, 750, 480, "Browse", "/mnt"));
+                WindowManager.PostClose(this);
             };
-            AddChild(browseBtn);
-        }
 
-        public override void DrawLocal()
-        {
-            base.DrawLocal();
-            if (dialogIcon != null)
-            {
-                try
-                {
-                    DrawImage(dialogIcon, 16, 16);
-                }
-                catch { }
-            }
+            layout.AddRow("Open:", input);
+
+            Button okBtn = new Button("OK", 0, 0, 76, 26);
+            okBtn.leftClickAction = ExecuteRun;
+
+            Button cancelBtn = new Button("Cancel", 0, 0, 76, 26);
+            cancelBtn.leftClickAction = () => WindowManager.PostClose(this);
+
+            layout.SetButtons(okBtn, cancelBtn, browseBtn);
         }
 
         private void ExecuteRun()

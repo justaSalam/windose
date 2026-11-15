@@ -21,11 +21,11 @@ public class DeviceManager : Window
 
     public DeviceManager(int x, int y, int width, int height) : base(x, y, width, height, "Device Manager", true, Windose.System.Resources.IconResource.Load("ddores.dll,-2001", 16))
     {
-        root = new DockPanel(0, 0, Width, Height)
+        root = new DockPanel(0, 0, ClientWidth, ClientHeight)
         {
             horizontalAlignment = HorizontalAlignment.Stretch,
             verticalAlignment = VerticalAlignment.Stretch,
-            Margin = new Thickness(28, 2, 2, 2),
+            Margin = new Thickness(0),
             Padding = new Thickness(0),
             useBackground = true,
             backgroundColor = Palette.ControlFace,
@@ -115,7 +115,7 @@ public class DeviceManager : Window
 
         BuildTree();
         treeScroll.SetContent(tree, 220, tree.GetContentHeight());
-        AddChild(root);
+        Content = root;
     }
 
     private static Panel CreateDetailRow(string text, System.Drawing.Color background, int height, int fontSize)

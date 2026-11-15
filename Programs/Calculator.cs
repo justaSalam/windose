@@ -20,7 +20,7 @@ namespace Windose.Programs
         private readonly Label displayLabel;
 
         public Calculator(int x = 200, int y = 140)
-            : base(x, y, 244, 304, "Calculator", true)
+            : base(x, y, 244, 320, "Calculator", true)
         {
             canResize = false;
             canMaximize = false;
@@ -31,7 +31,7 @@ namespace Windose.Programs
             }
 
             // Display readout
-            displayLabel = new Label(16, 16, 212, 38)
+            displayLabel = new Label(16, 34, 212, 36)
             {
                 text = "0",
                 fontSize = 20,
@@ -54,11 +54,11 @@ namespace Windose.Programs
             };
 
             int startX = 12;
-            int startY = 64;
+            int startY = 76;
             int btnW = 48;
-            int btnH = 34;
+            int btnH = 32;
             int gapX = 6;
-            int gapY = 6;
+            int gapY = 5;
 
             for (int r = 0; r < 5; r++)
             {

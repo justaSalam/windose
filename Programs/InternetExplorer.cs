@@ -159,11 +159,11 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
 
         public InternetExplorer(string initialUrl = null, int x = 80, int y = 60) : base(x, y, 800, 600, "Internet Explorer", true, null)
         {
-            root = new DockPanel(0, 0, Width, Height)
+            root = new DockPanel(0, 0, ClientWidth, ClientHeight)
             {
                 horizontalAlignment = HorizontalAlignment.Stretch,
                 verticalAlignment = VerticalAlignment.Stretch,
-                Margin = new Thickness(28, 2, 2, 2),
+                Margin = new Thickness(0),
                 Padding = new Thickness(0),
                 useBackground = true,
             };
@@ -218,7 +218,7 @@ Windose Internet Explorer &bull; HTML / CSS Engine &bull; Native TLS 1.2 &bull; 
 
             statusBar.AddPanel("Ready");
 
-            AddChild(root);
+            Content = root;
 
             LoadFavorites();
 

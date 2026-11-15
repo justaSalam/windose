@@ -139,6 +139,14 @@ public sealed class FileDialog : Window
 
         files.selectedChanged = SelectItem;
         files.itemDoubleClick = OpenItem;
+        files.itemDelete = item =>
+        {
+            if (item != null && item.hasFileEntry)
+            {
+                TrashManager.MoveToTrash(item.fileEntry.AbsoluteLocation);
+                Refresh();
+            }
+        };
 
         string initialDirectory = GetInitialDirectory(this.options.InitialPath);
         NavigateTo(initialDirectory);
@@ -147,7 +155,7 @@ public sealed class FileDialog : Window
     private void SelectItem(FileListViewItem item)
     {
         if (item == null) return;
-        if (!item.isFolder) fileName.text = item.text;
+        fileName.text = item.text;
         status.text = item.isFolder ? "File Folder" : item.type;
         fileName.MarkDirty();
         status.MarkDirty();
@@ -258,9 +266,9 @@ public sealed class FileDialog : Window
             name += defaultExtension;
 
         string path = FileSystemManager.Combine(currentDirectory, name);
-        if (options.Mode == FileDialogMode.Open && !File.Exists(path))
+        if (options.Mode == FileDialogMode.Open && !File.Exists(path) && !Directory.Exists(path))
         {
-            SetStatus("File not found");
+            SetStatus("File or folder not found");
             return;
         }
         if (options.Mode == FileDialogMode.Save && !options.AllowOverwrite && File.Exists(path))
@@ -283,8 +291,43 @@ public sealed class FileDialog : Window
 
     public override void HandleKeyboard(KeyEvent keyEvent)
     {
+        if (keyEvent.Key == Key.F5)
+        {
+            Refresh();
+            return;
+        }
+
+        if (IsAltPressed(keyEvent) && keyEvent.Key == Key.UpArrow)
+        {
+            NavigateTo(FileSystemManager.GetParent(currentDirectory));
+            return;
+        }
+
+        if (keyEvent.Key == Key.Backspace && focusedComponent != fileName && focusedComponent != addressBar)
+        {
+            NavigateTo(FileSystemManager.GetParent(currentDirectory));
+            return;
+        }
+
+        if (keyEvent.Key == Key.Delete && focusedComponent != fileName && focusedComponent != addressBar)
+        {
+            if (files.selectedItem != null && files.selectedItem.hasFileEntry)
+            {
+                TrashManager.MoveToTrash(files.selectedItem.fileEntry.AbsoluteLocation);
+                Refresh();
+            }
+            return;
+        }
+
         if (keyEvent.Key == Key.Enter) { Accept(); return; }
         if (keyEvent.Key == Key.Escape) { WindowManager.PostClose(this); return; }
+
+        if (focusedComponent != fileName && focusedComponent != addressBar)
+        {
+            files.HandleKeyboard(keyEvent);
+            return;
+        }
+
         base.HandleKeyboard(keyEvent);
     }
 

@@ -61,7 +61,7 @@ namespace Windose.Programs
 
             // Toolbar: Tools Row
             int toolX = 12;
-            int toolY = 10;
+            int toolY = 34;
             int toolW = 54;
             int toolH = 24;
             int gap = 4;
@@ -91,7 +91,7 @@ namespace Windose.Programs
 
             // Size Selector Buttons
             int sizeX = 430;
-            int sizeY = 10;
+            int sizeY = 34;
             int sizeW = 28;
             int[] sizes = new int[] { 1, 2, 4, 8 };
             for (int i = 0; i < sizes.Length; i++)
