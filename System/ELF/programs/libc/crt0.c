@@ -4,7 +4,7 @@
 #include <string.h>
 #include "kernel.h"
 
-KernelApi *__k;
+__attribute__((weak)) KernelApi *__k;
 static void *exit_buf[5];
 static int exit_code;
 
@@ -17,27 +17,29 @@ static int n_atexit = 0;
 static void (*at_quick_exit_handlers[MAX_ATEXIT])(void);
 static int n_at_quick_exit = 0;
 
-int atexit(void (*func)(void))
+#define EXPORT __attribute__((visibility("default")))
+
+EXPORT int atexit(void (*func)(void))
 {
     if (!func || n_atexit >= MAX_ATEXIT) return -1;
     atexit_handlers[n_atexit++] = func;
     return 0;
 }
 
-int at_quick_exit(void (*func)(void))
+EXPORT int at_quick_exit(void (*func)(void))
 {
     if (!func || n_at_quick_exit >= MAX_ATEXIT) return -1;
     at_quick_exit_handlers[n_at_quick_exit++] = func;
     return 0;
 }
 
-void _Exit(int code)
+EXPORT void _Exit(int code)
 {
     exit_code = code;
     __builtin_longjmp(exit_buf, 1);
 }
 
-void quick_exit(int code)
+EXPORT void quick_exit(int code)
 {
     while (n_at_quick_exit > 0) {
         void (*fn)(void) = at_quick_exit_handlers[--n_at_quick_exit];
@@ -48,7 +50,7 @@ void quick_exit(int code)
 
 void __attribute__((weak)) __stdio_cleanup(void);
 
-void exit(int code)
+EXPORT void exit(int code)
 {
     while (n_atexit > 0) {
         void (*fn)(void) = atexit_handlers[--n_atexit];
@@ -60,14 +62,14 @@ void exit(int code)
     _Exit(code);
 }
 
-void abort(void)
+EXPORT void abort(void)
 {
     static const char m[] = "abort()\n";
     k_write(m, (int)sizeof m - 1);
     _Exit(134);
 }
 
-KABI int _start(KernelApi *k)
+EXPORT KABI int _start(KernelApi *k)
 {
     __k = k;
     if ((int)k->version < KAPI_VERSION || (size_t)k->size < sizeof(KernelApi)) {

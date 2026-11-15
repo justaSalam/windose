@@ -10,59 +10,7 @@
 	  <NoWarn>$(NoWarn);COSMOS0001;COSMOS0003;IL2026</NoWarn>
   </PropertyGroup>
 
-  <ItemGroup>
-    <None Remove="System\ELF\programs\bin\cosmoslogindialog.elf" />
-    <None Remove="System\ELF\programs\bin\hello.elf" />
-    <None Remove="System\ELF\programs\bin\libctest.elf" />
-    <None Remove="System\ELF\programs\bin\memhog.elf" />
-    <None Remove="System\ELF\programs\bin\spin.elf" />
-    <None Remove="System\ELF\programs\bin\window.elf" />
-    <None Remove="System\ELF\programs\include\ctype.h" />
-    <None Remove="System\ELF\programs\include\kernel.h" />
-    <None Remove="System\ELF\programs\include\windose.h" />
-    <None Remove="System\ELF\programs\include\windose\core.h" />
-    <None Remove="System\ELF\programs\include\windose\gui.h" />
-    <None Remove="System\ELF\programs\include\windose\fs.h" />
-    <None Remove="System\ELF\programs\include\windose\sys.h" />
-    <None Remove="System\ELF\programs\include\stdio.h" />
-    <None Remove="System\ELF\programs\include\stdlib.h" />
-    <None Remove="System\ELF\programs\include\string.h" />
-    <None Remove="System\ELF\programs\libc\crt0.c" />
-    <None Remove="System\ELF\programs\libc\format.c" />
-    <None Remove="System\ELF\programs\libc\malloc.c" />
-    <None Remove="System\ELF\programs\libc\stdio.c" />
-    <None Remove="System\ELF\programs\libc\stdlib.c" />
-    <None Remove="System\ELF\programs\libc\string.c" />
-    <None Remove="System\ELF\programs\src\hello.c" />
-    <None Remove="System\ELF\programs\src\libctest.c" />
-    <None Remove="System\ELF\programs\src\memhog.c" />
-    <None Remove="System\ELF\programs\src\spin.c" />
-    <None Remove="System\ELF\programs\src\window.c" />
-      <None Remove="System\ELF\programs\bin\newelfapp.elf" />
-      <None Remove="System\ELF\programs\bin\aeroeditor.elf" />
-      <None Remove="System\ELF\programs\bin\startmenu.elf" />
-      <None Remove="System\ELF\programs\src\startmenu.c" />
-      <None Remove="System\ELF\programs\bin\taskmgr.elf" />
-      <None Remove="System\ELF\programs\bin\regedit.elf" />
-      <None Remove="System\ELF\programs\bin\winver.elf" />
-      <None Remove="System\ELF\programs\bin\paint.elf" />
-      <None Remove="System\ELF\programs\src\paint.c" />
-      <None Remove="System\ELF\programs\bin\tcc.elf" />
-      <None Remove="System\ELF\programs\src\tcc.c" />
-      <None Remove="System\ELF\programs\include\stdint.h" />
-      <None Remove="System\ELF\programs\include\stdbool.h" />
-      <None Remove="System\ELF\programs\include\assert.h" />
-      <None Remove="System\ELF\programs\include\limits.h" />
-      <None Remove="System\ELF\programs\include\errno.h" />
-      <None Remove="System\ELF\programs\include\math.h" />
-      <None Remove="System\ELF\programs\include\time.h" />
-      <None Remove="System\ELF\programs\libc\math.c" />
-      <None Remove="System\ELF\programs\libc\time.c" />
-      <None Remove="System\ELF\programs\src\properties.c" />
-      <None Remove="System\ELF\programs\src\sysdm.c" />
-      <None Remove="System\ELF\programs\bin\properties.elf" />
-      <None Remove="System\ELF\programs\bin\sysdm.elf" />
-  </ItemGroup>
+
 
   <!-- Core kernel packages -->
   <ItemGroup>
@@ -151,6 +99,28 @@
     <EmbeddedResource Include=".\System\ELF\programs\src\sysdm.c" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\properties.elf" />
     <EmbeddedResource Include=".\System\ELF\programs\bin\sysdm.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\libc.so" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\libwindose.so" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\dynhello.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\unistd.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\fcntl.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\dirent.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\dlfcn.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\sys\types.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\sys\stat.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\sys\mman.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\sys\ioctl.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\include\sys\utsname.h" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\grep.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\wc.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\head.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\tail.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\pwd.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\uname.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\yes.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\strings.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\donut.elf" />
+    <EmbeddedResource Include=".\System\ELF\programs\bin\micromax.elf" />
   </ItemGroup>
 
     <ItemGroup>

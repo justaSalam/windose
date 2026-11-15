@@ -222,21 +222,11 @@ double cbrt(double x) {
     if (isnan(x) || isinf(x) || x == 0.0) return x;
     double sign = (x < 0.0) ? -1.0 : 1.0;
     double ax = fabs(x);
-    int exp;
-    double f = frexp(ax, &exp);
-    double y = 0.5 + 0.5 * f; /* Initial linear approximation */
-    int rem = exp % 3;
-    if (rem < 0) rem += 3;
-    exp = (exp - rem) / 3;
-    if (rem == 1) y *= 1.259921049894873;      /* 2^(1/3) */
-    else if (rem == 2) y *= 1.587401051968199; /* 2^(2/3) */
-    
-    /* Halley's method iterations */
-    for (int i = 0; i < 6; i++) {
-        double y3 = y * y * y;
-        y = y * (y3 + 2.0 * ax) / (2.0 * y3 + ax);
-    }
-    return sign * ldexp(y, exp);
+    double y = exp(log(ax) / 3.0);
+    /* 2 Newton-Raphson refinement steps: y = (2*y + x / (y*y)) / 3 */
+    y = (2.0 * y + ax / (y * y)) / 3.0;
+    y = (2.0 * y + ax / (y * y)) / 3.0;
+    return sign * y;
 }
 
 double hypot(double x, double y) {

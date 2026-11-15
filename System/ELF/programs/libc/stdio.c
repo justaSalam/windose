@@ -358,14 +358,11 @@ int fgetc(FILE *stream)
         return c;
     }
     if (stream->fd == 0) {
-        Event e;
-        while (k_poll_event(&e)) {
-            if (e.type == EV_KEY) {
-                unsigned char ch = (unsigned char)(e.b & 0xFFFF);
-                if (ch >= 32 && ch <= 126) return (int)ch;
-                if (ch == 10 || ch == 13) return '\n';
-            }
-            k_yield();
+        if (__k && __k->read_file) {
+            char ch = 0;
+            int r = __k->read_file(__k->pid, "stdin", &ch, 1);
+            if (r <= 0) return EOF;
+            return (unsigned char)ch;
         }
         return EOF;
     }
