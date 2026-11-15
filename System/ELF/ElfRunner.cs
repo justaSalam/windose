@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using Windose.System.Kernel;
 
@@ -198,6 +199,32 @@ namespace Windose.System.Elf
 
     public static unsafe class ElfRunner
     {
+        public static void FlushPendingWindowsFallback()
+        {
+            lock (Programs)
+            {
+                foreach (var kvp in Programs)
+                {
+                    ElfProgram p = kvp.Value;
+                    if (p != null && p.PendingWindows.Count > 0)
+                    {
+                        lock (p.PendingWindows)
+                        {
+                            for (int i = 0; i < p.PendingWindows.Count; i++)
+                            {
+                                var win = p.PendingWindows[i];
+                                if (win != null && unchecked(Environment.TickCount - win.CreatedAtTicks) > 8000)
+                                {
+                                    p.FlushPendingWindows();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         public const int ApiVersion = 16;
         private const int KKilled = -100;
         private const int MaxStr = 260;
@@ -422,8 +449,6 @@ namespace Windose.System.Elf
             { error = "need x86-64 little-endian ELF64"; return null; }
             if (elf.Type != ElfConst.ET_EXEC && elf.Type != ElfConst.ET_DYN)
             { error = "need an executable (ET_EXEC or PIE)"; return null; }
-            if (elf.GetInterpreter() != null)
-            { error = "dynamically linked executables are not supported"; return null; }
 
             ulong low, size;
             if (!elf.GetImageExtent(MaxImageSize, out low, out size)) { error = elf.Error; return null; }
@@ -462,8 +487,21 @@ namespace Windose.System.Elf
 
                 elf.CopyImage(backing, offset, low);
                 ulong bias = unchecked(aligned - low);
-                if (!elf.ApplyRelocations(backing, offset, low, size, bias, out error))
+
+                if (!elf.ReadDynamicInfo(backing, offset, low, size, out error))
                 { Fail(p); return null; }
+
+                bool isDynamic = (elf.NeededLibraries != null && elf.NeededLibraries.Length > 0) || elf.GetInterpreter() != null;
+                if (isDynamic)
+                {
+                    if (!ElfDynLinker.Link(p, elf, backing, offset, low, size, bias, out error))
+                    { Fail(p); return null; }
+                }
+                else
+                {
+                    if (!elf.ApplyRelocations(backing, offset, low, size, bias, out error))
+                    { Fail(p); return null; }
+                }
 
                 p.Elf = elf;
                 p.Low = low;
@@ -778,6 +816,7 @@ namespace Windose.System.Elf
             {
                 ElfProgram p = Get(pid);
                 if (p == null) return KKilled;
+                p.FlushPendingWindows();
                 if (ms < 0) ms = 0;
                 if (ms > 60000) ms = 60000;
                 while (ms > 0)
@@ -864,6 +903,7 @@ namespace Windose.System.Elf
             try
             {
                 ElfProgram p = Live(pid); if (p == null) return KKilled;
+                p.FlushPendingWindows();
                 if (outEv == null) return 0;
                 KEvent e;
                 if (!p.Events.Pop(out e)) return 0;
@@ -880,7 +920,29 @@ namespace Windose.System.Elf
             {
                 ElfProgram p = Live(pid); if (p == null) return KKilled;
                 if (Host == null || buf == null || max <= 0 || max > MaxIo) return -1;
-                byte[] data = Host.ReadFile(CStr(path));
+                string pstr = CStr(path);
+                if (string.IsNullOrEmpty(pstr) || pstr == "stdin" || pstr == "-")
+                {
+                    if (p.InputHandler != null)
+                    {
+                        if (string.IsNullOrEmpty(p.StdinBuffer))
+                        {
+                            string? line = p.InputHandler();
+                            if (line == null) return 0;
+                            p.StdinBuffer = line.EndsWith("\n") ? line : line + "\n";
+                        }
+                        byte[] inBytes = Encoding.UTF8.GetBytes(p.StdinBuffer);
+                        int toCopy = Math.Min(inBytes.Length, max);
+                        for (int i = 0; i < toCopy; i++) buf[i] = inBytes[i];
+                        if (toCopy < inBytes.Length)
+                            p.StdinBuffer = Encoding.UTF8.GetString(inBytes, toCopy, inBytes.Length - toCopy);
+                        else
+                            p.StdinBuffer = "";
+                        return toCopy;
+                    }
+                    return 0;
+                }
+                byte[] data = Host.ReadFile(pstr);
                 if (data == null) return -1;
                 int n = data.Length < max ? data.Length : max;
                 for (int i = 0; i < n; i++) buf[i] = data[i];

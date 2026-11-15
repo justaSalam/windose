@@ -241,12 +241,14 @@ namespace Windose.System.Elf
             ElfWindow win = new ElfWindow(80 + n * 30, 80 + n * 30,
                                           w + border * 2, h + titleH + border,
                                           title, icon);
+            win.Visible = false;
+            win.canRender = false;
+            win.IsDeferredRegistration = true;
             if (title != null && title.Equals("Calculator", StringComparison.OrdinalIgnoreCase))
             {
                 win.canResize = false;
                 win.canMaximize = false;
             }
-            WindowManager.Register(win);   // posts to the DWM: starts the process, z-order, focus, taskbar button
             return win;
         }
 
@@ -290,14 +292,22 @@ namespace Windose.System.Elf
             {
                 win.openToTray = true;
                 win.closeToTray = true;
+                win.Visible = true;
+                win.canRender = true;
+                win.IsDeferredRegistration = false;
+                WindowManager.Register(win);
+            }
+            else
+            {
+                win.Visible = false;
+                win.canRender = false;
+                win.IsDeferredRegistration = true;
             }
             if (noResize || (title != null && title.Equals("Calculator", StringComparison.OrdinalIgnoreCase)))
             {
                 win.canResize = false;
                 win.canMaximize = false;
             }
-
-            WindowManager.Register(win);
             return win;
         }
 
@@ -457,6 +467,20 @@ namespace Windose.System.Elf
             {
                 ewin.Owner = owner;
                 ewin.ProgramHandle = h;
+                if (owner != null)
+                {
+                    lock (owner.Windows)
+                    {
+                        if (!owner.Windows.Contains(ewin)) owner.Windows.Add(ewin);
+                    }
+                    if (ewin.IsDeferredRegistration)
+                    {
+                        lock (owner.PendingWindows)
+                        {
+                            if (!owner.PendingWindows.Contains(ewin)) owner.PendingWindows.Add(ewin);
+                        }
+                    }
+                }
                 if (owner != null && (ewin.Icon == null || ewin.Icon == LoadPngIfExists("imageres.dll,-15")))
                 {
                     Image? resolved = ResolveIcon(ewin.text, owner.Name);
@@ -503,6 +527,7 @@ namespace Windose.System.Elf
             {
                 lb.List.selectedChanged += delegate (ListViewItem item) { owner.PostEvent(ElfEvent.Click, h, lb.List.SelectedIndex, 0); };
                 lb.List.itemDoubleClick += delegate (ListViewItem item) { owner.PostEvent(ElfEvent.DoubleClick, h, lb.List.SelectedIndex, 0); };
+                lb.List.itemDelete += delegate (ListViewItem item) { owner.PostEvent(ElfEvent.Key, h, 127, 127); };
                 return;
             }
             ElfTree et = obj as ElfTree;
@@ -1285,49 +1310,49 @@ namespace Windose.System.Elf
                 string app = (name ?? "").Trim().ToLowerInvariant();
                 if (app == "explorer")
                 {
-                    if (File.Exists("/mnt/Programs/explorer.elf"))
+                    if (ProgramCache.HasProgram("/mnt/Programs/explorer.elf"))
                         LaunchTracker.StartElf("/mnt/Programs/explorer.elf", string.IsNullOrEmpty(arg) ? new string[] { "/mnt" } : new string[] { arg });
                     else
                         LaunchTracker.Start(() => new FileExplorer(100, 100, 800, 500, "File Explorer", arg ?? "/mnt"));
                 }
                 else if (app == "terminal")
                 {
-                    if (File.Exists("/mnt/Programs/terminal.elf"))
+                    if (ProgramCache.HasProgram("/mnt/Programs/terminal.elf"))
                         LaunchTracker.StartElf("/mnt/Programs/terminal.elf");
                     else
                         LaunchTracker.Start(() => new CommandPrompt());
                 }
                 else if (app == "editor" || app == "notepad" || app == "aeroeditor")
                 {
-                    if (File.Exists("/mnt/Programs/aeroeditor.elf"))
+                    if (ProgramCache.HasProgram("/mnt/Programs/aeroeditor.elf"))
                         LaunchTracker.StartElf("/mnt/Programs/aeroeditor.elf", string.IsNullOrEmpty(arg) ? null : new string[] { arg });
                     else if (string.IsNullOrEmpty(arg)) LaunchTracker.Start(() => new BreezeEditor());
                     else LaunchTracker.Start(() => new BreezeEditor(100, 80, 900, 620, arg));
                 }
                 else if (app == "taskmgr" || app == "taskmanager")
                 {
-                    if (File.Exists("/mnt/Programs/taskmgr.elf"))
+                    if (ProgramCache.HasProgram("/mnt/Programs/taskmgr.elf"))
                         LaunchTracker.StartElf("/mnt/Programs/taskmgr.elf");
                     else
                         LaunchTracker.Start(() => new PerformanceMonitor(180, 120));
                 }
                 else if (app == "registry" || app == "regedit")
                 {
-                    if (File.Exists("/mnt/Programs/regedit.elf"))
+                    if (ProgramCache.HasProgram("/mnt/Programs/regedit.elf"))
                         LaunchTracker.StartElf("/mnt/Programs/regedit.elf");
                     else
                         LaunchTracker.Start(() => new RegistryEditor());
                 }
                 else if (app == "calc" || app == "calculator")
                 {
-                    if (File.Exists("/mnt/Programs/calc.elf"))
+                    if (ProgramCache.HasProgram("/mnt/Programs/calc.elf"))
                         LaunchTracker.StartElf("/mnt/Programs/calc.elf");
                     else
                         LaunchTracker.Start(() => new Calculator());
                 }
                 else if (app == "winver" || app == "about")
                 {
-                    if (File.Exists("/mnt/Programs/winver.elf"))
+                    if (ProgramCache.HasProgram("/mnt/Programs/winver.elf"))
                         LaunchTracker.StartElf("/mnt/Programs/winver.elf");
                     else
                         LaunchTracker.Start(() => new AboutWindows());
@@ -2093,6 +2118,40 @@ namespace Windose.System.Elf
 
         public bool WidgetSetVisible(object obj, bool visible)
         {
+            if (obj is ElfWindow ewin)
+            {
+                if (visible)
+                {
+                    if (ewin.IsDeferredRegistration)
+                    {
+                        ewin.IsDeferredRegistration = false;
+                        ewin.Visible = true;
+                        ewin.canRender = true;
+                        if (ewin.Owner != null)
+                        {
+                            lock (ewin.Owner.PendingWindows)
+                            {
+                                ewin.Owner.PendingWindows.Remove(ewin);
+                            }
+                        }
+                        WindowManager.Register(ewin);
+                    }
+                    else
+                    {
+                        ewin.Visible = true;
+                        ewin.canRender = true;
+                        ewin.ForceDirty();
+                        WindowManager.Invalidate(ewin.bounds);
+                    }
+                }
+                else
+                {
+                    ewin.Visible = false;
+                    ewin.canRender = false;
+                    ewin.MarkDirty();
+                }
+                return true;
+            }
             if (obj is Component comp)
             {
                 comp.Visible = visible;

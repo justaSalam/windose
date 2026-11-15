@@ -40,13 +40,34 @@ namespace Windose.System.Elf
         private int lastMouseX = int.MinValue;
         private int lastMouseY = int.MinValue;
 
+        public bool IsDeferredRegistration { get; set; }
+        public readonly int CreatedAtTicks;
+
         public ElfWindow(int x, int y, int width, int height, string title, Image? icon = null, bool useTitleBar = true, bool showInTaskbar = true)
             : base(x, y, width, height, title, useTitleBar, icon)
         {
+            this.CreatedAtTicks = Environment.TickCount;
+            this.visible = false;
+            this.canRender = false;
+            this.IsDeferredRegistration = true;
             this.showInTaskbar = showInTaskbar;
             this.managesChildLayout = true;
             this.InitialClientWidth = GetClientWidth();
             this.InitialClientHeight = GetClientHeight();
+            this.onClosed += () =>
+            {
+                if (Owner != null)
+                {
+                    lock (Owner.Windows)
+                    {
+                        Owner.Windows.Remove(this);
+                    }
+                    lock (Owner.PendingWindows)
+                    {
+                        Owner.PendingWindows.Remove(this);
+                    }
+                }
+            };
         }
 
         public void RecordChildInitialLayout(Component child)
@@ -270,7 +291,7 @@ namespace Windose.System.Elf
                 owner.PostEvent(ElfEvent.Key, ProgramHandle, (int)keyEvent.Key,
                     ((int)keyEvent.Modifiers << 16) | (ch & 0xFFFF));
             }
-            // Native typing for the focused text field (if any); the program still
+            // Native typing for the focused text field or list (if any); the program still
             // sees every key as EV_KEY and can read the result with get_text.
             try
             {
@@ -278,17 +299,54 @@ namespace Windose.System.Elf
                     field.HandleKeyboard(keyEvent);
                 else if (focusedComponent is TerminalView term && term.Visible && term.IsInputEnabled())
                     term.HandleKeyboard(keyEvent);
+                else if (focusedComponent is ElfListBox elfList && elfList.Visible && elfList.IsInputEnabled())
+                    elfList.HandleKeyboard(keyEvent);
+                else if (focusedComponent is ListView lv && lv.Visible && lv.IsInputEnabled())
+                    lv.HandleKeyboard(keyEvent);
+                else if (focusedComponent is ElfTree tree && tree.Visible && tree.IsInputEnabled())
+                    tree.HandleKeyboard(keyEvent);
                 else
                 {
-                    TerminalView? tv = FindTerminal(this);
-                    if (tv != null && tv.Visible)
+                    ElfListBox? firstList = FindFirstComponent<ElfListBox>(this);
+                    if (firstList != null && firstList.Visible && firstList.IsInputEnabled())
                     {
-                        tv.HandleKeyboard(keyEvent);
+                        firstList.HandleKeyboard(keyEvent);
+                    }
+                    else
+                    {
+                        ListView? firstLv = FindFirstComponent<ListView>(this);
+                        if (firstLv != null && firstLv.Visible && firstLv.IsInputEnabled())
+                        {
+                            firstLv.HandleKeyboard(keyEvent);
+                        }
+                        else
+                        {
+                            TerminalView? tv = FindTerminal(this);
+                            if (tv != null && tv.Visible)
+                            {
+                                tv.HandleKeyboard(keyEvent);
+                            }
+                        }
                     }
                 }
             }
             catch { }
             // Swallowed otherwise: ELF children (button/label/canvas) take no keyboard input.
+        }
+
+        private static T? FindFirstComponent<T>(Component root) where T : Component
+        {
+            if (root is T match && match.Visible) return match;
+            for (int i = 0; i < root.children.Count; i++)
+            {
+                Component child = root.children[i];
+                if (child.Visible)
+                {
+                    T? found = FindFirstComponent<T>(child);
+                    if (found != null) return found;
+                }
+            }
+            return null;
         }
 
         public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
@@ -505,6 +563,8 @@ namespace Windose.System.Elf
         public ElfListBox(int x, int y, int width, int height)
             : base(x, y, width, height)
         {
+            TabStop = true;
+            capturesInput = true;
             Scroll = new ScrollView(0, 0, width, height)
             {
                 clampSize = false,
@@ -519,6 +579,34 @@ namespace Windose.System.Elf
             List.AddColumn("", Math.Max(1, width - 4));
             Scroll.SetContent(List, width, List.GetContentHeight());
             AddChild(Scroll);
+
+            List.selectedChanged += item => EnsureSelectedVisible();
+        }
+
+        public override void HandleKeyboard(KeyEvent keyEvent)
+        {
+            List.HandleKeyboard(keyEvent);
+        }
+
+        public override bool HandleInput(int mouseX, int mouseY, MouseState mouseState)
+        {
+            bool handled = base.HandleInput(mouseX, mouseY, mouseState);
+            if (mouseState.left == MouseEvents.Press && IsInsideLocal(mouseX, mouseY))
+            {
+                GetOwningWindow()?.SetFocusedComponent(this);
+            }
+            return handled;
+        }
+
+        public void EnsureSelectedVisible()
+        {
+            int index = List.SelectedIndex;
+            if (index < 0 || index >= List.items.Count) return;
+
+            int rowH = List.detailsRowHeight > 0 ? List.detailsRowHeight : 20;
+            int itemTop = List.headerHeight + index * rowH;
+            Scroll.ScrollIntoView(new Rectangle(0, itemTop, List.Width, rowH));
+            Refresh();
         }
 
         public void Refresh()

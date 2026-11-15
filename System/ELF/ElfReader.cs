@@ -1,8 +1,10 @@
 // ElfReader.cs - ELF32/ELF64 parser for Cosmos / NativeAOT.
-// No LINQ, no lambdas, no reflection, no System.IO. Pure byte[] in, objects out.
 // Handles LE and BE, ET_EXEC/ET_DYN/ET_REL, program headers, sections, symbols.
 // Loading: GetImageExtent() + CopyImage() lay out PT_LOAD segments, ApplyRelocations() fixes up a PIE
-// (little-endian x86-64 only) via RELA/JMPREL and RELR. No dynamic linking against shared libraries.
+// (little-endian x86-64 only) via RELA/JMPREL and RELR. Supports external symbol resolution for
+// dynamically linked programs (via resolveExternal callback in ApplyRelocations).
+
+using System;
 
 namespace Windose.System.Elf
 {
@@ -115,6 +117,23 @@ namespace Windose.System.Elf
         public ulong PreinitArray;
         public ulong PreinitArraySize;
         public string[] NeededLibraries;
+
+        public ulong DynRela;
+        public ulong DynRelaSz;
+        public ulong DynRelaEnt;
+        public ulong DynJmpRel;
+        public ulong DynPltRelSz;
+        public ulong DynSymTab;
+        public ulong DynStrTab;
+        public ulong DynSymEnt;
+        public ulong DynRel;
+        public ulong DynRelSz;
+        public ulong DynRelEnt;
+        public ulong DynRelr;
+        public ulong DynRelrSz;
+        public ulong DynRelrEnt;
+        public bool HasDynamic;
+        public bool DynamicParsed;
 
         private ElfFile() { }
 
@@ -390,16 +409,117 @@ namespace Windose.System.Elf
         /// 'mem[memOffset]' holds the byte for vaddr 'low'; 'bias' is (runtime address of that byte) - low.
         /// Supports RELATIVE, 64, GLOB_DAT, JUMP_SLOT, 32, 32S, PC32, PLT32, IRELATIVE against symbols defined inside the program.
         /// Extracts init/fini arrays and DT_NEEDED libraries.
-        /// Undefined symbols and TLS are rejected. A file without PT_DYNAMIC checks section relocations or succeeds.
+        /// Undefined symbols are resolved via <paramref name="resolveExternal"/> when provided; otherwise they are an error.
+        /// A file without PT_DYNAMIC checks section relocations or succeeds.
         /// </summary>
-        public bool ApplyRelocations(byte[] mem, int memOffset, ulong low, ulong size, ulong bias, out string error)
+        /// <summary>
+        /// Reads PT_DYNAMIC (tags, needed libraries, init/fini) from the in-memory laid-out image.
+        /// Can be called before ApplyRelocations so the caller knows the DT_NEEDED libraries.
+        /// </summary>
+        public bool ReadDynamicInfo(byte[] mem, int memOffset, ulong low, ulong size, out string error)
         {
             error = null;
+            if (DynamicParsed) return true;
+
             ElfSegment dyn = null;
             for (int i = 0; i < Segments.Length; i++)
                 if (Segments[i].Type == ElfConst.PT_DYNAMIC) { dyn = Segments[i]; break; }
 
             if (dyn == null)
+            {
+                FindSectionInitFini();
+                DynamicParsed = true;
+                return true;
+            }
+
+            HasDynamic = true;
+            DynRelaEnt = 24;
+            DynSymEnt = 24;
+            DynRelrEnt = 8;
+            DynRelEnt = 16;
+
+            if (dyn.VAddr < low || dyn.VAddr - low + dyn.MemSize > size) { error = "PT_DYNAMIC outside image"; return false; }
+            int dp = memOffset + (int)(dyn.VAddr - low);
+            for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
+            {
+                long tag = (long)Rd64(mem, dp + (int)o);
+                ulong val = Rd64(mem, dp + (int)o + 8);
+                if (tag == ElfConst.DT_NULL) break;
+                switch (tag)
+                {
+                    case ElfConst.DT_RELA: DynRela = val; break;
+                    case ElfConst.DT_RELASZ: DynRelaSz = val; break;
+                    case ElfConst.DT_RELAENT: DynRelaEnt = val; break;
+                    case ElfConst.DT_JMPREL: DynJmpRel = val; break;
+                    case ElfConst.DT_PLTRELSZ: DynPltRelSz = val; break;
+                    case ElfConst.DT_SYMTAB: DynSymTab = val; break;
+                    case ElfConst.DT_STRTAB: DynStrTab = val; break;
+                    case ElfConst.DT_SYMENT: DynSymEnt = val; break;
+                    case ElfConst.DT_RELR: DynRelr = val; break;
+                    case ElfConst.DT_RELRSZ: DynRelrSz = val; break;
+                    case ElfConst.DT_RELRENT: DynRelrEnt = val; break;
+                    case ElfConst.DT_INIT: InitFunc = val; break;
+                    case ElfConst.DT_FINI: FiniFunc = val; break;
+                    case ElfConst.DT_INIT_ARRAY: InitArray = val; break;
+                    case ElfConst.DT_INIT_ARRAYSZ: InitArraySize = val; break;
+                    case ElfConst.DT_FINI_ARRAY: FiniArray = val; break;
+                    case ElfConst.DT_FINI_ARRAYSZ: FiniArraySize = val; break;
+                    case ElfConst.DT_PREINIT_ARRAY: PreinitArray = val; break;
+                    case ElfConst.DT_PREINIT_ARRAYSZ: PreinitArraySize = val; break;
+                    case ElfConst.DT_REL: DynRel = val; break;
+                    case ElfConst.DT_RELSZ: DynRelSz = val; break;
+                    case ElfConst.DT_RELENT: DynRelEnt = val; break;
+                }
+            }
+            if (DynRelaEnt != 24 && DynRela != 0) { error = "bad DT_RELAENT"; return false; }
+            if (DynSymEnt != 24 && DynSymTab != 0) { error = "bad DT_SYMENT"; return false; }
+            if (DynRelrEnt != 8 && DynRelr != 0) { error = "bad DT_RELRENT"; return false; }
+
+            // Extract needed libraries
+            if (DynStrTab != 0)
+            {
+                int neededCount = 0;
+                for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
+                {
+                    long tag = (long)Rd64(mem, dp + (int)o);
+                    if (tag == ElfConst.DT_NULL) break;
+                    if (tag == ElfConst.DT_NEEDED) neededCount++;
+                }
+                NeededLibraries = new string[neededCount];
+                int idx = 0;
+                for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
+                {
+                    long tag = (long)Rd64(mem, dp + (int)o);
+                    ulong val = Rd64(mem, dp + (int)o + 8);
+                    if (tag == ElfConst.DT_NULL) break;
+                    if (tag == ElfConst.DT_NEEDED)
+                    {
+                        NeededLibraries[idx++] = CStrAt(mem, memOffset, low, size, DynStrTab, (uint)val);
+                    }
+                }
+            }
+            else
+            {
+                NeededLibraries = Array.Empty<string>();
+            }
+
+            FindSectionInitFini();
+            DynamicParsed = true;
+            return true;
+        }
+
+        public bool ApplyRelocations(byte[] mem, int memOffset, ulong low, ulong size, ulong bias, out string error,
+                                     Func<string, ulong> resolveExternal = null)
+        {
+            error = null;
+            if (!DynamicParsed)
+            {
+                if (!ReadDynamicInfo(mem, memOffset, low, size, out error)) return false;
+            }
+
+            var resolvedSymbols = new Dictionary<uint, ulong>();
+
+            if (!HasDynamic)
             {
                 // Section-based relocations for static ELFs
                 if (Sections != null && Sections.Length > 0)
@@ -424,7 +544,7 @@ namespace Windose.System.Elf
                         if (sec.Type == ElfConst.SHT_RELA && sec.Size > 0)
                         {
                             ulong tblVaddr = sec.Addr != 0 ? sec.Addr : (low + sec.Offset);
-                            if (!ApplyTable(mem, memOffset, low, size, bias, tblVaddr, sec.Size, sVaddr, strVaddr, out error))
+                            if (!ApplyTable(mem, memOffset, low, size, bias, tblVaddr, sec.Size, sVaddr, strVaddr, resolveExternal, resolvedSymbols, out error))
                                 return false;
                         }
                     }
@@ -433,80 +553,10 @@ namespace Windose.System.Elf
                 return true;
             }
 
-            ulong rela = 0, relasz = 0, relaent = 24, jmprel = 0, pltrelsz = 0, symtab = 0, strtab = 0;
-            ulong syment = 24, relr = 0, relrsz = 0, relent = 8;
-            ulong rel = 0, relsz = 0, relent_rel = 16;
-            if (dyn.VAddr < low || dyn.VAddr - low + dyn.MemSize > size) { error = "PT_DYNAMIC outside image"; return false; }
-            int dp = memOffset + (int)(dyn.VAddr - low);
-            for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
-            {
-                long tag = (long)Rd64(mem, dp + (int)o);
-                ulong val = Rd64(mem, dp + (int)o + 8);
-                if (tag == ElfConst.DT_NULL) break;
-                switch (tag)
-                {
-                    case ElfConst.DT_RELA: rela = val; break;
-                    case ElfConst.DT_RELASZ: relasz = val; break;
-                    case ElfConst.DT_RELAENT: relaent = val; break;
-                    case ElfConst.DT_JMPREL: jmprel = val; break;
-                    case ElfConst.DT_PLTRELSZ: pltrelsz = val; break;
-                    case ElfConst.DT_SYMTAB: symtab = val; break;
-                    case ElfConst.DT_STRTAB: strtab = val; break;
-                    case ElfConst.DT_SYMENT: syment = val; break;
-                    case ElfConst.DT_RELR: relr = val; break;
-                    case ElfConst.DT_RELRSZ: relrsz = val; break;
-                    case ElfConst.DT_RELRENT: relent = val; break;
-                    case ElfConst.DT_INIT: InitFunc = val; break;
-                    case ElfConst.DT_FINI: FiniFunc = val; break;
-                    case ElfConst.DT_INIT_ARRAY: InitArray = val; break;
-                    case ElfConst.DT_INIT_ARRAYSZ: InitArraySize = val; break;
-                    case ElfConst.DT_FINI_ARRAY: FiniArray = val; break;
-                    case ElfConst.DT_FINI_ARRAYSZ: FiniArraySize = val; break;
-                    case ElfConst.DT_PREINIT_ARRAY: PreinitArray = val; break;
-                    case ElfConst.DT_PREINIT_ARRAYSZ: PreinitArraySize = val; break;
-                    case ElfConst.DT_REL: rel = val; break;
-                    case ElfConst.DT_RELSZ: relsz = val; break;
-                    case ElfConst.DT_RELENT: relent_rel = val; break;
-                }
-            }
-            if (relaent != 24 && rela != 0) { error = "bad DT_RELAENT"; return false; }
-            if (syment != 24 && symtab != 0) { error = "bad DT_SYMENT"; return false; }
-            if (relent != 8 && relr != 0) { error = "bad DT_RELRENT"; return false; }
-
-            // Extract needed libraries
-            if (strtab != 0)
-            {
-                int neededCount = 0;
-                for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
-                {
-                    long tag = (long)Rd64(mem, dp + (int)o);
-                    if (tag == ElfConst.DT_NULL) break;
-                    if (tag == ElfConst.DT_NEEDED) neededCount++;
-                }
-                NeededLibraries = new string[neededCount];
-                int idx = 0;
-                for (ulong o = 0; o + 16 <= dyn.MemSize; o += 16)
-                {
-                    long tag = (long)Rd64(mem, dp + (int)o);
-                    ulong val = Rd64(mem, dp + (int)o + 8);
-                    if (tag == ElfConst.DT_NULL) break;
-                    if (tag == ElfConst.DT_NEEDED)
-                    {
-                        NeededLibraries[idx++] = CStrAt(mem, memOffset, low, size, strtab, (uint)val);
-                    }
-                }
-            }
-            else
-            {
-                NeededLibraries = new string[0];
-            }
-
-            FindSectionInitFini();
-
-            if (rela != 0 && relasz != 0 && !ApplyTable(mem, memOffset, low, size, bias, rela, relasz, symtab, strtab, out error)) return false;
-            if (jmprel != 0 && pltrelsz != 0 && !ApplyTable(mem, memOffset, low, size, bias, jmprel, pltrelsz, symtab, strtab, out error)) return false;
-            if (rel != 0 && relsz != 0 && !ApplyRelTable(mem, memOffset, low, size, bias, rel, relsz, relent_rel, symtab, strtab, out error)) return false;
-            if (relr != 0 && relrsz != 0 && !ApplyRelr(mem, memOffset, low, size, bias, relr, relrsz, out error)) return false;
+            if (DynRela != 0 && DynRelaSz != 0 && !ApplyTable(mem, memOffset, low, size, bias, DynRela, DynRelaSz, DynSymTab, DynStrTab, resolveExternal, resolvedSymbols, out error)) return false;
+            if (DynJmpRel != 0 && DynPltRelSz != 0 && !ApplyTable(mem, memOffset, low, size, bias, DynJmpRel, DynPltRelSz, DynSymTab, DynStrTab, resolveExternal, resolvedSymbols, out error)) return false;
+            if (DynRel != 0 && DynRelSz != 0 && !ApplyRelTable(mem, memOffset, low, size, bias, DynRel, DynRelSz, DynRelEnt, DynSymTab, DynStrTab, resolveExternal, resolvedSymbols, out error)) return false;
+            if (DynRelr != 0 && DynRelrSz != 0 && !ApplyRelr(mem, memOffset, low, size, bias, DynRelr, DynRelrSz, out error)) return false;
             return true;
         }
 
@@ -574,7 +624,10 @@ namespace Windose.System.Elf
         }
 
         private static bool ApplyTable(byte[] mem, int memOffset, ulong low, ulong size, ulong bias,
-                                       ulong tableVaddr, ulong tableSize, ulong symtab, ulong strtab, out string error)
+                                       ulong tableVaddr, ulong tableSize, ulong symtab, ulong strtab,
+                                       Func<string, ulong> resolveExternal,
+                                       Dictionary<uint, ulong> resolvedSymbols,
+                                       out string error)
         {
             error = null;
             if (tableVaddr < low || tableVaddr - low + tableSize > size) { error = "relocation table outside image"; return false; }
@@ -626,21 +679,33 @@ namespace Windose.System.Elf
                         ulong s = 0;
                         if (sym != 0)
                         {
-                            if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
-                            ulong so = symtab - low + (ulong)sym * 24;
-                            if (so + 24 > size) { error = "symbol index out of range"; return false; }
-                            int sp = memOffset + (int)so;
-                            uint nameOff = *(uint*)(pMem + sp);
-                            byte stInfo = pMem[sp + 4];
-                            ushort shndx = *(ushort*)(pMem + sp + 6);
-                            ulong stValue = *(ulong*)(pMem + sp + 8);
-                            if (shndx == 0)
+                            if (!resolvedSymbols.TryGetValue(sym, out s))
                             {
-                                if ((stInfo >> 4) == 2) s = 0;   // weak undefined resolves to 0
-                                else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
+                                if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
+                                ulong so = symtab - low + (ulong)sym * 24;
+                                if (so + 24 > size) { error = "symbol index out of range"; return false; }
+                                int sp = memOffset + (int)so;
+                                uint nameOff = *(uint*)(pMem + sp);
+                                byte stInfo = pMem[sp + 4];
+                                ushort shndx = *(ushort*)(pMem + sp + 6);
+                                ulong stValue = *(ulong*)(pMem + sp + 8);
+                                if (shndx == 0)
+                                {
+                                    if ((stInfo >> 4) == 2) s = 0;   // weak undefined resolves to 0
+                                    else
+                                    {
+                                        string symName = CStrAt(mem, memOffset, low, size, strtab, nameOff);
+                                        if (resolveExternal != null)
+                                            s = resolveExternal(symName);   // 0 = not found; program will crash if called
+                                        else
+                                        { error = "unresolved symbol '" + symName + "'"; return false; }
+                                    }
+                                }
+                                else if (shndx == 0xFFF1) s = stValue;                 // SHN_ABS
+                                else s = unchecked(bias + stValue);
+
+                                resolvedSymbols[sym] = s;
                             }
-                            else if (shndx == 0xFFF1) s = stValue;                 // SHN_ABS
-                            else s = unchecked(bias + stValue);
                         }
 
                         if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
@@ -673,99 +738,115 @@ namespace Windose.System.Elf
         }
 
         private static bool ApplyRelTable(byte[] mem, int memOffset, ulong low, ulong size, ulong bias,
-                                          ulong tableVaddr, ulong tableSize, ulong relent, ulong symtab, ulong strtab, out string error)
+                                          ulong tableVaddr, ulong tableSize, ulong relent, ulong symtab, ulong strtab,
+                                          Func<string, ulong> resolveExternal,
+                                          Dictionary<uint, ulong> resolvedSymbols,
+                                          out string error)
         {
             error = null;
             if (relent == 0) relent = 16;
             if (tableVaddr < low || tableVaddr - low + tableSize > size) { error = "REL table outside image"; return false; }
             int tp = memOffset + (int)(tableVaddr - low);
             ulong count = tableSize / relent;
-            for (ulong i = 0; i < count; i++)
+            unsafe
             {
-                int e = tp + (int)(i * relent);
-                ulong rOff = Rd64(mem, e);
-                ulong info = Rd64(mem, e + 8);
-                uint type = (uint)(info & 0xFFFFFFFF);
-                uint sym = (uint)(info >> 32);
-                if (type == ElfConst.R_X86_64_NONE) continue;
-
-                ulong reqSize = (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S || type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32) ? 4UL : 8UL;
-                if (rOff < low || rOff - low + reqSize > size) { error = "relocation target outside image"; return false; }
-
-                long addend = (reqSize == 4) ? (long)(int)Rd32(mem, memOffset + (int)(rOff - low))
-                                             : (long)Rd64(mem, memOffset + (int)(rOff - low));
-
-                if (type == ElfConst.R_X86_64_RELATIVE)
+                fixed (byte* pMem = mem)
                 {
-                    ulong value = unchecked(bias + (ulong)addend);
-                    Wr64(mem, memOffset + (int)(rOff - low), value);
-                    continue;
-                }
-
-                if (type == ElfConst.R_X86_64_IRELATIVE)
-                {
-                    ulong resolverAddr = unchecked(bias + (ulong)addend);
-                    ulong value;
-                    unsafe
+                    for (ulong i = 0; i < count; i++)
                     {
-                        try
+                        int e = tp + (int)(i * relent);
+                        ulong rOff = *(ulong*)(pMem + e);
+                        ulong info = *(ulong*)(pMem + e + 8);
+                        uint type = (uint)(info & 0xFFFFFFFF);
+                        uint sym = (uint)(info >> 32);
+                        if (type == ElfConst.R_X86_64_NONE) continue;
+
+                        ulong reqSize = (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S || type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32) ? 4UL : 8UL;
+                        if (rOff < low || rOff - low + reqSize > size) { error = "relocation target outside image"; return false; }
+
+                        int targetOffset = memOffset + (int)(rOff - low);
+                        long addend = (reqSize == 4) ? (long)*(int*)(pMem + targetOffset)
+                                                     : *(long*)(pMem + targetOffset);
+
+                        if (type == ElfConst.R_X86_64_RELATIVE)
                         {
-                            var resolver = (delegate* unmanaged<ulong>)(byte*)resolverAddr;
-                            value = resolver();
+                            *(ulong*)(pMem + targetOffset) = unchecked(bias + (ulong)addend);
+                            continue;
                         }
-                        catch (global::System.Exception ex)
+
+                        if (type == ElfConst.R_X86_64_IRELATIVE)
                         {
-                            error = "IRELATIVE resolver failed: " + ex.Message;
+                            ulong resolverAddr = unchecked(bias + (ulong)addend);
+                            ulong value;
+                            try
+                            {
+                                var resolver = (delegate* unmanaged<ulong>)(byte*)resolverAddr;
+                                value = resolver();
+                            }
+                            catch (global::System.Exception ex)
+                            {
+                                error = "IRELATIVE resolver failed: " + ex.Message;
+                                return false;
+                            }
+                            *(ulong*)(pMem + targetOffset) = value;
+                            continue;
+                        }
+
+                        ulong s = 0;
+                        if (sym != 0)
+                        {
+                            if (!resolvedSymbols.TryGetValue(sym, out s))
+                            {
+                                if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
+                                ulong so = symtab - low + (ulong)sym * 24;
+                                if (so + 24 > size) { error = "symbol index out of range"; return false; }
+                                int sp = memOffset + (int)so;
+                                uint nameOff = *(uint*)(pMem + sp);
+                                byte stInfo = pMem[sp + 4];
+                                ushort shndx = *(ushort*)(pMem + sp + 6);
+                                ulong stValue = *(ulong*)(pMem + sp + 8);
+                                if (shndx == 0)
+                                {
+                                    if ((stInfo >> 4) == 2) s = 0;
+                                    else
+                                    {
+                                        string symName = CStrAt(mem, memOffset, low, size, strtab, nameOff);
+                                        if (resolveExternal != null)
+                                            s = resolveExternal(symName);
+                                        else
+                                        { error = "unresolved symbol '" + symName + "'"; return false; }
+                                    }
+                                }
+                                else if (shndx == 0xFFF1) s = stValue;
+                                else s = unchecked(bias + stValue);
+
+                                resolvedSymbols[sym] = s;
+                            }
+                        }
+
+                        if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
+                        {
+                            *(ulong*)(pMem + targetOffset) = unchecked(s + (ulong)addend);
+                        }
+                        else if (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S)
+                        {
+                            *(uint*)(pMem + targetOffset) = (uint)unchecked(s + (ulong)addend);
+                        }
+                        else if (type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32)
+                        {
+                            ulong pAddr = unchecked(bias + rOff);
+                            ulong pcVal = unchecked(s + (ulong)addend - pAddr);
+                            *(uint*)(pMem + targetOffset) = (uint)pcVal;
+                        }
+                        else if (type == ElfConst.R_X86_64_COPY)
+                        {
+                        }
+                        else
+                        {
+                            error = "unsupported relocation type " + type;
                             return false;
                         }
                     }
-                    Wr64(mem, memOffset + (int)(rOff - low), value);
-                    continue;
-                }
-
-                ulong s = 0;
-                if (sym != 0)
-                {
-                    if (symtab == 0 || symtab < low) { error = "relocation needs a symbol table"; return false; }
-                    ulong so = symtab - low + (ulong)sym * 24;
-                    if (so + 24 > size) { error = "symbol index out of range"; return false; }
-                    int sp = memOffset + (int)so;
-                    uint nameOff = Rd32(mem, sp);
-                    byte stInfo = mem[sp + 4];
-                    ushort shndx = (ushort)(mem[sp + 6] | (mem[sp + 7] << 8));
-                    ulong stValue = Rd64(mem, sp + 8);
-                    if (shndx == 0)
-                    {
-                        if ((stInfo >> 4) == 2) s = 0;
-                        else { error = "unresolved symbol '" + CStrAt(mem, memOffset, low, size, strtab, nameOff) + "'"; return false; }
-                    }
-                    else if (shndx == 0xFFF1) s = stValue;
-                    else s = unchecked(bias + stValue);
-                }
-
-                if (type == ElfConst.R_X86_64_64 || type == ElfConst.R_X86_64_GLOB_DAT || type == ElfConst.R_X86_64_JUMP_SLOT)
-                {
-                    ulong value = unchecked(s + (ulong)addend);
-                    Wr64(mem, memOffset + (int)(rOff - low), value);
-                }
-                else if (type == ElfConst.R_X86_64_32 || type == ElfConst.R_X86_64_32S)
-                {
-                    ulong value = unchecked(s + (ulong)addend);
-                    Wr32(mem, memOffset + (int)(rOff - low), (uint)value);
-                }
-                else if (type == ElfConst.R_X86_64_PC32 || type == ElfConst.R_X86_64_PLT32)
-                {
-                    ulong pAddr = unchecked(bias + rOff);
-                    ulong pcVal = unchecked(s + (ulong)addend - pAddr);
-                    Wr32(mem, memOffset + (int)(rOff - low), (uint)pcVal);
-                }
-                else if (type == ElfConst.R_X86_64_COPY)
-                {
-                }
-                else
-                {
-                    error = "unsupported relocation type " + type;
-                    return false;
                 }
             }
             return true;
@@ -819,10 +900,10 @@ namespace Windose.System.Elf
             ulong o = strtab - low + nameOff;
             if (o >= size) return "?";
             int s = memOffset + (int)o, e = s, lim = memOffset + (int)size;
-            while (e < lim && mem[e] != 0 && e - s < 64) e++;
-            char[] c = new char[e - s];
-            for (int i = 0; i < c.Length; i++) c[i] = (char)mem[s + i];
-            return new string(c);
+            while (e < lim && mem[e] != 0) e++;
+            int len = e - s;
+            if (len <= 0) return string.Empty;
+            return global::System.Text.Encoding.ASCII.GetString(mem, s, len);
         }
 
         private static uint Rd32(byte[] m, int o) { return (uint)(m[o] | (m[o + 1] << 8) | (m[o + 2] << 16) | (m[o + 3] << 24)); }

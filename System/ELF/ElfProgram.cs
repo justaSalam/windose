@@ -22,11 +22,37 @@ namespace Windose.System.Elf
         public string LastDropText;
         /// <summary>Redirects program stdout / k_write to a custom sink (e.g. terminal output).</summary>
         public Action<string>? OutputHandler;
+        /// <summary>Supplies lines of text for program stdin (e.g. terminal ReadLine).</summary>
+        public Func<string?>? InputHandler;
+        /// <summary>Buffer holding unread characters for standard input.</summary>
+        public string StdinBuffer = "";
         public string? FilePath { get; internal set; }
         public byte[]? OriginalBytes { get; internal set; }
 
         internal readonly HandleTable Objs = new HandleTable();
         internal readonly ElfEventQueue Events = new ElfEventQueue();
+        internal readonly List<ElfWindow> Windows = new List<ElfWindow>();
+        internal readonly List<ElfWindow> PendingWindows = new List<ElfWindow>();
+
+        public void FlushPendingWindows()
+        {
+            if (PendingWindows.Count == 0) return;
+            lock (PendingWindows)
+            {
+                for (int i = 0; i < PendingWindows.Count; i++)
+                {
+                    var win = PendingWindows[i];
+                    if (win != null && win.IsDeferredRegistration)
+                    {
+                        win.IsDeferredRegistration = false;
+                        win.Visible = true;
+                        win.canRender = true;
+                        WindowManager.Register(win);
+                    }
+                }
+                PendingWindows.Clear();
+            }
+        }
         internal readonly Dictionary<string, string> Env = new Dictionary<string, string>(StringComparer.Ordinal);
 
         // image: byte[] pinned for the whole life of the program; ImageAddress is 4 KB aligned inside it
@@ -48,6 +74,16 @@ namespace Windose.System.Elf
         internal ulong PreinitArray;
         internal ulong PreinitArraySize;
         internal string[] NeededLibraries;
+
+        // dynamic linking: shared libraries loaded for this program
+        /// <summary>Shared libraries loaded by ElfDynLinker (null for statically linked programs).</summary>
+        internal List<LoadedLib> LoadedLibs;
+        /// <summary>
+        /// Runtime address of the __k variable inside libwindose.so (or 0 for static programs).
+        /// ThreadMain writes the KernelApi* here before calling the entry point so that
+        /// dynamically linked code can access the kernel table through the shared GOT slot.
+        /// </summary>
+        internal ulong ExternalKernelApiAddress;
 
         // memory handed out through the alloc API (pinned arrays), freed after the thread has ended
         private readonly List<GCHandle> _pins = new List<GCHandle>();
@@ -103,6 +139,17 @@ namespace Windose.System.Elf
             }
             if (ImageHandle.IsAllocated) ImageHandle.Free();
             Image = null;
+
+            // Free shared libraries loaded by the dynamic linker
+            List<LoadedLib> libs = LoadedLibs;
+            if (libs != null)
+            {
+                foreach (LoadedLib lib in libs)
+                {
+                    try { lib.Free(); } catch { }
+                }
+                LoadedLibs = null;
+            }
         }
 
         // ---------------------------------------------------------------- lifecycle
@@ -143,32 +190,97 @@ namespace Windose.System.Elf
                 KernelApi api = default(KernelApi);
                 ElfRunner.FillApi(ref api, Pid);
 
-                // Run pre-initializers
+                // For dynamically linked programs: write the KernelApi* into the __k slot
+                // exported by libwindose.so so that library code can reach the kernel table.
+                // This must happen before any init function runs.
+                unsafe
+                {
+                    if (ExternalKernelApiAddress != 0)
+                    {
+                        KernelApi* kptr = &api;
+                        *(KernelApi**)(byte*)ExternalKernelApiAddress = kptr;
+                    }
+                }
+
+                // Run shared library initializers (dependency order)
+                if (LoadedLibs != null)
+                {
+                    for (int i = 0; i < LoadedLibs.Count; i++)
+                    {
+                        var lib = LoadedLibs[i];
+                        if (lib.Elf != null)
+                        {
+                            RunFuncArray(lib.Elf.PreinitArray != 0 ? unchecked(lib.Address + (lib.Elf.PreinitArray - lib.Low)) : 0, lib.Elf.PreinitArraySize, false);
+                            if (lib.Elf.InitFunc != 0)
+                            {
+                                ulong fn = unchecked(lib.Address + (lib.Elf.InitFunc - lib.Low));
+                                try { ((delegate* unmanaged<void>)(byte*)fn)(); } catch { }
+                            }
+                            RunFuncArray(lib.Elf.InitArray != 0 ? unchecked(lib.Address + (lib.Elf.InitArray - lib.Low)) : 0, lib.Elf.InitArraySize, false);
+                        }
+                    }
+                }
+
+                // Run main program pre-initializers
                 RunFuncArray(PreinitArray, PreinitArraySize, false);
 
-                // Run DT_INIT
+                // Run main program DT_INIT
                 if (InitFunc != 0)
                 {
                     try { ((delegate* unmanaged<void>)(byte*)InitFunc)(); }
                     catch { }
                 }
 
-                // Run DT_INIT_ARRAY constructors
+                // Run main program DT_INIT_ARRAY constructors
                 RunFuncArray(InitArray, InitArraySize, false);
 
-                var entry = (delegate* unmanaged<KernelApi*, int>)(byte*)EntryAddress;
-                ExitCode = entry(&api);
+                GCHandle stackPin = default;
+                if (Elf != null)
+                {
+                    LinuxSyscall.SetupInitialStack(this, Elf, out stackPin);
+                }
+
+                try
+                {
+                    var entry = (delegate* unmanaged<KernelApi*, int>)(byte*)EntryAddress;
+                    ExitCode = entry(&api);
+                }
+                finally
+                {
+                    if (stackPin.IsAllocated)
+                    {
+                        try { stackPin.Free(); } catch { }
+                    }
+                }
             }
             finally
             {
-                // Run DT_FINI_ARRAY destructors in reverse order
+                // Run main program DT_FINI_ARRAY destructors in reverse order
                 RunFuncArray(FiniArray, FiniArraySize, true);
 
-                // Run DT_FINI
+                // Run main program DT_FINI
                 if (FiniFunc != 0)
                 {
                     try { ((delegate* unmanaged<void>)(byte*)FiniFunc)(); }
                     catch { }
+                }
+
+                // Run shared library finalizers in reverse order
+                if (LoadedLibs != null)
+                {
+                    for (int i = LoadedLibs.Count - 1; i >= 0; i--)
+                    {
+                        var lib = LoadedLibs[i];
+                        if (lib.Elf != null)
+                        {
+                            RunFuncArray(lib.Elf.FiniArray != 0 ? unchecked(lib.Address + (lib.Elf.FiniArray - lib.Low)) : 0, lib.Elf.FiniArraySize, true);
+                            if (lib.Elf.FiniFunc != 0)
+                            {
+                                ulong fn = unchecked(lib.Address + (lib.Elf.FiniFunc - lib.Low));
+                                try { ((delegate* unmanaged<void>)(byte*)fn)(); } catch { }
+                            }
+                        }
+                    }
                 }
 
                 Cleanup();
@@ -209,6 +321,7 @@ namespace Windose.System.Elf
 
         private void Cleanup()
         {
+            LinuxSyscall.CleanupProcessFds(Pid);
             CloseAllObjects();
             FreeMemory();                       // safe: the program thread is done
             lock (_stateLock) State = ElfState.Exited;
